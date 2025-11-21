@@ -1,0 +1,25 @@
+CREATE TABLE users (
+    user_id VARCHAR(64) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rank VARCHAR(100),
+    reg_number VARCHAR(100),
+    full_name VARCHAR(255) NOT NULL,
+    joined_date DATE,
+    telephone VARCHAR(50),
+    public_key_fingerprint VARCHAR(64) NOT NULL,
+    public_key_pem TEXT NOT NULL,
+    status ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
+    role ENUM('USER', 'ADMIN', 'MODERATOR') DEFAULT 'USER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id),
+    UNIQUE KEY uk_users_username (username),
+    UNIQUE KEY uk_users_email (email),
+    UNIQUE KEY uk_users_fingerprint (public_key_fingerprint),
+    INDEX idx_users_username (username),
+    INDEX idx_users_status (status),
+    INDEX idx_users_fingerprint (public_key_fingerprint)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
