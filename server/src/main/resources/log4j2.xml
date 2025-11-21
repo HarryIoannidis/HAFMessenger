@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Properties>
+        <!-- Change this to 'dev' for local development or 'prod' for production -->
+        <Property name="log.environment">dev</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console Appender - Human-Readable (for development) -->
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{ISO8601} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+
+        <!-- JSON Console Appender - Structured (for production/tests) -->
+        <Console name="JsonConsoleAppender" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        </Console>
+
+        <!-- Rolling File Appender - JSON (for production logs) -->
+        <RollingFile name="JsonFileAppender"
+                     fileName="logs/haf-server.json"
+                     filePattern="logs/haf-server-%d{yyyy-MM-dd}-%i.json.gz">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+
+        <!-- Audit File Appender - JSON (for audit compliance) -->
+        <RollingFile name="AuditFileAppender"
+                     fileName="logs/audit.json"
+                     filePattern="logs/audit-%d{yyyy-MM-dd}-%i.json.gz">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="90"/> <!-- 90-day retention for audits -->
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!-- AuditLogger - Always to file (compliance) -->
+        <Logger name="AuditLogger" level="info" additivity="false">
+            <AppenderRef ref="AuditFileAppender"/>
+            <AppenderRef ref="JsonConsoleAppender"/> <!-- Also to console for monitoring -->
+        </Logger>
+
+        <!-- Root Logger - Environment-based -->
+        <Root level="info">
+            <!-- Use pretty console in dev, JSON in prod -->
+            <AppenderRef ref="${log.environment:-prod}"
+                         if="${sys:log.environment} == 'dev' ? 'ConsoleAppender' : 'JsonConsoleAppender'"/>
+            <AppenderRef ref="JsonFileAppender"/>
+        </Root>
+    </Loggers>
+</Configuration>
