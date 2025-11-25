@@ -1,16 +1,16 @@
 module client {
-    requires shared;
+    requires transitive shared;
     requires javafx.controls;
     requires javafx.fxml;
     requires java.net.http;
 
-//    exports com.haf.client.ui;
-//    exports com.haf.client.controllers;
-//    exports com.haf.client.service;
-//    exports com.haf.client.utils;
+    // exports com.haf.client.ui;
+    // exports com.haf.client.controllers;
+    // exports com.haf.client.service;
+    // exports com.haf.client.utils;
     exports com.haf.client.crypto;
     exports com.haf.client.viewmodel;
     exports com.haf.client.network;
 
-//    opens com.haf.client.controllers to javafx.fxml;
+    // opens com.haf.client.controllers to javafx.fxml;
 }

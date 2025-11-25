@@ -1,0 +1,8 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ADDITIONAL_TAGS" value="senderId,recipientId,timestampEpochMs,algorithm,ivB64,wrappedKeyB64,ciphertextB64,tagB64,contentType,contentLength,e2e,aadB64,ttlSeconds" />
+    </inspection_tool>
+  </profile>
+</component>
