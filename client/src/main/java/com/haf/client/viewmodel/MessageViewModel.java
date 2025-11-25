@@ -25,7 +25,7 @@ public class MessageViewModel {
         this.messageSender = messageSender;
         this.messageReceiver = messageReceiver;
         
-        // Set up message receiver listener
+        // Set up a message receiver listener
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
             public void onMessage(byte[] plaintext, String senderId, String contentType) {
@@ -56,6 +56,7 @@ public class MessageViewModel {
 
     /**
      * Sends a text message to a recipient.
+     * 
      * @param recipientId the recipient's ID
      * @param messageText the message text
      */
@@ -63,7 +64,7 @@ public class MessageViewModel {
         try {
             byte[] payload = messageText.getBytes(StandardCharsets.UTF_8);
             messageSender.sendMessage(payload, recipientId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
-            
+
             Platform.runLater(() -> {
                 status.set("Message sent to " + recipientId);
                 messages.add("[You -> " + recipientId + "]: " + messageText);
@@ -104,6 +105,7 @@ public class MessageViewModel {
 
     /**
      * Gets the status property.
+     * 
      * @return the status property
      */
     public StringProperty statusProperty() {
@@ -112,10 +114,10 @@ public class MessageViewModel {
 
     /**
      * Gets the messages list.
+     * 
      * @return the observable list of messages
      */
     public ObservableList<String> getMessages() {
         return messages;
     }
 }
-
