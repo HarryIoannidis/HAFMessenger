@@ -137,7 +137,6 @@ public final class Main {
 
     /**
      * Creates a HikariDataSource instance for database connection.
-     * 
      * @param config the server configuration.
      */
     private static HikariDataSource createDataSource(ServerConfig config) {
