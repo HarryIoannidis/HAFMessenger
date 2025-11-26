@@ -149,6 +149,7 @@ public final class Main {
         hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
         hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
+
         return new HikariDataSource(hikariConfig);
     }
 
@@ -168,6 +169,7 @@ public final class Main {
         hikariConfig.setConnectionTimeout(Duration.ofSeconds(30).toMillis());
         hikariConfig.setIdleTimeout(Duration.ofMinutes(10).toMillis());
         hikariConfig.setMaxLifetime(Duration.ofMinutes(30).toMillis());
+
         return hikariConfig;
     }
 
