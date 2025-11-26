@@ -140,6 +140,24 @@ public final class Main {
      * @param config the server configuration.
      */
     private static HikariDataSource createDataSource(ServerConfig config) {
+        HikariConfig hikariConfig = getHikariConfig(config);
+        hikariConfig.addDataSourceProperty("useSSL", "true");
+        hikariConfig.addDataSourceProperty("requireSSL", "true");
+        hikariConfig.addDataSourceProperty("verifyServerCertificate", "true");
+        hikariConfig.addDataSourceProperty("allowPublicKeyRetrieval", "false");
+        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
+        return new HikariDataSource(hikariConfig);
+    }
+
+    /**
+     * Builds HikariConfig from ServerConfig.
+     * @param config the server configuration.
+     * @return the HikariConfig instance.
+     */
+    private static HikariConfig getHikariConfig(ServerConfig config) {
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl(config.getDbUrl());
         hikariConfig.setUsername(config.getDbUser());
@@ -150,15 +168,7 @@ public final class Main {
         hikariConfig.setConnectionTimeout(Duration.ofSeconds(30).toMillis());
         hikariConfig.setIdleTimeout(Duration.ofMinutes(10).toMillis());
         hikariConfig.setMaxLifetime(Duration.ofMinutes(30).toMillis());
-        hikariConfig.addDataSourceProperty("useSSL", "true");
-        hikariConfig.addDataSourceProperty("requireSSL", "true");
-        hikariConfig.addDataSourceProperty("verifyServerCertificate", "true");
-        hikariConfig.addDataSourceProperty("allowPublicKeyRetrieval", "false");
-        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
-        hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
-        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
-        return new HikariDataSource(hikariConfig);
+        return hikariConfig;
     }
 
     /**
