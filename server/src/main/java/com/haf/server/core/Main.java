@@ -39,14 +39,15 @@ public final class Main {
     /**
      * Starts the HAF server.
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         new Main().start();
     }
 
     /**
      * Starts the HAF server.
+     * @throws InterruptedException if startup fails.
      */
-    private void start() {
+    private void start() throws InterruptedException {
         ServerConfig config = ServerConfig.load();
         runFlywayMigrations(config);
 
