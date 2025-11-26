@@ -124,7 +124,6 @@ public final class Main {
 
     /**
      * Runs Flyway database migrations.
-     * 
      * @param config the server configuration.
      */
     private static void runFlywayMigrations(ServerConfig config) {
@@ -165,7 +164,6 @@ public final class Main {
 
     /**
      * Builds an SSLContext for the server.
-     * 
      * @param config the server configuration.
      */
     private static SSLContext buildSslContext(ServerConfig config) throws GeneralSecurityException, IOException {
