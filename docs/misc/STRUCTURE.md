@@ -92,7 +92,7 @@ client/
 * **models/**: Object definitions such as User, Message, Session, independent of the UI.
 * **utils/**: Logging, configuration, and shared helper functions.
 * **resources/fxml/**: JavaFX scenes (e.g., login, main chat).
-* **resources/css/**: Dark military-themed user interface styles.
+* **resources/css/**: User interface styles.
 * **resources/images/**: Icons and SVG assets for the UI.
 
 ---
@@ -246,14 +246,16 @@ haf-messenger/
 │       │           └── migrations/
 │       └── test/
 │           ├── java/
-│           │   └── com/haf/server/
-│           │       ├── config/
-│           │       ├── core/
-│           │       ├── db/
-│           │       ├── handlers/
-│           │       ├── router/
-│           │       ├── ingress/
-│           │       └── metrics/
+│           │   └── com/haf/
+│           │       ├── integration_test/
+│           │       └── server/
+│           │           ├── config/
+│           │           ├── core/
+│           │           ├── db/
+│           │           ├── handlers/
+│           │           ├── router/
+│           │           ├── ingress/
+│           │           └── metrics/
 │           └── resources/
 │               ├── config/
 │               │   └── certificates/
