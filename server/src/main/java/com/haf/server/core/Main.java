@@ -38,6 +38,7 @@ public final class Main {
 
     /**
      * Starts the HAF server.
+     * @throws InterruptedException if startup fails.
      */
     public static void main(String[] args) throws InterruptedException {
         new Main().start();
