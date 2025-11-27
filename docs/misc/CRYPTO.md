@@ -2,7 +2,7 @@
 
 ### Core objective
 - End-to-end encryption between clients with AES-256-GCM for content and per-message IVs, including integrity verification (GCM tag).
-- Key exchange/wrapping with RSA (at least 2048), with no server-side decryption of content.
+- Key exchange/wrapping with RSA-OAEP (default 4096-bit keys, minimum 2048-bit), with no server-side decryption of content.
 - TLS 1.3 with certificate pinning at the transport layer, separate from E2E.
 - Storage of ciphertext blobs and metadata only, with TTL/automatic deletion.
 
@@ -11,7 +11,7 @@
 ### E2E architecture
 
 - Each message:
-    - Generates a new random 12-bit IV.
+    - Generates a new random 12-byte IV (96-bit, per NIST recommendation for GCM).
     - Encrypts the payload with AES-256-GCM and stores a 128-bit tag.
     - Uses a session key (symmetric encryption key) that changes per conversation/session for session-level forward secrecy.
     - Wraps the session key with the recipient’s RSA public key (or multi-recipient envelope for group chats).
@@ -89,7 +89,7 @@ Database (server) stores:
 - Create CryptoManager with:
     - AES-256-GCM encrypt/decrypt.
     - RSA-OAEP wrap/unwrap of session keys.
-    - Secure SecureRandom for IV/nonce.
+    - SecureRandom for IV/nonce.
 
 Code (simplified):
 

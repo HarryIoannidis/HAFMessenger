@@ -2,7 +2,7 @@
 - Describes the encryption/decryption schema in shared: AES-256-GCM, RSA-OAEP for key wrap, detached GCM tag in DTO and canonical AAD.
 
 ### Algorithms
-- Symmetric: AES-GCM with IV 12-bytes, tag 128-bit.
+- Symmetric: AES-GCM with 12-byte IV (96-bit), tag 128-bit.
 - Asymmetric: RSA-OAEP with SHA-256/MGF1 for wrap/unwrap of AES key.
 
 ### Feeds
@@ -14,7 +14,7 @@
 - Encoding: UTF-8 strings with 4-byte length-prefix, numbers in big-endian (long/int).
 
 ### DTO EncryptedMessage (about encryption)
-- ivB64: 12B IV.
+- ivB64: 12-byte IV (96-bit).
 - wrappedKeyB64: AES key with RSA-OAEP.
 - ciphertextB64, tagB64: detached tag (16B) from combined.
 - aadB64: base64 of AAD bytes (informational).
