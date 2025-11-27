@@ -5,9 +5,9 @@
 
 ### Methods
 - 'static SecretKey generateAesKey()': generate AES-256 key with 'SecureRandom.getInstanceStrong()'.
-- 'static byte[] generateIv()': 12-byte generation IV.
+- 'static byte[] generateIv()': generate 12-byte IV (96-bit) per GCM recommendations.
 - 'static byte[] encryptAesGcm(byte[] plaintext, SecretKey key, byte[] iv, byte[] aad)': encrypt, returns ciphertext+tag.
-- 'static byte[] decryptAesGcm(byte[] ciphertext, SecretKey key, byte[] iv, byte[] aad)': decrypt, drops 'AEADBadTagException' if tampering.
+- 'static byte[] decryptAesGcm(byte[] ciphertext, SecretKey key, byte[] iv, byte[] aad)': decrypt, throws 'AEADBadTagException' on tampering.
 
 ***
 

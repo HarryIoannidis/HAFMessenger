@@ -2,8 +2,8 @@
 - Describes the EncryptedMessage decryption stream with policy checking, canonical AAD, and AES-GCM.
 
 ### Algorithms
-- RSA-OAEP SHA-256/MGF1 for symmetric wrench unwrap.
-- AES-GCM with IV 12-bytes and 128-bit tags.
+- RSA-OAEP SHA-256/MGF1 for symmetric key unwrap.
+- AES-GCM with 12-byte IV (96-bit) and 128-bit tags.
 
 ### Feeds
 - Validate: version, algo, recipient binding, timestamp/ttl, IV/tag lengths, content policy.

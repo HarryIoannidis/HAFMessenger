@@ -108,6 +108,7 @@ public final class Main {
                 Thread.currentThread().interrupt();
                 LOGGER.warn("Shutdown latch interrupted", e);
             }
+
         } catch (Exception e) {
             LOGGER.error("Server startup failed", e);
 
@@ -134,6 +135,7 @@ public final class Main {
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .load();
+
         flyway.migrate();
     }
 
