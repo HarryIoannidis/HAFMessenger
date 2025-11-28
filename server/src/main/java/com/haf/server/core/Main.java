@@ -38,15 +38,17 @@ public final class Main {
 
     /**
      * Starts the HAF server.
+     * @throws Exception if the server startup fails.
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         new Main().start();
     }
 
     /**
      * Starts the HAF server.
+     * @throws Exception if the server startup fails.
      */
-    private void start() {
+    private void start() throws Exception {
         ServerConfig config = ServerConfig.load();
         runFlywayMigrations(config);
 
