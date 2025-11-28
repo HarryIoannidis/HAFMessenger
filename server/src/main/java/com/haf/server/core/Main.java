@@ -38,17 +38,15 @@ public final class Main {
 
     /**
      * Starts the HAF server.
-     * @throws InterruptedException if startup fails.
      */
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         new Main().start();
     }
 
     /**
      * Starts the HAF server.
-     * @throws InterruptedException if startup fails.
      */
-    private void start() throws InterruptedException {
+    private void start() {
         ServerConfig config = ServerConfig.load();
         runFlywayMigrations(config);
 
@@ -108,7 +106,6 @@ public final class Main {
                 Thread.currentThread().interrupt();
                 LOGGER.warn("Shutdown latch interrupted", e);
             }
-
         } catch (Exception e) {
             LOGGER.error("Server startup failed", e);
 
@@ -127,6 +124,7 @@ public final class Main {
 
     /**
      * Runs Flyway database migrations.
+     * 
      * @param config the server configuration.
      */
     private static void runFlywayMigrations(ServerConfig config) {
@@ -135,34 +133,15 @@ public final class Main {
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .load();
-
         flyway.migrate();
     }
 
     /**
      * Creates a HikariDataSource instance for database connection.
+     * 
      * @param config the server configuration.
      */
     private static HikariDataSource createDataSource(ServerConfig config) {
-        HikariConfig hikariConfig = getHikariConfig(config);
-        hikariConfig.addDataSourceProperty("useSSL", "true");
-        hikariConfig.addDataSourceProperty("requireSSL", "true");
-        hikariConfig.addDataSourceProperty("verifyServerCertificate", "true");
-        hikariConfig.addDataSourceProperty("allowPublicKeyRetrieval", "false");
-        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
-        hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
-        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
-
-        return new HikariDataSource(hikariConfig);
-    }
-
-    /**
-     * Builds HikariConfig from ServerConfig.
-     * @param config the server configuration.
-     * @return the HikariConfig instance.
-     */
-    private static HikariConfig getHikariConfig(ServerConfig config) {
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl(config.getDbUrl());
         hikariConfig.setUsername(config.getDbUser());
@@ -173,12 +152,20 @@ public final class Main {
         hikariConfig.setConnectionTimeout(Duration.ofSeconds(30).toMillis());
         hikariConfig.setIdleTimeout(Duration.ofMinutes(10).toMillis());
         hikariConfig.setMaxLifetime(Duration.ofMinutes(30).toMillis());
-
-        return hikariConfig;
+        hikariConfig.addDataSourceProperty("useSSL", "true");
+        hikariConfig.addDataSourceProperty("requireSSL", "true");
+        hikariConfig.addDataSourceProperty("verifyServerCertificate", "true");
+        hikariConfig.addDataSourceProperty("allowPublicKeyRetrieval", "false");
+        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+        hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
+        return new HikariDataSource(hikariConfig);
     }
 
     /**
      * Builds an SSLContext for the server.
+     * 
      * @param config the server configuration.
      */
     private static SSLContext buildSslContext(ServerConfig config) throws GeneralSecurityException, IOException {
