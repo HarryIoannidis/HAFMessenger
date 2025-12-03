@@ -9,7 +9,7 @@ module client {
     // exports com.haf.client.service;
     // exports com.haf.client.utils;
     exports com.haf.client.crypto;
-    exports com.haf.client.viewmodel;
+    exports com.haf.client.viewmodels;
     exports com.haf.client.network;
 
     // opens com.haf.client.controllers to javafx.fxml;

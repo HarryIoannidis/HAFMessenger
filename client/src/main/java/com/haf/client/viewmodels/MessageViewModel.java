@@ -1,4 +1,4 @@
-package com.haf.client.viewmodel;
+package com.haf.client.viewmodels;
 
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
@@ -56,7 +56,6 @@ public class MessageViewModel {
 
     /**
      * Sends a text message to a recipient.
-     * 
      * @param recipientId the recipient's ID
      * @param messageText the message text
      */
@@ -105,7 +104,6 @@ public class MessageViewModel {
 
     /**
      * Gets the status property.
-     * 
      * @return the status property
      */
     public StringProperty statusProperty() {
@@ -114,7 +112,6 @@ public class MessageViewModel {
 
     /**
      * Gets the messages list.
-     * 
      * @return the observable list of messages
      */
     public ObservableList<String> getMessages() {

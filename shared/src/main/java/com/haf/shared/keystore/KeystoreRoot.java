@@ -8,7 +8,8 @@ public final class KeystoreRoot {
 
     /**
      * Preferred keystore root:
-     * (Win: %ProgramData%\HAF\keystore, Linux: /var/lib/haf/keystore).
+     * Win: %ProgramData%\HAF\keystore
+     * Linux: /var/lib/haf/keystore)
      * Caller creates dir and applies 0700/ACLs.
      * @return path
      */
@@ -26,6 +27,7 @@ public final class KeystoreRoot {
         String os = System.getProperty("os.name","").toLowerCase();
         if (os.contains("win")) {
             String pd = System.getenv("ProgramData");
+
             return (pd != null && !pd.isBlank())
                     ? Paths.get(pd, "HAF", "keystore")
                     : Paths.get("C:\\ProgramData\\HAF\\keystore");
