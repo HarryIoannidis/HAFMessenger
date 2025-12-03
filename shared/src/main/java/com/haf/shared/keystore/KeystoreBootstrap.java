@@ -21,14 +21,17 @@ public final class KeystoreBootstrap {
      */
     public static Path run() throws Exception {
         Path root = KeystoreRoot.preferred();
+
         try {
             FilePerms.ensureDir700(root);
-        } catch (AccessDeniedException e) {
+        } catch (Exception e) {
             root = KeystoreRoot.userFallback();
             FilePerms.ensureDir700(root);
         }
 
         firstRunIfMissing(root);
+
+        System.out.println("DEBUG: Bootstrap resolving root to: " + root.toAbsolutePath());
         return root;
     }
 

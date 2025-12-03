@@ -25,7 +25,13 @@ public final class FilePerms {
      */
     public static void ensureDir700(Path dir) throws IOException {
         if (!Files.exists(dir)) Files.createDirectories(dir);
-        try { Files.setPosixFilePermissions(dir, DIR_700); } catch (UnsupportedOperationException ignored) {}
+        try {
+            Files.setPosixFilePermissions(dir, DIR_700);
+        } catch (UnsupportedOperationException ignored) {
+            if (!Files.isWritable(dir)) {
+                throw new AccessDeniedException(dir.toString(), null, "Cannot write to directory on non-POSIX system");
+            }
+        }
     }
 
     /**
@@ -36,7 +42,9 @@ public final class FilePerms {
      */
     public static void writeFile600(Path file, byte[] data) throws IOException {
         if (Files.notExists(file)) Files.createFile(file);
+
         Files.write(file, data, StandardOpenOption.TRUNCATE_EXISTING);
+
         try { 
             Files.setPosixFilePermissions(file, FILE_600); 
         } catch (UnsupportedOperationException ignored) {}

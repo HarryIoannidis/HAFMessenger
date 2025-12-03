@@ -8,17 +8,33 @@ class KeystoreBootstrapTest {
 
     @BeforeEach
     void setup() throws Exception {
-        // Εξαναγκάζουμε fallback: δείχνουμε preferred σε μη εγγράψιμο path για τρέχον χρήστη
-        // Χωρίς να πειράξουμε το σύστημα, βάζουμε ιδιότητα σε φάκελο που δεν υπάρχει/δεν πρέπει να γραφτεί.
-        System.setProperty("haf.keystore.root", "/root/___deny___");
+        // Check OS
+        String os = System.getProperty("os.name", "").toLowerCase();
+
+        if (os.contains("win")) {
+            // On Windows, use a path with invalid characters (< > : " / \ | ? *) to force an exception.
+            // "C:\Invalid:Path" will throw InvalidPathException or IOException.
+            System.setProperty("haf.keystore.root", "C:\\Windows\\System32\\config\\RegBack\\Protected");
+        } else {
+            // Linux/Mac - /root is usually protected
+            System.setProperty("haf.keystore.root", "/root/___deny___");
+        }
+
         Path uf = KeystoreRoot.userFallback();
         if (Files.exists(uf)) {
             try (var s = Files.list(uf)) {
                 s.forEach(p -> {
                     try {
-                        if (Files.isDirectory(p)) Files.walk(p).sorted((a,b)->b.getNameCount()-a.getNameCount()).forEach(pp -> { try { Files.deleteIfExists(pp);} catch(Exception ignored){} });
-                        else Files.deleteIfExists(p);
-                    } catch(Exception ignored){}
+                        if (Files.isDirectory(p)) {
+                            Files.walk(p)
+                                    .sorted((a, b) -> b.getNameCount() - a.getNameCount())
+                                    .forEach(pp -> {
+                                        try { Files.deleteIfExists(pp); } catch (Exception ignored) {}
+                                    });
+                        } else {
+                            Files.deleteIfExists(p);
+                        }
+                    } catch (Exception ignored) {}
                 });
             }
         }
@@ -31,7 +47,8 @@ class KeystoreBootstrapTest {
 
     @Test
     void bootstrap_creates_user_fallback_with_keys_and_permissions() throws Exception {
-        Path root = KeystoreBootstrap.run(); // πρέπει να πέσει αυτόματα στο userFallback
+        System.out.println("Loaded from: " + KeystoreRoot.class.getProtectionDomain().getCodeSource().getLocation());
+        Path root = KeystoreBootstrap.run();
 
         assertEquals(KeystoreRoot.userFallback().normalize(), root.normalize());
 

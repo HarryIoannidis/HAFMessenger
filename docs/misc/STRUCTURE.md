@@ -428,7 +428,7 @@ module com.haf.client {
     requires javafx.fxml;
 
     exports com.haf.client.ui;
-    exports com.haf.client.viewmodel;
+    exports com.haf.client.viewmodels;
 
     opens com.haf.client.controllers to javafx.fxml;
 }
@@ -490,11 +490,13 @@ package com.haf.client.ui;
 import javafx.fxml.FXML;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
-import com.haf.client.viewmodel.LoginViewModel;
+import com.haf.client.viewmodels.LoginViewModel;
 
 public class LoginController {
-    @FXML private TextField usernameField;
-    @FXML private PasswordField passwordField;
+    @FXML
+    private TextField usernameField;
+    @FXML
+    private PasswordField passwordField;
 
     private final LoginViewModel viewModel = new LoginViewModel();
 
@@ -512,7 +514,7 @@ Implements the **MVVM pattern logic** — connects the UI with the application l
 **Example: `LoginViewModel.java`**
 
 ```java
-package com.haf.client.viewmodel;
+package com.haf.client.viewmodels;
 
 import com.haf.client.network.ClientConnection;
 
