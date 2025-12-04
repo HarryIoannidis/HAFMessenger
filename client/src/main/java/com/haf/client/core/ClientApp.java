@@ -4,7 +4,6 @@ import com.haf.client.utils.ViewRouter;
 import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
-
 import java.util.Objects;
 
 public class ClientApp extends Application {
@@ -16,7 +15,7 @@ public class ClientApp extends Application {
 
         // 2. Set the Application Icon (Taskbar)
         try {
-            primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/icon.png"))));
+            primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app_logo.png"))));
         } catch (Exception e) {
             System.err.println("Warning: App icon not found.");
         }
@@ -31,7 +30,7 @@ public class ClientApp extends Application {
     /**
      * The main entry point for the JavaFX application.
      * It is a fallback for IDEs.
-     * @param args
+     * @param args command line arguments
      */
     public static void main(String[] args) {
         launch(args);

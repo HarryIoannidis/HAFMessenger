@@ -18,6 +18,7 @@
     -fx-font-family: "Montserrat", sans-serif;
     -fx-font-size: 14px;
     -fx-text-fill: #212121;
+    -fx-text-alignment: center;
 }
 
 /*Primary style*/
@@ -33,4 +34,16 @@
 /*Tertiary style*/
 .haf-tertiary {
     -fx-background-color: #0091EA;
+}
+
+/* Card-like app window */
+.window-card {
+    -fx-background-color: #ebebeb;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: #cdcdcd;
+    -fx-border-width: 4;
+
+    /* soft drop shadow around the panel */
+    -fx-effect: innershadow(three-pass-box, rgba(0,0,0,0.30), 10, 0, 0, 0);
 }

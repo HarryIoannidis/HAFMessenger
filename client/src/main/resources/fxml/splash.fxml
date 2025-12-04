@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.effect.DropShadow?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.paint.Color?>
+
+<StackPane maxHeight="500.0" maxWidth="600.0" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <VBox alignment="CENTER" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" StackPane.alignment="CENTER">
+         <children>
+             <ImageView fitHeight="218.0" fitWidth="203.0" pickOnBounds="true" preserveRatio="true">
+                 <VBox.margin>
+                     <Insets top="30.0" />
+                 </VBox.margin>
+                 <effect>
+                     <DropShadow height="16.0" radius="7.5" width="16.0">
+                         <color>
+                             <Color opacity="0.8" />
+                         </color>
+                     </DropShadow>
+                 </effect>
+                 <Image url="@../images/app_logo.png" />
+             </ImageView>
+            <Label prefWidth="210.0" styleClass="splash-title" text="Hellenic Air Force">
+               <VBox.margin>
+                  <Insets />
+               </VBox.margin>
+            </Label>
+            <Label contentDisplay="TOP" minHeight="-Infinity" minWidth="-Infinity" prefHeight="33.0" prefWidth="105.0" styleClass="splash-subtitle" text="Messenger" textAlignment="CENTER" />
+            <Pane minWidth="600.0" prefHeight="43.0" prefWidth="600.0" />
+            <HBox alignment="CENTER" minHeight="35.0" minWidth="400.0" prefHeight="35.0" prefWidth="400.0">
+               <children>
+                  <Label styleClass="splash-status" text="Connecting to database..." />
+                  <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
+                  <Label styleClass="splash-status" text="20%" />
+               </children>
+               <VBox.margin>
+                  <Insets left="110.0" right="110.0" />
+               </VBox.margin>
+            </HBox>
+            <ProgressBar prefHeight="38.0" prefWidth="400.0" progress="0.2">
+               <opaqueInsets>
+                  <Insets />
+               </opaqueInsets>
+            </ProgressBar>
+            <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="45.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
+               <children>
+                  <Label alignment="BOTTOM_RIGHT" styleClass="splash-version" text="1.0.0" />
+               </children>
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </HBox>
+         </children>
+      </VBox>
+   </children>
+   <stylesheets>
+      <URL value="@../css/global.css" />
+      <URL value="@../css/splash.css" />
+   </stylesheets>
+   <effect>
+      <DropShadow />
+   </effect>
+</StackPane>
