@@ -88,7 +88,7 @@
                     <execution>
                         <id>default-cli</id>
                         <configuration>
-                            <!-- set mainClass when ready -->
+                            <mainClass>com.haf.client.core.Launcher</mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>
