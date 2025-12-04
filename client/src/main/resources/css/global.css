@@ -1,0 +1,36 @@
+/* global.css */
+
+/* Import Regular */
+@font-face {
+    font-family: 'Montserrat';
+    src: url('../fonts/Manrope-Regular.ttf');
+}
+
+/* Import Bold */
+@font-face {
+    font-family: 'Montserrat';
+    font-weight: bold;
+    src: url('../fonts/Manrope-Bold.ttf');
+}
+
+/*Root style*/
+.root {
+    -fx-font-family: "Montserrat", sans-serif;
+    -fx-font-size: 14px;
+    -fx-text-fill: #212121;
+}
+
+/*Primary style*/
+.haf-primary {
+    -fx-background-color: #005EB8;
+}
+
+/*Secondary style*/
+.haf-secondary {
+    -fx-background-color: #0078D7;
+}
+
+/*Tertiary style*/
+.haf-tertiary {
+    -fx-background-color: #0091EA;
+}
