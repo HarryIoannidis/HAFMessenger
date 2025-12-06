@@ -171,28 +171,21 @@ public class MessageRoutingIT {
 }
 ```
 
+
 ```java
-// client/src/test/java/com/haf/client/viewmodels/ChatViewModelTest.java
-package com.haf.client.viewmodels;
+// client/src/test/java/com/haf/client/viewmodel/ChatViewModelTest.java
+package com.haf.client.viewmodel;
 
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ChatViewModelTest {
 
     static class FakeCrypto implements CryptoGateway {
-        @Override
-        public byte[] encrypt(byte[] p) {
-            return new byte[]{9, 9, 9};
-        }
+        @Override public byte[] encrypt(byte[] p) { return new byte[]{9,9,9}; }
     }
-
     static class FakeNet implements ChatGateway {
-        @Override
-        public boolean send(byte[] e2e) {
-            return e2e.length == 3;
-        }
+        @Override public boolean send(byte[] e2e) { return e2e.length == 3; }
     }
 
     @Test
