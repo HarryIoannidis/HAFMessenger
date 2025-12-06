@@ -14,4 +14,5 @@ module client {
     exports com.haf.client.network;
 
     opens com.haf.client.controllers to javafx.fxml;
+    opens com.haf.client.core to javafx.graphics;
 }
