@@ -14,11 +14,11 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.paint.Color?>
 
-<StackPane maxHeight="500.0" maxWidth="600.0" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<StackPane fx:id="rootContainer" maxHeight="500.0" maxWidth="600.0" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SplashController">
    <children>
       <VBox alignment="CENTER" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" StackPane.alignment="CENTER">
          <children>
-             <ImageView fitHeight="218.0" fitWidth="203.0" pickOnBounds="true" preserveRatio="true">
+             <ImageView fx:id="logo" fitHeight="218.0" fitWidth="203.0" pickOnBounds="true" preserveRatio="true">
                  <VBox.margin>
                      <Insets top="30.0" />
                  </VBox.margin>
@@ -31,31 +31,31 @@
                  </effect>
                  <Image url="@../images/app_logo.png" />
              </ImageView>
-            <Label prefWidth="210.0" styleClass="splash-title" text="Hellenic Air Force">
+            <Label fx:id="title" prefWidth="210.0" styleClass="splash-title" text="Hellenic Air Force">
                <VBox.margin>
                   <Insets />
                </VBox.margin>
             </Label>
-            <Label contentDisplay="TOP" minHeight="-Infinity" minWidth="-Infinity" prefHeight="33.0" prefWidth="105.0" styleClass="splash-subtitle" text="Messenger" textAlignment="CENTER" />
+            <Label fx:id="subtitle" contentDisplay="TOP" minHeight="-Infinity" minWidth="-Infinity" prefHeight="33.0" prefWidth="105.0" styleClass="splash-subtitle" text="Messenger" textAlignment="CENTER" />
             <Pane minWidth="600.0" prefHeight="43.0" prefWidth="600.0" />
             <HBox alignment="CENTER" minHeight="35.0" minWidth="400.0" prefHeight="35.0" prefWidth="400.0">
                <children>
-                  <Label styleClass="splash-status" text="Connecting to database..." />
+                  <Label fx:id="status" styleClass="splash-status" text="Starting..." />
                   <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
-                  <Label styleClass="splash-status" text="20%" />
+                  <Label fx:id="percentage" styleClass="splash-status" text="0%" />
                </children>
                <VBox.margin>
                   <Insets left="110.0" right="110.0" />
                </VBox.margin>
             </HBox>
-            <ProgressBar prefHeight="38.0" prefWidth="400.0" progress="0.2">
+            <ProgressBar fx:id="progressBar" prefHeight="38.0" prefWidth="400.0" progress="0.0">
                <opaqueInsets>
                   <Insets />
                </opaqueInsets>
             </ProgressBar>
             <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="45.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
                <children>
-                  <Label alignment="BOTTOM_RIGHT" styleClass="splash-version" text="1.0.0" />
+                  <Label fx:id="version" alignment="BOTTOM_RIGHT" styleClass="splash-version" text="1.0.0" />
                </children>
                <VBox.margin>
                   <Insets top="10.0" />
