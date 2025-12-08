@@ -45,12 +45,12 @@
 
 .progress-bar > .bar {
     -fx-background-color: linear-gradient(to bottom, #0078D7, #005EB8); /* HAF Blue Gradient */
-    -fx-background-radius:8.5;
+    -fx-background-radius:10;
     -fx-background-insets: 0;
 }
 
 .progress-bar {
-    -fx-border-color: #999999;     /* Dark Grey Border */
+    -fx-border-color: #989898;     /* Dark Grey Border */
     -fx-border-width: 2px;
     -fx-border-radius: 10;
 

@@ -40,6 +40,7 @@
 .window-card {
     -fx-background-color: #ebebeb;
     -fx-background-radius: 18;
+    -fx-background-insets: 2;
     -fx-border-radius: 16;
     -fx-border-color: #989898;
     -fx-border-width: 4;
