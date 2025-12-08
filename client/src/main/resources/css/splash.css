@@ -38,20 +38,19 @@
 
 .progress-bar > .track {
     -fx-background-color: #dcdcdc;
-    -fx-background-radius: 10;
+    -fx-background-radius: 60;
     -fx-background-insets: 0;
-    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.1), 2, 0, 0, 1);
 }
 
 .progress-bar > .bar {
     -fx-background-color: linear-gradient(to bottom, #0078D7, #005EB8); /* HAF Blue Gradient */
-    -fx-background-radius:10;
+    -fx-background-radius:60;
     -fx-background-insets: 0;
 }
 
 .progress-bar {
     -fx-border-color: #989898;     /* Dark Grey Border */
     -fx-border-width: 2px;
-    -fx-border-radius: 10;
+    -fx-border-radius: 60;
 
 }
