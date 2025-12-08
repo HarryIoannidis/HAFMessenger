@@ -49,7 +49,7 @@
 }
 
 .progress-bar {
-    -fx-border-color: #989898;     /* Dark Grey Border */
+    -fx-border-color: #989898;
     -fx-border-width: 2px;
     -fx-border-radius: 60;
 

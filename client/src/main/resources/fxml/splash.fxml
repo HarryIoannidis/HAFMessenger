@@ -37,8 +37,8 @@
                </VBox.margin>
             </Label>
             <Label fx:id="subtitle" contentDisplay="TOP" minHeight="-Infinity" minWidth="-Infinity" prefHeight="33.0" prefWidth="105.0" styleClass="splash-subtitle" text="Messenger" textAlignment="CENTER" />
-            <Pane minWidth="600.0" prefHeight="28.0" prefWidth="600.0" />
-            <HBox alignment="CENTER" minHeight="35.0" minWidth="400.0" prefHeight="35.0" prefWidth="400.0">
+            <Pane minWidth="600.0" prefHeight="30.0" prefWidth="600.0" />
+            <HBox alignment="CENTER" maxWidth="400.0" minHeight="35.0" minWidth="400.0" prefHeight="35.0" prefWidth="400.0">
                <children>
                   <Label fx:id="status" styleClass="splash-status" text="Starting..." />
                   <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
@@ -48,12 +48,12 @@
                   <Insets left="110.0" right="110.0" />
                </VBox.margin>
             </HBox>
-            <ProgressBar fx:id="progressBar" prefHeight="22.0" prefWidth="400.0" progress="0.0">
+            <ProgressBar fx:id="progressBar" prefHeight="25.0" prefWidth="400.0" progress="0.0">
                <opaqueInsets>
                   <Insets />
                </opaqueInsets>
             </ProgressBar>
-            <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
+            <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="44.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
                <children>
                   <Label fx:id="version" alignment="BOTTOM_RIGHT" styleClass="splash-version" text="1.0.0" />
                </children>

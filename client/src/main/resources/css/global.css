@@ -39,12 +39,14 @@
 /* Card-like app window */
 .window-card {
     -fx-background-color: #ebebeb;
-    -fx-background-radius: 18;
+    -fx-background-radius: 17;
     -fx-background-insets: 2;
+    -fx-border-insets: 0;
     -fx-border-radius: 16;
     -fx-border-color: #989898;
-    -fx-border-width: 4;
+    -fx-border-width: 3;
 
     /* soft drop shadow around the panel */
     -fx-effect: innershadow(three-pass-box, rgba(0,0,0,0.30), 10, 0, 0, 0);
+
 }
