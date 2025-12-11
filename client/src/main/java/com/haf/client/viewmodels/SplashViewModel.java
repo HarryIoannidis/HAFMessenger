@@ -115,8 +115,7 @@ public class SplashViewModel {
             @Override
             protected Void call() throws Exception {
                 update("Starting...", 0.0);
-
-                Thread.sleep(3000L);
+                delay();
 
                 update("Loading configuration...", 0.1);
                 String detectedVersion = configLoader.loadVersion();

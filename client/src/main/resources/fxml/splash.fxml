@@ -55,7 +55,7 @@
             </ProgressBar>
             <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="44.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
                <children>
-                  <Label fx:id="version" alignment="BOTTOM_RIGHT" styleClass="splash-version" text="1.0.0" />
+                  <Label fx:id="version" alignment="BOTTOM_RIGHT" styleClass="splash-version"/>
                </children>
                <VBox.margin>
                   <Insets top="10.0" />
