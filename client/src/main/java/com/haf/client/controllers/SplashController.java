@@ -1,8 +1,10 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.ViewRouter;
-import javafx.application.Platform;
+import com.haf.client.viewmodels.SplashViewModel;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.image.ImageView;
@@ -19,16 +21,29 @@ public class SplashController {
     @FXML private Label percentage;
     @FXML private ProgressBar progressBar;
     @FXML private Label version;
+    private final SplashViewModel viewModel = SplashViewModel.createDefault();
+
     /**
      * Initializes the controller class.
      * This method is automatically called after the FXML file has been loaded.
      */
     @FXML public void initialize() {
-        version.setText("1.0.0");
-
+        bindViewModel();
         applyProgressBarClip();
+        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
+    }
 
-        new Thread(this::simulateLoading).start();
+    private void bindViewModel() {
+        status.textProperty().bind(viewModel.statusProperty());
+        progressBar.progressProperty().bind(viewModel.progressProperty());
+        percentage.textProperty().bind(viewModel.percentageProperty());
+        version.textProperty().bind(viewModel.versionProperty());
+
+        // Hide progress visuals on error state
+        progressBar.visibleProperty().bind(viewModel.errorProperty().not());
+        progressBar.managedProperty().bind(viewModel.errorProperty().not());
+        percentage.visibleProperty().bind(viewModel.errorProperty().not());
+        percentage.managedProperty().bind(viewModel.errorProperty().not());
     }
 
     private void applyProgressBarClip() {
@@ -41,41 +56,24 @@ public class SplashController {
         progressBar.setClip(clip);
     }
 
-    private void simulateLoading() {
-        try {
-            Thread.sleep(2000);
-
-            // Phase 1
-            updateUI("Initializing Core...", 0.1);
-            Thread.sleep(600);
-
-            // Phase 2
-            updateUI("Loading Security Modules...", 0.4);
-            Thread.sleep(800);
-
-            // Phase 3
-            updateUI("Connecting to database...", 0.7);
-            Thread.sleep(800);
-
-            // Phase 4
-            updateUI("Ready", 1.0);
-            Thread.sleep(400);
-
-//            Platform.runLater(() -> {
-//                 Ensure you have login.fxml created, or this will crash!
-//                 ViewRouter.switchToTransparent("/fxml/login.fxml");
-//            });
-
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+    private void navigateToLogin() {
+        ViewRouter.switchToTransparent("/fxml/login.fxml");
     }
 
-    private void updateUI(String statusText, double progress) {
-        Platform.runLater(() -> {
-            status.setText(statusText);
-            progressBar.setProgress(progress);
-            percentage.setText((int)(progress * 100) + "%");
+    private void showFailureDialog(Throwable error) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Initialization failed");
+        alert.setHeaderText("Startup could not complete");
+        String message = (error != null && error.getMessage() != null) ? error.getMessage() : String.valueOf(error);
+        alert.setContentText(message);
+        alert.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+
+        alert.showAndWait().ifPresent(type -> {
+            if (type == ButtonType.OK) {
+                viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
+            } else {
+                ViewRouter.close();
+            }
         });
     }
 }
