@@ -116,6 +116,7 @@ public class SplashViewModel {
             protected Void call() throws Exception {
                 update("Starting...", 0.0);
                 delay();
+                delay();
 
                 update("Loading configuration...", 0.1);
                 String detectedVersion = configLoader.loadVersion();
@@ -165,7 +166,7 @@ public class SplashViewModel {
             percentage.unbind();
             percentage.set("");
             error.set(true);
-            status.set("Initialization failed");
+            status.set("Initialization failed.");
 
             if (onFailure != null) {
                 onFailure.accept(task.getException());

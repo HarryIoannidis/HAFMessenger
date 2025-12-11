@@ -2,81 +2,42 @@
 
 ### Screen objective
 - To start the application with controlled loading of settings/resources and network checks before the Login is displayed.
-- To show clear progress/status with secure preparations (TLS pinning readiness, crypto providers).
+- To show clear progress/status with secure preparations (crypto providers, resource verification).
 
-### UI elements (proposed)
-- Horizontal ProgressBar, Label for messages (e.g. “Initializing crypto…”, “Contacting server…”).
-- Optional: version Label (e.g. v1.0.0), unit insignia/logo.
+### UI elements
+- Logo ImageView, title/subtitle Labels, horizontal ProgressBar, status Label, percentage Label, version Label.
+- Progress bar hidden on error state (errorProperty binding).
 
 ### Flows and checks
-- Load local settings (config), check available certificates/pins.
-- Fast TLS reachability check of the server endpoint (without login).
-- Preload basic JavaFX resources (styles, icons).
+- Bootstrap sequence (via `SplashViewModel.startBootstrap()`):
+    1. Loading configuration (0.1): Reads version from manifest or `HAF_APP_VERSION` env var.
+    2. Initializing security modules (0.3): Verifies `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, `RSA/ECB/OAEPWithSHA-256AndMGF1Padding`, `SHA-256`.
+    3. Checking local resources (0.6): Verifies `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/app_logo.png`, `/css/global.css` exist.
+    4. Verifying network reachability (0.8): HEAD request to server endpoint (if `haf.server.url` or `HAF_SERVER_URL` configured).
+    5. Ready (1.0): Navigates to login screen.
 
 ### Implementation (FXML + MVVM)
-- FXML: splash.fxml
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.SplashController">
-  <center>
-    <VBox alignment="CENTER" spacing="12">
-      <Label text="HAF Messenger"/>
-      <ProgressBar fx:id="progress" prefWidth="320"/>
-      <Label fx:id="status" text="Initializing..."/>
-    </VBox>
-  </center>
-</BorderPane>
-```
-- Controller:
-```java
-public class SplashController {
-  @FXML private ProgressBar progress; @FXML private Label status;
-  private final SplashViewModel vm = new SplashViewModel();
-  @FXML public void initialize(){
-    status.textProperty().bind(vm.statusProperty());
-    progress.progressProperty().bind(vm.progressProperty());
-    vm.startBootstrap(()-> ViewRouter.gotoLogin());
-  }
-}
-```
-- ViewModel:
-```java
-public class SplashViewModel {
-  private final StringProperty status = new SimpleStringProperty();
-  private final DoubleProperty progress = new SimpleDoubleProperty(-1);
-  public StringProperty statusProperty(){ return status; }
-  public DoubleProperty progressProperty(){ return progress; }
-
-  public void startBootstrap(Runnable onOk){
-    Task<Void> t = new Task<>() {
-      @Override protected Void call() throws Exception {
-        update("Loading config...", 0.1);
-        Config.load();
-        update("Initializing crypto...", 0.3);
-        Crypto.initProviders();
-        update("Verifying server reachability...", 0.6);
-        Network.quickTlsCheck();
-        update("Preloading UI resources...", 0.8);
-        Ui.preload();
-        update("Ready", 1.0);
-        return null;
-      }
-      private void update(String s, double p){ Platform.runLater(()->{ status.set(s); progress.set(p); }); }
-    };
-    t.setOnSucceeded(e-> onOk.run());
-    new Thread(t, "bootstrap").start();
-  }
-}
-```
+- FXML: `splash.fxml` (StackPane with logo, labels, progress bar).
+- Controller: `SplashController` (`com.haf.client.controllers.SplashController`).
+    - Binds UI properties to `SplashViewModel`.
+    - Starts bootstrap on `initialize()`.
+    - Shows error dialog on failure with Retry/Exit options.
+- ViewModel: `SplashViewModel` (`com.haf.client.viewmodels.SplashViewModel`).
+    - Exposes `statusProperty()`, `progressProperty()`, `versionProperty()`, `percentageProperty()`, `errorProperty()`.
+    - Bootstrap runs on background thread via `Task<Void>`.
+    - Dependency injection: `ConfigLoader`, `CryptoInitializer`, `ResourceChecker`, `NetworkChecker` interfaces.
 
 ### Security
-- Crypto.initProviders(): installs JCA provider, checks “AES/GCM” availability, strong SecureRandom.
-- Network.quickTlsCheck(): creates TLS context with pinning and performs HEAD/WS handshake to server; fails with clear messages.
-- No sensitive information is loaded in plaintext; only readiness checks.
+- Crypto initialization: Verifies strong providers (`SecureRandom.getInstanceStrong()`, AES-GCM, RSA-OAEP, SHA-256) before any encryption operations.
+- Network check: HEAD request only (no credentials, minimal data transfer).
+- No sensitive information loaded: only version, resource paths, endpoint URL.
+- Error messages: do not expose internal paths or system details.
 
 ### Error handling
-- On TLS/pinning failure: show dialog “Cannot verify server. Check certificate pin or network.” with Retry/Exit.
-- Logging to local file for forensics (no secrets).
+- Bootstrap failure: `SplashController.showFailureDialog()` displays `Alert` with error message.
+- Dialog options: Retry (restarts bootstrap) or Exit (closes application via `ViewRouter.close()`).
+- Error state: Progress bar and percentage hidden when `errorProperty()` is true.
+- See [SPLASH.md](../client/SPLASH.md) for detailed error handling documentation.
 
 ***
 
