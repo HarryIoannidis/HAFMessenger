@@ -115,8 +115,7 @@ public class SplashViewModel {
             @Override
             protected Void call() throws Exception {
                 update("Starting...", 0.0);
-                delay();
-                delay();
+                delay(1500L);
 
                 update("Loading configuration...", 0.1);
                 String detectedVersion = configLoader.loadVersion();
@@ -125,15 +124,15 @@ public class SplashViewModel {
                 }
 
                 update("Initializing security modules...", 0.3);
-                delay();
+                delay(500L);
                 cryptoInitializer.initialize();
 
                 update("Checking local resources...", 0.6);
-                delay();
+                delay(1000L);
                 resourceChecker.verify();
 
                 update("Verifying network reachability...", 0.8);
-                delay();
+                delay(600L);
                 networkChecker.check();
 
                 update("Ready", 1.0);
@@ -180,9 +179,9 @@ public class SplashViewModel {
         t.start();
     }
 
-    private static void delay() {
+    private static void delay(long millis) {
         try {
-            Thread.sleep(800L);
+            Thread.sleep(millis);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }
