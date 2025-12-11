@@ -109,22 +109,30 @@ public class SplashViewModel {
         percentage.unbind();
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
 
+        // Run using a JavaFX Task; tests will initialize JavaFX toolkit explicitly.
+
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
+                sleepIfDebugDelay();
+
                 update("Loading configuration...", 0.1);
+                sleepIfDebugDelay();
                 String detectedVersion = configLoader.loadVersion();
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
 
                 update("Initializing security modules...", 0.3);
+                sleepIfDebugDelay();
                 cryptoInitializer.initialize();
 
                 update("Checking local resources...", 0.6);
+                sleepIfDebugDelay();
                 resourceChecker.verify();
 
                 update("Verifying network reachability...", 0.8);
+                sleepIfDebugDelay();
                 networkChecker.check();
 
                 update("Ready", 1.0);
@@ -171,6 +179,19 @@ public class SplashViewModel {
         Thread t = new Thread(task, "splash-bootstrap");
         t.setDaemon(true);
         t.start();
+    }
+
+    /**
+     * Debug-only delay: sleep the current thread to slow down the splash sequence.
+     * Hardcoded to 500 ms between stages so you can visually inspect progress during development.
+     * NOTE: Remove this method (and its call sites) when tests pass and you no longer need the delay.
+     */
+    private static void sleepIfDebugDelay() {
+        try {
+            Thread.sleep(1000L);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**

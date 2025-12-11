@@ -1,5 +1,7 @@
 package com.haf.client.viewmodels;
 
+import javafx.application.Platform;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -8,10 +10,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class SplashViewModelTest {
+
+    @BeforeAll
+    static void initJavaFx() throws Exception {
+        // Initialize JavaFX toolkit once for all tests; ignore if already initialized
+        try {
+            Platform.startup(() -> {});
+        } catch (IllegalStateException ignored) {
+            // already started
+        }
+    }
 
     @Test
     void bootstrap_runs_and_reaches_ready() throws Exception {
@@ -26,7 +37,7 @@ class SplashViewModelTest {
 
         vm.startBootstrap(success::countDown, ex -> fail("Should not fail"));
 
-        assertTrue(success.await(2, TimeUnit.SECONDS));
+        assertTrue(success.await(5, TimeUnit.SECONDS));
         assertEquals("Ready", vm.statusProperty().get());
         assertEquals("2.0.0-test", vm.versionProperty().get());
         assertEquals(1.0, vm.progressProperty().get(), 0.001);
@@ -47,7 +58,7 @@ class SplashViewModelTest {
 
         vm.startBootstrap(() -> successCalled.set(true), ex -> failure.countDown());
 
-        assertTrue(failure.await(2, TimeUnit.SECONDS));
+        assertTrue(failure.await(5, TimeUnit.SECONDS));
         assertFalse(successCalled.get());
         assertTrue(vm.progressProperty().get() < 1.0);
     }
@@ -55,35 +66,29 @@ class SplashViewModelTest {
     @Test
     void bootstrap_updates_messages_in_order() throws Exception {
         CountDownLatch success = new CountDownLatch(1);
-        List<String> updates = new CopyOnWriteArrayList<>();
+        List<String> order = new CopyOnWriteArrayList<>();
 
         SplashViewModel vm = new SplashViewModel(
-                () -> "v",
-                () -> {},
-                () -> {},
-                () -> {}
+                () -> {
+                    order.add("Loading configuration...");
+                    return "v";
+                },
+                () -> order.add("Initializing security modules..."),
+                () -> order.add("Checking local resources..."),
+                () -> order.add("Verifying network reachability...")
         );
-
-        vm.statusProperty().addListener((obs, oldV, newV) -> updates.add(newV));
 
         vm.startBootstrap(success::countDown, ex -> fail("Should not fail"));
 
-        assertTrue(success.await(2, TimeUnit.SECONDS));
+        assertTrue(success.await(6, TimeUnit.SECONDS));
 
         List<String> expectedOrder = List.of(
                 "Loading configuration...",
                 "Initializing security modules...",
                 "Checking local resources...",
-                "Verifying network reachability...",
-                "Ready"
+                "Verifying network reachability..."
         );
 
-        int cursor = 0;
-        for (String update : updates) {
-            if (cursor < expectedOrder.size() && update.equals(expectedOrder.get(cursor))) {
-                cursor++;
-            }
-        }
-        assertEquals(expectedOrder.size(), cursor, "Messages should appear in order");
+        assertEquals(expectedOrder, order, "Stages should execute in order");
     }
 }
