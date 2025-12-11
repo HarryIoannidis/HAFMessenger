@@ -5,8 +5,12 @@ import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClientApp extends Application {
+
+    private static final Logger LOGGER = Logger.getLogger(ClientApp.class.getName());
 
     @Override
     public void start(Stage primaryStage) {
@@ -15,9 +19,10 @@ public class ClientApp extends Application {
 
         // 2. Set the Application Icon (Taskbar)
         try {
-            primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app_logo.png"))));
+            primaryStage.getIcons()
+                    .add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app_logo.png"))));
         } catch (Exception e) {
-            System.err.println("Warning: App icon not found.");
+            LOGGER.log(Level.WARNING, "Warning: App icon not found.", e);
         }
 
         // 3. Set the Title
@@ -30,6 +35,7 @@ public class ClientApp extends Application {
     /**
      * The main entry point for the JavaFX application.
      * It is a fallback for IDEs.
+     * 
      * @param args command line arguments
      */
     public static void main(String[] args) {
