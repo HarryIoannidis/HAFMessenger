@@ -122,18 +122,19 @@ public class SplashViewModel {
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
+                delay(500L);
 
                 update("Initializing security modules...", 0.3);
-                delay(500L);
                 cryptoInitializer.initialize();
+                delay(600L);
 
                 update("Checking local resources...", 0.6);
-                delay(1000L);
                 resourceChecker.verify();
+                delay(1000L);
 
                 update("Verifying network reachability...", 0.8);
-                delay(600L);
                 networkChecker.check();
+                delay(700L);
 
                 update("Ready", 1.0);
                 return null;
@@ -181,7 +182,9 @@ public class SplashViewModel {
 
     private static void delay(long millis) {
         try {
-            Thread.sleep(millis);
+            long randomOffset = (long) (Math.random() * 201) - 100;
+            long sleepTime = Math.max(0, millis + randomOffset);
+            Thread.sleep(sleepTime);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }

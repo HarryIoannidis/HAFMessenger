@@ -15,7 +15,7 @@
 
 /*Root style*/
 .root {
-    -fx-font-family: "Montserrat", sans-serif;
+    -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 14px;
     -fx-text-fill: #212121;
     -fx-text-alignment: center;
