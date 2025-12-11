@@ -107,11 +107,15 @@ public class SplashViewModel {
         // Reset UI-related state before starting a new run
         error.set(false);
         percentage.unbind();
+
+        progress.set(0.0);
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
 
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
+                update("Starting...", 0.0);
+
                 Thread.sleep(3000L);
 
                 update("Loading configuration...", 0.1);
@@ -157,18 +161,12 @@ public class SplashViewModel {
 
         task.setOnFailed(e -> {
             runningTask = null;
-            // Show error in-bound properties: freeze status text to the error message,
-            // hide percentage by clearing it and mark error state.
             status.unbind();
             progress.unbind();
             percentage.unbind();
-            Throwable ex = task.getException();
-            String msg = (ex != null && ex.getMessage() != null && !ex.getMessage().isBlank())
-                    ? ex.getMessage() : String.valueOf(ex);
-
-            status.set(msg);
             percentage.set("");
             error.set(true);
+            status.set("Initialization failed");
 
             if (onFailure != null) {
                 onFailure.accept(task.getException());
