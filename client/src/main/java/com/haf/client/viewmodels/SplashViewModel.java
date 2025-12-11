@@ -157,6 +157,7 @@ public class SplashViewModel {
                 onSuccess.run();
             }
         });
+
         task.setOnFailed(e -> {
             runningTask = null;
             // Show error in-bound properties: freeze status text to the error message,
@@ -176,16 +177,12 @@ public class SplashViewModel {
         });
 
         runningTask = task;
+
         Thread t = new Thread(task, "splash-bootstrap");
         t.setDaemon(true);
         t.start();
     }
 
-    /**
-     * Debug-only delay: sleep the current thread to slow down the splash sequence.
-     * Hardcoded to 500 ms between stages so you can visually inspect progress during development.
-     * NOTE: Remove this method (and its call sites) when tests pass and you no longer need the delay.
-     */
     private static void sleepIfDebugDelay() {
         try {
             Thread.sleep(1000L);
@@ -264,25 +261,25 @@ public class SplashViewModel {
                 // No endpoint configured: skip reachability check
                 return;
             }
-            HttpClient client = HttpClient.newBuilder()
+
+            try (
+                HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(2))
-                    .build();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint))
-                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                    .timeout(Duration.ofSeconds(3))
-                    .build();
-            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() >= 400) {
-                throw new IOException("Server unreachable, status " + response.statusCode());
+                    .build()) {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(endpoint))
+                        .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                        .timeout(Duration.ofSeconds(3))
+                        .build();
+                HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+
+                if (response.statusCode() >= 400) {
+                    throw new IOException("Server unreachable, status " + response.statusCode());
+                }
+            } catch (IOException e) {
+                throw new IOException("Failed to check server reachability", e);
             }
         };
     }
 
-    /**
-     * For tests: expose whether a bootstrap task is running.
-     */
-    public synchronized boolean isRunning() {
-        return runningTask != null && runningTask.isRunning();
-    }
 }
