@@ -1,8 +1,10 @@
 module client {
     requires transitive shared;
+    requires transitive javafx.graphics;
     requires javafx.controls;
     requires javafx.fxml;
     requires java.net.http;
+    requires java.logging;
 
     // exports com.haf.client.ui;
     // exports com.haf.client.service;

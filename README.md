@@ -25,11 +25,11 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
 * Language: Java 21
 * UI: JavaFX (FXML + CSS, MVVM pattern)
 * Server: Java (Spring Boot recommended or custom secure socket server)
-* Database: MySQL or SQLite (depending on installation)
-* Cryptography: BouncyCastle, Java Cryptography (AES-256, RSA 2048, SHA-256)
+* Database: MySQL
+* Cryptography: Java Cryptography (AES-256, RSA 2048, SHA-256)
 * 2FA: otp-java (TOTP)
 * WebAuthn: WebAuthn4J (when required)
-* Build / Packaging: Maven or Gradle, jlink / jpackage for self-contained installers
+* Build / Packaging: Maven, jlink / jpackage for self-contained installers
 * Logging: Log4j2 or SLF4J + Logback
 
 ---
