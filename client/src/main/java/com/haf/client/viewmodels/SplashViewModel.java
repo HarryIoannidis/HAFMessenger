@@ -109,30 +109,27 @@ public class SplashViewModel {
         percentage.unbind();
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
 
-        // Run using a JavaFX Task; tests will initialize JavaFX toolkit explicitly.
-
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                sleepIfDebugDelay();
+                Thread.sleep(3000L);
 
                 update("Loading configuration...", 0.1);
-                sleepIfDebugDelay();
                 String detectedVersion = configLoader.loadVersion();
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
 
                 update("Initializing security modules...", 0.3);
-                sleepIfDebugDelay();
+                delay();
                 cryptoInitializer.initialize();
 
                 update("Checking local resources...", 0.6);
-                sleepIfDebugDelay();
+                delay();
                 resourceChecker.verify();
 
                 update("Verifying network reachability...", 0.8);
-                sleepIfDebugDelay();
+                delay();
                 networkChecker.check();
 
                 update("Ready", 1.0);
@@ -168,9 +165,11 @@ public class SplashViewModel {
             Throwable ex = task.getException();
             String msg = (ex != null && ex.getMessage() != null && !ex.getMessage().isBlank())
                     ? ex.getMessage() : String.valueOf(ex);
+
             status.set(msg);
             percentage.set("");
             error.set(true);
+
             if (onFailure != null) {
                 onFailure.accept(task.getException());
             }
@@ -183,9 +182,9 @@ public class SplashViewModel {
         t.start();
     }
 
-    private static void sleepIfDebugDelay() {
+    private static void delay() {
         try {
-            Thread.sleep(1000L);
+            Thread.sleep(800L);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }
@@ -199,13 +198,16 @@ public class SplashViewModel {
     private static ConfigLoader defaultConfigLoader() {
         return () -> {
             String fromManifest = SplashViewModel.class.getPackage().getImplementationVersion();
+
             if (fromManifest != null && !fromManifest.isBlank()) {
                 return fromManifest;
             }
+
             String envVersion = System.getenv("HAF_APP_VERSION");
             if (envVersion != null && !envVersion.isBlank()) {
                 return envVersion;
             }
+
             return "1.0.0";
         };
     }
@@ -221,6 +223,12 @@ public class SplashViewModel {
 
             // Verify AES/GCM availability
             javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+
+            // Verify RSA-OAEP availability (Critical for Key Exchange)
+            javax.crypto.Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+
+            // Verify SHA-256 availability
+            java.security.MessageDigest.getInstance("SHA-256");
         };
     }
 

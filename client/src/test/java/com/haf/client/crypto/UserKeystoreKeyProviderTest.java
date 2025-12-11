@@ -36,7 +36,7 @@ class UserKeystoreKeyProviderTest {
     }
 
     @Test
-    void getSenderId_returns_keyId_from_current_key() throws Exception {
+    void get_sender_id_returns_keyId_from_current_key() throws Exception {
         // Create a key in keystore
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String keyId = UserKeystore.todayKeyId();
@@ -51,7 +51,7 @@ class UserKeystoreKeyProviderTest {
     }
 
     @Test
-    void getRecipientPublicKey_loads_from_local_keystore() throws Exception {
+    void get_recipient_public_key_loads_from_local_keystore() throws Exception {
         // Create two keys: sender and recipient
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String senderKeyId = "key-sender-001";
@@ -74,7 +74,7 @@ class UserKeystoreKeyProviderTest {
     }
 
     @Test
-    void getRecipientPublicKey_throws_for_unknown_recipient() throws Exception {
+    void get_recipient_public_key_throws_for_unknown_recipient() throws Exception {
         // Create only sender key
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String senderKeyId = "key-sender-001";
@@ -90,7 +90,7 @@ class UserKeystoreKeyProviderTest {
     }
 
     @Test
-    void getKeyStore_returns_keystore_instance() throws Exception {
+    void get_key_store_returns_keystore_instance() throws Exception {
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String keyId = UserKeystore.todayKeyId();
         KeyPair kp = RsaKeyIO.generate(2048);
