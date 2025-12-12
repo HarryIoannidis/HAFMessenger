@@ -97,6 +97,45 @@ public final class MailboxRouter implements AutoCloseable {
     }
 
     /**
+     * Acknowledges delivery for the specified user only.
+     * Filters out any envelope IDs that do not belong to the provided user to
+     * prevent cross-user acknowledgements.
+     * @param userId the user who owns the mailbox
+     * @param envelopeIds the candidate envelope IDs to acknowledge
+     * @return true if at least one envelope was acknowledged, false otherwise
+     */
+    public boolean acknowledgeOwned(String userId, Collection<String> envelopeIds) {
+        if (userId == null || envelopeIds == null || envelopeIds.isEmpty()) {
+            return false;
+        }
+
+        Map<String, QueuedEnvelope> envelopes = envelopeDAO.fetchByIds(envelopeIds);
+
+        // Filter to envelopes that belong to the user
+        List<String> owned = envelopes.values().stream()
+                .filter(env -> userId.equals(env.payload().recipientId))
+                .map(QueuedEnvelope::envelopeId)
+                .toList();
+
+        if (owned.isEmpty()) {
+            return false;
+        }
+
+        boolean updated = envelopeDAO.markDelivered(owned);
+        if (updated) {
+            long now = System.currentTimeMillis();
+            for (QueuedEnvelope envelope : envelopes.values()) {
+                if (owned.contains(envelope.envelopeId())) {
+                    long latency = now - envelope.createdAtEpochMs();
+                    metricsRegistry.recordDeliveryLatency(latency);
+                }
+            }
+            metricsRegistry.decreaseQueueDepth(owned.size());
+        }
+        return updated;
+    }
+
+    /**
      * Subscribes a recipient to receive notifications for new messages.
      * @param recipientId the ID of the recipient.
      * @param subscriber the subscriber to be notified.

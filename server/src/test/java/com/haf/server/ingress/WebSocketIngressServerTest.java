@@ -93,7 +93,7 @@ class WebSocketIngressServerTest {
 
         server.onMessage(webSocket, ackJson);
 
-        verify(mailboxRouter, times(1)).acknowledge(anyList());
+        verify(mailboxRouter, times(1)).acknowledgeOwned(eq("test-user"), anyList());
     }
 
     @Test
@@ -106,7 +106,7 @@ class WebSocketIngressServerTest {
 
         verify(auditLogger, times(1)).logRateLimit(anyString(), anyString(), eq(60L));
         verify(webSocket, times(1)).send(contains("rate_limit"));
-        verify(mailboxRouter, never()).acknowledge(anyList());
+        verify(mailboxRouter, never()).acknowledgeOwned(anyString(), anyList());
     }
 
     @Test
