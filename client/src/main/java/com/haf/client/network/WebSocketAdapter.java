@@ -9,6 +9,8 @@ import java.net.http.WebSocket;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -24,11 +26,27 @@ public class WebSocketAdapter {
     private WebSocket webSocket;
     private Consumer<String> messageConsumer;
     private Consumer<Throwable> errorConsumer;
-    private boolean isConnected = false;
+    private volatile boolean isConnected = false;
+    
+    // Inbound text accumulation (handle fragmented frames)
+    private final StringBuilder inboundBuffer = new StringBuilder();
+    private static final int MAX_INBOUND_MESSAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+    
+    // Heartbeat (ping/pong)
+    private ScheduledExecutorService scheduler;
+    private volatile long lastPongAtNanos;
+    private static final long HEARTBEAT_INTERVAL_SECONDS = 5L;
+    private static final long HEARTBEAT_MAX_SILENCE_MS = 15_000L;
+    private volatile boolean heartbeatScheduled = false;
+    
+    // Reconnect state
+    private final Object stateLock = new Object();
+    private volatile boolean userClosed = false;
     
     // Reconnection policy (Phase 4: stubs)
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
+    private static final long MAX_RETRY_DELAY_MS = 5000;
     private int retryAttempts = 0;
 
     /**
@@ -77,6 +95,11 @@ public class WebSocketAdapter {
         SSLParameters params = new SSLParameters();
         // Phase 4: Enable TLS 1.3
         params.setProtocols(new String[]{"TLSv1.3"});
+        // Phase 5: Add cipher suite allowlist (docs requirement)
+        params.setCipherSuites(new String[]{
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_CHACHA20_POLY1305_SHA256"
+        });
         // Phase 5: Will add certificate pinning checks here
         return params;
     }
@@ -102,6 +125,7 @@ public class WebSocketAdapter {
     public void connect(Consumer<String> onMessage, Consumer<Throwable> onError) throws IOException {
         this.messageConsumer = onMessage;
         this.errorConsumer = onError;
+        this.userClosed = false;
 
         WebSocket.Listener listener = new WebSocket.Listener() {
             @Override
@@ -111,22 +135,44 @@ public class WebSocketAdapter {
                 WebSocket.Listener.super.onOpen(webSocket);
                 // Request next message
                 webSocket.request(1);
+                startHeartbeat();
             }
 
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                if (messageConsumer != null) {
-                    try {
-                        messageConsumer.accept(data.toString());
-                    } catch (Exception e) {
-                        if (errorConsumer != null) {
-                            errorConsumer.accept(e);
+                try {
+                    // Accumulate fragments until last == true
+                    if (data != null) {
+                        // Guard against oversize messages (approx by char count)
+                        if (inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES) {
+                            inboundBuffer.setLength(0);
+                            if (errorConsumer != null) {
+                                errorConsumer.accept(new IOException("Inbound message too large"));
+                            }
+                            // Drop this message and request next
+                            webSocket.request(1);
+                            return null;
+                        }
+                        inboundBuffer.append(data);
+                    }
+                    if (last) {
+                        String message = inboundBuffer.toString();
+                        inboundBuffer.setLength(0);
+                        if (messageConsumer != null) {
+                            try {
+                                messageConsumer.accept(message);
+                            } catch (Exception e) {
+                                if (errorConsumer != null) {
+                                    errorConsumer.accept(e);
+                                }
+                            }
                         }
                     }
+                } finally {
+                    // Request next message
+                    webSocket.request(1);
                 }
-                // Request next message
-                webSocket.request(1);
-                return WebSocket.Listener.super.onText(webSocket, data, last);
+                return null;
             }
 
             @Override
@@ -136,13 +182,22 @@ public class WebSocketAdapter {
                     errorConsumer.accept(error);
                 }
                 WebSocket.Listener.super.onError(webSocket, error);
+                scheduleReconnect();
             }
 
             @Override
             public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
                 isConnected = false;
                 WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
+                stopHeartbeat();
+                scheduleReconnect();
                 return null;
+            }
+
+            @Override
+            public CompletionStage<?> onPong(WebSocket webSocket, java.nio.ByteBuffer message) {
+                lastPongAtNanos = System.nanoTime();
+                return WebSocket.Listener.super.onPong(webSocket, message);
             }
         };
 
@@ -185,7 +240,9 @@ public class WebSocketAdapter {
         
         // Wait for send to complete (with timeout)
         try {
-            sendFuture.get();
+            sendFuture.get(5, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException te) {
+            throw new IOException("Failed to send message: timeout", te);
         } catch (Exception e) {
             throw new IOException("Failed to send message", e);
         }
@@ -195,8 +252,18 @@ public class WebSocketAdapter {
      * Closes the WebSocket connection.
      */
     public void close() {
-        if (webSocket != null) {
-            webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Client closing");
+        userClosed = true;
+        stopHeartbeat();
+        WebSocket ws = this.webSocket;
+        this.webSocket = null;
+        if (ws != null) {
+            try {
+                ws.sendClose(WebSocket.NORMAL_CLOSURE, "Client closing").get(3, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+            } finally {
+                isConnected = false;
+            }
+        } else {
             isConnected = false;
         }
     }
@@ -228,9 +295,12 @@ public class WebSocketAdapter {
      * @return the retry delay in milliseconds
      */
     public long getRetryDelayMs() {
-        // Phase 4: Fixed delay
-        // Phase 5: Exponential backoff: INITIAL_DELAY * (2 ^ retryAttempts)
-        return INITIAL_RETRY_DELAY_MS;
+        // Exponential backoff with cap
+        long base = INITIAL_RETRY_DELAY_MS * (1L << Math.max(0, retryAttempts - 1));
+        if (base < INITIAL_RETRY_DELAY_MS) {
+            base = INITIAL_RETRY_DELAY_MS;
+        }
+        return Math.min(base, MAX_RETRY_DELAY_MS);
     }
 
     /**
@@ -238,6 +308,98 @@ public class WebSocketAdapter {
      */
     public void resetRetryCounter() {
         retryAttempts = 0;
+    }
+
+    /**
+     * Starts heartbeat scheduler (ping/pong) to detect half-open connections.
+     */
+    private void startHeartbeat() {
+        synchronized (stateLock) {
+            if (scheduler == null || scheduler.isShutdown()) {
+                scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+                    Thread t = new Thread(r, "ws-heartbeat");
+                    t.setDaemon(true);
+                    return t;
+                });
+            }
+            lastPongAtNanos = System.nanoTime();
+            if (!heartbeatScheduled) {
+                scheduler.scheduleAtFixedRate(() -> {
+                    try {
+                        WebSocket ws = webSocket;
+                        if (ws != null && isConnected) {
+                            ws.sendPing(java.nio.ByteBuffer.wrap(new byte[]{1}));
+                        }
+                        long ageMs = (System.nanoTime() - lastPongAtNanos) / 1_000_000L;
+                        if (ageMs > HEARTBEAT_MAX_SILENCE_MS) {
+                            // Consider connection stale; close and attempt reconnect
+                            try {
+                                if (ws != null) {
+                                    ws.abort();
+                                }
+                            } catch (Throwable ignored) {}
+                            isConnected = false;
+                        }
+                    } catch (Throwable t) {
+                        if (errorConsumer != null) {
+                            errorConsumer.accept(t);
+                        }
+                    }
+                }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+                heartbeatScheduled = true;
+            }
+        }
+    }
+
+    /**
+     * Stops and cleans up heartbeat scheduler.
+     */
+    private void stopHeartbeat() {
+        synchronized (stateLock) {
+            if (scheduler != null) {
+                scheduler.shutdownNow();
+                scheduler = null;
+            }
+            heartbeatScheduled = false;
+        }
+    }
+
+    /**
+     * Schedules a reconnect attempt if policy allows and the user did not explicitly close.
+     */
+    private void scheduleReconnect() {
+        if (userClosed) {
+            return;
+        }
+        if (!shouldRetry()) {
+            return;
+        }
+        long delay = getRetryDelayMs();
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            synchronized (stateLock) {
+                if (isConnected || userClosed) {
+                    return;
+                }
+                try {
+                    // Reuse previous consumers
+                    if (messageConsumer != null || errorConsumer != null) {
+                        connect(messageConsumer, errorConsumer);
+                    }
+                } catch (IOException e) {
+                    if (errorConsumer != null) {
+                        errorConsumer.accept(e);
+                    }
+                    // Chain next retry if still allowed
+                    scheduleReconnect();
+                }
+            }
+        });
     }
 }
 

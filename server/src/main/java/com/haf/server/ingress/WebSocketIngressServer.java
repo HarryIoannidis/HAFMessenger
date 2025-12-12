@@ -53,12 +53,11 @@ public final class WebSocketIngressServer extends WebSocketServer {
         super(new InetSocketAddress(config.getWsPort()));
         setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
 
-        SSLParameters sslParams = sslContext.getDefaultSSLParameters();
-        sslParams.setProtocols(new String[]{"TLSv1.3"});
-        sslParams.setCipherSuites(new String[]{
-                "TLS_AES_256_GCM_SHA384",
-                "TLS_CHACHA20_POLY1305_SHA256"
-        });
+        // Note: The SSLContext provided by Main is created with TLSv1.3 only.
+        // DefaultSSLWebSocketServerFactory uses that context to create SSLEngine instances,
+        // so TLSv1.3 and cipher selections are enforced by the context itself.
+        // If a future change requires per-connection tuning, consider a custom factory
+        // that applies SSLParameters to each SSLEngine.
 
         this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
@@ -73,6 +72,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        // TODO(auth): Replace TEST_USER_ID with authenticated principal once auth is wired.
         String userId = TEST_USER_ID;
         connectionUsers.put(conn, userId);
 
@@ -81,6 +81,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
         subscriptions.put(conn, subscription);
 
         List<QueuedEnvelope> pending = mailboxRouter.fetchUndelivered(userId, 100);
+        // Push any backlog to the newly connected client.
         pending.forEach(envelope -> sendEnvelope(conn, envelope));
     }
 
@@ -111,13 +112,22 @@ public final class WebSocketIngressServer extends WebSocketServer {
             RateLimitDecision decision = rateLimiterService.checkAndConsume(requestId, userId);
             if (!decision.allowed()) {
                 auditLogger.logRateLimit(requestId, userId, decision.retryAfterSeconds());
-                conn.send(JsonCodec.toJson(new ErrorMessage("rate_limit", decision.retryAfterSeconds())));
+                conn.send(rateLimitJson(decision.retryAfterSeconds()));
                 return;
             }
 
-            AckMessage ack = JsonCodec.fromJson(message, AckMessage.class);
-            if (ack.envelopeIds() != null && !ack.envelopeIds().isEmpty()) {
-                mailboxRouter.acknowledge(ack.envelopeIds());
+            // Parse minimal ACK payload without relying on reflective record access.
+            java.util.Map<?,?> ackMap = JsonCodec.fromJson(message, java.util.Map.class);
+            Object ids = ackMap.get("envelopeIds");
+            if (ids instanceof java.util.List<?> list && !list.isEmpty()) {
+                java.util.List<String> asStrings = new java.util.ArrayList<>(list.size());
+                for (Object o : list) {
+                    if (o != null) {
+                        asStrings.add(String.valueOf(o));
+                    }
+                }
+                // Only allow acknowledging envelopes owned by this user.
+                mailboxRouter.acknowledgeOwned(userId, asStrings);
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_ingress_error", requestId, userId, ex);
@@ -147,35 +157,35 @@ public final class WebSocketIngressServer extends WebSocketServer {
      * @param envelope the envelope to send.
      */
     private void sendEnvelope(WebSocket conn, QueuedEnvelope envelope) {
-        EnvelopeNotification notification = new EnvelopeNotification(
-            "message",
-            envelope.envelopeId(),
-            envelope.payload(),
-            envelope.expiresAtEpochMs()
-        );
-        conn.send(JsonCodec.toJson(notification));
+        // Build a compact JSON message manually to avoid reflective access to inner record types.
+        String payloadJson = JsonCodec.toJson(envelope.payload());
+        String json = "{\"type\":\"message\",\"envelopeId\":\"" + escape(envelope.envelopeId()) +
+                "\",\"payload\":" + payloadJson + ",\"expiresAt\":" + envelope.expiresAtEpochMs() + "}";
+        conn.send(json);
+    }
+
+    // Avoid using inner records for JSON I/O to keep Jackson from requiring deep reflection on the module.
+    // Minimal helper methods for small response payloads follow.
+
+    /**
+     * Builds a minimal JSON payload describing a rate-limit event.
+     * @param retryAfterSeconds the number of seconds to wait before retrying
+     * @return a compact JSON string
+     */
+    private String rateLimitJson(long retryAfterSeconds) {
+        return "{\"type\":\"rate_limit\",\"retryAfterSeconds\":" + Math.max(1, retryAfterSeconds) + "}";
     }
 
     /**
-     * Represents an acknowledgement message.
-     * @param envelopeIds the envelope IDs to acknowledge.
+     * Escapes a string for safe embedding in a JSON string literal.
+     * Only minimal escaping needed for envelope IDs (backslash, quotes).
+     * @param s the input string
+     * @return the escaped string
      */
-    private record AckMessage(List<String> envelopeIds) {}
-
-    /**
-     * Represents an error message.
-     * @param type the type of error.
-     * @param retryAfterSeconds the number of seconds to wait before retrying.
-     */
-    private record ErrorMessage(String type, long retryAfterSeconds) {}
-
-    /**
-     * Represents an envelope notification.
-     * @param type the type of notification.
-     * @param envelopeId the envelope ID.
-     * @param payload the payload.
-     * @param expiresAt the expiration time of the envelope.
-     */
-    private record EnvelopeNotification(String type, String envelopeId, com.haf.shared.dto.EncryptedMessage payload, long expiresAt) {}
+    private static String escape(String s) {
+        if (s == null) return "";
+        // Minimal JSON string escape for ids (quotes and backslashes).
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
 }
 
