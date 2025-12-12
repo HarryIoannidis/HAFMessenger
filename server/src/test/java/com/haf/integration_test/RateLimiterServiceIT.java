@@ -28,7 +28,6 @@ class RateLimiterServiceIT {
 
     private HikariDataSource dataSource;
     private RateLimiterService service;
-    private AuditLogger auditLogger;
 
     @BeforeEach
     void setUp() {
@@ -47,7 +46,7 @@ class RateLimiterServiceIT {
         flyway.migrate();
 
         MetricsRegistry metricsRegistry = new MetricsRegistry();
-        auditLogger = AuditLogger.create(metricsRegistry);
+        AuditLogger auditLogger = AuditLogger.create(metricsRegistry);
         service = new RateLimiterService(dataSource, auditLogger);
     }
 
