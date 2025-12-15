@@ -13,7 +13,7 @@
 ### Phase 2 – Crypto core (Complete)
 - **Deliverables**
     - Cryptography: `CryptoService` (AES-256-GCM, IV 12B, 128-bit tag), `CryptoRSA` (RSA-OAEP SHA-256/MGF1 wrap/unwrap), `CryptoConstants`. 
-    - AAD policy: `AadCodec` builds deterministic AAD from {version, algo, senderId, recipientId, timestamp, ttl, contentType, contentLength}. 
+    - AAD policy: `AadCodec` builds deterministic AAD from {version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength}.
     - Encrypt/Decrypt helpers: `MessageEncryptor`/`MessageDecryptor` round-trip APIs + `MessageFlowTest` scaffolding, with strict separation payload vs metadata. 
     - Hardening: use `SecureRandom`, zero-copy conversions where possible, avoid key/IV reuse. 
 - **Tests**

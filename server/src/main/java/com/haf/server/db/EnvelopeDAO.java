@@ -280,11 +280,11 @@ public final class EnvelopeDAO {
             String.valueOf(message.contentLength)
         );
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(com.haf.shared.constants.CryptoConstants.OAEP_HASH);
 
             return HexFormat.of().formatHex(digest.digest(aad.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            throw new IllegalStateException(com.haf.shared.constants.CryptoConstants.OAEP_HASH + " not available", e);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.haf.client.core;
 
 import com.haf.client.utils.ViewRouter;
+import com.haf.client.utils.UiConstants;
 import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
@@ -20,16 +21,16 @@ public class ClientApp extends Application {
         // 2. Set the Application Icon (Taskbar)
         try {
             primaryStage.getIcons()
-                    .add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/app_logo.png"))));
+                    .add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(UiConstants.IMAGE_APP_LOGO))));
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Warning: App icon not found.", e);
         }
 
         // 3. Set the Title
-        primaryStage.setTitle("HAF Messenger");
+        primaryStage.setTitle(UiConstants.APP_TITLE);
 
         // 4. Launch the First Screen
-        ViewRouter.switchToTransparent("/fxml/splash.fxml");
+        ViewRouter.switchToTransparent(UiConstants.FXML_SPLASH);
     }
 
     /**

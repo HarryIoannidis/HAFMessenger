@@ -42,7 +42,7 @@
     - Singleton or factory-based logger.
 - `MetricsRegistry metricsRegistry = new MetricsRegistry();`
     - Thread-safe in-memory counters.
-- `EnvelopeDAO envelopeDAO = new EnvelopeDAO(dataSource);`
+- `EnvelopeDAO envelopeDAO = new EnvelopeDAO(dataSource, auditLogger);`
     - Access to 'message_envelopes' table.
 - `RateLimiterService rateLimiterService = new RateLimiterService(dataSource, auditLogger);`
     - Sliding window + lockout logic.

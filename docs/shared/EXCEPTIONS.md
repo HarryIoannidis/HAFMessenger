@@ -53,7 +53,7 @@
 ### When is it thrown
 - 'MessageDecryptor.decrypt(m)' → 'AEADBadTagException' from 'Cipher.doFinal()'.
 - AAD mismatch: different AAD in decrypt.
-- Change metadata (timestamp, senderId, algo) after encrypt.
+- Change metadata (timestamp, senderId, algorithm) after encrypt.
 
 ### Handling
 - **CRITICAL**: log incident with metadata (not payload), security audit flag.
@@ -79,7 +79,7 @@
     - Invalid Base64 encoding.
     - 'ttlSeconds <= 0' or 'ttlSeconds > MAX_TTL'.
     - 'timestampEpochMs' in the future or > 30 days old.
-    - Invalid 'algo' (not ''AES-256-GCM'') or 'version' (not ''v1'').
+    - Invalid 'algorithm' (not ''AES-256-GCM'') or 'version' (not ''v1'').
 - `MessageValidator.validateRecipientOrThrow(localId, m)` → recipient mismatch.
 
 ### Handling

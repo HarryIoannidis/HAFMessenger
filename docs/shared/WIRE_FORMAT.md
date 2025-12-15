@@ -10,7 +10,7 @@
 - Tag: 16 bytes, tagB64 field (Base64)
 
 ### Envelope Fields (DTO)
-- Required: version, senderId, recipientId, timestampEpochMs, ttlSeconds, algo, ivB64, wrappedKeyB64, ciphertextB64, tagB64, contentType, contentLength
+- Required: version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, wrappedKeyB64, ciphertextB64, tagB64, contentType, contentLength
 - Optional: e2e
 - contentLength: non-negative, equal to bytes plaintext
 
@@ -28,7 +28,7 @@
 ### Size Limits
 - MAX_CIPHERTEXT_BASE64: according to MessageHeader (e.g. 8 MB)
 
-### Validation rolls
+### Validation roles
 - Client: MessageValidator.isValid() before sending
 - Server: MessageValidator.validate() at ingress, reject to fail
 
@@ -36,7 +36,7 @@
 - Serialization: JsonCodec.toJson(dto)
 - Deserialization: JsonCodec.fromJson(json)
 - Decoding Accuracy:
-    - FAIL_ON_UNKNOWN_PROPERTIES = true (discard unknown fields)
+    - FAIL_ON_UNKNOWN_PROPERTIES = true (fail on unknown fields)
     - REQUIRE_SETTERS_FOR_GETTERS = true or explicit @JsonProperty for Required fields
     - Null strings rejected· An empty value is allowed only where specified
     - Checking types/bounds: numbers within bounds, Base64 fields decodable, IV/tag of exact lengths

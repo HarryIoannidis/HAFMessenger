@@ -96,7 +96,7 @@ CREATE TABLE message_envelopes (
 
 **Rationale:**
 - **Envelope-Only Storage:** Server nevers access to `PrivateKey`, cannot decrypt `encrypted_payload`.
-- `aad_hash`: Tamper detection for immutable header fields (version, algo, sender, recipient, timestamp, ttl, contentType, contentLength).
+- `aad_hash`: Tamper detection for immutable header fields (version, algorithm, sender, recipient, timestamp, ttl, contentType, contentLength).
 - `idx_recipient_delivered`: Optimizes mailbox queries (`SELECT * WHERE recipient_id = ? AND delivered = FALSE`).
 - `expires_at`: Indexed for efficient TTL cleanup via scheduled job.
 
@@ -605,9 +605,9 @@ public class DatabaseManager {
     
     // Helper methods
     private static String computeAadHash(EncryptedMessageDTO envelope) {
-        // SHA-256 of immutable header fields (version, algo, senderId, recipientId, timestamp, ttl, contentType, contentLength)
+        // SHA-256 of immutable header fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength)
         String aad = String.join("|", 
-            envelope.version, envelope.algo, envelope.senderId, envelope.recipientId,
+            envelope.version, envelope.algorithm, envelope.senderId, envelope.recipientId,
             String.valueOf(envelope.timestamp), String.valueOf(envelope.ttl),
             envelope.contentType, String.valueOf(envelope.contentLength)
         );

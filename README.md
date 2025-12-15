@@ -24,7 +24,11 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
 
 * Language: Java 21
 * UI: JavaFX (FXML + CSS, MVVM pattern)
-* Server: Java (Spring Boot recommended or custom secure socket server)
+* Server: Plain Java service (non-Spring) using:
+  - Java-WebSocket for WebSocket ingress
+  - HikariCP for JDBC connection pooling
+  - Flyway for database migrations
+  - Log4j2 for structured logging
 * Database: MySQL
 * Cryptography: Java Cryptography (AES-256, RSA 2048, SHA-256)
 * 2FA: otp-java (TOTP)
@@ -40,13 +44,12 @@ The application follows a **client–server 3-tier** design and the **MVVM** pat
 
 * **Client Layer (Presentation / JavaFX)**
 
-    * UI components in `client/src/main/java/com/haf/client/ui/` for FXML loaders and UI helpers
     * Controllers in `client/src/main/java/com/haf/client/controllers/` connecting UI with ViewModels
-    * ViewModels in `client/src/main/java/com/haf/client/viewmodel/` implementing MVVM pattern with business logic
+    * ViewModels in `client/src/main/java/com/haf/client/viewmodels/` implementing MVVM pattern with business logic
     * Local crypto module in `client/src/main/java/com/haf/client/crypto/` for client-side crypto operations (uses shared crypto APIs)
     * Network client in `client/src/main/java/com/haf/client/network/` using secure TCP sockets or WebSockets
     * Models in `client/src/main/java/com/haf/client/models/` (Message, User, Session) for client-side data representation
-    * Utilities in `client/src/main/java/com/haf/client/utils/` for configuration, logging, and helpers
+    * Utilities in `client/src/main/java/com/haf/client/utils/` for configuration, logging, and helpers (e.g., ViewRouter, UiConstants)
     * FXML views in `client/src/main/resources/fxml/` for JavaFX scenes
     * CSS styles in `client/src/main/resources/css/` for dark military UI theme
     * Images in `client/src/main/resources/images/` for icons and assets
@@ -71,10 +74,10 @@ The application follows a **client–server 3-tier** design and the **MVVM** pat
 
 * **Documentation Layer (Docs / References)**
 
-    * Main project documentation in `docs/misc/` — ARCHITECTURE.md, CRYPTO.md, DATABASE.md, DEVELOPMENT.md, PHASES.md, SCENES.md, STRUCTURE.md, TESTING.md, WORFKLOW.md
+    * Main project documentation in `docs/misc/` — ARCHITECTURE.md, CRYPTO.md, DATABASE.md, DEVELOPMENT.md, PHASES.md, SCENES.md, STRUCTURE.md, TESTING.md, WORKFLOW.md
     * Shared module docs in `docs/shared/` — AAD.md, CODECS.md, CONSTANTS.md, CRYPTO_SERVICE.md, DECRYPTION.md, DTO.md, ENCRYPTION.md, EXCEPTIONS.md, FILEPERMS.md, KEYSTORE.md, UTILS.md, VALIDATION.md, WIRE_FORMAT.md
     * Client docs in `docs/client/` — KEYSTORE_PROVIDER.md, MSG_INTERFACES.md, SENDER_RECEIVER.md, WEBSOCKET.md
-    * Server docs in `docs/server/` — CONFIG.md, INGRESS.md, MAIN.md, OBSERVABILITY.md, PERSISTANCE.md, RATE_LIMITER.md, ROUTING.md
+    * Server docs in `docs/server/` — CONFIG.md, INGRESS.md, MAIN.md, OBSERVABILITY.md, PERSISTENCE.md, RATE_LIMITER.md, ROUTING.md
 
 
 ---
@@ -86,9 +89,8 @@ haf-messenger/
 │
 ├── client/
 │   ├── src/main/java/com/haf/client/
-│   │   ├── ui/                  # UI components and FXML loaders
 │   │   ├── controllers/         # Controllers (Login, Chat, Settings)
-│   │   ├── viewmodel/           # ViewModels for MVVM pattern
+│   │   ├── viewmodels/          # ViewModels for MVVM pattern
 │   │   ├── crypto/              # Client-side crypto operations (uses shared crypto)
 │   │   ├── network/             # Client-side socket/WebSocket handlers
 │   │   ├── models/              # Message, User, Session classes
@@ -147,7 +149,7 @@ haf-messenger/
   1. Client generates a session AES-256 key.
   2. AES key is wrapped (encrypted) with the recipient’s public RSA key using RSA-OAEP (SHA-256/MGF1).
   3. Payload is encrypted using AES-256-GCM with a 12-byte IV and 128-bit authentication tag.
-  4. AAD (Additional Authenticated Data) is constructed from DTO metadata fields (version, algo, senderId, recipientId, timestamp, ttl, contentType, contentLength) — not transmitted, reconstructed during decryption.
+  4. AAD (Additional Authenticated Data) is constructed from DTO metadata fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength) — not transmitted, reconstructed during decryption.
   5. Packet structure: `{version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, wrappedKeyB64, ciphertextB64, tagB64, contentType, contentLength, e2e}`
 
 * The server must **not decrypt messages** — true **E2E encryption** ensures the server only handles encrypted blobs and metadata.
@@ -158,12 +160,29 @@ haf-messenger/
 
 ## **Database Design (summary)**
 
-* users(id, username, password_hash, pubkey, salt, role, rank, created_at)
-* messages(id, sender_id, receiver_id, content_blob, content_meta, timestamp, ttl)
-* sessions(id, user_id, token_hash, expires_at, last_active)
-* logs(id, user_id, event_type, details_encrypted, created_at)
+Schema focuses on storing encrypted message envelopes; server never decrypts payloads.
 
-**Note:** message contents (`content_blob`) are always stored encrypted.
+* users(user_id, username, email, password_hash, rank, reg_number, full_name, joined_date, telephone, public_key_fingerprint, public_key_pem, status, role, created_at, updated_at)
+* message_envelopes(
+    envelope_id, sender_id, recipient_id,
+    encrypted_payload LONGBLOB,
+    wrapped_key BLOB,
+    iv VARBINARY(12),
+    auth_tag VARBINARY(16),
+    aad_hash VARCHAR(64),
+    content_type VARCHAR(100),
+    content_length INT,
+    timestamp BIGINT,
+    ttl INT,
+    delivered BOOLEAN,
+    created_at TIMESTAMP,
+    expires_at TIMESTAMP
+  )
+* Additional indexes exist for recipient+delivered, expires_at, and sender+timestamp.
+
+Notes:
+- content_length is stored as INT in DB (32-bit range) while DTO uses long.
+- Encrypted payloads and metadata are stored; AAD hash is computed from DTO metadata.
 
 ---
 
@@ -182,7 +201,7 @@ haf-messenger/
 ## **UI / UX (JavaFX)**
 
 * **Pattern:** MVVM — each FXML view has a corresponding ViewModel
-* **SceneManager:** central manager for FXML loading and scene transitions
+* **ViewRouter:** central utility for FXML loading and scene transitions
 
 ---
 
