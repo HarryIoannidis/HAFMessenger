@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.utils.UiConstants;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -222,13 +223,13 @@ public class SplashViewModel {
             SecureRandom.getInstanceStrong().nextBytes(new byte[16]);
 
             // Verify AES/GCM availability
-            javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            javax.crypto.Cipher.getInstance(com.haf.shared.constants.CryptoConstants.AES_GCM_TRANSFORMATION);
 
             // Verify RSA-OAEP availability (Critical for Key Exchange)
-            javax.crypto.Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+            javax.crypto.Cipher.getInstance(com.haf.shared.constants.CryptoConstants.RSA_OAEP_TRANSFORMATION);
 
             // Verify SHA-256 availability
-            java.security.MessageDigest.getInstance("SHA-256");
+            java.security.MessageDigest.getInstance(com.haf.shared.constants.CryptoConstants.OAEP_HASH);
         };
     }
 
@@ -238,10 +239,10 @@ public class SplashViewModel {
      */
     private static ResourceChecker defaultResourceChecker() {
         return () -> {
-            requireResource("/fxml/login.fxml", "Login view");
-            requireResource("/fxml/splash.fxml", "Splash view");
-            requireResource("/images/app_logo.png", "Application logo");
-            requireResource("/css/global.css", "Global stylesheet");
+            requireResource(UiConstants.FXML_LOGIN, "Login view");
+            requireResource(UiConstants.FXML_SPLASH, "Splash view");
+            requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");
+            requireResource(UiConstants.CSS_GLOBAL, "Global stylesheet");
         };
     }
 

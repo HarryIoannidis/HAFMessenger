@@ -6,8 +6,8 @@
 - AES-GCM with 12-byte IV (96-bit) and 128-bit tags.
 
 ### Feeds
-- Validate: version, algo, recipient binding, timestamp/ttl, IV/tag lengths, content policy.
-- Rebuild AAD: canonical AAD from meta fields (version|algo|senderId|recipientId|timestampEpochMs|ttlSeconds|contentType|contentLength).
+- Validate: version, algorithm, recipient binding, timestamp/ttl, IV/tag lengths, content policy.
+- Rebuild AAD: canonical AAD from meta fields (version|algorithm|senderId|recipientId|timestampEpochMs|ttlSeconds|contentType|contentLength).
 - Join: ct || tag in combined.
 - Unwrap: RSA-OAEP unwrap of AES key.
 - Decrypt: AES-GCM decrypt with iv, key, AAD, combined → plaintext.

@@ -60,7 +60,7 @@
 - FXML: login.fxml
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<GridPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.LoginController" hgap="8" vgap="8">
+<GridPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.LoginController" hgap="8" vgap="8">
   <Label text="Email"/>
   <TextField fx:id="email"/>
   <Label text="Password"/>
@@ -76,7 +76,7 @@
 public class LoginController {
   @FXML private TextField email; @FXML private PasswordField password;
   @FXML private CheckBox remember; @FXML private Label status;
-  private final LoginViewModel vm = new LoginViewModel();
+  private final LoginViewModel vm = new LoginViewModel(); // Illustrative example
 
   @FXML public void initialize(){
     status.textProperty().bind(vm.statusProperty());
@@ -94,6 +94,7 @@ public class LoginController {
   @FXML private void onRegister(){ ViewRouter.gotoRegistration(); }
 }
 ```
+Note: The `LoginViewModel` shown here is illustrative and may differ from the concrete implementation in the repository.
 - ViewModel:
 ```java
 public class LoginViewModel {
@@ -289,7 +290,7 @@ public void submitAll(Runnable onDone){
     @Override protected Void call() throws Exception {
       byte[] idEnc = Crypto.encryptFile(idFile.get());
       byte[] selfieEnc = Crypto.encryptFile(selfieFile.get());
-      RegistrationPayload payload = buildPayload(idEnc, selfieEnc, /* from step1 fields */);
+      RegistrationPayload payload = buildPayload(idEnc, selfieEnc);
       RegistrationResult res = RegistrationService.submit(payload);
       if (res.ok()) Platform.runLater(onDone);
       return null;
@@ -341,7 +342,7 @@ public void submitAll(Runnable onDone){
 - FXML: main_chat.fxml
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.MainChatController">
+<BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.MainChatController">
   <left>
     <VBox spacing="6">
       <HBox spacing="10">
@@ -357,7 +358,7 @@ public void submitAll(Runnable onDone){
       <Button text="⋯" onAction="#openOverflow"/>
     </HBox>
   </top>
-  enterer>
+  <center>
     <StackPane fx:id="centerArea">
       <VBox alignment="CENTER" spacing="10">
         <Label text="No chat selected..."/>

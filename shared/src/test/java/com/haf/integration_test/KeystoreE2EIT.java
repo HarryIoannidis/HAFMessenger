@@ -4,6 +4,7 @@ import org.junit.jupiter.api.*;
 import java.nio.file.*;
 import java.security.*;
 import javax.crypto.Cipher;
+import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.utils.RsaKeyIO;
@@ -45,11 +46,11 @@ class KeystoreE2EIT {
         PrivateKey prv = ks.loadCurrentPrivate(pass);
 
         byte[] msg = "HAF-IT-PAYLOAD".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        Cipher enc = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        Cipher enc = Cipher.getInstance(CryptoConstants.RSA_OAEP_TRANSFORMATION);
         enc.init(Cipher.ENCRYPT_MODE, pub);
         byte[] ct = enc.doFinal(msg);
 
-        Cipher dec = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        Cipher dec = Cipher.getInstance(CryptoConstants.RSA_OAEP_TRANSFORMATION);
         dec.init(Cipher.DECRYPT_MODE, prv);
         byte[] pt = dec.doFinal(ct);
 

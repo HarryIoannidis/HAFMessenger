@@ -14,10 +14,10 @@ public final class FingerprintUtil {
      */
     public static String sha256Hex(byte[] derPublicKey) {
         try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(derPublicKey);
+            byte[] d = MessageDigest.getInstance(com.haf.shared.constants.CryptoConstants.OAEP_HASH).digest(derPublicKey);
             return HexFormat.of().withUpperCase().formatHex(d);
         } catch (Exception e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            throw new IllegalStateException(com.haf.shared.constants.CryptoConstants.OAEP_HASH + " not available", e);
         }
     }
 }

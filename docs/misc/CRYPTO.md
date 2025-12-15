@@ -27,7 +27,7 @@ Logical flow diagram:
 
 ### Message packet format
 
-- Header: version, algo ids, sender, recipient, timestamp, TTL.
+- Header: version, algorithm id, sender, recipient, timestamp, TTL.
 - EncryptedKey: RSA-OAEP wrapping of the session key to the recipient.
 - EncryptedPayload: AES-256-GCM ciphertext.
 - Tag: GCM authentication tag.
@@ -208,7 +208,7 @@ public class EncryptedMessageDTO implements Serializable {
   public String recipientId;
   public long timestampEpochMs;
   public long ttlSeconds;
-  public String algo;              // "AES-256-GCM+RSA-OAEP"
+  public String algorithm;         // "AES-256-GCM+RSA-OAEP"
   public String ivB64;             // 12 bytes
   public String wrappedKeyB64;     // RSA-OAEP
   public String ciphertextB64;     // AES-GCM ciphertext (without tag)
@@ -244,7 +244,7 @@ dto.senderId = myId;
 dto.recipientId = peerId;
 dto.timestampEpochMs = System.currentTimeMillis();
 dto.ttlSeconds = 7 * 24 * 3600;
-dto.algo = "AES-256-GCM+RSA-OAEP";
+dto.algorithm = "AES-256-GCM+RSA-OAEP";
 dto.ivB64 = CryptoManager.b64(iv);
 dto.wrappedKeyB64 = CryptoManager.b64(wrapped);
 dto.ciphertextB64 = CryptoManager.b64(out.ciphertext);

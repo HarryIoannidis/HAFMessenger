@@ -28,7 +28,7 @@ HAF Messenger is an **end-to-end encrypted messaging system** designed for milit
 - **Java Server** (Layered architecture)
 - **MySQL Database** (persistent storage)
 - **TLS 1.3** (transport security)
-- **AES-256-GCM + RSA-OAEP (4096-bit default, min 2048)** (end-to-end encryption)
+- **AES-256-GCM + RSA-OAEP (SHA-256/MGF1), key sizes 2048–4096 (default 2048)** (end-to-end encryption)
 
 ### **High-Level Architecture**
 
@@ -1041,7 +1041,7 @@ HttpsConfigurator configurator = new HttpsConfigurator(sslContext) {
 ```
 1. Sender generates random AES-256 key
 2. Sender encrypts message with AES-256-GCM
-3. Sender wraps AES key with recipient's RSA-OAEP public key (4096-bit default)
+3. Sender wraps AES key with recipient's RSA-OAEP public key (default 2048-bit; supports 2048–4096)
 4. Send: {encryptedPayload, wrappedKey, iv, authTag}
 5. Recipient unwraps AES key with their RSA private key
 6. Recipient decrypts message with AES-256-GCM
@@ -1054,7 +1054,7 @@ public record EncryptedMessage(
     String senderId,
     String recipientId,
     byte[] encryptedPayload,  // AES-256-GCM encrypted
-    byte[] wrappedKey,         // RSA-OAEP (4096-bit default) wrapped AES key
+    byte[] wrappedKey,         // RSA-OAEP (default 2048-bit; supports 2048–4096) wrapped AES key
     byte[] iv,                 // 12-byte nonce
     byte[] authTag,            // 16-byte authentication tag
     String contentType,

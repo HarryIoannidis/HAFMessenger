@@ -3,7 +3,7 @@
 
 ### Field and Row
 - version: string.
-- algo: string.
+- algorithm: string.
 - senderId: string.
 - recipientId: string.
 - timestampEpochMs: long (ms since epoch).

@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.SplashViewModel;
+import com.haf.client.utils.UiConstants;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -57,7 +58,7 @@ public class SplashController {
     }
 
     private void navigateToLogin() {
-        ViewRouter.switchToTransparent("/fxml/login.fxml");
+        ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
     }
 
     private void showFailureDialog(Throwable error) {

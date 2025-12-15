@@ -20,7 +20,7 @@
 │ MessageEncryptor.encrypt()                              │
 │ 1. Generate random 256-bit AES key (ephemeral)          │
 │ 2. Generate random 12-byte IV                           │
-│ 3. Build AAD from metadata (version, algo, IDs, etc.)   │
+│ 3. Build AAD from metadata (version, algorithm, IDs, etc.)   │
 │ 4. Encrypt payload with AES-256-GCM                     │
 │    → produces: ciphertext + 128-bit auth tag            │
 │ 5. Wrap AES key with recipient's RSA public key         │
