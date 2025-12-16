@@ -1,52 +1,111 @@
 /* global.css */
 
-/* Import Regular */
+/* FONTS & ROOT */
 @font-face {
     font-family: 'Montserrat';
     src: url('../fonts/Manrope-Regular.ttf');
 }
 
-/* Import Bold */
 @font-face {
     font-family: 'Montserrat';
     font-weight: bold;
     src: url('../fonts/Manrope-Bold.ttf');
 }
 
-/*Root style*/
 .root {
     -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 14px;
-    -fx-text-fill: #212121;
+    -fx-text-fill: rgba(16, 16, 16, 0.95);
     -fx-text-alignment: center;
 }
 
-/*Primary style*/
 .haf-primary {
     -fx-background-color: #005EB8;
 }
 
-/*Secondary style*/
-.haf-secondary {
-    -fx-background-color: #0078D7;
+/* TITLE BAR */
+.title-bar {
+    -fx-background-color: #D9D9D9; /* Light gray title bar */
+    -fx-background-radius: 8 8 0 0;
+    -fx-alignment: center-left;
 }
 
-/*Tertiary style*/
-.haf-tertiary {
-    -fx-background-color: #0091EA;
+.title-bar-Hbox {
+    -fx-spacing: 0;
+    -fx-alignment: center;
+    -fx-padding: 0;
 }
 
-/* Card-like app window */
+.title-bar-buttons-Hbox {
+    -fx-spacing: 0;
+    -fx-padding: 0;
+}
+
+.title-bar-button-minimize, .title-bar-button-maximize {
+    -fx-background-color: transparent;
+    -fx-text-fill: #3C3C3C;
+    -fx-font-size: 16px;
+    -fx-padding: 8 12;
+    -fx-cursor: hand;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-content-display: graphic-only;
+}
+
+.title-bar-button-minimize:hover, .title-bar-button-maximize:hover {
+    -fx-background-color: #CDCDCD;
+}
+
+.title-bar-button-minimize:pressed, .title-bar-button-maximize:pressed {
+    -fx-background-color: #C3C3C3;
+}
+
+.title-bar-button-minimize .image-view {
+    -fx-fit-width: 16;
+    -fx-fit-height: 16;
+    -fx-preserve-ratio: true;
+}
+
+.title-bar-button-maximize .image-view {
+    -fx-fit-width: 16;
+    -fx-fit-height: 16;
+    -fx-preserve-ratio: true;
+}
+
+.title-bar-button-close {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0 8 0 0;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 16px;
+    -fx-padding: 8 12;
+    -fx-cursor: hand;
+    -fx-content-display: graphic-only;
+}
+
+.title-bar-button-close:hover {
+    -fx-background-color: #D01020;
+}
+
+.title-bar-button-close:pressed {
+    -fx-background-color: #B80F1C;
+}
+
+.title-bar-button-close .image-view {
+    -fx-fit-width: 16;
+    -fx-fit-height: 16;
+    -fx-preserve-ratio: true;
+}
+
+/* WINDOW */
 .window-card {
     -fx-background-color: #ebebeb;
-    -fx-background-radius: 17;
+    -fx-background-radius: 8;
     -fx-background-insets: 2;
     -fx-border-insets: 0;
-    -fx-border-radius: 16;
+    -fx-border-radius: 10;
     -fx-border-color: #989898;
     -fx-border-width: 3;
 
-    /* soft drop shadow around the panel */
     -fx-effect: innershadow(three-pass-box, rgba(0,0,0,0.30), 10, 0, 0, 0);
 
 }
