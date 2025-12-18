@@ -1,0 +1,90 @@
+/* register.css */
+
+/* ComboBox */
+.combo-box {
+    -fx-background-color: #d9d9d9;
+    -fx-border-color: #d9d9d9;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 16px;
+    -fx-min-height: 50;
+    -fx-cursor: hand;
+}
+
+.combo-box:hover {
+    -fx-border-color: #c0c0c0;
+}
+
+.combo-box:focused {
+    -fx-border-color: #007ABD;
+    -fx-border-width: 2;
+}
+
+
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 15 0 0;
+}
+
+.combo-box .arrow {
+    -fx-background-color: #2B2B2B;
+    -fx-shape: "M 0 0 L 12 0 L 6 6 Z";
+    -fx-padding: 6;
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+}
+
+.combo-box:hover .arrow {
+    -fx-background-color: #000000;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #989898;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0.3, 0, 2);
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: #FFFFFF;        /* Λευκό background */
+    -fx-text-fill: #2B2B2B;               /* Μαύρο text */
+    -fx-font-size: 16px;
+    -fx-font-weight: normal;              /* Κανονικό font weight */
+    -fx-cursor: hand;
+    -fx-alignment: center-left;           /* Align αριστερά */
+    -fx-graphic-text-gap: 10;             /* Απόσταση icon-text */
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: #F0F0F0;        /* Ανοιχτό γκρι */
+    -fx-text-fill: #000000;               /* Πιο σκούρο text */
+}
+
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: #007ABD;        /* Μπλε HAF */
+    -fx-text-fill: #FFFFFF;               /* Λευκό text */
+    -fx-font-weight: 600;                 /* Bold όταν επιλεγμένο */
+}
+
+.combo-box-popup .list-cell:pressed {
+    -fx-background-color: #0063B1;        /* Πιο σκούρο μπλε */
+}
+
+.combo-box-popup .list-cell .image-view {
+    -fx-fit-width: 24;
+    -fx-fit-height: 24;
+    -fx-preserve-ratio: true;
+}
+
+.combo-box-popup .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.combo-box-popup .list-cell:disabled {
+    -fx-opacity: 0.4;
+    -fx-cursor: default;
+}
