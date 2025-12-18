@@ -1,56 +1,29 @@
 .splash-title {
-    -fx-font-family: "Manrope", sans-serif;
     -fx-font-size: 24px;
     -fx-font-weight: bold;
     -fx-text-fill: #212121;
 }
 
 .splash-subtitle {
-    -fx-font-family: "Manrope", sans-serif;
     -fx-font-size: 20px;
     -fx-font-weight: 500;
     -fx-text-fill: #2c2c2c;
-    -fx-text-alignment: center;
 }
 
 .splash-status {
-    -fx-font-family: "Manrope", sans-serif;
     -fx-font-size: 18px;
-    -fx-font-weight: 600; /* Looks slightly bold in the pic */
+    -fx-font-weight: 600;
     -fx-text-fill: #212121;
-    -fx-text-alignment: center;
 }
 
 .splash-percent {
-    -fx-font-family: "Manrope", sans-serif;
     -fx-font-size: 18px;
     -fx-font-weight: bold;
     -fx-text-fill: #212121;
-    -fx-text-alignment: center;
 }
 
 .splash-version {
-    -fx-font-family: "Manrope", sans-serif;
     -fx-font-size: 15px;
     -fx-text-fill: #888888;
-    -fx-text-alignment: center;
 }
 
-.progress-bar > .track {
-    -fx-background-color: #dcdcdc;
-    -fx-background-radius: 60;
-    -fx-background-insets: 0;
-}
-
-.progress-bar > .bar {
-    -fx-background-color: linear-gradient(to bottom, #0078d7, #005eb8); /* HAF Blue Gradient */
-    -fx-background-radius:60;
-    -fx-background-insets: 0;
-}
-
-.progress-bar {
-    -fx-border-color: #989898;
-    -fx-border-width: 2px;
-    -fx-border-radius: 60;
-
-}
