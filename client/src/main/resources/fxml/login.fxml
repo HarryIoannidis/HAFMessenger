@@ -2,12 +2,12 @@
 
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.Cursor?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.effect.DropShadow?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
@@ -31,7 +31,7 @@
                         <Insets left="6.0" />
                      </HBox.margin>
                      <image>
-                        <Image url="@../images/app_logo.png" />
+                        <Image url="@../images/app_logo_downscale.png" />
                      </image>
                   </ImageView>
                   <Label text="HAF Messenger">
@@ -63,16 +63,16 @@
          <children>
             <StackPane fx:id="leftPanel" prefHeight="803.0" prefWidth="450.0" HBox.hgrow="NEVER">
                <children>
-                  <ImageView fitHeight="316.0" fitWidth="627.0" pickOnBounds="true" preserveRatio="true">
+                  <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
                      <image>
-                        <Image url="@../images/app_logo_upscale.png" />
+                        <Image url="@../images/app_logo_upscale2.png" />
                      </image>
-                     <effect>
-                        <DropShadow />
-                     </effect>
                      <StackPane.margin>
                         <Insets left="50.0" />
                      </StackPane.margin>
+                     <cursor>
+                        <Cursor fx:constant="CLOSED_HAND" />
+                     </cursor>
                   </ImageView>
                </children>
                <HBox.margin>
