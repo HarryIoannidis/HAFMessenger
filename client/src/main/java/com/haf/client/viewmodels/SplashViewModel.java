@@ -138,6 +138,7 @@ public class SplashViewModel {
                 delay(700L);
 
                 update("Ready", 1.0);
+                delay(400L);
                 return null;
             }
 
