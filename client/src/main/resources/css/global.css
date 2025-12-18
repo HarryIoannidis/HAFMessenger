@@ -121,11 +121,14 @@
     -fx-prompt-text-fill: #8B8B8B;
     -fx-min-height: 50;
     -fx-effect: null;
-    -fx-transition: -fx-border-color 0.3s ease;
+    -fx-transition: -fx-border-color 0.5s ease;
 }
 
 .password-field {
     -fx-padding: 12 55 12 15;
+}
+.text-field:hover, .password-field:hover {
+    -fx-border-color: #c0c0c0;
 }
 
 .text-field:focused, .password-field:focused {
@@ -259,3 +262,4 @@
     -fx-border-width: 2px;
     -fx-border-radius: 60;
 }
+

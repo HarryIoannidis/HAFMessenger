@@ -34,6 +34,9 @@ public class SplashController {
         viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
+    /**
+     * Binds the ViewModel properties to the UI components.
+     */
     private void bindViewModel() {
         status.textProperty().bind(viewModel.statusProperty());
         progressBar.progressProperty().bind(viewModel.progressProperty());
@@ -47,6 +50,9 @@ public class SplashController {
         percentage.managedProperty().bind(viewModel.errorProperty().not());
     }
 
+    /**
+     * Applies a rounded rectangle clip to the progress bar for rounded corners.
+     */
     private void applyProgressBarClip() {
         Rectangle clip = new Rectangle();
         clip.widthProperty().bind(progressBar.widthProperty());
@@ -57,10 +63,17 @@ public class SplashController {
         progressBar.setClip(clip);
     }
 
+    /**
+     * Navigates to the login screen.
+     */
     private void navigateToLogin() {
         ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
     }
 
+    /**
+     * Displays a failure dialog with the given error message.
+     * @param error the Throwable containing the error details
+     */
     private void showFailureDialog(Throwable error) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Initialization failed");

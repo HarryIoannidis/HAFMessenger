@@ -16,7 +16,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="LoginRegister">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/login.css" />
@@ -106,7 +106,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField prefHeight="50.0" prefWidth="564.0" styleClass="text-field">
+                                    <TextField prefHeight="50.0" styleClass="text-field">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
@@ -127,7 +127,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField prefHeight="50.0" prefWidth="564.0" styleClass="password-field">
+                                    <TextField prefHeight="50.0" styleClass="password-field">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
