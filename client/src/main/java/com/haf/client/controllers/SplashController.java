@@ -31,7 +31,9 @@ public class SplashController {
     @FXML public void initialize() {
         bindViewModel();
         applyProgressBarClip();
-        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
+
+        viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
+//        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
     /**
@@ -68,6 +70,13 @@ public class SplashController {
      */
     private void navigateToLogin() {
         ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
+    }
+
+    /**
+     * Navigates to the register screen.
+     */
+    private void navigateToRegister() {
+        ViewRouter.switchToTransparent(UiConstants.FXML_REGISTER);
     }
 
     /**

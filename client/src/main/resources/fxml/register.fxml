@@ -16,7 +16,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="RegisterController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/register.css" />
@@ -103,7 +103,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
+                                    <TextField maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="50.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
@@ -129,7 +129,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="123456" styleClass="text-field">
+                                          <TextField maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="123456" styleClass="text-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -153,7 +153,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="Γ-1234" styleClass="text-field">
+                                          <TextField maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="Γ-1234" styleClass="text-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -190,7 +190,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <ComboBox fx:id="rankComboBox" maxWidth="1.7976931348623157E308" prefWidth="277.0" />
+                                          <ComboBox fx:id="rankComboBox" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" />
                                        </children>
                                     </StackPane>
                                  </children>
@@ -210,7 +210,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="6971978340" styleClass="text-field">
+                                          <TextField maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="6971978340" styleClass="text-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -236,7 +236,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
+                                    <TextField maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="50.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
@@ -265,7 +265,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" promptText="ooooooo" styleClass="password-field">
+                                          <TextField maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="ooooooo" styleClass="password-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -291,7 +291,7 @@
                                     </Label>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="password-field">
+                                          <TextField maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" styleClass="password-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
