@@ -41,7 +41,7 @@ public class SplashViewModel {
         void check() throws Exception;
     }
 
-    private final StringProperty status = new SimpleStringProperty("Starting...");
+    private final StringProperty status = new SimpleStringProperty(UiConstants.BOOTSTRAP_STARTING);
     private final DoubleProperty progress = new SimpleDoubleProperty(0);
     private final StringProperty version = new SimpleStringProperty("1.0.0");
     private final StringProperty percentage = new SimpleStringProperty("0%");
@@ -115,29 +115,29 @@ public class SplashViewModel {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                update("Starting...", 0.0);
+                update(UiConstants.BOOTSTRAP_STARTING, 0.0);
                 delay(1500L);
 
-                update("Loading configuration...", 0.1);
+                update(UiConstants.BOOTSTRAP_CONFIG, 0.1);
                 String detectedVersion = configLoader.loadVersion();
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
                 delay(500L);
 
-                update("Initializing security modules...", 0.3);
+                update(UiConstants.BOOTSTRAP_SECURITY, 0.3);
                 cryptoInitializer.initialize();
                 delay(600L);
 
-                update("Checking local resources...", 0.6);
+                update(UiConstants.BOOTSTRAP_RESOURCES, 0.6);
                 resourceChecker.verify();
                 delay(1000L);
 
-                update("Verifying network reachability...", 0.8);
+                update(UiConstants.BOOTSTRAP_NETWORK, 0.8);
                 networkChecker.check();
                 delay(700L);
 
-                update("Ready", 1.0);
+                update(UiConstants.BOOTSTRAP_READY, 1.0);
                 delay(400L);
                 return null;
             }
@@ -168,7 +168,7 @@ public class SplashViewModel {
             percentage.unbind();
             percentage.set("");
             error.set(true);
-            status.set("Initialization failed.");
+            status.set(UiConstants.BOOTSTRAP_FAILED);
 
             if (onFailure != null) {
                 onFailure.accept(task.getException());
@@ -234,10 +234,6 @@ public class SplashViewModel {
         };
     }
 
-    /**
-     * Default implementation for the ResourceChecker.
-     * @return a Runnable that checks for required resources
-     */
     private static ResourceChecker defaultResourceChecker() {
         return () -> {
             requireResource(UiConstants.FXML_LOGIN, "Login view");

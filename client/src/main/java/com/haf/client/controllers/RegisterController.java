@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.UiConstants;
 import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
@@ -15,14 +16,19 @@ public class RegisterController {
     public void initialize() {
         // Populate ComboBox με τους βαθμούς
         rankComboBox.getItems().addAll(
-                "Σμηνίας",
-                "Υποσμηναγός",
-                "Σμηναγός",
-                "Επισμηναγός",
-                "Ανθυποσμηνάρχης",
-                "Σμηνάρχης",
-                "Αντισμήναρχος",
-                "Σμήναρχος"
+                UiConstants.RANK_YPOSMINIAS,
+                UiConstants.RANK_SMINIAS,
+                UiConstants.RANK_EPISMINIAS,
+                UiConstants.RANK_ARCHISMINIAS,
+                UiConstants.RANK_ANTHYPASPISTIS,
+                UiConstants.RANK_ANTHYPOSMINAGOS,
+                UiConstants.RANK_YPOSMINAGOS,
+                UiConstants.RANK_EPISMINAGOS,
+                UiConstants.RANK_ANTISMINARCHOS,
+                UiConstants.RANK_SMINARCHOS,
+                UiConstants.RANK_TAKSIARCOS,
+                UiConstants.RANK_YPOPTERARCHOS,
+                UiConstants.RANK_ANTIPTERARCHOS
         );
 
         // Set cell factory για εικονίδια στη λίστα
@@ -44,8 +50,8 @@ public class RegisterController {
                         String iconPath = getRankIconPath(rank);
                         Image image = new Image(getClass().getResourceAsStream(iconPath));
                         imageView.setImage(image);
-                        imageView.setFitWidth(24);
-                        imageView.setFitHeight(24);
+                        imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
+                        imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
                         imageView.setPreserveRatio(true);
                         setGraphic(imageView);
                     } catch (Exception e) {
@@ -74,8 +80,8 @@ public class RegisterController {
                         String iconPath = getRankIconPath(rank);
                         Image image = new Image(getClass().getResourceAsStream(iconPath));
                         imageView.setImage(image);
-                        imageView.setFitWidth(24);
-                        imageView.setFitHeight(24);
+                        imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
+                        imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
                         imageView.setPreserveRatio(true);
                         setGraphic(imageView);
                     } catch (Exception e) {
@@ -88,25 +94,34 @@ public class RegisterController {
 
     // Helper method - επιστρέφει το path του icon
     private String getRankIconPath(String rank) {
-        switch (rank) {
-            case "Σμηνίας":
-                return "/images/ranks/sminias.png";
-            case "Υποσμηναγός":
-                return "/images/ranks/yposminagos.png";
-            case "Σμηναγός":
-                return "/images/ranks/sminagos.png";
-            case "Επισμηναγός":
-                return "/images/ranks/episminagos.png";
-            case "Ανθυποσμηνάρχης":
-                return "/images/ranks/anthyposminarchis.png";
-            case "Σμηνάρχης":
-                return "/images/ranks/sminarchis.png";
-            case "Αντισμήναρχος":
-                return "/images/ranks/antisminarchos.png";
-            case "Σμήναρχος":
-                return "/images/ranks/sminarchos.png";
-            default:
-                return "/images/ranks/default.png";
+        if (UiConstants.RANK_YPOSMINIAS.equals(rank)) {
+            return UiConstants.ICON_RANK_YPOSMINIAS;
+        } else if (UiConstants.RANK_SMINIAS.equals(rank)) {
+            return UiConstants.ICON_RANK_SMINIAS;
+        } else if (UiConstants.RANK_EPISMINIAS.equals(rank)) {
+            return UiConstants.ICON_RANK_EPISMINIAS;
+        } else if (UiConstants.RANK_ARCHISMINIAS.equals(rank)) {
+            return UiConstants.ICON_RANK_ARCHISMINIAS;
+        } else if (UiConstants.RANK_ANTHYPASPISTIS.equals(rank)) {
+            return UiConstants.ICON_RANK_ANTHYPASPISTIS;
+        } else if (UiConstants.RANK_ANTHYPOSMINAGOS.equals(rank)) {
+            return UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
+        } else if (UiConstants.RANK_YPOSMINAGOS.equals(rank)) {
+            return UiConstants.ICON_RANK_YPOSMINAGOS;
+        } else if (UiConstants.RANK_EPISMINAGOS.equals(rank)) {
+            return UiConstants.ICON_RANK_EPISMINAGOS;
+        } else if (UiConstants.RANK_ANTISMINARCHOS.equals(rank)) {
+            return UiConstants.ICON_RANK_ANTISMINARCHOS;
+        } else if (UiConstants.RANK_SMINARCHOS.equals(rank)) {
+            return UiConstants.ICON_RANK_SMINARCHOS;
+        } else if (UiConstants.RANK_TAKSIARCOS.equals(rank)) {
+            return UiConstants.ICON_RANK_TAKSIARCOS;
+        } else if (UiConstants.RANK_YPOPTERARCHOS.equals(rank)) {
+            return UiConstants.ICON_RANK_YPOPTERARCHOS;
+        } else if (UiConstants.RANK_ANTIPTERARCHOS.equals(rank)) {
+            return UiConstants.ICON_RANK_ANTIPTERARCHOS;
+        } else {
+            return UiConstants.ICON_RANK_DEFAULT;
         }
     }
 

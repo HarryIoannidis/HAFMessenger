@@ -1,20 +1,9 @@
 /* global.css */
 
-/*--------------------- FONTS & ROOT ---------------------*/
-@font-face {
-    font-family: 'Manrope';
-    src: url('../fonts/Manrope-Regular.ttf');
-}
-
-@font-face {
-    font-family: 'Manrope';
-    font-weight: bold;
-    src: url('../fonts/Manrope-Bold.ttf');
-}
-
+/*--------------------- ROOT ---------------------*/
 .root {
     -fx-font-family: 'Manrope', sans-serif;
-    -fx-text-fill: #2B2B2B;
+    -fx-text-fill: #2b2b2b;
     -fx-text-alignment: center;
 }
 
@@ -40,7 +29,8 @@
     -fx-padding: 0;
 }
 
-.title-bar-button-minimize, .title-bar-button-maximize {
+.title-bar-button-minimize,
+.title-bar-button-maximize {
     -fx-background-color: transparent;
     -fx-text-fill: #3c3c3c;
     -fx-font-size: 16px;
@@ -51,11 +41,13 @@
     -fx-content-display: graphic-only;
 }
 
-.title-bar-button-minimize:hover, .title-bar-button-maximize:hover {
+.title-bar-button-minimize:hover,
+.title-bar-button-maximize:hover {
     -fx-background-color: #cdcdcd;
 }
 
-.title-bar-button-minimize:pressed, .title-bar-button-maximize:pressed {
+.title-bar-button-minimize:pressed,
+.title-bar-button-maximize:pressed {
     -fx-background-color: #c3c3c3;
 }
 
@@ -104,11 +96,12 @@
     -fx-border-radius: 10;
     -fx-border-color: #989898;
     -fx-border-width: 3;
-    -fx-effect: innershadow(three-pass-box, rgba(0,0,0,0.50), 10, 0, 0, 0);
+    -fx-effect: innershadow(three-pass-box, rgba(0, 0, 0, 0.50), 10, 0, 0, 0);
 }
 
 /*--------------------- COMPONENTS ---------------------*/
-.text-field, .password-field {
+.text-field,
+.password-field {
     -fx-background-color: #d9d9d9;
     -fx-border-color: #d9d9d9;
     -fx-border-width: 2;
@@ -118,7 +111,7 @@
     -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 16px;
     -fx-text-fill: #000000;
-    -fx-prompt-text-fill: #8B8B8B;
+    -fx-prompt-text-fill: #8b8b8b;
     -fx-min-height: 50;
     -fx-effect: null;
     -fx-transition: -fx-border-color 0.5s ease;
@@ -127,14 +120,17 @@
 .password-field {
     -fx-padding: 12 55 12 15;
 }
-.text-field:hover, .password-field:hover {
+
+.text-field:hover,
+.password-field:hover {
     -fx-border-color: #c0c0c0;
 }
 
-.text-field:focused, .password-field:focused {
-    -fx-border-color: #0078D7;
+.text-field:focused,
+.password-field:focused {
+    -fx-border-color: #0078d7;
     -fx-border-width: 2;
-    -fx-background-color: #DBDBDB;
+    -fx-background-color: #dbdbdb;
 }
 
 .field-icon-button {
@@ -165,9 +161,8 @@
 }
 
 .button-primary {
-    -fx-background-color: #007ABD;
-    -fx-text-fill: #FFFFFF;
-    -fx-font-family: 'Montserrat', sans-serif;
+    -fx-background-color: #007abd;
+    -fx-text-fill: #ffffff;
     -fx-font-size: 18px;
     -fx-font-weight: 600;
     -fx-background-radius: 8;
@@ -178,15 +173,15 @@
 }
 
 .button-primary:hover {
-    -fx-background-color: #0063B1;
+    -fx-background-color: #0063b1;
 }
 
 .button-primary:pressed {
-    -fx-background-color: #004E8C;
+    -fx-background-color: #004e8c;
 }
 
 .button-primary:disabled {
-    -fx-background-color: #B0B0B0;
+    -fx-background-color: #b0b0b0;
     -fx-opacity: 0.6;
     -fx-cursor: default;
 }
@@ -194,12 +189,12 @@
 .check-box {
     -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 16px;
-    -fx-text-fill: #2B2B2B;
+    -fx-text-fill: #2b2b2b;
     -fx-cursor: hand;
 }
 
 .check-box .box {
-    -fx-border-color: #2B2B2B;
+    -fx-border-color: #2b2b2b;
     -fx-border-width: 2;
     -fx-border-radius: 4;
     -fx-background-radius: 3;
@@ -210,16 +205,16 @@
 }
 
 .check-box:hover .box {
-    -fx-border-color: #004E8C;
+    -fx-border-color: #004e8c;
 }
 
 .check-box:selected .box {
-    -fx-background-color: #007ABD;
-    -fx-border-color: #007ABD;
+    -fx-background-color: #007abd;
+    -fx-border-color: #007abd;
 }
 
 .check-box:selected .mark {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: #ffffff;
     -fx-shape: "M -6 5 L -2 9 L 6 1 L 4 -1 L -2 5 L -4 3 Z";
 }
 
@@ -227,7 +222,7 @@
 .text-button {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-text-fill: #007ABD;
+    -fx-text-fill: #007abd;
     -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 15px;
     -fx-font-weight: 600;
@@ -237,23 +232,24 @@
 }
 
 .text-button:hover {
-    -fx-text-fill: #0063B1;
+    -fx-text-fill: #0063b1;
 }
 
 .text-button:pressed {
-    -fx-text-fill: #004E8C;
+    -fx-text-fill: #004e8c;
 }
 
 /* ProggresBar */
-.progress-bar > .track {
+.progress-bar>.track {
     -fx-background-color: #dcdcdc;
     -fx-background-radius: 60;
     -fx-background-insets: 0;
 }
 
-.progress-bar > .bar {
-    -fx-background-color: linear-gradient(to bottom, #0078d7, #005eb8); /* HAF Blue Gradient */
-    -fx-background-radius:60;
+.progress-bar>.bar {
+    -fx-background-color: linear-gradient(to bottom, #0078d7, #005eb8);
+    /* HAF Blue Gradient */
+    -fx-background-radius: 60;
     -fx-background-insets: 0;
 }
 
@@ -262,4 +258,3 @@
     -fx-border-width: 2px;
     -fx-border-radius: 60;
 }
-

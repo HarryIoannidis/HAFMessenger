@@ -58,8 +58,8 @@ public class SplashController {
         clip.widthProperty().bind(progressBar.widthProperty());
         clip.heightProperty().bind(progressBar.heightProperty());
 
-        clip.setArcWidth(24);
-        clip.setArcHeight(24);
+        clip.setArcWidth(UiConstants.SPLASH_PROGRESS_BAR_ARC);
+        clip.setArcHeight(UiConstants.SPLASH_PROGRESS_BAR_ARC);
         progressBar.setClip(clip);
     }
 
@@ -76,8 +76,8 @@ public class SplashController {
      */
     private void showFailureDialog(Throwable error) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Initialization failed");
-        alert.setHeaderText("Startup could not complete");
+        alert.setTitle(UiConstants.DIALOG_INIT_FAILED_TITLE);
+        alert.setHeaderText(UiConstants.DIALOG_INIT_FAILED_HEADER);
         String message = (error != null && error.getMessage() != null) ? error.getMessage() : String.valueOf(error);
         alert.setContentText(message);
         alert.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);

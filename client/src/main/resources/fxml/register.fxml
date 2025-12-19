@@ -31,7 +31,7 @@
                         <Insets left="6.0" />
                      </HBox.margin>
                      <image>
-                        <Image url="@../images/app_logo_downscale.png" />
+                        <Image url="@../images/logo/app_logo_downscale.png" />
                      </image>
                   </ImageView>
                   <Label text="HAF Messenger">
@@ -61,11 +61,11 @@
    <center>
       <HBox prefHeight="100.0" prefWidth="200.0" BorderPane.alignment="CENTER">
          <children>
-            <StackPane fx:id="leftPanel" prefHeight="803.0" prefWidth="450.0" HBox.hgrow="NEVER">
+            <StackPane fx:id="leftPanel" prefHeight="803.0" prefWidth="400.0" HBox.hgrow="NEVER">
                <children>
                   <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
                      <image>
-                        <Image url="@../images/app_logo_upscale2.png" />
+                        <Image url="@../images/logo/app_logo_upscale2.png" />
                      </image>
                      <StackPane.margin>
                         <Insets left="50.0" />
