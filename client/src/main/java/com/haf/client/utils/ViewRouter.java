@@ -4,11 +4,21 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import java.io.IOException;
+import java.util.Objects;
 
 public class ViewRouter {
+
+    /**
+     * Loads the Manrope font once at class initialization.
+     */
+    static {
+        Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_REGULAR), UiConstants.FONT_SIZE_REGULAR);
+        Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD), UiConstants.FONT_SIZE_BOLD);
+    }
 
     private static Stage mainStage;
 
@@ -36,7 +46,9 @@ public class ViewRouter {
             if (mainStage.getScene() != null) {
                 mainStage.getScene().setRoot(root);
             } else {
-                mainStage.setScene(new Scene(root));
+                Scene scene = new Scene(root);
+                scene.getStylesheets().add(UiConstants.CSS_GLOBAL);
+                mainStage.setScene(scene);
             }
             mainStage.centerOnScreen();
             mainStage.show();
@@ -60,6 +72,7 @@ public class ViewRouter {
             Parent root = loader.load();
             Scene scene = new Scene(root);
             scene.setFill(Color.TRANSPARENT);
+            scene.getStylesheets().add(UiConstants.CSS_GLOBAL);
 
             mainStage.setScene(scene);
             mainStage.centerOnScreen();

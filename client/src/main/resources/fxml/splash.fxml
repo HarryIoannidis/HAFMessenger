@@ -29,7 +29,7 @@
                          </color>
                      </DropShadow>
                  </effect>
-                 <Image url="@../images/app_logo.png" />
+                 <Image url="@../images/logo/app_logo.png" />
              </ImageView>
             <Label fx:id="title" prefWidth="210.0" styleClass="splash-title" text="Hellenic Air Force">
                <VBox.margin>
