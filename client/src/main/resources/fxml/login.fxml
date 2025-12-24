@@ -6,6 +6,7 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.image.Image?>
@@ -68,7 +69,7 @@
                         <Image url="@../images/logo/app_logo_upscale2.png" />
                      </image>
                      <StackPane.margin>
-                        <Insets left="50.0" />
+                        <Insets left="55.0" />
                      </StackPane.margin>
                      <cursor>
                         <Cursor fx:constant="CLOSED_HAND" />
@@ -91,7 +92,7 @@
                               <Insets bottom="20.0" />
                            </VBox.margin>
                         </Label>
-                        <VBox prefWidth="100.0">
+                        <VBox prefWidth="105.0">
                            <padding>
                               <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                            </padding>
@@ -106,7 +107,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField prefHeight="50.0" styleClass="text-field">
+                                    <TextField fx:id="emailField" prefHeight="50.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
@@ -115,7 +116,7 @@
                               </StackPane>
                            </children>
                         </VBox>
-                        <VBox prefWidth="100.0">
+                        <VBox prefWidth="105.0">
                            <padding>
                               <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                            </padding>
@@ -127,11 +128,7 @@
                               </Label>
                               <StackPane prefWidth="200.0">
                                  <children>
-                                    <TextField prefHeight="50.0" styleClass="password-field">
-                                       <font>
-                                          <Font size="18.0" />
-                                       </font>
-                                    </TextField>
+                                    <PasswordField fx:id="passwordField" promptText="abc123!@#" />
                                     <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                        <StackPane.margin>
                                           <Insets right="10.0" />
@@ -149,16 +146,16 @@
                               <Insets bottom="10.0" left="45.0" right="45.0" top="25.0" />
                            </VBox.margin>
                            <children>
-                              <CheckBox alignment="CENTER" mnemonicParsing="false" prefHeight="30.0" text="Remember credentials">
+                              <CheckBox fx:id="rememberCHeckBox" alignment="CENTER" mnemonicParsing="false" prefHeight="30.0" text="Remember credentials">
                                  <font>
                                     <Font size="18.0" />
                                  </font>
                               </CheckBox>
                            </children>
                         </HBox>
-                        <Button maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" prefHeight="50.0" styleClass="button-primary" text="Sign In">
+                        <Button fx:id="signInButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" prefHeight="50.0" styleClass="button-primary" text="Sign In">
                            <VBox.margin>
-                              <Insets bottom="20.0" left="45.0" right="45.0" top="30.0" />
+                              <Insets bottom="30.0" left="45.0" right="45.0" top="30.0" />
                            </VBox.margin>
                            <font>
                               <Font name="System Bold" size="18.0" />
@@ -174,7 +171,7 @@
                                     <Font size="15.0" />
                                  </font>
                               </Label>
-                              <Label accessibleRole="HYPERLINK" alignment="CENTER" styleClass="text-button" text="Register here">
+                              <Label fx:id="gotoRegisterButton" accessibleRole="HYPERLINK" alignment="CENTER" styleClass="text-button" text="Register here">
                                  <font>
                                     <Font size="15.0" />
                                  </font>
