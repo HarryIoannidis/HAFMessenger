@@ -14,7 +14,6 @@ public class RegisterController {
 
     @FXML
     public void initialize() {
-        // Populate ComboBox με τους βαθμούς
         rankComboBox.getItems().addAll(
                 UiConstants.RANK_YPOSMINIAS,
                 UiConstants.RANK_SMINIAS,
@@ -92,7 +91,11 @@ public class RegisterController {
         });
     }
 
-    // Helper method - επιστρέφει το path του icon
+    /**
+     * Returns the rank's image
+     * @param rank the rank
+     * @return the rank's corresponding image path
+     */
     private String getRankIconPath(String rank) {
         if (UiConstants.RANK_YPOSMINIAS.equals(rank)) {
             return UiConstants.ICON_RANK_YPOSMINIAS;
