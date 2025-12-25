@@ -7,10 +7,13 @@ import javafx.scene.control.ListCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 
+import java.util.Objects;
+
 public class RegisterController {
 
     @FXML
     private ComboBox<String> rankComboBox;
+
 
     @FXML
     public void initialize() {
@@ -44,17 +47,15 @@ public class RegisterController {
                 } else {
                     setText(rank);
 
-                    // Φόρτωσε το εικονίδιο
                     try {
                         String iconPath = getRankIconPath(rank);
-                        Image image = new Image(getClass().getResourceAsStream(iconPath));
+                        Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream(iconPath)));
                         imageView.setImage(image);
                         imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
                         imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
                         imageView.setPreserveRatio(true);
                         setGraphic(imageView);
                     } catch (Exception e) {
-                        // Αν δεν βρεθεί το icon, μην βάζεις τίποτα
                         setGraphic(null);
                     }
                 }
@@ -77,7 +78,7 @@ public class RegisterController {
 
                     try {
                         String iconPath = getRankIconPath(rank);
-                        Image image = new Image(getClass().getResourceAsStream(iconPath));
+                        Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream(iconPath)));
                         imageView.setImage(image);
                         imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
                         imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
@@ -97,35 +98,22 @@ public class RegisterController {
      * @return the rank's corresponding image path
      */
     private String getRankIconPath(String rank) {
-        if (UiConstants.RANK_YPOSMINIAS.equals(rank)) {
-            return UiConstants.ICON_RANK_YPOSMINIAS;
-        } else if (UiConstants.RANK_SMINIAS.equals(rank)) {
-            return UiConstants.ICON_RANK_SMINIAS;
-        } else if (UiConstants.RANK_EPISMINIAS.equals(rank)) {
-            return UiConstants.ICON_RANK_EPISMINIAS;
-        } else if (UiConstants.RANK_ARCHISMINIAS.equals(rank)) {
-            return UiConstants.ICON_RANK_ARCHISMINIAS;
-        } else if (UiConstants.RANK_ANTHYPASPISTIS.equals(rank)) {
-            return UiConstants.ICON_RANK_ANTHYPASPISTIS;
-        } else if (UiConstants.RANK_ANTHYPOSMINAGOS.equals(rank)) {
-            return UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
-        } else if (UiConstants.RANK_YPOSMINAGOS.equals(rank)) {
-            return UiConstants.ICON_RANK_YPOSMINAGOS;
-        } else if (UiConstants.RANK_EPISMINAGOS.equals(rank)) {
-            return UiConstants.ICON_RANK_EPISMINAGOS;
-        } else if (UiConstants.RANK_ANTISMINARCHOS.equals(rank)) {
-            return UiConstants.ICON_RANK_ANTISMINARCHOS;
-        } else if (UiConstants.RANK_SMINARCHOS.equals(rank)) {
-            return UiConstants.ICON_RANK_SMINARCHOS;
-        } else if (UiConstants.RANK_TAKSIARCOS.equals(rank)) {
-            return UiConstants.ICON_RANK_TAKSIARCOS;
-        } else if (UiConstants.RANK_YPOPTERARCHOS.equals(rank)) {
-            return UiConstants.ICON_RANK_YPOPTERARCHOS;
-        } else if (UiConstants.RANK_ANTIPTERARCHOS.equals(rank)) {
-            return UiConstants.ICON_RANK_ANTIPTERARCHOS;
-        } else {
-            return UiConstants.ICON_RANK_DEFAULT;
-        }
+        return switch (rank) {
+            case UiConstants.RANK_YPOSMINIAS -> UiConstants.ICON_RANK_YPOSMINIAS;
+            case UiConstants.RANK_SMINIAS -> UiConstants.ICON_RANK_SMINIAS;
+            case UiConstants.RANK_EPISMINIAS -> UiConstants.ICON_RANK_EPISMINIAS;
+            case UiConstants.RANK_ARCHISMINIAS -> UiConstants.ICON_RANK_ARCHISMINIAS;
+            case UiConstants.RANK_ANTHYPASPISTIS -> UiConstants.ICON_RANK_ANTHYPASPISTIS;
+            case UiConstants.RANK_ANTHYPOSMINAGOS -> UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
+            case UiConstants.RANK_YPOSMINAGOS -> UiConstants.ICON_RANK_YPOSMINAGOS;
+            case UiConstants.RANK_EPISMINAGOS -> UiConstants.ICON_RANK_EPISMINAGOS;
+            case UiConstants.RANK_ANTISMINARCHOS -> UiConstants.ICON_RANK_ANTISMINARCHOS;
+            case UiConstants.RANK_SMINARCHOS -> UiConstants.ICON_RANK_SMINARCHOS;
+            case UiConstants.RANK_TAKSIARCOS -> UiConstants.ICON_RANK_TAKSIARCOS;
+            case UiConstants.RANK_YPOPTERARCHOS -> UiConstants.ICON_RANK_YPOPTERARCHOS;
+            case UiConstants.RANK_ANTIPTERARCHOS -> UiConstants.ICON_RANK_ANTIPTERARCHOS;
+            case null, default -> UiConstants.ICON_RANK_DEFAULT;
+        };
     }
 
     // Get selected rank
