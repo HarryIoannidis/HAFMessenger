@@ -66,7 +66,7 @@
                <children>
                   <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
                      <image>
-                        <Image url="@../images/logo/app_logo_upscale2.png" />
+                        <Image url="@../images/logo/app_logo_upscale.png" />
                      </image>
                      <StackPane.margin>
                         <Insets left="55.0" />
