@@ -13,7 +13,9 @@ public final class UiConstants {
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";
     public static final String IMAGE_APP_LOGO_DOWNSCALE = "/images/logo/app_logo_downscale.png";
-    public static final String IMAGE_APP_LOGO_UPSCALE = "/images/logo/app_logo_upscale2.png";
+    public static final String IMAGE_APP_LOGO_UPSCALE = "/images/logo/app_logo_upscale.png";
+    public static final String IMAGE_APP_LOGO_SVG = "/images/logo/app_logo_svg.svg";
+
 
     // Rank names
     public static final String RANK_YPOSMINIAS = "Υποσμηνίας";
