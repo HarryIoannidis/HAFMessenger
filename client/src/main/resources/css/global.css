@@ -176,9 +176,9 @@
     -fx-background-color: #0063b1;
 }
 
-.button-primary:pressed {
-    -fx-background-color: #004e8c;
-}
+/*.button-primary:pressed {*/
+/*    -fx-background-color: #004e8c;*/
+/*}*/
 
 .button-primary:disabled {
     -fx-background-color: #b0b0b0;

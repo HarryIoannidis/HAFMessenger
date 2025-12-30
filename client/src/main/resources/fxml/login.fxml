@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import com.jfoenix.controls.JFXButton?>
+<?import com.jfoenix.controls.JFXCheckBox?>
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.Cursor?>
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.Separator?>
@@ -72,7 +73,7 @@
                         <Insets left="55.0" />
                      </StackPane.margin>
                      <cursor>
-                        <Cursor fx:constant="CLOSED_HAND" />
+                        <Cursor fx:constant="DEFAULT" />
                      </cursor>
                   </ImageView>
                </children>
@@ -143,24 +144,17 @@
                         </VBox>
                         <HBox>
                            <VBox.margin>
-                              <Insets bottom="10.0" left="45.0" right="45.0" top="25.0" />
+                              <Insets left="45.0" right="45.0" top="15.0" />
                            </VBox.margin>
                            <children>
-                              <CheckBox fx:id="rememberCHeckBox" alignment="CENTER" mnemonicParsing="false" prefHeight="30.0" text="Remember credentials">
-                                 <font>
-                                    <Font size="18.0" />
-                                 </font>
-                              </CheckBox>
+                              <JFXCheckBox fx:id="rememberCheckBox" checkedColor="#007abd" prefHeight="30.0" text="Remember Credentials" />
                            </children>
                         </HBox>
-                        <Button fx:id="signInButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" prefHeight="50.0" styleClass="button-primary" text="Sign In">
+                        <JFXButton fx:id="signInButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="button-primary" text="Sign In">
                            <VBox.margin>
-                              <Insets bottom="30.0" left="45.0" right="45.0" top="30.0" />
+                              <Insets bottom="25.0" left="45.0" right="45.0" top="40.0" />
                            </VBox.margin>
-                           <font>
-                              <Font name="System Bold" size="18.0" />
-                           </font>
-                        </Button>
+                        </JFXButton>
                         <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
                            <VBox.margin>
                               <Insets left="30.0" right="30.0" />

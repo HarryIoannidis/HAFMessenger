@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import com.jfoenix.controls.JFXButton?>
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.Cursor?>
@@ -356,14 +357,11 @@
                               <Insets left="30.0" right="30.0" />
                            </VBox.margin>
                         </StackPane>
-                        <Button fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" prefHeight="50.0" styleClass="button-primary" text="Register">
+                        <JFXButton fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="button-primary" text="Register">
                            <VBox.margin>
                               <Insets bottom="25.0" left="45.0" right="45.0" top="40.0" />
                            </VBox.margin>
-                           <font>
-                              <Font name="System Bold" size="18.0" />
-                           </font>
-                        </Button>
+                        </JFXButton>
                         <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
                            <VBox.margin>
                               <Insets left="30.0" right="30.0" />
