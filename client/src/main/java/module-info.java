@@ -5,6 +5,7 @@ module client {
     requires javafx.fxml;
     requires java.net.http;
     requires java.logging;
+    requires com.jfoenix;
 
     // exports com.haf.client.ui;
     // exports com.haf.client.service;
