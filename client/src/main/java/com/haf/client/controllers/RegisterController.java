@@ -6,14 +6,65 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.Label;
+import com.jfoenix.controls.JFXButton;
 
 import java.util.Objects;
 
 public class RegisterController {
 
     @FXML
-    private ComboBox<String> rankComboBox;
+    private BorderPane rootContainer;
 
+    @FXML
+    private HBox titleBar;
+
+    @FXML
+    private HBox ttileHBox;
+
+    @FXML
+    private HBox buttonsHBox;
+
+    @FXML
+    private StackPane leftPanel;
+
+    @FXML
+    private StackPane rightPanel;
+
+    @FXML
+    private TextField nameField;
+
+    @FXML
+    private TextField regNumField;
+
+    @FXML
+    private TextField idNumField;
+
+    @FXML
+    private TextField phoneNumField;
+
+    @FXML
+    private TextField emailField;
+
+    @FXML
+    private PasswordField passwordField;
+
+    @FXML
+    private PasswordField passwordConfField;
+
+    @FXML
+    private JFXButton registerButton;
+
+    @FXML
+    private Label gotoSignInButton;
+
+    @FXML
+    private ComboBox<String> rankComboBox;
 
     @FXML
     public void initialize() {
@@ -30,8 +81,7 @@ public class RegisterController {
                 UiConstants.RANK_SMINARCHOS,
                 UiConstants.RANK_TAKSIARCOS,
                 UiConstants.RANK_YPOPTERARCHOS,
-                UiConstants.RANK_ANTIPTERARCHOS
-        );
+                UiConstants.RANK_ANTIPTERARCHOS);
 
         // Set cell factory για εικονίδια στη λίστα
         rankComboBox.setCellFactory(listView -> new ListCell<String>() {
@@ -94,6 +144,7 @@ public class RegisterController {
 
     /**
      * Returns the rank's image
+     * 
      * @param rank the rank
      * @return the rank's corresponding image path
      */
