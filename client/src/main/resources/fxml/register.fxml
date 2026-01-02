@@ -18,6 +18,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 <BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
@@ -49,9 +50,21 @@
             <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
             <HBox fx:id="buttonsHBox" prefHeight="40.0" styleClass="title-bar-buttons-Hbox">
                <children>
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize" />
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize" />
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close" />
+                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                     <graphic>
+                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20"/>
+                     </graphic>
+                  </Button>
+                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
+                     <graphic>
+                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20"/>
+                     </graphic>
+                  </Button>
+                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                     <graphic>
+                        <FontIcon iconLiteral="mdi2c-close" iconSize="20"/>
+                     </graphic>
+                  </Button>
                </children>
             </HBox>
          </children>
@@ -262,6 +275,9 @@
                                                          </StackPane.margin>
                                                       </PasswordField>
                                                       <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
+                                                         <graphic>
+                                                            <FontIcon iconLiteral="mdi2e-eye" iconSize="20"/>
+                                                         </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
                                                          </StackPane.margin>
@@ -291,6 +307,9 @@
                                                          </font>
                                                       </PasswordField>
                                                       <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
+                                                         <graphic>
+                                                            <FontIcon iconLiteral="mdi2e-eye" iconSize="20"/>
+                                                         </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
                                                          </StackPane.margin>
