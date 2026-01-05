@@ -28,15 +28,11 @@
 }
 
 .combo-box .arrow {
-    -fx-background-color: #2B2B2B;
+    -fx-background-color: #d9d9d9;
     -fx-shape: "M 0 0 L 12 0 L 6 6 Z";
     -fx-padding: 6;
     -fx-scale-x: 1.0;
     -fx-scale-y: 1.0;
-}
-
-.combo-box:hover .arrow {
-    -fx-background-color: #000000;
 }
 
 .combo-box-popup .list-view {
@@ -50,6 +46,7 @@
 
 .combo-box-popup .list-cell {
     -fx-background-color: #FFFFFF;        /* Λευκό background */
+    -fx-background-radius: 5;
     -fx-text-fill: #2B2B2B;               /* Μαύρο text */
     -fx-font-size: 16px;
     -fx-font-weight: normal;              /* Κανονικό font weight */
