@@ -17,8 +17,8 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
-
 <?import org.kordamp.ikonli.javafx.FontIcon?>
+
 <BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
@@ -52,17 +52,17 @@
                <children>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20"/>
+                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20" />
                      </graphic>
                   </Button>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20"/>
+                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20" />
                      </graphic>
                   </Button>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2c-close" iconSize="20"/>
+                        <FontIcon iconLiteral="mdi2c-close" iconSize="20" />
                      </graphic>
                   </Button>
                </children>
@@ -108,7 +108,7 @@
                         </Label>
                         <StackPane>
                            <children>
-                              <VBox>
+                              <VBox visible="false">
                                  <children>
                                     <VBox prefWidth="100.0">
                                        <padding>
@@ -198,6 +198,14 @@
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <ComboBox fx:id="rankComboBox" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Σμηνίας" visibleRowCount="12" />
+                                                      <Label alignment="CENTER" contentDisplay="CENTER" prefHeight="30.0" prefWidth="30.0" StackPane.alignment="CENTER_RIGHT">
+                                                         <StackPane.margin>
+                                                            <Insets right="5.0" />
+                                                         </StackPane.margin>
+                                                         <graphic>
+                                                            <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="40" />
+                                                         </graphic>
+                                                      </Label>
                                                    </children>
                                                 </StackPane>
                                              </children>
@@ -276,7 +284,7 @@
                                                       </PasswordField>
                                                       <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
-                                                            <FontIcon iconLiteral="mdi2e-eye" iconSize="20"/>
+                                                            <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
                                                          </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
@@ -308,7 +316,7 @@
                                                       </PasswordField>
                                                       <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
-                                                            <FontIcon iconLiteral="mdi2e-eye" iconSize="20"/>
+                                                            <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
                                                          </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
@@ -325,7 +333,7 @@
                                     </HBox>
                                  </children>
                               </VBox>
-                              <VBox visible="false">
+                              <VBox>
                                  <children>
                                     <VBox prefWidth="100.0">
                                        <padding>
@@ -339,11 +347,93 @@
                                           </Label>
                                           <StackPane prefWidth="200.0">
                                              <children>
-                                                <TextField maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="200.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
-                                                   <font>
-                                                      <Font size="18.0" />
-                                                   </font>
-                                                </TextField>
+                                                <VBox fx:id="emptyStateZoneId" alignment="CENTER" prefHeight="250.0" prefWidth="100.0" visible="false">
+                                                   <children>
+                                                      <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2i-image-plus-outline" iconSize="80" />
+                                                      <Label text="Click to browse files or drag &amp; drop it">
+                                                         <font>
+                                                            <Font size="18.0" />
+                                                         </font>
+                                                      </Label>
+                                                      <Label opacity="0.8" text=" Image format, up to 10MB">
+                                                         <font>
+                                                            <Font size="16.0" />
+                                                         </font>
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                      </Label>
+                                                   </children>
+                                                </VBox>
+                                                <VBox fx:id="previewSateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0">
+                                                   <children>
+                                                      <HBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity">
+                                                         <VBox.margin>
+                                                            <Insets left="100.0" right="100.0" />
+                                                         </VBox.margin>
+                                                         <children>
+                                                            <ImageView fitHeight="130.0" fitWidth="130.0" pickOnBounds="true" preserveRatio="true">
+                                                               <image>
+                                                                  <Image url="@../../../../../../../../../Pictures/ChatGPT%20Image%20May%2020,%202025,%2011_27_40%20PM_upscayl_4x_remacri-4x.png" />
+                                                               </image>
+                                                            </ImageView>
+                                                            <VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity">
+                                                               <children>
+                                                                  <Label text="Name_of_file.png">
+                                                                     <font>
+                                                                        <Font size="18.0" />
+                                                                     </font>
+                                                                  </Label>
+                                                                  <Label text="files_size MB">
+                                                                     <font>
+                                                                        <Font size="15.0" />
+                                                                     </font>
+                                                                  </Label>
+                                                               </children>
+                                                               <HBox.margin>
+                                                                  <Insets left="10.0" />
+                                                               </HBox.margin>
+                                                            </VBox>
+                                                         </children>
+                                                      </HBox>
+                                                      <HBox maxHeight="-Infinity" maxWidth="-Infinity">
+                                                         <children>
+                                                            <JFXButton prefHeight="35.0" prefWidth="117.0" text="Replace">
+                                                               <HBox.margin>
+                                                                  <Insets right="10.0" />
+                                                               </HBox.margin>
+                                                               <font>
+                                                                  <Font size="16.0" />
+                                                               </font>
+                                                            </JFXButton>
+                                                            <JFXButton prefHeight="35.0" prefWidth="117.0" text="Remove">
+                                                               <HBox.margin>
+                                                                  <Insets left="10.0" />
+                                                               </HBox.margin>
+                                                               <font>
+                                                                  <Font size="16.0" />
+                                                               </font>
+                                                            </JFXButton>
+                                                         </children>
+                                                         <VBox.margin>
+                                                            <Insets top="30.0" />
+                                                         </VBox.margin>
+                                                      </HBox>
+                                                   </children>
+                                                </VBox>
+                                                <VBox fx:id="activeStateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
+                                                   <children>
+                                                      <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-upload-outline" iconSize="80" />
+                                                      <Label text="Drop file here">
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                         <font>
+                                                            <Font size="18.0" />
+                                                         </font>
+                                                      </Label>
+                                                   </children>
+                                                </VBox>
                                              </children>
                                           </StackPane>
                                        </children>
