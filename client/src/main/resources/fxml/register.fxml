@@ -1,25 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import com.jfoenix.controls.JFXButton?>
-<?import java.net.URL?>
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.Cursor?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ComboBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.PasswordField?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.image.Image?>
-<?import javafx.scene.image.ImageView?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.StackPane?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
-<?import org.kordamp.ikonli.javafx.FontIcon?>
+<?import com.jfoenix.controls.*?>
+<?import java.lang.*?>
+<?import java.net.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+<?import org.kordamp.ikonli.javafx.*?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/register.css" />
@@ -37,11 +29,11 @@
                         <Image url="@../images/logo/app_logo_downscale.png" />
                      </image>
                   </ImageView>
-                  <Label text="HAF Messenger">
+                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="HAF Messenger">
                      <HBox.margin>
                         <Insets left="10.0" right="10.0" />
                      </HBox.margin>
-                  </Label>
+                  </Text>
                </children>
                <padding>
                   <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
@@ -98,14 +90,14 @@
                <children>
                   <VBox alignment="CENTER" prefHeight="200.0" prefWidth="100.0">
                      <children>
-                        <Label text="Register">
+                        <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="Register">
                            <font>
                               <Font name="System Bold" size="22.0" />
                            </font>
                            <VBox.margin>
                               <Insets bottom="20.0" top="50.0" />
                            </VBox.margin>
-                        </Label>
+                        </Text>
                         <StackPane VBox.vgrow="ALWAYS">
                            <children>
                               <VBox>
@@ -115,11 +107,11 @@
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
                                        <children>
-                                          <Label text="Full Name">
+                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Full Name">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
-                                          </Label>
+                                          </Text>
                                           <StackPane prefWidth="200.0">
                                              <children>
                                                 <TextField fx:id="nameField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
@@ -138,11 +130,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="Registration Number">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Registration Number">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <TextField fx:id="regNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="123456" styleClass="text-field">
@@ -162,11 +154,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="ID Number">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="ID Number">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <TextField fx:id="idNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="Γ-1234" styleClass="text-field">
@@ -190,11 +182,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="Rank">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Rank">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Σμηνίας" visibleRowCount="12" />
@@ -218,11 +210,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="Phone Number">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Phone Number">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <TextField fx:id="phoneNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="6971978340" styleClass="text-field">
@@ -244,11 +236,11 @@
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
                                        <children>
-                                          <Label text="Email">
+                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Email">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
-                                          </Label>
+                                          </Text>
                                           <StackPane prefWidth="200.0">
                                              <children>
                                                 <TextField fx:id="emailField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
@@ -267,11 +259,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="Password">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Password">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
@@ -302,11 +294,11 @@
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
                                              <children>
-                                                <Label text="Confirm Password">
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Confirm Password">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
-                                                </Label>
+                                                </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
@@ -340,11 +332,11 @@
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
                                        <children>
-                                          <Label text="ID &amp; Selfie Photo">
+                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="ID &amp; Selfie Photo">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
-                                          </Label>
+                                          </Text>
                                           <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="drop-zone" VBox.vgrow="ALWAYS">
                                              <children>
                                                 <VBox fx:id="previewSateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
@@ -361,16 +353,16 @@
                                                             </ImageView>
                                                             <VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity">
                                                                <children>
-                                                                  <Label text="Name_of_file.png">
+                                                                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Name_of_file.png">
                                                                      <font>
                                                                         <Font size="18.0" />
                                                                      </font>
-                                                                  </Label>
-                                                                  <Label text="files_size MB">
+                                                                  </Text>
+                                                                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="files_size MB">
                                                                      <font>
                                                                         <Font size="15.0" />
                                                                      </font>
-                                                                  </Label>
+                                                                  </Text>
                                                                </children>
                                                                <HBox.margin>
                                                                   <Insets left="10.0" />
@@ -406,56 +398,56 @@
                                                 <VBox fx:id="activeStateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
                                                    <children>
                                                       <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-upload-outline" iconSize="80" />
-                                                      <Label text="Drop file here">
+                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Drop file here">
                                                          <VBox.margin>
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
-                                                      </Label>
+                                                      </Text>
                                                    </children>
                                                 </VBox>
                                                 <VBox fx:id="errorStateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
                                                    <children>
                                                       <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-alert-outline" iconSize="80" />
-                                                      <Label text="Only images up to 10MB are allowed">
+                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Only images up to 10MB are allowed">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
                                                          <VBox.margin>
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
-                                                      </Label>
+                                                      </Text>
                                                    </children>
                                                 </VBox>
                                                 <VBox fx:id="emptyStateZoneId" alignment="CENTER" maxHeight="1.7976931348623157E308" prefHeight="200.0" prefWidth="100.0">
                                                    <children>
                                                       <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-image" iconSize="80" />
-                                                      <Label text="Upload the front of your ID and a self picture">
+                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Upload the front of your ID and a self picture">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
                                                          <VBox.margin>
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
-                                                      </Label>
-                                                      <Label text="Click to browse files or drag &amp; drop it">
+                                                      </Text>
+                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Click to browse files or drag &amp; drop it">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
                                                          <VBox.margin>
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
-                                                      </Label>
-                                                      <Label opacity="0.8" text=" Image format, up to 10MB, min 2">
+                                                      </Text>
+                                                      <Text opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text=" Image format, up to 10MB, min 2">
                                                          <font>
                                                             <Font size="16.0" />
                                                          </font>
                                                          <VBox.margin>
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
-                                                      </Label>
+                                                      </Text>
                                                    </children>
                                                 </VBox>
                                              </children>
@@ -469,29 +461,41 @@
                               <Insets left="30.0" right="30.0" />
                            </VBox.margin>
                         </StackPane>
-                        <JFXButton fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="button-primary" text="Register">
+                        <StackPane>
                            <VBox.margin>
                               <Insets bottom="25.0" left="45.0" right="45.0" top="40.0" />
                            </VBox.margin>
-                        </JFXButton>
+                           <children>
+                              <JFXButton fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="button-primary" text=" " />
+                              <Text disable="true" fill="WHITE" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-button" text="Register">
+                                 <font>
+                                    <Font size="20.0" />
+                                 </font>
+                              </Text>
+                           </children>
+                        </StackPane>
                         <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
                            <VBox.margin>
                               <Insets bottom="50.0" left="30.0" right="30.0" />
                            </VBox.margin>
                            <children>
-                              <Label alignment="CENTER" text="Already have an account? ">
+                              <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Already have an account? " textAlignment="CENTER">
                                  <font>
                                     <Font size="15.0" />
                                  </font>
                                  <HBox.margin>
                                     <Insets />
                                  </HBox.margin>
-                              </Label>
-                              <Label fx:id="gotoSignInButton" accessibleRole="HYPERLINK" alignment="CENTER" styleClass="text-button" text="Sign in here">
+                              </Text>
+                              <Text fx:id="gotoSignInButton" accessibleRole="HYPERLINK" strokeType="OUTSIDE" strokeWidth="0.0" text="Sign in here">
                                  <font>
                                     <Font size="15.0" />
                                  </font>
-                              </Label>
+                                 <styleClass>
+                                    <String fx:value="text-button" />
+                                    <String fx:value="plain-text" />
+                                 </styleClass>
+                              </Text>
                            </children>
                         </HBox>
                      </children>

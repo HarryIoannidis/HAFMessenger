@@ -116,29 +116,29 @@ public class SplashViewModel {
             @Override
             protected Void call() throws Exception {
                 update(UiConstants.BOOTSTRAP_STARTING, 0.0);
-                delay(1500L);
+                delay(1200L);
 
                 update(UiConstants.BOOTSTRAP_CONFIG, 0.1);
                 String detectedVersion = configLoader.loadVersion();
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
-                delay(500L);
+                delay(300L);
 
                 update(UiConstants.BOOTSTRAP_SECURITY, 0.3);
                 cryptoInitializer.initialize();
-                delay(600L);
+                delay(300L);
 
                 update(UiConstants.BOOTSTRAP_RESOURCES, 0.6);
                 resourceChecker.verify();
-                delay(1000L);
+                delay(600L);
 
                 update(UiConstants.BOOTSTRAP_NETWORK, 0.8);
                 networkChecker.check();
-                delay(700L);
+                delay(400L);
 
                 update(UiConstants.BOOTSTRAP_READY, 1.0);
-                delay(400L);
+                delay(200L);
                 return null;
             }
 
