@@ -27,3 +27,21 @@
     -fx-text-fill: #888888;
 }
 
+/* ProggresBar */
+.progress-bar>.track {
+    -fx-background-color: #dcdcdc;
+    -fx-background-radius: 4;
+    -fx-background-insets: 0;
+}
+
+.progress-bar>.bar {
+    -fx-background-color: linear-gradient(to bottom, #0078d7, #008acf);
+    -fx-background-radius: 4;
+    -fx-background-insets: 0;
+}
+
+/*.progress-bar {*/
+/*    -fx-border-color: #989898;*/
+/*    -fx-border-width: 0px;*/
+/*    -fx-border-radius: 5;*/
+/*}*/

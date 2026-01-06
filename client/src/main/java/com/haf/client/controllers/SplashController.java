@@ -30,7 +30,6 @@ public class SplashController {
      */
     @FXML public void initialize() {
         bindViewModel();
-        applyProgressBarClip();
 
         viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
 //        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
@@ -50,19 +49,6 @@ public class SplashController {
         progressBar.managedProperty().bind(viewModel.errorProperty().not());
         percentage.visibleProperty().bind(viewModel.errorProperty().not());
         percentage.managedProperty().bind(viewModel.errorProperty().not());
-    }
-
-    /**
-     * Applies a rounded rectangle clip to the progress bar for rounded corners.
-     */
-    private void applyProgressBarClip() {
-        Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(progressBar.widthProperty());
-        clip.heightProperty().bind(progressBar.heightProperty());
-
-        clip.setArcWidth(UiConstants.SPLASH_PROGRESS_BAR_ARC);
-        clip.setArcHeight(UiConstants.SPLASH_PROGRESS_BAR_ARC);
-        progressBar.setClip(clip);
     }
 
     /**
