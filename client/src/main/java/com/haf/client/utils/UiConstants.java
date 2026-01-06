@@ -68,8 +68,9 @@ public final class UiConstants {
     public static final String CSS_REGISTER = "/css/register.css";
 
     // Fonts
-    public static final String FONT_MANROPE_REGULAR = "/fonts/Manrope-Regular.ttf";
+    public static final String FONT_MANROPE = "/fonts/Manrope.ttf";
     public static final String FONT_MANROPE_BOLD = "/fonts/Manrope-Bold.ttf";
+
     public static final int FONT_SIZE_REGULAR = 18;
     public static final int FONT_SIZE_BOLD = 22;
 
@@ -78,7 +79,6 @@ public final class UiConstants {
 
     // Common Dimensions
     public static final double RANK_ICON_SIZE = 24.0;
-//    public static final double SPLASH_PROGRESS_BAR_ARC = 5.0;
 
     private UiConstants() {}
 }
