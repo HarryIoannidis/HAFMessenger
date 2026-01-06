@@ -11,7 +11,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.Label;
+import javafx.scene.text.Text;
 import com.jfoenix.controls.JFXButton;
 
 import java.util.Objects;
@@ -61,7 +61,7 @@ public class RegisterController {
     private JFXButton registerButton;
 
     @FXML
-    private Label gotoSignInButton;
+    private Text gotoSignInButton;
 
     @FXML
     private ComboBox<String> rankComboBox;

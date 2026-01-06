@@ -122,6 +122,12 @@
     -fx-font-smoothing-type: gray;
 }
 
+.plain-text-button {
+    -fx-fill: #ebebeb;
+    -fx-text-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-smoothing-type: gray;
+}
 
 .text-field,
 .password-field {
@@ -239,21 +245,17 @@
 
 /* TextButton */
 .text-button {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-text-fill: #007abd;
-    -fx-font-family: 'Montserrat', sans-serif;
-    -fx-font-size: 15px;
-    -fx-font-weight: 600;
+    -fx-text-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-weight: bold;
     -fx-underline: true;
     -fx-cursor: hand;
-    -fx-padding: 0;
-}
-
-.text-button:hover {
-    -fx-text-fill: #0063b1;
+    -fx-fill: #007abd;
+    -fx-font-size: 15px;
+    -fx-font-smoothing-type: gray;
 }
 
 .text-button:pressed {
     -fx-text-fill: #004e8c;
+    -fx-font-size: 15px;
 }
