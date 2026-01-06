@@ -19,7 +19,7 @@
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/register.css" />
@@ -103,14 +103,14 @@
                               <Font name="System Bold" size="22.0" />
                            </font>
                            <VBox.margin>
-                              <Insets bottom="20.0" />
+                              <Insets bottom="20.0" top="50.0" />
                            </VBox.margin>
                         </Label>
-                        <StackPane>
+                        <StackPane VBox.vgrow="ALWAYS">
                            <children>
-                              <VBox visible="false">
+                              <VBox>
                                  <children>
-                                    <VBox prefWidth="100.0">
+                                    <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
@@ -122,7 +122,7 @@
                                           </Label>
                                           <StackPane prefWidth="200.0">
                                              <children>
-                                                <TextField fx:id="nameField" maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="50.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
+                                                <TextField fx:id="nameField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -131,7 +131,7 @@
                                           </StackPane>
                                        </children>
                                     </VBox>
-                                    <HBox alignment="CENTER" prefWidth="227.0">
+                                    <HBox alignment="CENTER" prefWidth="227.0" VBox.vgrow="ALWAYS">
                                        <children>
                                           <VBox HBox.hgrow="ALWAYS">
                                              <padding>
@@ -145,7 +145,7 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <TextField fx:id="regNumField" maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="123456" styleClass="text-field">
+                                                      <TextField fx:id="regNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="123456" styleClass="text-field">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -169,7 +169,7 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <TextField fx:id="idNumField" maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="Γ-1234" styleClass="text-field">
+                                                      <TextField fx:id="idNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="Γ-1234" styleClass="text-field">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -183,7 +183,7 @@
                                           </VBox>
                                        </children>
                                     </HBox>
-                                    <HBox alignment="CENTER">
+                                    <HBox alignment="CENTER" VBox.vgrow="ALWAYS">
                                        <children>
                                           <VBox HBox.hgrow="ALWAYS">
                                              <padding>
@@ -197,14 +197,17 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <ComboBox fx:id="rankComboBox" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Σμηνίας" visibleRowCount="12" />
-                                                      <Label alignment="CENTER" contentDisplay="CENTER" prefHeight="30.0" prefWidth="30.0" StackPane.alignment="CENTER_RIGHT">
+                                                      <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Σμηνίας" visibleRowCount="12" />
+                                                      <Label alignment="CENTER" contentDisplay="CENTER" focusTraversable="false" prefHeight="30.0" prefWidth="30.0" styleClass="arrow-button" StackPane.alignment="CENTER_RIGHT">
                                                          <StackPane.margin>
                                                             <Insets right="5.0" />
                                                          </StackPane.margin>
                                                          <graphic>
                                                             <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="40" />
                                                          </graphic>
+                                                         <cursor>
+                                                            <Cursor fx:constant="HAND" />
+                                                         </cursor>
                                                       </Label>
                                                    </children>
                                                 </StackPane>
@@ -225,7 +228,7 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <TextField fx:id="phoneNumField" maxWidth="1.7976931348623157E308" minWidth="150.0" prefHeight="50.0" promptText="6971978340" styleClass="text-field">
+                                                      <TextField fx:id="phoneNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="6971978340" styleClass="text-field">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -239,7 +242,7 @@
                                           </VBox>
                                        </children>
                                     </HBox>
-                                    <VBox prefWidth="100.0">
+                                    <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
@@ -251,7 +254,7 @@
                                           </Label>
                                           <StackPane prefWidth="200.0">
                                              <children>
-                                                <TextField fx:id="emailField" maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="50.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
+                                                <TextField fx:id="emailField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -260,7 +263,7 @@
                                           </StackPane>
                                        </children>
                                     </VBox>
-                                    <HBox>
+                                    <HBox VBox.vgrow="ALWAYS">
                                        <children>
                                           <VBox prefWidth="100.0" HBox.hgrow="ALWAYS">
                                              <padding>
@@ -274,7 +277,7 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordField" minWidth="150.0" prefHeight="50.0" prefWidth="302.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -309,7 +312,7 @@
                                                 </Label>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordConfField" minWidth="150.0" prefHeight="50.0" prefWidth="302.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -335,37 +338,19 @@
                               </VBox>
                               <VBox>
                                  <children>
-                                    <VBox prefWidth="100.0">
+                                    <VBox prefWidth="100.0" visible="false" VBox.vgrow="ALWAYS">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
                                        <children>
-                                          <Label text="ID Photo">
+                                          <Label text="ID &amp; Selfie Photo">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
                                           </Label>
-                                          <StackPane prefWidth="200.0">
+                                          <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="drop-zone" VBox.vgrow="ALWAYS">
                                              <children>
-                                                <VBox fx:id="emptyStateZoneId" alignment="CENTER" prefHeight="250.0" prefWidth="100.0" visible="false">
-                                                   <children>
-                                                      <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2i-image-plus-outline" iconSize="80" />
-                                                      <Label text="Click to browse files or drag &amp; drop it">
-                                                         <font>
-                                                            <Font size="18.0" />
-                                                         </font>
-                                                      </Label>
-                                                      <Label opacity="0.8" text=" Image format, up to 10MB">
-                                                         <font>
-                                                            <Font size="16.0" />
-                                                         </font>
-                                                         <VBox.margin>
-                                                            <Insets top="10.0" />
-                                                         </VBox.margin>
-                                                      </Label>
-                                                   </children>
-                                                </VBox>
-                                                <VBox fx:id="previewSateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0">
+                                                <VBox fx:id="previewSateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
                                                    <children>
                                                       <HBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity">
                                                          <VBox.margin>
@@ -434,27 +419,48 @@
                                                       </Label>
                                                    </children>
                                                 </VBox>
-                                             </children>
-                                          </StackPane>
-                                       </children>
-                                    </VBox>
-                                    <VBox prefWidth="100.0">
-                                       <padding>
-                                          <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
-                                       </padding>
-                                       <children>
-                                          <Label text="Self Photo">
-                                             <font>
-                                                <Font size="18.0" />
-                                             </font>
-                                          </Label>
-                                          <StackPane prefWidth="200.0">
-                                             <children>
-                                                <TextField maxWidth="1.7976931348623157E308" minWidth="350.0" prefHeight="200.0" promptText="georgefasoulas@haf.gr" styleClass="text-field">
-                                                   <font>
-                                                      <Font size="18.0" />
-                                                   </font>
-                                                </TextField>
+                                                <VBox fx:id="errorStateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
+                                                   <children>
+                                                      <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-alert-outline" iconSize="80" />
+                                                      <Label text="Only images up to 10MB are allowed">
+                                                         <font>
+                                                            <Font size="18.0" />
+                                                         </font>
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                      </Label>
+                                                   </children>
+                                                </VBox>
+                                                <VBox fx:id="emptyStateZoneId" alignment="CENTER" maxHeight="1.7976931348623157E308" prefHeight="200.0" prefWidth="100.0">
+                                                   <children>
+                                                      <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-image" iconSize="80" />
+                                                      <Label text="Upload the front of your ID and a self picture">
+                                                         <font>
+                                                            <Font size="18.0" />
+                                                         </font>
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                      </Label>
+                                                      <Label text="Click to browse files or drag &amp; drop it">
+                                                         <font>
+                                                            <Font size="18.0" />
+                                                         </font>
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                      </Label>
+                                                      <Label opacity="0.8" text=" Image format, up to 10MB, min 2">
+                                                         <font>
+                                                            <Font size="16.0" />
+                                                         </font>
+                                                         <VBox.margin>
+                                                            <Insets top="10.0" />
+                                                         </VBox.margin>
+                                                      </Label>
+                                                   </children>
+                                                </VBox>
                                              </children>
                                           </StackPane>
                                        </children>
@@ -473,13 +479,16 @@
                         </JFXButton>
                         <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
                            <VBox.margin>
-                              <Insets left="30.0" right="30.0" />
+                              <Insets bottom="50.0" left="30.0" right="30.0" />
                            </VBox.margin>
                            <children>
                               <Label alignment="CENTER" text="Already have an account? ">
                                  <font>
                                     <Font size="15.0" />
                                  </font>
+                                 <HBox.margin>
+                                    <Insets />
+                                 </HBox.margin>
                               </Label>
                               <Label fx:id="gotoSignInButton" accessibleRole="HYPERLINK" alignment="CENTER" styleClass="text-button" text="Sign in here">
                                  <font>
