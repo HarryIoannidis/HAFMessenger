@@ -52,17 +52,17 @@
                <children>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20" />
+                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
                      </graphic>
                   </Button>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20" />
+                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
                      </graphic>
                   </Button>
                   <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2c-close" iconSize="20" />
+                        <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
                      </graphic>
                   </Button>
                </children>
@@ -76,14 +76,14 @@
    <center>
       <HBox prefHeight="100.0" prefWidth="200.0" BorderPane.alignment="CENTER">
          <children>
-            <StackPane fx:id="leftPanel" prefHeight="825.0" prefWidth="350.0" HBox.hgrow="NEVER">
+            <StackPane fx:id="leftPanel" minHeight="-Infinity" minWidth="-Infinity" prefHeight="825.0" prefWidth="360.0" HBox.hgrow="SOMETIMES">
                <children>
                   <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
                      <image>
                         <Image url="@../images/logo/app_logo_upscale.png" />
                      </image>
                      <StackPane.margin>
-                        <Insets left="55.0" />
+                        <Insets left="60.0" />
                      </StackPane.margin>
                      <cursor>
                         <Cursor fx:constant="CLOSED_HAND" />
@@ -198,17 +198,14 @@
                                                 <StackPane prefWidth="200.0">
                                                    <children>
                                                       <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Σμηνίας" visibleRowCount="12" />
-                                                      <Label alignment="CENTER" contentDisplay="CENTER" focusTraversable="false" prefHeight="30.0" prefWidth="30.0" styleClass="arrow-button" StackPane.alignment="CENTER_RIGHT">
-                                                         <StackPane.margin>
-                                                            <Insets right="5.0" />
-                                                         </StackPane.margin>
+                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
                                                             <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="40" />
                                                          </graphic>
-                                                         <cursor>
-                                                            <Cursor fx:constant="HAND" />
-                                                         </cursor>
-                                                      </Label>
+                                                         <StackPane.margin>
+                                                            <Insets right="10.0" />
+                                                         </StackPane.margin>
+                                                      </JFXButton>
                                                    </children>
                                                 </StackPane>
                                              </children>
@@ -285,14 +282,14 @@
                                                             <Insets />
                                                          </StackPane.margin>
                                                       </PasswordField>
-                                                      <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
+                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
                                                             <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
                                                          </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
                                                          </StackPane.margin>
-                                                      </Button>
+                                                      </JFXButton>
                                                    </children>
                                                 </StackPane>
                                              </children>
@@ -317,14 +314,14 @@
                                                             <Font size="18.0" />
                                                          </font>
                                                       </PasswordField>
-                                                      <Button mnemonicParsing="false" prefHeight="30.0" prefWidth="30.0" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
+                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
                                                             <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
                                                          </graphic>
                                                          <StackPane.margin>
                                                             <Insets right="10.0" />
                                                          </StackPane.margin>
-                                                      </Button>
+                                                      </JFXButton>
                                                    </children>
                                                 </StackPane>
                                              </children>
