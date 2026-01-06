@@ -48,7 +48,7 @@
                   <Insets left="110.0" right="110.0" />
                </VBox.margin>
             </HBox>
-            <ProgressBar fx:id="progressBar" prefHeight="25.0" prefWidth="400.0" progress="0.0">
+            <ProgressBar fx:id="progressBar" prefHeight="5.0" prefWidth="400.0" progress="0.39">
                <opaqueInsets>
                   <Insets />
                </opaqueInsets>

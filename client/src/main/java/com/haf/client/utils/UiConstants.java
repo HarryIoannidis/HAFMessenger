@@ -78,7 +78,7 @@ public final class UiConstants {
 
     // Common Dimensions
     public static final double RANK_ICON_SIZE = 24.0;
-    public static final double SPLASH_PROGRESS_BAR_ARC = 24.0;
+//    public static final double SPLASH_PROGRESS_BAR_ARC = 5.0;
 
     private UiConstants() {}
 }

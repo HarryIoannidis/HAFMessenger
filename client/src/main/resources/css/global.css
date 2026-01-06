@@ -235,23 +235,3 @@
 .text-button:pressed {
     -fx-text-fill: #004e8c;
 }
-
-/* ProggresBar */
-.progress-bar>.track {
-    -fx-background-color: #dcdcdc;
-    -fx-background-radius: 60;
-    -fx-background-insets: 0;
-}
-
-.progress-bar>.bar {
-    -fx-background-color: linear-gradient(to bottom, #0078d7, #005eb8);
-    /* HAF Blue Gradient */
-    -fx-background-radius: 60;
-    -fx-background-insets: 0;
-}
-
-.progress-bar {
-    -fx-border-color: #989898;
-    -fx-border-width: 2px;
-    -fx-border-radius: 60;
-}
