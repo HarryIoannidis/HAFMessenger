@@ -2,7 +2,6 @@
 
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.effect.DropShadow?>
@@ -13,14 +12,16 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.paint.Color?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
 
-<StackPane fx:id="rootContainer" maxHeight="500.0" maxWidth="600.0" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SplashController">
+<StackPane fx:id="rootContainer" maxHeight="500.0" maxWidth="550.0" minHeight="-Infinity" minWidth="-Infinity" prefHeight="500.0" prefWidth="550.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SplashController">
    <children>
-      <VBox alignment="CENTER" minHeight="500.0" minWidth="600.0" prefHeight="500.0" prefWidth="600.0" StackPane.alignment="CENTER">
+      <VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="500.0" prefWidth="550.0" StackPane.alignment="CENTER">
          <children>
              <ImageView fx:id="logo" fitHeight="218.0" fitWidth="203.0" pickOnBounds="true" preserveRatio="true">
                  <VBox.margin>
-                     <Insets top="60.0" />
+                     <Insets right="4.0" top="50.0" />
                  </VBox.margin>
                  <effect>
                      <DropShadow height="16.0" radius="7.5" width="16.0">
@@ -31,18 +32,30 @@
                  </effect>
                  <Image url="@../images/logo/app_logo.png" />
              </ImageView>
-            <Label fx:id="title" styleClass="splash-title" text="Hellenic Air Force">
-               <VBox.margin>
-                  <Insets />
-               </VBox.margin>
-            </Label>
-            <Label fx:id="subtitle" contentDisplay="TOP" minHeight="-Infinity" minWidth="-Infinity" prefHeight="33.0" prefWidth="105.0" styleClass="splash-subtitle" text="Messenger" textAlignment="CENTER" />
-            <Pane minWidth="600.0" prefHeight="30.0" prefWidth="600.0" />
+            <Text fx:id="title" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="Hellenic Air Force">
+               <font>
+                  <Font size="24.0" />
+               </font>
+            </Text>
+            <Text fx:id="subtitle" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="Messenger">
+               <font>
+                  <Font size="24.0" />
+               </font>
+            </Text>
+            <Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="46.0" prefWidth="185.0" />
             <HBox alignment="CENTER" maxWidth="400.0" minHeight="35.0" minWidth="400.0" prefHeight="35.0" prefWidth="400.0">
                <children>
-                  <Label fx:id="status" styleClass="splash-status" text="Starting..." />
+                  <Text fx:id="status" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Starting...">
+                     <font>
+                        <Font size="18.0" />
+                     </font>
+                  </Text>
                   <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
-                  <Label fx:id="percentage" styleClass="splash-status" text="0%" />
+                  <Text fx:id="percentage" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="0%">
+                     <font>
+                        <Font size="18.0" />
+                     </font>
+                  </Text>
                </children>
                <VBox.margin>
                   <Insets left="110.0" right="110.0" />
@@ -53,9 +66,9 @@
                   <Insets />
                </opaqueInsets>
             </ProgressBar>
-            <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="44.0" prefWidth="580.0" spacing="300.0" VBox.vgrow="NEVER">
+            <HBox alignment="BOTTOM_RIGHT" fillHeight="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="56.0" prefWidth="537.0" spacing="300.0" VBox.vgrow="NEVER">
                <children>
-                  <Label fx:id="version" alignment="BOTTOM_RIGHT" styleClass="splash-version" />
+                  <Text fx:id="version" opacity="0.4" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" wrappingWidth="44.0" />
                </children>
                <VBox.margin>
                   <Insets top="10.0" />

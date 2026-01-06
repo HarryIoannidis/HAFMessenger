@@ -6,22 +6,21 @@ import com.haf.client.utils.UiConstants;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
-import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
 
 public class SplashController {
 
     @FXML private StackPane rootContainer;
     @FXML private ImageView logo;
-    @FXML private Label title;
-    @FXML private Label subtitle;
-    @FXML private Label status;
-    @FXML private Label percentage;
+    @FXML private Text title;
+    @FXML private Text subtitle;
+    @FXML private Text status;
+    @FXML private Text percentage;
+    @FXML private Text version;
     @FXML private ProgressBar progressBar;
-    @FXML private Label version;
     private final SplashViewModel viewModel = SplashViewModel.createDefault();
 
     /**

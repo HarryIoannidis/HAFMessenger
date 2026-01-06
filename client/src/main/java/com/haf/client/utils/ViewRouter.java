@@ -15,9 +15,13 @@ public class ViewRouter {
     /**
      * Loads the Manrope font once at class initialization.
      */
-    static {
-        Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_REGULAR), UiConstants.FONT_SIZE_REGULAR);
-        Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD), UiConstants.FONT_SIZE_BOLD);
+   static {
+        try {
+            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE), UiConstants.FONT_SIZE_REGULAR);
+            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD), UiConstants.FONT_SIZE_BOLD);
+        } catch (Exception e) {
+            System.err.println("Could not load fonts: " + e.getMessage());
+        }
     }
 
     private static Stage mainStage;
@@ -47,7 +51,6 @@ public class ViewRouter {
                 mainStage.getScene().setRoot(root);
             } else {
                 Scene scene = new Scene(root);
-                scene.getStylesheets().add(UiConstants.CSS_GLOBAL);
                 mainStage.setScene(scene);
             }
             mainStage.centerOnScreen();
@@ -72,7 +75,7 @@ public class ViewRouter {
             Parent root = loader.load();
             Scene scene = new Scene(root);
             scene.setFill(Color.TRANSPARENT);
-            scene.getStylesheets().add(UiConstants.CSS_GLOBAL);
+            scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
 
             mainStage.setScene(scene);
             mainStage.centerOnScreen();
