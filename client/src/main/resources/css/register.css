@@ -45,29 +45,29 @@
 }
 
 .combo-box-popup .list-cell {
-    -fx-background-color: #FFFFFF;        /* Λευκό background */
+    -fx-background-color: #FFFFFF;
     -fx-background-radius: 5;
-    -fx-text-fill: #2B2B2B;               /* Μαύρο text */
+    -fx-text-fill: #2B2B2B;
     -fx-font-size: 16px;
-    -fx-font-weight: normal;              /* Κανονικό font weight */
+    -fx-font-weight: normal;
     -fx-cursor: hand;
-    -fx-alignment: center-left;           /* Align αριστερά */
-    -fx-graphic-text-gap: 10;             /* Απόσταση icon-text */
+    -fx-alignment: center-left;
+    -fx-graphic-text-gap: 10;
 }
 
 .combo-box-popup .list-cell:hover {
-    -fx-background-color: #F0F0F0;        /* Ανοιχτό γκρι */
-    -fx-text-fill: #000000;               /* Πιο σκούρο text */
+    -fx-background-color: #F0F0F0;
+    -fx-text-fill: #000000;
 }
 
 .combo-box-popup .list-cell:selected {
-    -fx-background-color: #007ABD;        /* Μπλε HAF */
-    -fx-text-fill: #FFFFFF;               /* Λευκό text */
-    -fx-font-weight: 600;                 /* Bold όταν επιλεγμένο */
+    -fx-background-color: #007ABD;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: 600;
 }
 
 .combo-box-popup .list-cell:pressed {
-    -fx-background-color: #0063B1;        /* Πιο σκούρο μπλε */
+    -fx-background-color: #0063B1;
 }
 
 .combo-box-popup .list-cell .image-view {
@@ -84,4 +84,19 @@
 .combo-box-popup .list-cell:disabled {
     -fx-opacity: 0.4;
     -fx-cursor: default;
+}
+
+/* Drag&Drop Zone */
+.drop-zone {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #2b2b2b;
+    -fx-border-width: 2;
+    -fx-border-style: segments(10, 10);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.drop-zone:hover {
+    -fx-background-color: #ebebeb;
 }

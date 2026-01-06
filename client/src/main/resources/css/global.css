@@ -150,10 +150,6 @@
     -fx-background-color: rgba(0, 0, 0, 0.05);
 }
 
-.field-icon-button:pressed {
-    -fx-background-color: rgba(0, 0, 0, 0.15);
-}
-
 .field-icon-button .image-view {
     -fx-fit-width: 20;
     -fx-fit-height: 20;
