@@ -14,7 +14,7 @@
 /*--------------------- TITLE BAR ---------------------*/
 .title-bar {
     -fx-background-color: #d9d9d9;
-    -fx-background-radius: 9 9 0 0;
+    -fx-background-radius: 5 5 0 0;
     -fx-alignment: center-left;
 }
 
@@ -65,7 +65,7 @@
 
 .title-bar-button-close {
     -fx-background-color: transparent;
-    -fx-background-radius: 0 8 0 0;
+    -fx-background-radius: 0 5 0 0;
     -fx-text-fill: #ffffff;
     -fx-font-size: 16px;
     -fx-padding: 8 12;
@@ -90,13 +90,14 @@
 /*--------------------- WINDOW ---------------------*/
 .window-card {
     -fx-background-color: #ebebeb;
-    -fx-background-radius: 9;
-    -fx-background-insets: 2;
+    -fx-background-radius: 5;
+    -fx-background-insets: 1;
     -fx-border-insets: 0;
-    -fx-border-radius: 10;
-    -fx-border-color: #989898;
-    -fx-border-width: 3;
-    -fx-effect: innershadow(three-pass-box, rgba(0, 0, 0, 0.50), 10, 0, 0, 0);
+    -fx-border-radius: 6;
+    -fx-border-color: #acacac;
+    -fx-border-width: 1;
+    /*-fx-effect: innershadow(three-pass-box, rgba(0, 0, 0, 0.50), 10, 0, 0, 0);*/
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0), 0, 0, 0, 0);
 }
 
 /*--------------------- COMPONENTS ---------------------*/

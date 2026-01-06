@@ -25,7 +25,7 @@
       <URL value="@../css/register.css" />
    </stylesheets>
    <top>
-      <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="41.0" styleClass="title-bar" BorderPane.alignment="CENTER">
+      <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" prefHeight="41.0" prefWidth="1198.0" styleClass="title-bar" BorderPane.alignment="CENTER">
          <children>
             <HBox fx:id="ttileHBox" prefHeight="100.0" styleClass="title-bar-Hbox">
                <children>
@@ -336,7 +336,7 @@
                                     </HBox>
                                  </children>
                               </VBox>
-                              <VBox>
+                              <VBox visible="false">
                                  <children>
                                     <VBox prefWidth="100.0" visible="false" VBox.vgrow="ALWAYS">
                                        <padding>
