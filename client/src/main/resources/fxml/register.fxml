@@ -1,17 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import com.jfoenix.controls.*?>
-<?import java.lang.*?>
-<?import java.net.*?>
-<?import javafx.geometry.*?>
-<?import javafx.scene.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.image.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
-<?import org.kordamp.ikonli.javafx.*?>
+<?import com.jfoenix.controls.JFXButton?>
+<?import java.lang.String?>
+<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/register.css" />
@@ -100,7 +109,7 @@
                         </Text>
                         <StackPane VBox.vgrow="ALWAYS">
                            <children>
-                              <VBox>
+                              <VBox visible="false">
                                  <children>
                                     <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
                                        <padding>
@@ -325,14 +334,14 @@
                                     </HBox>
                                  </children>
                               </VBox>
-                              <VBox visible="false">
+                              <VBox>
                                  <children>
-                                    <VBox prefWidth="100.0" visible="false" VBox.vgrow="ALWAYS">
+                                    <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
                                        <children>
-                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="ID &amp; Selfie Photo">
+                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="ID Photo">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -424,7 +433,7 @@
                                                 <VBox fx:id="emptyStateZoneId" alignment="CENTER" maxHeight="1.7976931348623157E308" prefHeight="200.0" prefWidth="100.0">
                                                    <children>
                                                       <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-image" iconSize="80" />
-                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Upload the front of your ID and a self picture">
+                                                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Upload the front of your ID">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -440,7 +449,7 @@
                                                             <Insets top="10.0" />
                                                          </VBox.margin>
                                                       </Text>
-                                                      <Text opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text=" Image format, up to 10MB, min 2">
+                                                      <Text opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text=" Image format, up to 10MB">
                                                          <font>
                                                             <Font size="16.0" />
                                                          </font>

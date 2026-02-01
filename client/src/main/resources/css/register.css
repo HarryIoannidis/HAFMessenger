@@ -93,10 +93,7 @@
     -fx-border-width: 2;
     -fx-border-style: segments(10, 10);
     -fx-border-radius: 8;
-    -fx-background-radius: 8;
+    -fx-background-radius: 7;
+    -fx-background-insets: 1;
     -fx-cursor: hand;
-}
-
-.drop-zone:hover {
-    -fx-background-color: #ebebeb;
 }
