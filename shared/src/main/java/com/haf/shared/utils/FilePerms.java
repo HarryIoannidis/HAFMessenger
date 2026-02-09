@@ -20,6 +20,7 @@ public final class FilePerms {
 
     /**
      * Ensures that the given directory exists and is 700.
+     *
      * @param dir the directory to ensure
      * @throws IOException
      */
@@ -36,6 +37,7 @@ public final class FilePerms {
 
     /**
      * Writes the given data to the given file and sets the permissions to 600.
+     *
      * @param file the file to write to
      * @param data the data to write
      * @throws IOException

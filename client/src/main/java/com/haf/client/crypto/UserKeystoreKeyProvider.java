@@ -24,6 +24,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     /**
      * Creates a UserKeystoreKeyProvider with the specified keystore root and passphrase.
+     *
      * @param keystoreRoot the root directory of the keystore
      * @param passphrase the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
@@ -40,6 +41,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     /**
      * Creates a UserKeystoreKeyProvider using the default keystore location.
+     *
      * @param passphrase the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
      */
@@ -49,6 +51,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     /**
      * Derives the sender ID from the current key's metadata.
+     *
      * @return the sender ID (currently the keyId)
      * @throws Exception if keystore is invalid or empty
      */
@@ -101,6 +104,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     /**
      * Gets the UserKeystore instance (for loading private keys in MessageReceiver).
+     *
      * @return the UserKeystore instance
      */
     public UserKeystore getKeyStore() {
@@ -109,6 +113,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     /**
      * Gets the passphrase for unlocking private keys.
+     *
      * @return the passphrase (cloned for security)
      */
     public char[] getPassphrase() {

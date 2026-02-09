@@ -6,6 +6,7 @@ import java.security.PublicKey;
 public interface KeyProvider {
     /**
      * Retrieves the public key for a given recipient ID.
+     *
      * @param recipientId the recipient's identifier
      * @return the recipient's public key
      * @throws KeyNotFoundException if the key cannot be found
@@ -14,6 +15,7 @@ public interface KeyProvider {
 
     /**
      * Returns the sender's own identifier.
+     *
      * @return the sender ID
      */
     String getSenderId();

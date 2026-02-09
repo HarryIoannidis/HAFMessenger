@@ -15,6 +15,7 @@ public final class AuditLogger {
 
     /**
      * Creates an AuditLogger with a MetricsRegistry.
+     *
      * @param metricsRegistry the MetricsRegistry
      */
     private AuditLogger(MetricsRegistry metricsRegistry) {
@@ -23,6 +24,7 @@ public final class AuditLogger {
 
     /**
      * Creates an AuditLogger with a default MetricsRegistry.
+     *
      * @return the AuditLogger
      */
     public static AuditLogger create(MetricsRegistry metricsRegistry) {
@@ -31,6 +33,7 @@ public final class AuditLogger {
 
     /**
      * Logs an ingress accepted event.
+     *
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
      * @param recipientId the ID of the recipient.
@@ -48,6 +51,7 @@ public final class AuditLogger {
 
     /**
      * Logs an ingress rejected event.
+     *
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
      * @param reason the reason for the rejection.
@@ -63,6 +67,7 @@ public final class AuditLogger {
 
     /**
      * Logs a rate limit rejection event.
+     *
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
      * @param retryAfterSeconds the number of seconds to wait before retrying.
@@ -77,6 +82,7 @@ public final class AuditLogger {
 
     /**
      * Logs a validation failure event.
+     *
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
      * @param recipientId the ID of the recipient.
@@ -91,6 +97,7 @@ public final class AuditLogger {
 
     /**
      * Logs a cleanup event.
+     *
      * @param deleted the number of messages deleted.
      * @param durationMs the duration of the cleanup in milliseconds.
      */
@@ -103,6 +110,7 @@ public final class AuditLogger {
 
     /**
      * Logs a metrics snapshot event.
+     *
      * @param snapshot the metrics snapshot.
      */
     public void logMetricsSnapshot(MetricsSnapshot snapshot) {
@@ -118,6 +126,7 @@ public final class AuditLogger {
 
     /**
      * Logs an error event.
+     *
      * @param action the action that caused the error.
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
@@ -130,6 +139,7 @@ public final class AuditLogger {
 
     /**
      * Logs an audit event.
+     *
      * @param level the log level.
      * @param action the action that was performed.
      * @param requestId the ID of the request.
@@ -152,6 +162,7 @@ public final class AuditLogger {
 
     /**
      * Creates a base message for an audit event.
+     *
      * @param action the action that was performed.
      * @param requestId the ID of the request.
      * @param userId the ID of the user.

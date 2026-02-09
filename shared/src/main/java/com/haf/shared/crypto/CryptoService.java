@@ -15,6 +15,7 @@ public final class CryptoService {
 
     /**
      * Generates new random AES-256 key to use in a message
+     *
      * @return secretKey AES 256bit
      * @throws GeneralSecurityException in case of a creation error
      */
@@ -27,6 +28,7 @@ public final class CryptoService {
 
     /**
      * Generates random IV 12 bytes for AES-GCM
+     *
      * @return byte[] length 12 bytes
      */
     public static byte[] generateIv() {
@@ -38,6 +40,7 @@ public final class CryptoService {
 
     /**
      * Encrypts plaintext with AES-256-GCM
+     *
      * @param plaintext bytes to encrypt
      * @param key aES 256bit key
      * @param iv 12 bytes IV
@@ -62,6 +65,7 @@ public final class CryptoService {
 
     /**
      * Decrypts ciphertext with AES-256-GCM
+     *
      * @param ciphertext encrypted bytes (ciphertext+tag)
      * @param key aES 256bit key
      * @param iv 12 bytes IV

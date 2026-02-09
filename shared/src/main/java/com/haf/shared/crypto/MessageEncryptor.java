@@ -18,6 +18,7 @@ public class MessageEncryptor {
 
     /**
      * Creates a MessageEncryptor with RSA public key of recipient and metadata.
+     *
      * @param recipientPublicKey the recipient's public RSA key
      * @param senderId the sender's ID
      * @param recipientId the recipient's ID

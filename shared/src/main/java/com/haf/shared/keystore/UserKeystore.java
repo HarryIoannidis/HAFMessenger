@@ -29,6 +29,7 @@ public final class UserKeystore {
 
     /**
      * Builds a key ID based on current date in yyyymmdd format prefixed with "key-".
+     *
      * @return key ID
      */
     public static String todayKeyId() {
@@ -37,6 +38,7 @@ public final class UserKeystore {
 
     /**
      * Constructs a UserKeystore instance with the specified root directory.
+     *
      * @param root the root directory for the key store; must not be null
      * @throws NullPointerException if the root is null
      */
@@ -46,6 +48,7 @@ public final class UserKeystore {
 
     /**
      * Validates the passphrase for null or empty values.
+     *
      * @param passphrase the passphrase to validate
      * @throws IllegalArgumentException if the passphrase is null or empty
      */
@@ -58,6 +61,7 @@ public final class UserKeystore {
     /**
      * Stores RSA pair: public.pem (PEM), private.enc (AES-GCM of PKCS#8),
      * and metadata.json (KeyMetadata with fingerprint/status).
+     *
      * @param keyId key ID (UUID/label)
      * @param kp rSA pair to save
      * @param passphrase secret phrase to protect the private
@@ -86,6 +90,7 @@ public final class UserKeystore {
     /**
      * Loads private RSA from private.enc:
      * salt|iv|GCM(ciphertext+tag) → PBKDF2‑SHA256→AES‑256‑GCM → PKCS#8 → PrivateKey.
+     *
      * @param keyId key ID
      * @param passphrase decryption secret phrase
      * @return rSA private key
@@ -106,6 +111,7 @@ public final class UserKeystore {
      * 1. Most recent key with CURRENT status
      * 2. Most recent key with any metadata
      * 3. Most recently modified directory
+     *
      * @return path to the selected key directory
      * @throws Exception if the keystore root is invalid or empty
      */
@@ -171,6 +177,7 @@ public final class UserKeystore {
      * 1. Oldest key with CURRENT status
      * 2. Oldest key with any metadata
      * 3. Oldest by directory last-modified timestamp
+     *
      * @return path to the selected key directory
      * @throws Exception if the keystore root is invalid or empty
      */
@@ -236,6 +243,7 @@ public final class UserKeystore {
 
     /**
      * Loads the current private key (status==CURRENT or fallback as described).
+     *
      * @return the private key
      * @throws Exception if loading fails
      */
@@ -251,6 +259,7 @@ public final class UserKeystore {
 
     /**
      * Loads the current public key (status==CURRENT or fallback as described).
+     *
      * @return the public key
      * @throws Exception if loading fails
      */
@@ -262,6 +271,7 @@ public final class UserKeystore {
 
     /**
      * Loads a public key by keyId.
+     *
      * @param keyId the key identifier
      * @return the public key
      * @throws Exception if the key cannot be found or loaded
@@ -280,6 +290,7 @@ public final class UserKeystore {
 
     /**
      * Reads <root>/<keyId>/metadata.json for all keyIds and returns KeyMetadata.
+     *
      * @return list of KeyMetadata
      * @throws Exception if reading/JSON parsing fails
      */
@@ -305,6 +316,7 @@ public final class UserKeystore {
 
      /**
      * Makes rotation: current CURRENT → PREVIOUS and save new pair as CURRENT.
+     *
      * @param currentKeyId the existing key that becomes PREVIOUS
      * @param newKeyId the ID of the new pair
      * @param newPair new RSA KeyPair
@@ -327,6 +339,7 @@ public final class UserKeystore {
 
     /**
      * Returns the algorithm name for the given public key, based on its bit length.
+     *
      * @param pub the public key
      * @return the algorithm name
      */

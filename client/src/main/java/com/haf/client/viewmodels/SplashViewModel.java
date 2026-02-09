@@ -97,6 +97,7 @@ public class SplashViewModel {
 
     /**
      * Starts the bootstrap process on a background thread.
+     *
      * @param onSuccess Callback to run when bootstrap completes successfully.
      * @param onFailure Callback to run when bootstrap fails.
      */
@@ -195,6 +196,7 @@ public class SplashViewModel {
     /**
      * Default implementations for the ConfigLoader.
      * It attempts to read the version from the application's manifest, then from an environment variable,
+     *
      * @return the detected version or "1.0.0" if none found
      */
     private static ConfigLoader defaultConfigLoader() {
@@ -216,6 +218,7 @@ public class SplashViewModel {
 
     /**
      * Default implementation for the CryptoInitializer.
+     *
      * @return a Runnable that initializes security modules
      */
     private static CryptoInitializer defaultCryptoInitializer() {
@@ -245,6 +248,7 @@ public class SplashViewModel {
 
     /**
      * Default implementation for the ResourceChecker.
+     *
      * @param path The resource path
      * @param label The resource label for error messages
      * @throws IOException if the resource is not found
@@ -258,6 +262,7 @@ public class SplashViewModel {
     /**
      * Default implementation for the NetworkChecker.
      * It checks if the configured server is reachable.
+     *
      * @return a Runnable that checks server reachability
      */
     private static NetworkChecker defaultNetworkChecker() {

@@ -7,6 +7,7 @@ public final class SystemClockProvider implements ClockProvider {
 
     /**
      * Returns the singleton instance.
+     *
      * @return the SystemClockProvider instance
      */
     public static SystemClockProvider getInstance() {

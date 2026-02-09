@@ -23,6 +23,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Creates a DefaultMessageReceiver with the specified dependencies.
+     *
      * @param keyProvider the key provider (must be UserKeystoreKeyProvider to access keystore)
      * @param clockProvider the clock provider for deterministic expiry checks
      * @param webSocketAdapter the WebSocket adapter for network communication
@@ -38,6 +39,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Sets the message listener for incoming messages.
+     *
      * @param listener the message listener
      */
     @Override
@@ -47,6 +49,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Starts the message receiver.
+     *
      * @throws IOException if the connection cannot be established
      */
     @Override
@@ -72,6 +75,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Handles incoming JSON message from WebSocket.
+     *
      * @param json the JSON string containing EncryptedMessage
      */
     private void handleIncomingMessage(String json) {
@@ -146,6 +150,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Handles errors from WebSocket.
+     *
      * @param error the error that occurred
      */
     private void handleError(Throwable error) {
@@ -156,6 +161,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Loads the local private key from the keystore.
+     *
      * @return the private key
      * @throws Exception if the key cannot be loaded
      */

@@ -44,6 +44,7 @@ public final class MetricsRegistry {
 
     /**
      * Decrements the number of messages in the queue.
+     *
      * @param count the number of messages to remove from the queue.
      */
     public void decreaseQueueDepth(long count) {
@@ -55,6 +56,7 @@ public final class MetricsRegistry {
 
     /**
      * Gets a snapshot of the current metrics.
+     *
      * @return a snapshot of the current metrics.
      */
     public MetricsSnapshot snapshot() {
@@ -71,6 +73,7 @@ public final class MetricsRegistry {
 
     /**
      * Records the latency of message delivery and increments the delivered message count.
+     *
      * @param latencyMs the latency in milliseconds.
      */
     public void recordDeliveryLatency(long latencyMs) {
@@ -80,6 +83,7 @@ public final class MetricsRegistry {
 
     /**
      * Gets the average latency of message delivery.
+     *
      * @return the average latency in milliseconds.
      */
     public double getAverageDeliveryLatencyMs() {

@@ -51,6 +51,7 @@ public class WebSocketAdapter {
 
     /**
      * Creates a WebSocketAdapter for the specified server URI.
+     *
      * @param serverUri the WebSocket server URI (e.g., "wss://server:8080/ws")
      */
     public WebSocketAdapter(URI serverUri) {
@@ -73,6 +74,7 @@ public class WebSocketAdapter {
      * Creates SSL context for TLS connections.
      * Phase 4: Uses default SSL context.
      * Phase 5: Will add certificate pinning here.
+     *
      * @return the SSL context
      */
     private SSLContext createSSLContext() {
@@ -89,6 +91,7 @@ public class WebSocketAdapter {
      * Creates SSL parameters for TLS connections.
      * Phase 4: Basic TLS 1.3 parameters.
      * Phase 5: Will add certificate pinning validation here.
+     *
      * @return the SSL parameters
      */
     private SSLParameters createSSLParameters() {
@@ -106,6 +109,7 @@ public class WebSocketAdapter {
 
     /**
      * Hook for certificate pinning validation (Phase 5 placeholder).
+     *
      * @param certificateChain the server certificate chain
      * @return true if certificate is trusted, false otherwise
      */
@@ -118,6 +122,7 @@ public class WebSocketAdapter {
 
     /**
      * Connects to the WebSocket server.
+     *
      * @param onMessage callback for incoming messages
      * @param onError callback for errors
      * @throws IOException if connection fails
@@ -228,6 +233,7 @@ public class WebSocketAdapter {
 
     /**
      * Sends a text message over the WebSocket.
+     *
      * @param message the message to send
      * @throws IOException if the connection is not established or send fails
      */
@@ -270,6 +276,7 @@ public class WebSocketAdapter {
 
     /**
      * Checks if the WebSocket is connected.
+     *
      * @return true if connected, false otherwise
      */
     public boolean isConnected() {
@@ -279,6 +286,7 @@ public class WebSocketAdapter {
     /**
      * Reconnection policy stub (Phase 4 placeholder).
      * Phase 5: Will implement exponential backoff and bounded retries.
+     *
      * @return true if reconnection should be attempted
      */
     public boolean shouldRetry() {
@@ -292,6 +300,7 @@ public class WebSocketAdapter {
     /**
      * Gets the retry delay in milliseconds (Phase 4 placeholder).
      * Phase 5: Will implement exponential backoff.
+     *
      * @return the retry delay in milliseconds
      */
     public long getRetryDelayMs() {

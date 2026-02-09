@@ -16,6 +16,7 @@ public final class KeystoreBootstrap {
 
     /**
      * Bootstraps the keystore if needed.
+     *
      * @return the root directory of the keystore
      * @throws Exception
      */
@@ -37,6 +38,7 @@ public final class KeystoreBootstrap {
 
     /**
      * Bootstraps the keystore if needed.
+     *
      * @param root the root directory of the keystore
      * @throws Exception
      */
@@ -65,6 +67,7 @@ public final class KeystoreBootstrap {
 
     /**
      * Gets the passphrase for the first key.
+     *
      * @return the passphrase
      */
     private static char[] getPass() {

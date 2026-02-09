@@ -12,6 +12,7 @@ public class MessageTamperedException extends Exception {
 
     /**
      * Creates a new MessageTamperedException with a custom message.
+     *
      * @param message the detail message
      */
     public MessageTamperedException(String message) {
@@ -20,6 +21,7 @@ public class MessageTamperedException extends Exception {
 
     /**
      * Creates a new MessageTamperedException from an AEADBadTagException.
+     *
      * @param cause the AEADBadTagException that caused this exception
      */
     public MessageTamperedException(AEADBadTagException cause) {
@@ -28,6 +30,7 @@ public class MessageTamperedException extends Exception {
 
     /**
      * Creates a new MessageTamperedException with a custom message and cause.
+     *
      * @param message the detail message
      * @param cause the cause
      */
