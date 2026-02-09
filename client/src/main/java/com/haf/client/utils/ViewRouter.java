@@ -8,17 +8,18 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import java.io.IOException;
-import java.util.Objects;
 
 public class ViewRouter {
 
     /**
      * Loads the Manrope font once at class initialization.
      */
-   static {
+    static {
         try {
-            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE), UiConstants.FONT_SIZE_REGULAR);
-            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD), UiConstants.FONT_SIZE_BOLD);
+            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE),
+                    UiConstants.FONT_SIZE_REGULAR);
+            Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD),
+                    UiConstants.FONT_SIZE_BOLD);
         } catch (Exception e) {
             System.err.println("Could not load fonts: " + e.getMessage());
         }
@@ -28,6 +29,7 @@ public class ViewRouter {
 
     /**
      * Sets the main application stage.
+     * 
      * @param stage the main application stage
      */
     public static void setMainStage(Stage stage) {
@@ -36,6 +38,7 @@ public class ViewRouter {
 
     /**
      * Switches the main stage to the specified FXML view.
+     * 
      * @param fxmlPath the path to the FXML file
      */
     public static void switchTo(String fxmlPath) {
@@ -63,6 +66,7 @@ public class ViewRouter {
 
     /**
      * Switches the main stage to a transparent style with the specified FXML view.
+     * 
      * @param fxmlPath the path to the FXML file
      */
     public static void switchToTransparent(String fxmlPath) {
@@ -88,6 +92,7 @@ public class ViewRouter {
 
     /**
      * Recreates the main stage with the specified style.
+     * 
      * @param style the stage style
      */
     private static void recreateStage(StageStyle style) {

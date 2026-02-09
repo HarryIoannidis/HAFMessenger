@@ -18,6 +18,7 @@ public class MessageViewModel {
 
     /**
      * Creates a MessageViewModel with the specified MessageSender and MessageReceiver.
+     *
      * @param messageSender the message sender
      * @param messageReceiver the message receiver
      */
@@ -56,6 +57,7 @@ public class MessageViewModel {
 
     /**
      * Sends a text message to a recipient.
+     *
      * @param recipientId the recipient's ID
      * @param messageText the message text
      */
@@ -104,6 +106,7 @@ public class MessageViewModel {
 
     /**
      * Gets the status property.
+     *
      * @return the status property
      */
     public StringProperty statusProperty() {
@@ -112,6 +115,7 @@ public class MessageViewModel {
 
     /**
      * Gets the messages list.
+     *
      * @return the observable list of messages
      */
     public ObservableList<String> getMessages() {

@@ -8,6 +8,7 @@ public final class RsaKeyIO {
 
     /**
      * Generates new RSA KeyPair with bits size.
+     *
      * @param bits key size (2048 or 3072)
      * @return new RSA key pair
      * @throws IllegalStateException if creation fails
@@ -24,6 +25,7 @@ public final class RsaKeyIO {
 
     /**
      * Returns DER (X.509 SPKI) of the public key.
+     *
      * @param pub public key
      * @return dER bytes of public key
      */
@@ -33,6 +35,7 @@ public final class RsaKeyIO {
 
     /**
      * Returns DER (PKCS#8) of the private key.
+     *
      * @param prv private key
      * @return dER bytes of private key
      */
@@ -42,6 +45,7 @@ public final class RsaKeyIO {
 
     /**
      * Export public key to PEM (BEGIN/END PUBLIC KEY).
+     *
      * @param pub public key
      * @return pEM string
      */
@@ -51,6 +55,7 @@ public final class RsaKeyIO {
 
     /**
      * Export private key to PEM (BEGIN/END PRIVATE KEY).
+     *
      * @param prv private key
      * @return pEM string
      */
@@ -60,6 +65,7 @@ public final class RsaKeyIO {
 
     /**
      * Import public key from PEM (X.509 SPKI DER).
+     *
      * @param pem pEM of public key
      * @return publicKey RSA
      * @throws IllegalArgumentException if PEM/DER is invalid
@@ -76,6 +82,7 @@ public final class RsaKeyIO {
 
     /**
      * Private key import from PEM (PKCS#8 DER).
+     *
      * @param pem pEM of private key
      * @return privateKey RSA
      * @throws IllegalArgumentException if PEM/DER is invalid

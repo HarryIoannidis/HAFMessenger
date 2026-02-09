@@ -29,6 +29,7 @@ public final class ServerConfig {
 
     /**
      * Creates a new ServerConfig.
+     *
      * @param env the environment variables to read from.
      */
     private ServerConfig(Map<String, String> env) {
@@ -57,6 +58,7 @@ public final class ServerConfig {
     /**
      * Package-private for testing
      * Creates a ServerConfig from the given environment variables.
+     *
      * @param env the environment variables to read from.
      */
     static ServerConfig fromEnv(Map<String, String> env) {
@@ -146,6 +148,7 @@ public final class ServerConfig {
 
     /**
      * Parses an integer value from the given candidate string.
+     *
      * @param candidate the candidate string to parse.
      * @param defaultValue the default value to return if the candidate is blank or invalid.
      * @return the parsed integer value.

@@ -6,8 +6,10 @@ import java.io.IOException;
 
 
 public interface MessageSender {
+
     /**
      * Sends an encrypted message to a recipient.
+     *
      * @param payload the plaintext bytes to send
      * @param recipientId the recipient's identifier
      * @param contentType the MIME content type of the payload

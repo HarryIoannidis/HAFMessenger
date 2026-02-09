@@ -13,6 +13,7 @@ public final class JsonCodec {
 
     /**
      * Serializes object in JSON with strict settings (NO NULL, FAIL_ON_UNKNOWN).
+     *
      * @param value any DTO (KeyMetadata, EncryptedMessage, etc.)
      * @return jSON string
      * @throws RuntimeException if serialization fails
@@ -24,6 +25,7 @@ public final class JsonCodec {
 
     /**
      * Deserializes JSON to given type with FAIL_ON_UNKNOWN_PROPERTIES.
+     *
      * @param JSON incoming JSON
      * @param type target class
      * @param <T> type of return

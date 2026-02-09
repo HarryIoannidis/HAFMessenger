@@ -53,6 +53,7 @@ public final class RateLimiterService {
 
     /**
      * Creates a new rate limit service.
+     *
      * @param dataSource the database connection pool.
      * @param auditLogger the audit logger.
      */
@@ -63,6 +64,7 @@ public final class RateLimiterService {
 
     /**
      * Checks and consumes a rate limit for a user.
+     *
      * @param requestId the ID of the request.
      * @param userId the ID of the user.
      * @return the rate limit decision.
@@ -97,6 +99,7 @@ public final class RateLimiterService {
 
     /**
      * Upserts a new rate limit window for a user.
+     *
      * @param connection the database connection.
      * @param userId the ID of the user.
      * @throws SQLException if an error occurs while executing the query.
@@ -115,6 +118,7 @@ public final class RateLimiterService {
 
     /**
      * Represents a rate limit decision.
+     *
      * @param allowed true if the request is allowed, false otherwise.
      * @param retryAfterSeconds the number of seconds to wait before retrying.
      */
@@ -122,6 +126,7 @@ public final class RateLimiterService {
 
         /**
          * Creates a new allow decision.
+         *
          * @return a new allow decision.
          */
         public static RateLimitDecision allow() {
@@ -130,6 +135,7 @@ public final class RateLimiterService {
 
         /**
          * Creates a new block decision.
+         *
          * @param retryAfterSeconds the number of seconds to wait before retrying.
          * @return a new block decision.
          */

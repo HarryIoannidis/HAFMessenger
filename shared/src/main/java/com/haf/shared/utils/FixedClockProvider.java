@@ -9,6 +9,7 @@ public final class FixedClockProvider implements ClockProvider {
 
     /**
      * Creates a FixedClockProvider with the specified fixed time.
+     *
      * @param fixedTimeMillis the fixed time in milliseconds since epoch
      */
     public FixedClockProvider(long fixedTimeMillis) {
@@ -22,6 +23,7 @@ public final class FixedClockProvider implements ClockProvider {
 
     /**
      * Returns the fixed time value.
+     *
      * @return the fixed time in milliseconds
      */
     public long getFixedTimeMillis() {

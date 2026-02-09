@@ -19,6 +19,7 @@ public class DefaultMessageSender implements MessageSender {
 
     /**
      * Creates a DefaultMessageSender with the specified dependencies.
+     *
      * @param keyProvider the key provider for retrieving recipient public keys
      * @param clockProvider the clock provider for deterministic timestamps
      * @param webSocketAdapter the WebSocket adapter for network communication
@@ -31,6 +32,7 @@ public class DefaultMessageSender implements MessageSender {
 
     /**
      * Sends a message to the specified recipient.
+     *
      * @param payload the plaintext bytes to send
      * @param recipientId the recipient's identifier
      * @param contentType the MIME content type of the payload

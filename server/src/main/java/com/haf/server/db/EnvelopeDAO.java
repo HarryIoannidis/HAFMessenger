@@ -95,6 +95,7 @@ public final class EnvelopeDAO {
 
     /**
      * Creates an EnvelopeDAO with a DataSource.
+     *
      * @param dataSource the DataSource
      * @param auditLogger the AuditLogger
      */
@@ -105,6 +106,7 @@ public final class EnvelopeDAO {
 
     /**
      * Inserts a new envelope into the database.
+     *
      * @param message the message to insert
      * @return the inserted envelope
      */
@@ -142,6 +144,7 @@ public final class EnvelopeDAO {
 
     /**
      * Fetches envelopes for a specific recipient.
+     *
      * @param recipientId The ID of the recipient.
      * @param limit The maximum number of messages to fetch.
      * @return list of envelopes for the recipient.
@@ -177,6 +180,7 @@ public final class EnvelopeDAO {
 
     /**
      * Fetches multiple envelopes by their IDs.
+     *
      * @param envelopeIds collection of envelope IDs to fetch.
      * @return map of envelopeId -> QueuedEnvelope for found envelopes.
      */
@@ -221,6 +225,7 @@ public final class EnvelopeDAO {
 
     /**
      * Marks a list of envelopes as delivered.
+     *
      * @param envelopeIds the list of envelope IDs to mark as delivered.
      * @return true if the operation was successful, false otherwise.
      */
@@ -249,6 +254,7 @@ public final class EnvelopeDAO {
 
     /**
      * Deletes expired envelopes.
+     *
      * @return the number of deleted envelopes
      */
     public int deleteExpired() {
@@ -265,6 +271,7 @@ public final class EnvelopeDAO {
 
     /**
      * Computes the Authentication and Authorization (AAD) hash for an encrypted message.
+     *
      * @param message the encrypted message
      * @return the AAD hash
      */
@@ -290,6 +297,7 @@ public final class EnvelopeDAO {
 
     /**
      * Decodes a Base64-encoded string.
+     *
      * @param field the field name
      * @param value the Base64-encoded value
      * @return the decoded bytes
@@ -304,6 +312,7 @@ public final class EnvelopeDAO {
 
     /**
      * Hydrate an EncryptedMessage from a ResultSet.
+     *
      * @param rs the ResultSet
      * @return the EncryptedMessage
      * @throws SQLException if the ResultSet cannot be read

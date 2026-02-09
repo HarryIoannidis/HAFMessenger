@@ -47,6 +47,7 @@ public final class HttpIngressServer {
 
     /**
      * Creates an HttpIngressServer with a default MetricsRegistry.
+     *
      * @param config the ServerConfig
      * @param sslContext the SSLContext
      * @param mailboxRouter the MailboxRouter
@@ -73,6 +74,7 @@ public final class HttpIngressServer {
 
     /**
      * Creates an HttpsServer with the given SSLContext.
+     *
      * @param sslContext the SSLContext
      * @return the created HttpsServer
      * @throws IOException if an error occurs while creating the HttpsServer
@@ -123,6 +125,7 @@ public final class HttpIngressServer {
 
         /**
          * Handles an HTTP request.
+         *
          * @param exchange the HttpExchange
          * @throws IOException if an error occurs while handling the request
          */
@@ -181,6 +184,7 @@ public final class HttpIngressServer {
 
         /**
          * Reads the body of an HTTP request.
+         *
          * @param body the InputStream
          * @return the body as a string
          * @throws IOException if an error occurs while reading the body
@@ -202,6 +206,7 @@ public final class HttpIngressServer {
 
         /**
          * Applies security headers to the given Headers.
+         *
          * @param headers the Headers
          */
         private void applySecurityHeaders(Headers headers) {
@@ -213,6 +218,7 @@ public final class HttpIngressServer {
 
         /**
          * Sends a response to the given HttpExchange.
+         *
          * @param exchange the HttpExchange
          * @param requestId the request ID
          * @param status the response status code
@@ -242,6 +248,7 @@ public final class HttpIngressServer {
 
     /**
      * Represents the response to an ingress request.
+     *
      * @param envelopeId the envelope ID
      * @param expiresAt the expiration time of the envelope
      */

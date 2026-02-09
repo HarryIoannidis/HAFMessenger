@@ -5,6 +5,7 @@ import java.io.Serializable;
 
 /**
  * Store an encrypted message.
+ *
  * @version the version of the protocol.
  * @senderId the ID of the sender.
  * @recipientId the ID of the recipient.

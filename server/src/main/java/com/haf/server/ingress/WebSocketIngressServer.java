@@ -16,7 +16,6 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
@@ -37,24 +36,26 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Creates a WebSocketIngressServer with the given configuration and dependencies.
-     * @param config the server configuration.
-     * @param sslContext the SSL context.
-     * @param mailboxRouter the mailbox router.
+     * 
+     * @param config             the server configuration.
+     * @param sslContext         the SSL context.
+     * @param mailboxRouter      the mailbox router.
      * @param rateLimiterService the rate limiter service.
-     * @param auditLogger the audit logger.
-     * @param metricsRegistry the metrics registry.
+     * @param auditLogger        the audit logger.
+     * @param metricsRegistry    the metrics registry.
      */
     public WebSocketIngressServer(ServerConfig config,
-                                  SSLContext sslContext,
-                                  MailboxRouter mailboxRouter,
-                                  RateLimiterService rateLimiterService,
-                                  AuditLogger auditLogger,
-                                  MetricsRegistry metricsRegistry) {
+            SSLContext sslContext,
+            MailboxRouter mailboxRouter,
+            RateLimiterService rateLimiterService,
+            AuditLogger auditLogger,
+            MetricsRegistry metricsRegistry) {
         super(new InetSocketAddress(config.getWsPort()));
         setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
 
         // Note: The SSLContext provided by Main is created with TLSv1.3 only.
-        // DefaultSSLWebSocketServerFactory uses that context to create SSLEngine instances,
+        // DefaultSSLWebSocketServerFactory uses that context to create SSLEngine
+        // instances,
         // so TLSv1.3 and cipher selections are enforced by the context itself.
         // If a future change requires per-connection tuning, consider a custom factory
         // that applies SSLParameters to each SSLEngine.
@@ -67,12 +68,14 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Handles the opening of a WebSocket connection.
-     * @param conn the WebSocket instance this event is occurring on.
+     * 
+     * @param conn      the WebSocket instance this event is occurring on.
      * @param handshake the handshake of the websocket instance
      */
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        // TODO(auth): Replace TEST_USER_ID with authenticated principal once auth is wired.
+        // TODO(auth): Replace TEST_USER_ID with authenticated principal once auth is
+        // wired.
         String userId = TEST_USER_ID;
         connectionUsers.put(conn, userId);
 
@@ -87,10 +90,12 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Handles the closing of a WebSocket connection.
-     * @param conn the WebSocket instance this event is occurring on.
-     * @param code  the codes can be looked up here: {@link CloseFrame}
+     * 
+     * @param conn   the WebSocket instance this event is occurring on.
+     * @param code   the codes can be looked up here: {@link CloseFrame}
      * @param reason additional information string
-     * @param remote returns whether or not the closing of the connection was initiated by the remote host.
+     * @param remote returns whether or not the closing of the connection was
+     *               initiated by the remote host.
      */
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
@@ -100,7 +105,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Handles the receipt of a message from a WebSocket connection.
-     * @param conn the WebSocket instance this event is occurring on.
+     * 
+     * @param conn    the WebSocket instance this event is occurring on.
      * @param message the UTF-8 decoded message that was received.
      */
     @Override
@@ -117,7 +123,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
             }
 
             // Parse minimal ACK payload without relying on reflective record access.
-            java.util.Map<?,?> ackMap = JsonCodec.fromJson(message, java.util.Map.class);
+            java.util.Map<?, ?> ackMap = JsonCodec.fromJson(message, java.util.Map.class);
             Object ids = ackMap.get("envelopeIds");
             if (ids instanceof java.util.List<?> list && !list.isEmpty()) {
                 java.util.List<String> asStrings = new java.util.ArrayList<>(list.size());
@@ -138,8 +144,10 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Handles the error event.
-     * @param conn can be null if there error does not belong to one specific websocket.
-     * @param ex the exception causing this error
+     * 
+     * @param conn can be null if there error does not belong to one specific
+     *             websocket.
+     * @param ex   the exception causing this error
      */
     @Override
     public void onError(WebSocket conn, Exception ex) {
@@ -153,22 +161,26 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     /**
      * Sends an envelope to a WebSocket connection.
-     * @param conn the WebSocket instance this event is occurring on.
+     * 
+     * @param conn     the WebSocket instance this event is occurring on.
      * @param envelope the envelope to send.
      */
     private void sendEnvelope(WebSocket conn, QueuedEnvelope envelope) {
-        // Build a compact JSON message manually to avoid reflective access to inner record types.
+        // Build a compact JSON message manually to avoid reflective access to inner
+        // record types.
         String payloadJson = JsonCodec.toJson(envelope.payload());
         String json = "{\"type\":\"message\",\"envelopeId\":\"" + escape(envelope.envelopeId()) +
                 "\",\"payload\":" + payloadJson + ",\"expiresAt\":" + envelope.expiresAtEpochMs() + "}";
         conn.send(json);
     }
 
-    // Avoid using inner records for JSON I/O to keep Jackson from requiring deep reflection on the module.
+    // Avoid using inner records for JSON I/O to keep Jackson from requiring deep
+    // reflection on the module.
     // Minimal helper methods for small response payloads follow.
 
     /**
      * Builds a minimal JSON payload describing a rate-limit event.
+     * 
      * @param retryAfterSeconds the number of seconds to wait before retrying
      * @return a compact JSON string
      */
@@ -179,13 +191,14 @@ public final class WebSocketIngressServer extends WebSocketServer {
     /**
      * Escapes a string for safe embedding in a JSON string literal.
      * Only minimal escaping needed for envelope IDs (backslash, quotes).
+     * 
      * @param s the input string
      * @return the escaped string
      */
     private static String escape(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         // Minimal JSON string escape for ids (quotes and backslashes).
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
-

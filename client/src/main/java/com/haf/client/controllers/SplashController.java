@@ -66,6 +66,7 @@ public class SplashController {
 
     /**
      * Displays a failure dialog with the given error message.
+     *
      * @param error the Throwable containing the error details
      */
     private void showFailureDialog(Throwable error) {

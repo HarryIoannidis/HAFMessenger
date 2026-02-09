@@ -10,6 +10,7 @@ public class KeyNotFoundException extends Exception {
 
     /**
      * Creates a new KeyNotFoundException with a custom message.
+     *
      * @param message the detail message
      */
     public KeyNotFoundException(String message) {
@@ -18,6 +19,7 @@ public class KeyNotFoundException extends Exception {
 
     /**
      * Creates a new KeyNotFoundException with a custom message and cause.
+     *
      * @param message the detail message
      * @param cause the cause
      */

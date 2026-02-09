@@ -11,6 +11,7 @@ public class CryptoRSA {
 
     /**
      * Encrypts (wraps) the AES key with the recipient's public RSA key.
+     *
      * @param sessionKey the AES session key to be wrapped.
      * @param recipientPublicKey the recipient's public RSA key.
      * @return the bytes of the encrypted key.
@@ -25,6 +26,7 @@ public class CryptoRSA {
 
     /**
      * Unwinds (decrypts) the wrapped AES session key with the private RSA key.
+     *
      * @param wrappedKey the bytes of the wrapped key.
      * @param recipientPrivateKey the recipient's private RSA key.
      * @return the original AES SecretKey.

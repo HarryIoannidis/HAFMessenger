@@ -16,6 +16,7 @@ public class MessageDecryptor {
 
     /**
      * Creates a MessageDecryptor with RSA private key of recipient.
+     *
      * @param recipientPrivateKey the recipient's private RSA key
      * @param clockProvider the clock provider for deterministic expiry checks
      */

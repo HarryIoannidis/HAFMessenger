@@ -8,6 +8,7 @@ public class MessageValidationException extends Exception {
 
     /**
      * Creates a new MessageValidationException.
+     *
      * @param message the detail message
      * @param errorCodes the list of validation error codes
      */
@@ -18,6 +19,7 @@ public class MessageValidationException extends Exception {
 
     /**
      * Creates a new MessageValidationException with error codes.
+     *
      * @param errorCodes the list of validation error codes
      */
     public MessageValidationException(List<MessageValidator.ErrorCode> errorCodes) {
@@ -26,6 +28,7 @@ public class MessageValidationException extends Exception {
 
     /**
      * Returns the list of validation error codes.
+     *
      * @return the error codes
      */
     public List<MessageValidator.ErrorCode> getErrorCodes() {

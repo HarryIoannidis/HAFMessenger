@@ -6,6 +6,7 @@ package com.haf.shared.utils;
 public interface ClockProvider {
     /**
      * Returns the current time in milliseconds since epoch.
+     *
      * @return current time in milliseconds
      */
     long currentTimeMillis();

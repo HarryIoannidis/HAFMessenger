@@ -11,6 +11,7 @@ public final class KeystoreRoot {
      * Win: %ProgramData%\HAF\keystore
      * Linux: /var/lib/haf/keystore)
      * Caller creates dir and applies 0700/ACLs.
+     *
      * @return path
      */
     public static Path preferred() {
@@ -41,6 +42,7 @@ public final class KeystoreRoot {
      * Win: %LOCALAPPDATA%\HAF\keystore or <home>\AppData\Local\HAF\keystore,
      * Linux: $XDG_DATA_HOME/haf/keystore or ~/.local/share/haf/keystore.
      * Caller creates dir and applies 0700/ACLs.
+     *
      * @return path
      */
     public static Path userFallback() {

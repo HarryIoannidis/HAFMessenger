@@ -7,6 +7,7 @@ public final class PemCodec {
 
     /**
      * Converts a DER-encoded byte array to a PEM-encoded string.
+     *
      * @param type the type of the PEM block, e.g. "PUBLIC KEY"
      * @param der the DER-encoded byte array
      * @return the PEM-encoded string
@@ -19,6 +20,7 @@ public final class PemCodec {
 
     /**
      * Converts a PEM-encoded string to a DER-encoded byte array.
+     *
      * @param pem the PEM-encoded string
      * @return the DER-encoded byte array
      */

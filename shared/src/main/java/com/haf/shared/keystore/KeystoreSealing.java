@@ -13,6 +13,7 @@ public final class KeystoreSealing {
 
     /**
      * Seals the given plaintext with the given password.
+     *
      * @param pass the password to use for sealing
      * @param plaintext the plaintext to seal
      * @return the sealed ciphertext
@@ -36,6 +37,7 @@ public final class KeystoreSealing {
 
     /**
      * Opens the given envelope with the given password.
+     *
      * @param pass the password to use for opening
      * @param envelope the envelope to open
      * @return the plaintext
@@ -66,6 +68,7 @@ public final class KeystoreSealing {
 
     /**
      * Base64 encodes the given byte array.
+     *
      * @param b the byte array
      * @return the base64 encoded string
      */
@@ -75,6 +78,7 @@ public final class KeystoreSealing {
 
     /**
      * Base64 decodes the given string.
+     *
      * @param s the base64 encoded string
      * @return the decoded byte array
      */

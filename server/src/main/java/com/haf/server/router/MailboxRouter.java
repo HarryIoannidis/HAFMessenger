@@ -26,6 +26,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Constructs a MailboxRouter instance.
+     *
      * @param envelopeDAO The DAO for managing envelopes in the database.
      * @param scheduler The scheduler for running periodic tasks.
      * @param auditLogger The logger for auditing cleanup operations.
@@ -55,6 +56,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Handles the ingress of a new encrypted message.
+     *
      * @param message the encrypted message to be ingressed.
      * @return the queued envelope representing the ingressed message.
      */
@@ -67,6 +69,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Fetches undelivered messages for a specific recipient.
+     *
      * @param recipientId The ID of the recipient.
      * @param limit The maximum number of messages to fetch.
      * @return  list of undelivered messages for the recipient.
@@ -77,6 +80,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Acknowledges the delivery of messages by their envelope IDs.
+     *
      * @param envelopeIds a collection of envelope IDs to acknowledge.
      * @return true if the acknowledgment was successful, false otherwise.
      */
@@ -100,6 +104,7 @@ public final class MailboxRouter implements AutoCloseable {
      * Acknowledges delivery for the specified user only.
      * Filters out any envelope IDs that do not belong to the provided user to
      * prevent cross-user acknowledgements.
+     *
      * @param userId the user who owns the mailbox
      * @param envelopeIds the candidate envelope IDs to acknowledge
      * @return true if at least one envelope was acknowledged, false otherwise
@@ -137,6 +142,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Subscribes a recipient to receive notifications for new messages.
+     *
      * @param recipientId the ID of the recipient.
      * @param subscriber the subscriber to be notified.
      * @return a MailboxSubscription object representing the subscription.
@@ -148,6 +154,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Unsubscribes a recipient from receiving notifications.
+     *
      * @param subscription the subscription to be removed.
      */
     public void unsubscribe(MailboxSubscription subscription) {
@@ -165,6 +172,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Dispatches a message to all subscribers of a recipient.
+     *
      * @param recipientId the ID of the recipient.
      * @param envelope the envelope containing the message.
      */
@@ -210,6 +218,7 @@ public final class MailboxRouter implements AutoCloseable {
 
         /**
          * Called when a new envelope is available for the subscriber.
+         *
          * @param envelope the new envelope.
          */
         void onEnvelope(QueuedEnvelope envelope);
@@ -217,6 +226,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     /**
      * Represents a subscription to a recipient's mailbox.
+     *
      * @param recipientId the ID of the recipient.
      * @param subscriber the subscriber associated with the subscription.
      */

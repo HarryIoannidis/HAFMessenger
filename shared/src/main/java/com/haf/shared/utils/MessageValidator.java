@@ -30,6 +30,7 @@ public final class MessageValidator {
 
     /**
      * Validates EncryptedMessage and throws exception if it fails.
+     *
      * @param m encryptedMessage to be validated
      * @throws MessageValidationException if the message does not pass the checks
      */
@@ -42,6 +43,7 @@ public final class MessageValidator {
 
     /**
      * Checks if the message is to the specific recipient.
+     *
      * @param localRecipientId the ID of the local recipient
      * @param m encryptedMessage to check
      * @throws IllegalArgumentException if recipientId does not match
@@ -60,6 +62,7 @@ public final class MessageValidator {
 
     /**
      * Collects all validation errors without throwing exceptions.
+     *
      * @param m encryptedMessage to check
      * @return list of ErrorCode of each error
      */
@@ -163,6 +166,7 @@ public final class MessageValidator {
 
     /**
      * Normalizes the content type string by removing parameters and converting to lowercase.
+     *
      * @param ct the content type string to normalize
      * @return the normalized content type string or null if the input is null or empty
      */
@@ -178,6 +182,7 @@ public final class MessageValidator {
 
     /**
      * Safely decodes a Base64 string into a byte array.
+     *
      * @param s the Base64 encoded string.
      * @return the decoded byte array, or null if decoding fails.
      */
@@ -191,6 +196,7 @@ public final class MessageValidator {
 
     /**
      * Checks if the EncryptedMessage is valid.
+     *
      * @param m encryptedMessage to check
      * @return true if no errors, false otherwise
      */

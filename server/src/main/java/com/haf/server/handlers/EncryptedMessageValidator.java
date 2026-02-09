@@ -16,6 +16,7 @@ public final class EncryptedMessageValidator {
 
     /**
      * Validates an EncryptedMessage.
+     *
      * @param message the EncryptedMessage to validate
      * @return the ValidationResult
      */
@@ -58,6 +59,7 @@ public final class EncryptedMessageValidator {
 
     /**
      * Estimates the number of bytes in a Base64-encoded string.
+     *
      * @param base64 the Base64-encoded string
      * @return the estimated number of bytes
      */
@@ -75,6 +77,7 @@ public final class EncryptedMessageValidator {
 
         /**
          * Creates a valid ValidationResult.
+         *
          * @param expiresAtMillis the expiration time of the message
          * @return the ValidationResult
          */
@@ -84,6 +87,7 @@ public final class EncryptedMessageValidator {
 
         /**
          * Creates an invalid ValidationResult.
+         *
          * @param reason the reason for the invalidation
          * @return the ValidationResult
          */

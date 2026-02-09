@@ -9,6 +9,7 @@ public final class AadCodec {
 
     /**
      * Κατασκευάζει τα AAD bytes από metadata EncryptedMessage για AES-GCM.
+     *
      * @param m το EncryptedMessage προς επεξεργασία
      * @return τα canonical AAD bytes
      */
@@ -43,6 +44,7 @@ public final class AadCodec {
     
     /**
      * Μετατρέπει String σε UTF-8 bytes.
+     *
      * @param s το String προς μετατροπή
      * @return uTF-8 bytes ή κενό array αν null
      */
@@ -52,6 +54,7 @@ public final class AadCodec {
 
     /**
      * Γράφει byte array στο ByteBuffer με length prefix.
+     *
      * @param bb το ByteBuffer προς εγγραφή
      * @param s το byte array προς εγγραφή
      */

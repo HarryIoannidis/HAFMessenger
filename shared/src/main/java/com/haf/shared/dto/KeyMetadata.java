@@ -2,6 +2,7 @@ package com.haf.shared.dto;
 
 /**
  * Store metadata about a key pair.
+ *
  * @param keyId The ID of the key pair.
  * @param algorithm The algorithm used to generate the key pair.
  * @param fingerprint The fingerprint of the public key.

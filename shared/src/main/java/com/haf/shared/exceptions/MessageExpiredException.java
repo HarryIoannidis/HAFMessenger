@@ -10,6 +10,7 @@ public class MessageExpiredException extends Exception {
 
     /**
      * Creates a new MessageExpiredException with a custom message.
+     *
      * @param message the detail message
      */
     public MessageExpiredException(String message) {
@@ -18,6 +19,7 @@ public class MessageExpiredException extends Exception {
 
     /**
      * Creates a new MessageExpiredException with a custom message and cause.
+     *
      * @param message the detail message
      * @param cause the cause
      */
