@@ -6,6 +6,8 @@ module client {
     requires java.net.http;
     requires java.logging;
     requires com.jfoenix;
+    requires org.kordamp.ikonli.javafx;
+    requires org.kordamp.ikonli.materialdesign2;
 
     // exports com.haf.client.ui;
     // exports com.haf.client.service;

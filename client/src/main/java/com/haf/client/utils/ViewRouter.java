@@ -82,6 +82,7 @@ public class ViewRouter {
             scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
 
             mainStage.setScene(scene);
+            WindowResizeHelper.enableResizing(mainStage);
             mainStage.centerOnScreen();
             mainStage.show();
 
@@ -104,6 +105,15 @@ public class ViewRouter {
         }
         newStage.setTitle(mainStage.getTitle());
         mainStage = newStage;
+    }
+
+    /**
+     * Returns the main application stage.
+     *
+     * @return the main Stage
+     */
+    public static Stage getMainStage() {
+        return mainStage;
     }
 
     /**

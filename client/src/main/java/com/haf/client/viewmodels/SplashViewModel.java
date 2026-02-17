@@ -11,34 +11,32 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
+import java.util.concurrent.ThreadLocalRandom;
 import java.time.Duration;
 import java.util.Objects;
 
-/**
- * ViewModel responsible for bootstrapping the client while the splash screen is shown.
- * It exposes observable status/progress properties and runs the heavy lifting off the FX thread.
- */
 public class SplashViewModel {
 
     @FunctionalInterface
     public interface ConfigLoader {
-        String loadVersion() throws Exception;
+        String loadVersion() throws IOException;
     }
 
     @FunctionalInterface
     public interface CryptoInitializer {
-        void initialize() throws Exception;
+        void initialize() throws GeneralSecurityException;
     }
 
     @FunctionalInterface
     public interface ResourceChecker {
-        void verify() throws Exception;
+        void verify() throws IOException;
     }
 
     @FunctionalInterface
     public interface NetworkChecker {
-        void check() throws Exception;
+        void check() throws IOException;
     }
 
     private final StringProperty status = new SimpleStringProperty(UiConstants.BOOTSTRAP_STARTING);
@@ -62,8 +60,7 @@ public class SplashViewModel {
             ConfigLoader configLoader,
             CryptoInitializer cryptoInitializer,
             ResourceChecker resourceChecker,
-            NetworkChecker networkChecker
-    ) {
+            NetworkChecker networkChecker) {
         this.configLoader = Objects.requireNonNull(configLoader, "configLoader");
         this.cryptoInitializer = Objects.requireNonNull(cryptoInitializer, "cryptoInitializer");
         this.resourceChecker = Objects.requireNonNull(resourceChecker, "resourceChecker");
@@ -102,13 +99,15 @@ public class SplashViewModel {
      * @param onFailure Callback to run when bootstrap fails.
      */
     public synchronized void startBootstrap(Runnable onSuccess, java.util.function.Consumer<Throwable> onFailure) {
-        if (runningTask != null && runningTask.isRunning()) {
+        if (runningTask != null) {
             return;
         }
 
         // Reset UI-related state before starting a new run
         error.set(false);
         percentage.unbind();
+        status.unbind();
+        progress.unbind();
 
         progress.set(0.0);
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
@@ -150,8 +149,6 @@ public class SplashViewModel {
         };
 
         // Reflect task state into observable properties
-        status.unbind();
-        progress.unbind();
         status.bind(task.messageProperty());
         progress.bind(task.progressProperty());
 
@@ -185,7 +182,7 @@ public class SplashViewModel {
 
     private static void delay(long millis) {
         try {
-            long randomOffset = (long) (Math.random() * 201) - 100;
+            long randomOffset = ThreadLocalRandom.current().nextLong(-100, 101);
             long sleepTime = Math.max(0, millis + randomOffset);
             Thread.sleep(sleepTime);
         } catch (InterruptedException ie) {
@@ -195,7 +192,8 @@ public class SplashViewModel {
 
     /**
      * Default implementations for the ConfigLoader.
-     * It attempts to read the version from the application's manifest, then from an environment variable,
+     * It attempts to read the version from the application's manifest, then from an
+     * environment variable,
      *
      * @return the detected version or "1.0.0" if none found
      */
@@ -249,7 +247,7 @@ public class SplashViewModel {
     /**
      * Default implementation for the ResourceChecker.
      *
-     * @param path The resource path
+     * @param path  The resource path
      * @param label The resource label for error messages
      * @throws IOException if the resource is not found
      */
@@ -274,9 +272,9 @@ public class SplashViewModel {
             }
 
             try (
-                HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .build()) {
+                    HttpClient client = HttpClient.newBuilder()
+                            .connectTimeout(Duration.ofSeconds(2))
+                            .build()) {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
                         .method("HEAD", HttpRequest.BodyPublishers.noBody())
@@ -289,6 +287,9 @@ public class SplashViewModel {
                 }
             } catch (IOException e) {
                 throw new IOException("Failed to check server reachability", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while checking server reachability", e);
             }
         };
     }
