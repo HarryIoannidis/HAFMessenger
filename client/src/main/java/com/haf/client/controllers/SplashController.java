@@ -13,29 +13,42 @@ import javafx.scene.text.Text;
 
 public class SplashController {
 
-    @FXML private StackPane rootContainer;
-    @FXML private ImageView logo;
-    @FXML private Text title;
-    @FXML private Text subtitle;
-    @FXML private Text status;
-    @FXML private Text percentage;
-    @FXML private Text version;
-    @FXML private ProgressBar progressBar;
+    @FXML
+    private StackPane rootContainer;
+
+    @FXML
+    private ImageView logo;
+
+    @FXML
+    private Text title;
+
+    @FXML
+    private Text subtitle;
+
+    @FXML
+    private Text status;
+
+    @FXML
+    private Text percentage;
+
+    @FXML
+    private Text version;
+
+    @FXML
+    private ProgressBar progressBar;
+
     private final SplashViewModel viewModel = SplashViewModel.createDefault();
 
-    /**
-     * Initializes the controller class.
-     * This method is automatically called after the FXML file has been loaded.
-     */
-    @FXML public void initialize() {
+    @FXML
+    public void initialize() {
         bindViewModel();
+        // viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
+        viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
 
-//        viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
-        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
     /**
-     * Binds the ViewModel properties to the UI components.
+     * Binds ViewModel properties to UI components.
      */
     private void bindViewModel() {
         status.textProperty().bind(viewModel.statusProperty());
@@ -43,7 +56,6 @@ public class SplashController {
         percentage.textProperty().bind(viewModel.percentageProperty());
         version.textProperty().bind(viewModel.versionProperty());
 
-        // Hide progress visuals on error state
         progressBar.visibleProperty().bind(viewModel.errorProperty().not());
         progressBar.managedProperty().bind(viewModel.errorProperty().not());
         percentage.visibleProperty().bind(viewModel.errorProperty().not());
@@ -51,21 +63,21 @@ public class SplashController {
     }
 
     /**
-     * Navigates to the login screen.
+     * Navigates to the Login screen.
      */
     private void navigateToLogin() {
         ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
     }
 
     /**
-     * Navigates to the register screen.
+     * Navigates to the Register screen.
      */
     private void navigateToRegister() {
         ViewRouter.switchToTransparent(UiConstants.FXML_REGISTER);
     }
 
     /**
-     * Displays a failure dialog with the given error message.
+     * Displays a failure dialog with retry/cancel options.
      *
      * @param error the Throwable containing the error details
      */
@@ -86,4 +98,3 @@ public class SplashController {
         });
     }
 }
-

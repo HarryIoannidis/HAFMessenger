@@ -259,3 +259,26 @@
     -fx-text-fill: #004e8c;
     -fx-font-size: 15px;
 }
+
+/*--------------------- ERROR STYLES ---------------------*/
+.error-text {
+    -fx-fill: #d01020;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-font-smoothing-type: gray;
+}
+
+.text-field-error,
+.password-field-error,
+.combo-box-error,
+.combo-box.text-field-error {
+    -fx-border-color: #d01020;
+    -fx-border-width: 2;
+}
+
+.text-field-error:focused,
+.password-field-error:focused,
+.combo-box.text-field-error:focused {
+    -fx-border-color: #d01020;
+}

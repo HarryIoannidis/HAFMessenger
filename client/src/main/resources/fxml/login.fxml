@@ -19,7 +19,7 @@
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/login.css" />
@@ -50,17 +50,17 @@
             <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
             <HBox fx:id="buttonsHBox" prefHeight="40.0" styleClass="title-bar-buttons-Hbox">
                <children>
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                  <Button fx:id="minimizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
                      <graphic>
                         <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
                      </graphic>
                   </Button>
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
+                  <Button fx:id="maximizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
                      <graphic>
                         <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
                      </graphic>
                   </Button>
-                  <Button mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                  <Button fx:id="closeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
                      <graphic>
                         <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
                      </graphic>
@@ -143,9 +143,10 @@
                               <StackPane prefWidth="200.0">
                                  <children>
                                     <PasswordField fx:id="passwordField" promptText="abc123!@#" />
-                                    <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
+                                     <TextField fx:id="passwordVisibleField" managed="false" promptText="abc123!@#" styleClass="text-field" visible="false" />
+                                    <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                        <graphic>
-                                          <FontIcon iconLiteral="mdi2e-eye" iconSize="20" />
+                                          <FontIcon fx:id="togglePasswordIcon" iconLiteral="mdi2e-eye" iconSize="20" />
                                        </graphic>
                                        <StackPane.margin>
                                           <Insets right="10.0" />
@@ -160,21 +161,22 @@
                         </VBox>
                         <HBox>
                            <VBox.margin>
-                              <Insets left="30.0" right="30.0" top="15.0" />
+                              <Insets bottom="5.0" left="30.0" right="30.0" top="20.0" />
                            </VBox.margin>
                            <children>
                               <JFXCheckBox fx:id="rememberCheckBox" alignment="CENTER_RIGHT" checkedColor="#007abd" graphicTextGap="10.0" prefHeight="30.0" text="Remember Credentials">
                                  <HBox.margin>
-                                    <Insets />
+                                    <Insets left="2.0" />
                                  </HBox.margin></JFXCheckBox>
                            </children>
                            <padding>
                               <Insets left="15.0" right="15.0" />
                            </padding>
                         </HBox>
+                        <Text fx:id="errorText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="error-text" />
                         <JFXButton fx:id="signInButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" styleClass="button-primary" text="Sign In">
                            <VBox.margin>
-                              <Insets bottom="25.0" left="45.0" right="45.0" top="40.0" />
+                              <Insets bottom="15.0" left="45.0" right="45.0" top="10.0" />
                            </VBox.margin>
                         </JFXButton>
                         <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
