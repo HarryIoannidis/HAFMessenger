@@ -3,6 +3,7 @@ package com.haf.client.controllers;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
+import java.util.logging.Logger;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXCheckBox;
 import javafx.fxml.FXML;
@@ -22,6 +23,8 @@ import org.kordamp.ikonli.javafx.FontIcon;
  * LoginViewModel.
  */
 public class LoginController {
+
+    private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
 
     private static final String TEXT_FIELD_ERROR = "text-field-error";
     private static final String PASSWORD_FIELD_ERROR = "password-field-error";
@@ -225,8 +228,7 @@ public class LoginController {
         }
 
         if (!viewModel.validate()) {
-            // Shake animation on sign-in button for feedback
-            shakeNode(signInButton);
+            shakeInvalidFields();
             return;
         }
 
@@ -254,7 +256,7 @@ public class LoginController {
                     if (success) {
                         // TODO: Navigate to main chat view
                         // ViewRouter.switchTo(UiConstants.FXML_MAIN_CHAT);
-                        System.out.println("Login successful for: " + viewModel.getEmail());
+                        LOGGER.info("Login successful for: " + viewModel.getEmail());
                     } else {
                         viewModel.setLoginError(LoginViewModel.ERROR_LOGIN_FAILED);
                         shakeNode(signInButton);
@@ -339,5 +341,14 @@ public class LoginController {
         shake.setAutoReverse(true);
         shake.setOnFinished(e -> node.setTranslateX(0));
         shake.play();
+    }
+
+    private void shakeInvalidFields() {
+        if (viewModel.emailErrorProperty().get()) {
+            shakeNode(emailField.getParent());
+        }
+        if (viewModel.passwordErrorProperty().get()) {
+            shakeNode(passwordField.getParent());
+        }
     }
 }

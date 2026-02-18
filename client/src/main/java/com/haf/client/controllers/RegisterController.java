@@ -4,6 +4,7 @@ import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.RegisterViewModel;
 import javafx.animation.TranslateTransition;
+import javafx.geometry.Insets;
 import javafx.beans.property.BooleanProperty;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -24,7 +25,11 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import com.jfoenix.controls.JFXButton;
 import org.kordamp.ikonli.javafx.FontIcon;
-
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
+import java.io.File;
+import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,6 +40,7 @@ public class RegisterController {
 
     private static final String STYLE_TEXT_FIELD_ERROR = "text-field-error";
     private static final String STYLE_PASSWORD_FIELD_ERROR = "password-field-error";
+    private static final String STYLE_BORDER_ERROR = "-fx-border-color: red; -fx-border-style: dashed; -fx-border-width: 2;";
 
     @FXML
     private BorderPane rootContainer;
@@ -97,6 +103,9 @@ public class RegisterController {
     private JFXButton registerButton;
 
     @FXML
+    private JFXButton backButton;
+
+    @FXML
     private StackPane registerButtonContainer;
 
     @FXML
@@ -109,6 +118,48 @@ public class RegisterController {
     private ComboBox<String> rankComboBox;
 
     @FXML
+    private VBox credentialsVBox;
+
+    @FXML
+    private VBox photosVBox;
+
+    @FXML
+    private Text photoTitleText;
+
+    @FXML
+    private StackPane dropZoneContainer;
+
+    @FXML
+    private VBox previewSateZoneId;
+
+    @FXML
+    private ImageView previewThumbnail;
+
+    @FXML
+    private Text previewNameText;
+
+    @FXML
+    private Text previewSizeText;
+
+    @FXML
+    private JFXButton previewReplaceButton;
+
+    @FXML
+    private JFXButton previewRemoveButton;
+
+    @FXML
+    private VBox emptyStateZoneSelfie;
+
+    @FXML
+    private VBox emptyStateZoneId;
+
+    @FXML
+    private VBox errorStateZoneId;
+
+    @FXML
+    private Text dropZoneErrorText;
+
+    @FXML
     private Button minimizeButton;
 
     @FXML
@@ -116,6 +167,14 @@ public class RegisterController {
 
     @FXML
     private Button closeButton;
+
+    private enum RegistrationStep {
+        CREDENTIALS,
+        ID_PHOTO,
+        SELFIE_PHOTO
+    }
+
+    private RegistrationStep currentStep = RegistrationStep.CREDENTIALS;
 
     private final RegisterViewModel viewModel = new RegisterViewModel();
 
@@ -129,6 +188,25 @@ public class RegisterController {
         setupListeners();
         setupPasswordToggle();
         setupWindowControls();
+        setupDragAndDrop();
+        initializeStep();
+    }
+
+    private void initializeStep() {
+        // Initial State: Credentials
+        currentStep = RegistrationStep.CREDENTIALS;
+        credentialsVBox.setVisible(true);
+        credentialsVBox.setManaged(true);
+        photosVBox.setVisible(false);
+        photosVBox.setManaged(false);
+        registerButton.setText("Next Step");
+
+        // Back button is hidden on the first step
+        if (backButton != null) {
+            backButton.setVisible(false);
+            backButton.setManaged(false);
+            HBox.setMargin(backButton, Insets.EMPTY);
+        }
     }
 
     /**
@@ -157,6 +235,11 @@ public class RegisterController {
     private void setupListeners() {
         // Register button click
         registerButton.setOnAction(event -> handleRegister());
+
+        // Back button click
+        if (backButton != null) {
+            backButton.setOnAction(event -> handleBack());
+        }
 
         // Navigate to Sign In
         gotoSignInButton.setOnMouseClicked(event -> navigateToLogin());
@@ -298,9 +381,7 @@ public class RegisterController {
      * Adds a listener that applies/removes error styling based on a
      * BooleanProperty.
      */
-    private void addErrorStyleListener(BooleanProperty errorProp,
-            Control field,
-            String errorStyleClass) {
+    private void addErrorStyleListener(BooleanProperty errorProp, Control field, String errorStyleClass) {
         errorProp.addListener((obs, oldVal, newVal) -> {
             if (Boolean.TRUE.equals(newVal)) {
                 if (!field.getStyleClass().contains(errorStyleClass)) {
@@ -314,29 +395,358 @@ public class RegisterController {
 
     /**
      * Handles the register button action.
-     * Validates input through the ViewModel, then proceeds with registration.
+     * Validates input based on the current step and proceeds.
      */
     private void handleRegister() {
         if (viewModel.loadingProperty().get()) {
             return;
         }
 
-        if (!viewModel.validate()) {
-            // Shake animation on register button for feedback
-            if (registerButtonContainer != null) {
-                shakeNode(registerButtonContainer);
-            } else {
-                shakeNode(registerButton);
+        switch (currentStep) {
+            case CREDENTIALS:
+                if (viewModel.validateCredentials()) {
+                    transitionToIdPhoto();
+                } else {
+                    shakeInvalidFields();
+                }
+                break;
+
+            case ID_PHOTO:
+                if (viewModel.validateIdPhoto()) {
+                    transitionToSelfiePhoto();
+                } else {
+                    handlePhotoError();
+                }
+                break;
+
+            case SELFIE_PHOTO:
+                if (viewModel.validateSelfiePhoto()) {
+                    performRegistration();
+                } else {
+                    handlePhotoError();
+                }
+                break;
+        }
+    }
+
+    private void handlePhotoError() {
+        dropZoneContainer.setStyle(STYLE_BORDER_ERROR);
+        shakeNode(dropZoneContainer);
+
+        // Determine if it's a missing file scenario
+        boolean isMissingFile = (currentStep == RegistrationStep.ID_PHOTO
+                && viewModel.idPhotoFileProperty().get() == null) ||
+                (currentStep == RegistrationStep.SELFIE_PHOTO && viewModel.selfiePhotoFileProperty().get() == null);
+
+        if (!isMissingFile) {
+            // If not missing, it means invalid file (type/size), so we show the error
+            // state.
+            if (viewModel.getErrorMessage() != null && !viewModel.getErrorMessage().isEmpty()
+                    && dropZoneErrorText != null) {
+                dropZoneErrorText.setText(viewModel.getErrorMessage());
+            } else if (dropZoneErrorText != null) {
+                // Reset to default if no specific message
+                dropZoneErrorText.setText("Only images up to 10MB are allowed");
             }
-            return;
+            showErrorState();
         }
 
+        if (isMissingFile) {
+            String message = (currentStep == RegistrationStep.ID_PHOTO)
+                    ? "Please upload your ID photo"
+                    : "Please upload your photo";
+            if (dropZoneErrorText != null) {
+                dropZoneErrorText.setText(message);
+            }
+            showErrorState();
+        }
+    }
+
+    private void shakeInvalidFields() {
+        if (viewModel.nameErrorProperty().get())
+            shakeNode(nameField.getParent());
+        if (viewModel.regNumErrorProperty().get())
+            shakeNode(regNumField.getParent());
+        if (viewModel.idNumErrorProperty().get())
+            shakeNode(idNumField.getParent());
+        if (viewModel.rankErrorProperty().get())
+            shakeNode(rankComboBox.getParent());
+        if (viewModel.phoneNumErrorProperty().get())
+            shakeNode(phoneNumField.getParent());
+        if (viewModel.emailErrorProperty().get())
+            shakeNode(emailField.getParent());
+        if (viewModel.passwordErrorProperty().get()) {
+            shakeNode(passwordField.getParent());
+        }
+        if (viewModel.passwordConfErrorProperty().get()) {
+            shakeNode(passwordConfField.getParent());
+        }
+    }
+
+    private void performRegistration() {
         // Validation passed — attempt registration
         viewModel.loadingProperty().set(true);
+        viewModel.errorMessageProperty().set("");
+        if (dropZoneErrorText != null)
+            dropZoneErrorText.setText("");
 
-        // TODO: Replace with actual server registration call
-        LOGGER.log(Level.INFO, "Registration validation passed for: {0}", viewModel.getEmail());
-        viewModel.loadingProperty().set(false);
+        // Store original text to restore if needed
+        String originalText = registerButton.getText();
+        registerButton.setText("Register...");
+
+        Thread registrationThread = new Thread(() -> {
+            try {
+                // Simulate network delay
+                Thread.sleep(1500);
+
+                // TODO: Replace with actual server registration call
+
+                javafx.application.Platform.runLater(() -> {
+                    viewModel.loadingProperty().set(false);
+                    // On success, we might navigate away. For now, we restore text or show success.
+                    LOGGER.log(Level.INFO, "Registration validation passed for: {0}", viewModel.getEmail());
+                    LOGGER.log(Level.INFO, "Registration simulated successfully.");
+
+                    // If we stay on this screen:
+                    registerButton.setText(originalText);
+                });
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                javafx.application.Platform.runLater(() -> {
+                    viewModel.loadingProperty().set(false);
+                    registerButton.setText(originalText);
+                    viewModel.setRegistrationError("Registration interrupted.");
+                });
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    viewModel.loadingProperty().set(false);
+                    registerButton.setText(originalText);
+                    viewModel.setRegistrationError("Registration failed.");
+                });
+            }
+        });
+        registrationThread.setDaemon(true);
+        registrationThread.start();
+    }
+
+    private void transitionToIdPhoto() {
+        currentStep = RegistrationStep.ID_PHOTO;
+
+        // Hide Credentials, Show Photos
+        credentialsVBox.setVisible(false);
+        credentialsVBox.setManaged(false);
+        photosVBox.setVisible(true);
+        photosVBox.setManaged(true);
+
+        // Show back button
+        if (backButton != null) {
+            backButton.setVisible(true);
+            backButton.setManaged(true);
+            HBox.setMargin(backButton, new Insets(0, 20, 0, 0));
+        }
+
+        // Setup ID View
+        photoTitleText.setText("ID Photo");
+        registerButton.setText("Last Step");
+
+        updateDropZoneView();
+    }
+
+    private void transitionToSelfiePhoto() {
+        currentStep = RegistrationStep.SELFIE_PHOTO;
+
+        // Back button stays visible on the last step
+
+        // Setup Selfie View
+        photoTitleText.setText("Your Picture"); // Or Selfie
+        registerButton.setText("Register");
+
+        updateDropZoneView();
+    }
+
+    /**
+     * Handles the back button action.
+     * Returns to the previous step in the registration flow.
+     */
+    private void handleBack() {
+        viewModel.clearErrors();
+
+        switch (currentStep) {
+            case ID_PHOTO:
+                // Go back to credentials
+                currentStep = RegistrationStep.CREDENTIALS;
+                credentialsVBox.setVisible(true);
+                credentialsVBox.setManaged(true);
+                photosVBox.setVisible(false);
+                photosVBox.setManaged(false);
+                registerButton.setText("Next Step");
+
+                // Hide back button on the first step
+                if (backButton != null) {
+                    backButton.setVisible(false);
+                    backButton.setManaged(false);
+                    HBox.setMargin(backButton, Insets.EMPTY);
+                }
+                break;
+
+            case SELFIE_PHOTO:
+                // Go back to ID photo
+                transitionToIdPhoto();
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    private void updateDropZoneView() {
+        // Reset Error Style
+        dropZoneContainer.setStyle("");
+        dropZoneErrorText.setText("");
+        viewModel.errorMessageProperty().set("");
+
+        // Hide all inner VBoxes first
+        previewSateZoneId.setVisible(false);
+        emptyStateZoneId.setVisible(false);
+        emptyStateZoneSelfie.setVisible(false);
+        errorStateZoneId.setVisible(false);
+
+        File currentParamsFile = (currentStep == RegistrationStep.ID_PHOTO)
+                ? viewModel.idPhotoFileProperty().get()
+                : viewModel.selfiePhotoFileProperty().get();
+
+        if (currentParamsFile != null) {
+            // Show Preview
+            showPreview(currentParamsFile);
+        } else {
+            // Show Empty State
+            if (currentStep == RegistrationStep.ID_PHOTO) {
+                emptyStateZoneId.setVisible(true);
+            } else {
+                emptyStateZoneSelfie.setVisible(true);
+            }
+        }
+    }
+
+    private void showPreview(File file) {
+        previewSateZoneId.setVisible(true);
+        emptyStateZoneId.setVisible(false);
+        emptyStateZoneSelfie.setVisible(false);
+        errorStateZoneId.setVisible(false);
+
+        previewNameText.setText(file.getName());
+        // Calculate size in MB
+        double bytes = file.length();
+        double mb = bytes / (1024 * 1024);
+        previewSizeText.setText(String.format("%.2f MB", mb));
+
+        try {
+            Image image = new Image(file.toURI().toString());
+            previewThumbnail.setImage(image);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to load image preview", e);
+        }
+    }
+
+    private void setupDragAndDrop() {
+        dropZoneContainer.setOnDragOver(event -> {
+            if (event.getGestureSource() != dropZoneContainer && event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+            }
+            event.consume();
+        });
+
+        dropZoneContainer.setOnDragDropped(event -> {
+            boolean success = false;
+            // Clear error text and style immediately on drop
+            dropZoneContainer.setStyle("");
+            if (dropZoneErrorText != null) {
+                dropZoneErrorText.setText("");
+            }
+            if (event.getDragboard().hasFiles()) {
+                List<File> files = event.getDragboard().getFiles();
+                if (!files.isEmpty()) {
+                    handleFileSelection(files.get(0));
+                    success = true;
+                }
+            }
+            event.setDropCompleted(success);
+            event.consume();
+        });
+
+        // Click to browse
+        dropZoneContainer.setOnMouseClicked(event -> {
+            if (currentStep == RegistrationStep.CREDENTIALS)
+                return;
+
+            if (!previewSateZoneId.isVisible()) {
+                browseFile();
+            }
+        });
+
+        // Initialize buttons in preview
+        previewReplaceButton.setOnAction(e -> browseFile());
+        previewRemoveButton.setOnAction(e -> removeFile());
+    }
+
+    private void browseFile() {
+        // Reset UI to clean state (clears errors, resets borders)
+        updateDropZoneView();
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Image");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg"));
+        File file = fileChooser.showOpenDialog(rootContainer.getScene().getWindow());
+        if (file != null) {
+            handleFileSelection(file);
+        }
+    }
+
+    private void removeFile() {
+        if (dropZoneErrorText != null)
+            dropZoneErrorText.setText("");
+        if (currentStep == RegistrationStep.ID_PHOTO) {
+            viewModel.idPhotoFileProperty().set(null);
+        } else {
+            viewModel.selfiePhotoFileProperty().set(null);
+        }
+        updateDropZoneView();
+    }
+
+    private void handleFileSelection(File file) {
+        // Reset styles and text
+        dropZoneContainer.setStyle("");
+        if (dropZoneErrorText != null)
+            dropZoneErrorText.setText("");
+
+        if (viewModel.validateFile(file)) {
+            if (currentStep == RegistrationStep.ID_PHOTO) {
+                viewModel.idPhotoFileProperty().set(file);
+            } else {
+                viewModel.selfiePhotoFileProperty().set(file);
+            }
+            updateDropZoneView();
+        } else {
+            // Show Error State
+            if (viewModel.getErrorMessage() != null && !viewModel.getErrorMessage().isEmpty()
+                    && dropZoneErrorText != null) {
+                dropZoneErrorText.setText(viewModel.getErrorMessage());
+            }
+            showErrorState();
+        }
+    }
+
+    private void showErrorState() {
+        previewSateZoneId.setVisible(false);
+        emptyStateZoneId.setVisible(false);
+        emptyStateZoneSelfie.setVisible(false);
+        errorStateZoneId.setVisible(true);
+
+        // Also red border
+        dropZoneContainer.setStyle(STYLE_BORDER_ERROR);
+        shakeNode(dropZoneContainer);
     }
 
     /**

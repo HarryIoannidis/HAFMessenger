@@ -81,9 +81,30 @@ public class ViewRouter {
             scene.setFill(Color.TRANSPARENT);
             scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
 
+            mainStage.setResizable(true);
+
             mainStage.setScene(scene);
-            WindowResizeHelper.enableResizing(mainStage);
-            mainStage.centerOnScreen();
+
+            boolean isSplash = fxmlPath.equals(UiConstants.FXML_SPLASH);
+
+            if (isSplash) {
+                // Splash: use its own FXML dimensions, no resizing
+                if (root instanceof javafx.scene.layout.Region region) {
+                    mainStage.setWidth(region.getPrefWidth());
+                    mainStage.setHeight(region.getPrefHeight());
+                }
+                mainStage.setResizable(false);
+                mainStage.centerOnScreen();
+            } else {
+                // Login/Register: open at 1200x850 if current window is smaller,
+                // otherwise keep current dimensions
+                if (mainStage.getWidth() < 1200 || mainStage.getHeight() < 850) {
+                    mainStage.setWidth(1200);
+                    mainStage.setHeight(850);
+                    mainStage.centerOnScreen();
+                }
+                WindowResizeHelper.enableResizing(mainStage);
+            }
             mainStage.show();
 
         } catch (IOException e) {
