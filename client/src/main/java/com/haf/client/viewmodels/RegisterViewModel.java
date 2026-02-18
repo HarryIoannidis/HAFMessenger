@@ -3,7 +3,10 @@ package com.haf.client.viewmodels;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
+import java.io.File;
 
 public class RegisterViewModel {
 
@@ -27,7 +30,14 @@ public class RegisterViewModel {
             + " characters.";
     public static final String ERROR_PASSWORD_CONF_EMPTY = "Please confirm your password.";
     public static final String ERROR_PASSWORDS_MISMATCH = "Passwords do not match.";
+
+    public static final String ERROR_ID_PHOTO_MISSING = "Please upload your ID photo.";
+    public static final String ERROR_SELFIE_PHOTO_MISSING = "Please upload your selfie.";
+    public static final String ERROR_FILE_TOO_LARGE = "File is too large (max 10MB).";
+    public static final String ERROR_INVALID_FILE_TYPE = "Invalid file type. Only images are allowed.";
     public static final String ERROR_REGISTRATION_FAILED = "Registration failed. Please try again.";
+
+    private static final long MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024; // 10MB
 
     // Observable properties
     private final StringProperty name = new SimpleStringProperty("");
@@ -49,6 +59,9 @@ public class RegisterViewModel {
     private final BooleanProperty emailError = new SimpleBooleanProperty(false);
     private final BooleanProperty passwordError = new SimpleBooleanProperty(false);
     private final BooleanProperty passwordConfError = new SimpleBooleanProperty(false);
+
+    private final ObjectProperty<File> idPhotoFile = new SimpleObjectProperty<>();
+    private final ObjectProperty<File> selfiePhotoFile = new SimpleObjectProperty<>();
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     // Property accessors
@@ -141,6 +154,14 @@ public class RegisterViewModel {
 
     public void togglePasswordConfVisibility() {
         passwordConfVisible.set(!passwordConfVisible.get());
+    }
+
+    public ObjectProperty<File> idPhotoFileProperty() {
+        return idPhotoFile;
+    }
+
+    public ObjectProperty<File> selfiePhotoFileProperty() {
+        return selfiePhotoFile;
     }
 
     // Getters
@@ -306,6 +327,43 @@ public class RegisterViewModel {
             passwordError.set(true);
             passwordConfError.set(true);
             errorMessage.set(ERROR_PASSWORDS_MISMATCH);
+            return false;
+        }
+        return true;
+
+    }
+
+    public boolean validateCredentials() {
+        return validate();
+    }
+
+    public boolean validateIdPhoto() {
+        if (idPhotoFile.get() == null) {
+            errorMessage.set(ERROR_ID_PHOTO_MISSING);
+            return false;
+        }
+        return true;
+    }
+
+    public boolean validateSelfiePhoto() {
+        if (selfiePhotoFile.get() == null) {
+            errorMessage.set(ERROR_SELFIE_PHOTO_MISSING);
+            return false;
+        }
+        return true;
+    }
+
+    public boolean validateFile(File file) {
+        if (file == null) {
+            return false;
+        }
+        if (file.length() > MAX_FILE_SIZE_BYTES) {
+            errorMessage.set(ERROR_FILE_TOO_LARGE);
+            return false;
+        }
+        String fileName = file.getName().toLowerCase();
+        if (!fileName.endsWith(".png") && !fileName.endsWith(".jpg") && !fileName.endsWith(".jpeg")) {
+            errorMessage.set(ERROR_INVALID_FILE_TYPE);
             return false;
         }
         return true;

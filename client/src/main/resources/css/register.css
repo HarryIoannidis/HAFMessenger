@@ -91,9 +91,10 @@
     -fx-background-color: #f5f5f5;
     -fx-border-color: #2b2b2b;
     -fx-border-width: 2;
-    -fx-border-style: segments(10, 10);
+    -fx-border-style: dashed;
     -fx-border-radius: 8;
     -fx-background-radius: 7;
     -fx-background-insets: 1;
     -fx-cursor: hand;
+
 }

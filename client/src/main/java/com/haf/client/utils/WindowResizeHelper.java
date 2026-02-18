@@ -1,18 +1,28 @@
 package com.haf.client.utils;
 
+import javafx.application.Platform;
 import javafx.scene.Cursor;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 
+import java.util.logging.Logger;
+
 public final class WindowResizeHelper {
+
+    private static final Logger LOGGER = Logger.getLogger(WindowResizeHelper.class.getName());
 
     /** How many pixels from the edge count as "resize zone". */
     private static final int BORDER = 8;
 
-    /** Minimum window dimensions. */
-    private static final double MIN_WIDTH = 1000;
-    private static final double MIN_HEIGHT = 800;
+    /** Fallback minimum dimensions if computed values are unusable. */
+    private static final double FALLBACK_MIN_WIDTH = 500;
+    private static final double FALLBACK_MIN_HEIGHT = 400;
+
+    /** Computed minimum window dimensions, set after the first layout pass. */
+    private static double minWidth = FALLBACK_MIN_WIDTH;
+    private static double minHeight = FALLBACK_MIN_HEIGHT;
 
     private WindowResizeHelper() {
         // Utility class
@@ -40,11 +50,22 @@ public final class WindowResizeHelper {
     public static void enableResizing(Stage stage) {
         Scene scene = stage.getScene();
         if (scene == null) {
-            System.err.println("WindowResizeHelper: Scene is null, cannot enable resizing.");
+            LOGGER.warning("WindowResizeHelper: Scene is null, cannot enable resizing.");
             return;
         }
 
-        // Explicitly set min dimensions to prevent GTK errors
+        // Compute minimum dimensions from the layout after the first render pass
+        Platform.runLater(() -> {
+            Parent root = scene.getRoot();
+
+            double computedMinW = root.minWidth(-1);
+            double computedMinH = root.minHeight(-1);
+            minWidth = computedMinW > 0 ? computedMinW : FALLBACK_MIN_WIDTH;
+            minHeight = computedMinH > 0 ? computedMinH : FALLBACK_MIN_HEIGHT;
+
+            stage.setMinWidth(minWidth);
+            stage.setMinHeight(minHeight);
+        });
 
         scene.addEventFilter(MouseEvent.MOUSE_MOVED, e -> handleMouseMoved(e, stage));
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> handleMousePressed(e, stage));
@@ -78,9 +99,9 @@ public final class WindowResizeHelper {
 
             // Sanity check
             if (Double.isNaN(startW) || startW <= 0)
-                startW = MIN_WIDTH;
+                startW = minWidth;
             if (Double.isNaN(startH) || startH <= 0)
-                startH = MIN_HEIGHT;
+                startH = minHeight;
             if (Double.isNaN(startStageX))
                 startStageX = 0;
             if (Double.isNaN(startStageY))
@@ -110,18 +131,18 @@ public final class WindowResizeHelper {
         double newY = startStageY;
 
         if (right) {
-            newW = Math.max(MIN_WIDTH, startW + dx);
+            newW = Math.max(minWidth, startW + dx);
         } else if (left) {
             double proposedW = startW - dx;
-            newW = Math.max(MIN_WIDTH, proposedW);
+            newW = Math.max(minWidth, proposedW);
             newX = startStageX + (startW - newW);
         }
 
         if (bottom) {
-            newH = Math.max(MIN_HEIGHT, startH + dy);
+            newH = Math.max(minHeight, startH + dy);
         } else if (top) {
             double proposedH = startH - dy;
-            newH = Math.max(MIN_HEIGHT, proposedH);
+            newH = Math.max(minHeight, proposedH);
             newY = startStageY + (startH - newH);
         }
 
