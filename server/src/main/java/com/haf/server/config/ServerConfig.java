@@ -28,6 +28,24 @@ public final class ServerConfig {
     private final int wsPort;
 
     /**
+     * Loads the server configuration from environment variables or a .env file.
+     */
+    public static ServerConfig load() {
+        io.github.cdimascio.dotenv.Dotenv dotenv = io.github.cdimascio.dotenv.Dotenv.configure()
+                .directory("src/main/resources/config")
+                .filename("variables.env")
+                .ignoreIfMissing()
+                .load();
+
+        Map<String, String> env = new java.util.HashMap<>(System.getenv());
+        if (dotenv != null) {
+            dotenv.entries().forEach(entry -> env.putIfAbsent(entry.getKey(), entry.getValue()));
+        }
+
+        return new ServerConfig(env);
+    }
+
+    /**
      * Creates a new ServerConfig.
      *
      * @param env the environment variables to read from.
@@ -38,7 +56,7 @@ public final class ServerConfig {
         this.dbPassword = require(env, "HAF_DB_PASS");
         this.dbPoolSize = parseInt(env.get("HAF_DB_POOL_SIZE"), DEFAULT_DB_POOL_SIZE);
 
-        this.keystoreRoot = Path.of(require(env, "HAF_KEYSTORE_ROOT"));
+        this.keystoreRoot = env.get("HAF_KEYSTORE_ROOT") != null ? Path.of(env.get("HAF_KEYSTORE_ROOT")) : null;
         this.keyPassword = require(env, "HAF_KEY_PASS").toCharArray();
 
         this.tlsKeystorePath = Path.of(require(env, "HAF_TLS_KEYSTORE_PATH"));
@@ -46,13 +64,6 @@ public final class ServerConfig {
 
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
         this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
-    }
-
-    /**
-     * Loads the server configuration from environment variables.
-     */
-    public static ServerConfig load() {
-        return new ServerConfig(System.getenv());
     }
 
     /**
@@ -149,8 +160,9 @@ public final class ServerConfig {
     /**
      * Parses an integer value from the given candidate string.
      *
-     * @param candidate the candidate string to parse.
-     * @param defaultValue the default value to return if the candidate is blank or invalid.
+     * @param candidate    the candidate string to parse.
+     * @param defaultValue the default value to return if the candidate is blank or
+     *                     invalid.
      * @return the parsed integer value.
      */
     private static int parseInt(String candidate, int defaultValue) {
@@ -170,14 +182,13 @@ public final class ServerConfig {
     @Override
     public String toString() {
         return "ServerConfig{" +
-            "dbUrl='" + dbUrl + '\'' +
-            ", dbUser='" + dbUser + '\'' +
-            ", dbPoolSize=" + dbPoolSize +
-            ", httpPort=" + httpPort +
-            ", wsPort=" + wsPort +
-            ", keystoreRoot=" + keystoreRoot +
-            ", tlsKeystorePath=" + tlsKeystorePath +
-            '}';
+                "dbUrl='" + dbUrl + '\'' +
+                ", dbUser='" + dbUser + '\'' +
+                ", dbPoolSize=" + dbPoolSize +
+                ", httpPort=" + httpPort +
+                ", wsPort=" + wsPort +
+                ", keystoreRoot=" + keystoreRoot +
+                ", tlsKeystorePath=" + tlsKeystorePath +
+                '}';
     }
 }
-
