@@ -40,6 +40,11 @@
             <artifactId>flyway-core</artifactId>
             <version>10.16.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+            <version>10.16.0</version>
+        </dependency>
 
         <!-- Logging -->
         <dependency>
@@ -101,6 +106,13 @@
             <artifactId>mysql</artifactId>
             <version>1.20.1</version>
             <scope>test</scope>
+        </dependency>
+
+        <!-- Environment Variables (.env) -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
         </dependency>
     </dependencies>
 

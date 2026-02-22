@@ -8,8 +8,19 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ViewRouter {
+
+    /**
+     * Utility class.
+     */
+    private ViewRouter() {
+    }
+
+    private static final Logger logger = Logger.getLogger(ViewRouter.class.getName());
 
     /**
      * Loads the Manrope font once at class initialization.
@@ -21,7 +32,7 @@ public class ViewRouter {
             Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD),
                     UiConstants.FONT_SIZE_BOLD);
         } catch (Exception e) {
-            System.err.println("Could not load fonts: " + e.getMessage());
+            logger.log(Level.WARNING, "Could not load fonts", e);
         }
     }
 
@@ -60,7 +71,7 @@ public class ViewRouter {
             mainStage.show();
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load FXML: " + fxmlPath, e);
+            throw new UncheckedIOException("Failed to load FXML: " + fxmlPath, e);
         }
     }
 
@@ -96,7 +107,7 @@ public class ViewRouter {
                 mainStage.setResizable(false);
                 mainStage.centerOnScreen();
             } else {
-                // Login/Register: open at 1200x850 if current window is smaller,
+                // Open new window at 1200x850 if current window is smaller,
                 // otherwise keep current dimensions
                 if (mainStage.getWidth() < 1200 || mainStage.getHeight() < 850) {
                     mainStage.setWidth(1200);
@@ -108,7 +119,7 @@ public class ViewRouter {
             mainStage.show();
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load FXML: " + fxmlPath, e);
+            throw new UncheckedIOException("Failed to load FXML: " + fxmlPath, e);
         }
     }
 

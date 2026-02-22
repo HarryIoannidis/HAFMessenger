@@ -152,10 +152,6 @@ public final class Main {
         hikariConfig.setConnectionTimeout(Duration.ofSeconds(30).toMillis());
         hikariConfig.setIdleTimeout(Duration.ofMinutes(10).toMillis());
         hikariConfig.setMaxLifetime(Duration.ofMinutes(30).toMillis());
-        hikariConfig.addDataSourceProperty("useSSL", "true");
-        hikariConfig.addDataSourceProperty("requireSSL", "true");
-        hikariConfig.addDataSourceProperty("verifyServerCertificate", "true");
-        hikariConfig.addDataSourceProperty("allowPublicKeyRetrieval", "false");
         hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
         hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
