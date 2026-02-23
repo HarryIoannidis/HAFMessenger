@@ -19,7 +19,7 @@
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/login.css" />
@@ -117,7 +117,7 @@
                                     </Text>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <TextField fx:id="emailField" prefHeight="50.0" promptText="examplemail@haf.gr" styleClass="text-field">
+                                          <TextField fx:id="emailField" minWidth="300.0" prefHeight="50.0" promptText="examplemail@haf.gr" styleClass="text-field">
                                              <font>
                                                 <Font size="18.0" />
                                              </font>
@@ -138,7 +138,7 @@
                                     </Text>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <PasswordField fx:id="passwordField" promptText="abc123!@#" />
+                                          <PasswordField fx:id="passwordField" minWidth="300.0" promptText="abc123!@#" />
                                            <TextField fx:id="passwordVisibleField" managed="false" promptText="abc123!@#" styleClass="text-field" visible="false" />
                                           <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
                                              <graphic>
@@ -160,7 +160,7 @@
                               <Insets left="30.0" right="30.0" />
                            </VBox.margin>
                         </VBox>
-                        <HBox>
+                        <HBox minWidth="300.0">
                            <VBox.margin>
                               <Insets bottom="5.0" left="30.0" right="30.0" top="20.0" />
                            </VBox.margin>
