@@ -147,7 +147,7 @@
 }
 
 .password-field {
-    -fx-padding: 12 55 12 15;
+    -fx-padding: 12 45 12 15;
 }
 
 .text-field:hover,
@@ -158,7 +158,6 @@
 .text-field:focused,
 .password-field:focused {
     -fx-border-color: #0078d7;
-    -fx-border-width: 2;
     -fx-background-color: #dbdbdb;
 }
 

@@ -1,210 +1,140 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import com.jfoenix.controls.JFXButton?>
-<?import com.jfoenix.controls.JFXCheckBox?>
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.Cursor?>
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
-   <stylesheets>
-      <URL value="@../css/global.css" />
-      <URL value="@../css/login.css" />
-   </stylesheets>
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
    <top>
-      <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="41.0" styleClass="title-bar" BorderPane.alignment="CENTER">
-         <children>
-            <HBox fx:id="ttileHBox" prefHeight="100.0" styleClass="title-bar-Hbox">
-               <children>
-                  <ImageView fitHeight="30.0" fitWidth="30.0" pickOnBounds="true" preserveRatio="true">
-                     <HBox.margin>
-                        <Insets left="6.0" />
-                     </HBox.margin>
-                     <image>
-                        <Image url="@../images/logo/app_logo_downscale.png" />
-                     </image>
-                  </ImageView>
-                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="HAF Messenger">
-                     <HBox.margin>
-                        <Insets left="10.0" right="10.0" />
-                     </HBox.margin>
-                  </Text>
-               </children>
-               <padding>
-                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-               </padding>
-            </HBox>
-            <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
-            <HBox fx:id="buttonsHBox" prefHeight="40.0" styleClass="title-bar-buttons-Hbox">
-               <children>
-                  <Button fx:id="minimizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
-                     <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
-                     </graphic>
-                  </Button>
-                  <Button fx:id="maximizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
-                     <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
-                     </graphic>
-                  </Button>
-                  <Button fx:id="closeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
-                     <graphic>
-                        <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
-                     </graphic>
-                  </Button>
-               </children>
-            </HBox>
-         </children>
+      <VBox BorderPane.alignment="CENTER">
          <BorderPane.margin>
             <Insets />
          </BorderPane.margin>
-      </HBox>
-   </top>
-   <center>
-      <HBox BorderPane.alignment="CENTER">
          <children>
-            <StackPane fx:id="leftPanel" maxHeight="1.7976931348623157E308" prefWidth="360.0" HBox.hgrow="SOMETIMES">
+            <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="41.0" styleClass="title-bar">
                <children>
-                  <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
-                     <image>
-                        <Image url="@../images/logo/app_logo_upscale.png" />
-                     </image>
-                     <StackPane.margin>
-                        <Insets left="60.0" />
-                     </StackPane.margin>
-                     <cursor>
-                        <Cursor fx:constant="DEFAULT" />
-                     </cursor>
-                  </ImageView>
-               </children>
-               <HBox.margin>
-                  <Insets />
-               </HBox.margin>
-            </StackPane>
-            <StackPane fx:id="rightPanel" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
-               <children>
-                  <VBox alignment="CENTER" minWidth="700.0">
+                  <HBox fx:id="ttileHBox" prefHeight="100.0" styleClass="title-bar-Hbox">
                      <children>
-                        <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="Sign In">
-                           <font>
-                              <Font name="System Bold" size="22.0" />
-                           </font>
-                           <VBox.margin>
-                              <Insets bottom="20.0" />
-                           </VBox.margin>
+                        <ImageView fitHeight="30.0" fitWidth="30.0" pickOnBounds="true" preserveRatio="true">
+                           <HBox.margin>
+                              <Insets left="6.0" />
+                           </HBox.margin>
+                           <image>
+                              <Image url="@../images/logo/app_logo_downscale.png" />
+                           </image>
+                        </ImageView>
+                        <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="HAF Messenger">
+                           <HBox.margin>
+                              <Insets left="10.0" right="10.0" />
+                           </HBox.margin>
                         </Text>
-                        <VBox>
-                           <children>
-                              <VBox>
-                                 <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Email">
-                                       <font>
-                                          <Font size="18.0" />
-                                       </font>
-                                    </Text>
-                                    <StackPane prefWidth="200.0">
-                                       <children>
-                                          <TextField fx:id="emailField" prefHeight="50.0" promptText="examplemail@haf.gr" styleClass="text-field">
-                                             <font>
-                                                <Font size="18.0" />
-                                             </font>
-                                          </TextField>
-                                       </children>
-                                    </StackPane>
-                                 </children>
-                                 <padding>
-                                    <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
-                                 </padding>
-                              </VBox>
-                              <VBox>
-                                 <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Password">
-                                       <font>
-                                          <Font size="18.0" />
-                                       </font>
-                                    </Text>
-                                    <StackPane prefWidth="200.0">
-                                       <children>
-                                          <PasswordField fx:id="passwordField" promptText="abc123!@#" />
-                                           <TextField fx:id="passwordVisibleField" managed="false" promptText="abc123!@#" styleClass="text-field" visible="false" />
-                                          <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" styleClass="field-icon-button" StackPane.alignment="CENTER_RIGHT">
-                                             <graphic>
-                                                <FontIcon fx:id="togglePasswordIcon" iconLiteral="mdi2e-eye" iconSize="20" />
-                                             </graphic>
-                                             <StackPane.margin>
-                                                <Insets right="10.0" />
-                                             </StackPane.margin>
-                                          </JFXButton>
-                                       </children>
-                                    </StackPane>
-                                 </children>
-                                 <padding>
-                                    <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
-                                 </padding>
-                              </VBox>
-                           </children>
-                           <VBox.margin>
-                              <Insets left="30.0" right="30.0" />
-                           </VBox.margin>
-                        </VBox>
-                        <HBox>
-                           <VBox.margin>
-                              <Insets bottom="5.0" left="30.0" right="30.0" top="20.0" />
-                           </VBox.margin>
-                           <children>
-                              <JFXCheckBox fx:id="rememberCheckBox" alignment="CENTER_RIGHT" checkedColor="#007abd" graphicTextGap="10.0" prefHeight="30.0" text="Remember Credentials">
-                                 <HBox.margin>
-                                    <Insets left="2.0" />
-                                 </HBox.margin></JFXCheckBox>
-                           </children>
-                           <padding>
-                              <Insets left="15.0" right="15.0" />
-                           </padding>
-                        </HBox>
-                        <Text fx:id="errorText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="error-text" />
-                        <JFXButton fx:id="signInButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" prefWidth="300.0" styleClass="button-primary" text="Sign In">
-                           <VBox.margin>
-                              <Insets bottom="15.0" left="45.0" right="45.0" top="10.0" />
-                           </VBox.margin>
-                        </JFXButton>
-                        <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
-                           <VBox.margin>
-                              <Insets left="30.0" right="30.0" />
-                           </VBox.margin>
-                           <children>
-                              <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Don’t have an account? " textAlignment="CENTER">
-                                 <font>
-                                    <Font size="15.0" />
-                                 </font>
-                              </Text>
-                              <Text fx:id="gotoRegisterButton" accessibleRole="HYPERLINK" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="text-button" text="Register here" textAlignment="CENTER">
-                                 <font>
-                                    <Font size="15.0" />
-                                 </font>
-                              </Text>
-                           </children>
-                        </HBox>
                      </children>
                      <padding>
-                        <Insets right="20.0" />
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                      </padding>
-                  </VBox>
+                  </HBox>
+                  <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
+                  <HBox fx:id="buttonsHBox" prefHeight="40.0" styleClass="title-bar-buttons-Hbox">
+                     <children>
+                        <Button fx:id="minimizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                           <graphic>
+                              <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
+                           </graphic>
+                        </Button>
+                        <Button fx:id="maximizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
+                           <graphic>
+                              <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
+                           </graphic>
+                        </Button>
+                        <Button fx:id="closeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                           <graphic>
+                              <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
                </children>
-            </StackPane>
+            </HBox>
+            <HBox maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" prefWidth="250.0" styleClass="toolbar">
+               <children>
+                  <HBox>
+                     <children>
+                        <StackPane>
+                           <children>
+                              <JFXButton contentDisplay="GRAPHIC_ONLY" prefHeight="90.0" prefWidth="125.0" styleClass="nav-item" text=" ">
+                                 <graphic>
+                                    <FontIcon iconColor="#007abd" iconLiteral="mdi2m-message-outline" iconSize="35" selectionEnd="0" />
+                                 </graphic>
+                                 <padding>
+                                    <Insets left="5.0" />
+                                 </padding>
+                              </JFXButton>
+                              <Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="125.0" styleClass="nav-indicator" StackPane.alignment="BOTTOM_CENTER" />
+                           </children>
+                        </StackPane>
+                        <StackPane>
+                           <children>
+                              <JFXButton contentDisplay="CENTER" prefHeight="90.0" prefWidth="125.0" styleClass="nav-item" text=" ">
+                                 <graphic>
+                                    <FontIcon iconLiteral="mdi2m-magnify" iconSize="35" />
+                                 </graphic>
+                                 <padding>
+                                    <Insets left="5.0" />
+                                 </padding>
+                              </JFXButton>
+                              <Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="125.0" styleClass="nav-indicator" visible="false" StackPane.alignment="BOTTOM_CENTER" />
+                           </children>
+                        </StackPane>
+                     </children>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
+                     <padding>
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                     </padding>
+                     <children>
+                        <HBox prefWidth="200.0" />
+                        <StackPane>
+                           <children>
+                              <TextField styleClass="search-field">
+                                 <padding>
+                                    <Insets right="20.0" />
+                                 </padding>
+                              </TextField>
+                              <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                 <StackPane.margin>
+                                    <Insets right="10.0" />
+                                 </StackPane.margin>
+                                 <graphic>
+                                    <FontIcon iconLiteral="mdi2m-magnify" iconSize="25" textAlignment="CENTER" />
+                                 </graphic>
+                              </JFXButton>
+                           </children>
+                        </StackPane>
+                     </children>
+                  </HBox>
+               </children>
+            </HBox>
+            <Pane maxHeight="-Infinity" maxWidth="1.7976931348623157E308" prefHeight="1.0" styleClass="divider" />
          </children>
-      </HBox>
-   </center>
+      </VBox>
+   </top>
+   <left>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" BorderPane.alignment="CENTER" />
+   </left>
+   <stylesheets>
+      <URL value="@../css/global.css" />
+      <URL value="@../css/main.css" />
+   </stylesheets>
 </BorderPane>
