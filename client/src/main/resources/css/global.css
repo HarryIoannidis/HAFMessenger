@@ -4,17 +4,22 @@
 @font-face {
     font-family: 'Manrope';
     src: url('../fonts/Manrope.ttf');
+    -fx-font-smoothing-type: gray;
 }
 
 .root {
     -fx-font-family: 'Manrope', sans-serif;
-    -fx-text-fill: #212121;
-    -fx-fill: #212121;
+    -fx-text-fill: #2b2b2b;
+    -fx-fill: #2b2b2b;
     -fx-text-alignment: center;
 }
 
 .haf-primary {
     -fx-background-color: #005eb8;
+}
+
+.ikonli-font-icon {
+    -fx-icon-color: #2b2b2b;
 }
 
 /*--------------------- TITLE BAR ---------------------*/
@@ -129,6 +134,13 @@
     -fx-font-smoothing-type: gray;
 }
 
+.plain-text-subtitle {
+    -fx-fill: #333333;
+    -fx-text-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-smoothing-type: gray;
+}
+
 .text-field,
 .password-field {
     -fx-background-color: #d9d9d9;
@@ -168,10 +180,10 @@
     -fx-border-radius: 50%;
     -fx-cursor: hand;
     -fx-padding: 8;
-    -fx-min-width: 30;
-    -fx-min-height: 30;
-    -fx-pref-width: 30;
-    -fx-pref-height: 30;
+    -fx-min-width: 40;
+    -fx-min-height: 40;
+    -fx-pref-width: 40;
+    -fx-pref-height: 40;
 }
 
 .field-icon-button:hover {
@@ -200,9 +212,6 @@
     -fx-background-color: #0063b1;
 }
 
-/*.button-primary:pressed {*/
-/*    -fx-background-color: #004e8c;*/
-/*}*/
 
 .button-primary:disabled {
     -fx-background-color: #b0b0b0;

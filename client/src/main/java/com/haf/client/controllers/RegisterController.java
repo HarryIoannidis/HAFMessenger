@@ -38,10 +38,6 @@ public class RegisterController {
 
     private static final Logger LOGGER = Logger.getLogger(RegisterController.class.getName());
 
-    private static final String STYLE_TEXT_FIELD_ERROR = "text-field-error";
-    private static final String STYLE_PASSWORD_FIELD_ERROR = "password-field-error";
-    private static final String STYLE_BORDER_ERROR = "-fx-border-color: red; -fx-border-style: dashed; -fx-border-width: 2;";
-
     @FXML
     private BorderPane rootContainer;
 
@@ -253,23 +249,23 @@ public class RegisterController {
 
     private void setupInputInteractionListeners() {
         // Clear errors when user types in any field
-        addClearErrorListener(nameField, STYLE_TEXT_FIELD_ERROR);
-        addClearErrorListener(regNumField, STYLE_TEXT_FIELD_ERROR);
-        addClearErrorListener(idNumField, STYLE_TEXT_FIELD_ERROR);
-        addClearErrorListener(phoneNumField, STYLE_TEXT_FIELD_ERROR);
-        addClearErrorListener(emailField, STYLE_TEXT_FIELD_ERROR);
-        addClearErrorListener(passwordField, STYLE_PASSWORD_FIELD_ERROR);
-        addClearErrorListener(passwordConfField, STYLE_PASSWORD_FIELD_ERROR);
+        addClearErrorListener(nameField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addClearErrorListener(regNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addClearErrorListener(idNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addClearErrorListener(phoneNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addClearErrorListener(emailField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addClearErrorListener(passwordField, UiConstants.STYLE_PASSWORD_FIELD_ERROR);
+        addClearErrorListener(passwordConfField, UiConstants.STYLE_PASSWORD_FIELD_ERROR);
 
         if (passwordVisibleField != null)
-            addClearErrorListener(passwordVisibleField, STYLE_TEXT_FIELD_ERROR);
+            addClearErrorListener(passwordVisibleField, UiConstants.STYLE_TEXT_FIELD_ERROR);
         if (passwordConfVisibleField != null)
-            addClearErrorListener(passwordConfVisibleField, STYLE_TEXT_FIELD_ERROR);
+            addClearErrorListener(passwordConfVisibleField, UiConstants.STYLE_TEXT_FIELD_ERROR);
 
         // Clear errors when rank is selected
         rankComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.clearErrors();
-            rankComboBox.getStyleClass().remove(STYLE_TEXT_FIELD_ERROR);
+            rankComboBox.getStyleClass().remove(UiConstants.STYLE_TEXT_FIELD_ERROR);
         });
 
         // Sync rank ComboBox value to ViewModel
@@ -278,22 +274,24 @@ public class RegisterController {
 
     private void setupValidationErrorListeners() {
         // Apply error styling reactively for each field
-        addErrorStyleListener(viewModel.nameErrorProperty(), nameField, STYLE_TEXT_FIELD_ERROR);
-        addErrorStyleListener(viewModel.regNumErrorProperty(), regNumField, STYLE_TEXT_FIELD_ERROR);
-        addErrorStyleListener(viewModel.idNumErrorProperty(), idNumField, STYLE_TEXT_FIELD_ERROR);
-        addErrorStyleListener(viewModel.phoneNumErrorProperty(), phoneNumField, STYLE_TEXT_FIELD_ERROR);
-        addErrorStyleListener(viewModel.emailErrorProperty(), emailField, STYLE_TEXT_FIELD_ERROR);
-        addErrorStyleListener(viewModel.passwordErrorProperty(), passwordField, STYLE_PASSWORD_FIELD_ERROR);
-        addErrorStyleListener(viewModel.passwordConfErrorProperty(), passwordConfField, STYLE_PASSWORD_FIELD_ERROR);
+        addErrorStyleListener(viewModel.nameErrorProperty(), nameField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.regNumErrorProperty(), regNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.idNumErrorProperty(), idNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.phoneNumErrorProperty(), phoneNumField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.emailErrorProperty(), emailField, UiConstants.STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.passwordErrorProperty(), passwordField, UiConstants.STYLE_PASSWORD_FIELD_ERROR);
+        addErrorStyleListener(viewModel.passwordConfErrorProperty(), passwordConfField,
+                UiConstants.STYLE_PASSWORD_FIELD_ERROR);
 
         if (passwordVisibleField != null)
-            addErrorStyleListener(viewModel.passwordErrorProperty(), passwordVisibleField, STYLE_TEXT_FIELD_ERROR);
+            addErrorStyleListener(viewModel.passwordErrorProperty(), passwordVisibleField,
+                    UiConstants.STYLE_TEXT_FIELD_ERROR);
         if (passwordConfVisibleField != null)
             addErrorStyleListener(viewModel.passwordConfErrorProperty(), passwordConfVisibleField,
-                    STYLE_TEXT_FIELD_ERROR);
+                    UiConstants.STYLE_TEXT_FIELD_ERROR);
 
         // Rank ComboBox error styling
-        addErrorStyleListener(viewModel.rankErrorProperty(), rankComboBox, STYLE_TEXT_FIELD_ERROR);
+        addErrorStyleListener(viewModel.rankErrorProperty(), rankComboBox, UiConstants.STYLE_TEXT_FIELD_ERROR);
     }
 
     private void setupPasswordToggle() {
@@ -430,7 +428,7 @@ public class RegisterController {
     }
 
     private void handlePhotoError() {
-        dropZoneContainer.setStyle(STYLE_BORDER_ERROR);
+        dropZoneContainer.setStyle(UiConstants.STYLE_BORDER_ERROR);
         shakeNode(dropZoneContainer);
 
         // Determine if it's a missing file scenario
@@ -745,7 +743,7 @@ public class RegisterController {
         errorStateZoneId.setVisible(true);
 
         // Also red border
-        dropZoneContainer.setStyle(STYLE_BORDER_ERROR);
+        dropZoneContainer.setStyle(UiConstants.STYLE_BORDER_ERROR);
         shakeNode(dropZoneContainer);
     }
 
