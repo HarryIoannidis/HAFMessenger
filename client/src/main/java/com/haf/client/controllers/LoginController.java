@@ -26,8 +26,6 @@ public class LoginController {
 
     private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
 
-    private static final String TEXT_FIELD_ERROR = "text-field-error";
-    private static final String PASSWORD_FIELD_ERROR = "password-field-error";
     private static final String SIGN_IN_TEXT = "Sign In";
 
     @FXML
@@ -131,12 +129,12 @@ public class LoginController {
         // Clear errors when user types
         emailField.textProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.clearErrors();
-            emailField.getStyleClass().remove(TEXT_FIELD_ERROR);
+            emailField.getStyleClass().remove(UiConstants.STYLE_TEXT_FIELD_ERROR);
         });
 
         passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
             viewModel.clearErrors();
-            passwordField.getStyleClass().remove(PASSWORD_FIELD_ERROR);
+            passwordField.getStyleClass().remove(UiConstants.STYLE_PASSWORD_FIELD_ERROR);
         });
 
         // Enter key on password field triggers sign in
@@ -152,27 +150,27 @@ public class LoginController {
 
     private void handleEmailError(Boolean isError) {
         if (Boolean.TRUE.equals(isError)) {
-            if (!emailField.getStyleClass().contains(TEXT_FIELD_ERROR)) {
-                emailField.getStyleClass().add(TEXT_FIELD_ERROR);
+            if (!emailField.getStyleClass().contains(UiConstants.STYLE_TEXT_FIELD_ERROR)) {
+                emailField.getStyleClass().add(UiConstants.STYLE_TEXT_FIELD_ERROR);
             }
         } else {
-            emailField.getStyleClass().remove(TEXT_FIELD_ERROR);
+            emailField.getStyleClass().remove(UiConstants.STYLE_TEXT_FIELD_ERROR);
         }
     }
 
     private void handlePasswordError(Boolean isError) {
         if (Boolean.TRUE.equals(isError)) {
-            if (!passwordField.getStyleClass().contains(PASSWORD_FIELD_ERROR)) {
-                passwordField.getStyleClass().add(PASSWORD_FIELD_ERROR);
+            if (!passwordField.getStyleClass().contains(UiConstants.STYLE_PASSWORD_FIELD_ERROR)) {
+                passwordField.getStyleClass().add(UiConstants.STYLE_PASSWORD_FIELD_ERROR);
             }
             if (passwordVisibleField != null
-                    && !passwordVisibleField.getStyleClass().contains(TEXT_FIELD_ERROR)) {
-                passwordVisibleField.getStyleClass().add(TEXT_FIELD_ERROR);
+                    && !passwordVisibleField.getStyleClass().contains(UiConstants.STYLE_TEXT_FIELD_ERROR)) {
+                passwordVisibleField.getStyleClass().add(UiConstants.STYLE_TEXT_FIELD_ERROR);
             }
         } else {
-            passwordField.getStyleClass().remove(PASSWORD_FIELD_ERROR);
+            passwordField.getStyleClass().remove(UiConstants.STYLE_PASSWORD_FIELD_ERROR);
             if (passwordVisibleField != null) {
-                passwordVisibleField.getStyleClass().remove(TEXT_FIELD_ERROR);
+                passwordVisibleField.getStyleClass().remove(UiConstants.STYLE_TEXT_FIELD_ERROR);
             }
         }
     }

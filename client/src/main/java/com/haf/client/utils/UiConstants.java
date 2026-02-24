@@ -9,13 +9,15 @@ public final class UiConstants {
     public static final String FXML_SPLASH = "/fxml/splash.fxml";
     public static final String FXML_LOGIN = "/fxml/login.fxml";
     public static final String FXML_REGISTER = "/fxml/register.fxml";
+    public static final String FXML_MAIN = "/fxml/main.fxml";
 
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";
     public static final String IMAGE_APP_LOGO_DOWNSCALE = "/images/logo/app_logo_downscale.png";
     public static final String IMAGE_APP_LOGO_UPSCALE = "/images/logo/app_logo_upscale.png";
     public static final String IMAGE_APP_LOGO_SVG = "/images/logo/app_logo_svg.svg";
-
+    public static final String IMAGE_LOGO_PNG = "/images/logo/logoPNG.png";
+    public static final String IMAGE_AVATAR = "/images/misc/avatar.png";
 
     // Rank names
     public static final String RANK_YPOSMINIAS = "Υποσμηνίας";
@@ -48,7 +50,6 @@ public final class UiConstants {
     public static final String ICON_RANK_ANTIPTERARCHOS = "/images/ranks/sminarchos.png";
     public static final String ICON_RANK_DEFAULT = "/images/ranks/default.png";
 
-
     // Bootstrap status messages
     public static final String BOOTSTRAP_STARTING = "Starting...";
     public static final String BOOTSTRAP_CONFIG = "Loading configuration...";
@@ -66,6 +67,8 @@ public final class UiConstants {
     public static final String CSS_GLOBAL = "/css/global.css";
     public static final String CSS_LOGIN = "/css/login.css";
     public static final String CSS_REGISTER = "/css/register.css";
+    public static final String CSS_MAIN = "/css/main.css";
+    public static final String CSS_SPLASH = "/css/splash.css";
 
     // Fonts
     public static final String FONT_MANROPE = "/fonts/Manrope.ttf";
@@ -80,5 +83,11 @@ public final class UiConstants {
     // Common Dimensions
     public static final double RANK_ICON_SIZE = 24.0;
 
-    private UiConstants() {}
+    // Styles
+    public static final String STYLE_TEXT_FIELD_ERROR = "text-field-error";
+    public static final String STYLE_PASSWORD_FIELD_ERROR = "password-field-error";
+    public static final String STYLE_BORDER_ERROR = "-fx-border-color: red; -fx-border-style: dashed; -fx-border-width: 2;";
+
+    private UiConstants() {
+    }
 }
