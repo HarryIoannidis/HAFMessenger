@@ -3,16 +3,15 @@
 .toolbar {
     -fx-background-color: #d9d9d9;
 }
+
 .nav-indicator {
     -fx-background-color: #007ABD;
-    -fx-background-radius: 4 4
-    0 0;
-    /*-fx-effect: dropshadow(gaussian, rgba(26,124,197,0.4), 6, 0.3, 0, -2);*/
+    -fx-background-radius: 4 4 0 0;
 }
 
 .divider {
     -fx-background-color: #A3A3A3;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.40), 4, 0, 0, 1.95);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.40), 4, 0, 0, 1.95);
 }
 
 .nav-item {
@@ -24,6 +23,14 @@
 
 .nav-item:hover {
     -fx-background-color: rgba(0, 0, 0, 0.06);
+}
+
+.nav-item-icon {
+    -fx-fill: #6b6b6b;
+}
+
+.nav-item-icon-active {
+    -fx-fill: #007ABD;
 }
 
 .search-field {
@@ -48,5 +55,68 @@
 
 .search-field:focused {
     -fx-border-color: #0078d7;
-    -fx-background-color: #EDEDED;
+}
+
+.split-pane-divider {
+    -fx-background-color: #E0E0E0;
+    -fx-pref-width: 1;
+    -fx-cursor: h-resize;
+}
+
+.split-pane-divider:hover {
+    -fx-background-color: #c4c4c4;
+    -fx-pref-width: 2;
+}
+
+.list-view {
+    -fx-background-color: #d9d9d9;
+    -fx-border-color: transparent;
+}
+
+.list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.list-view .list-cell:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.06);
+    -fx-background-insets: 0;
+}
+
+.list-view .list-cell:selected {
+    -fx-background-color: rgba(0, 122, 189, 0.15);
+}
+
+.list-view .list-cell:selected:hover {
+    -fx-background-color: rgba(0, 122, 189, 0.22);
+}
+
+.list-view .scroll-bar:vertical .thumb {
+    -fx-background-color: #A3A3A3;
+    -fx-background-radius: 3px;
+    -fx-opacity: 0.6;
+}
+
+.list-view .scroll-bar:vertical .thumb:hover {
+    -fx-opacity: 1.0;
+}
+
+.list-view .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.list-view .scroll-bar:vertical .increment-button,
+.list-view .scroll-bar:vertical .decrement-button {
+    -fx-background-color: transparent;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+}
+
+.list-view .scroll-bar:horizontal {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-opacity: 0;
 }

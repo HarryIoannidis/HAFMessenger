@@ -171,7 +171,7 @@ public class LoginViewModel {
         String localPart = email.substring(0, atIndex);
         String domainPart = email.substring(atIndex + 1);
 
-        // Local part must not be empty, domain part must contain a dot
+        // The local part must not be empty, the domain part must contain a dot
         if (localPart.isBlank() || domainPart.isBlank() || !domainPart.contains(".")) {
             return false;
         }

@@ -27,22 +27,22 @@ public class WebSocketAdapter {
     private Consumer<String> messageConsumer;
     private Consumer<Throwable> errorConsumer;
     private volatile boolean isConnected = false;
-    
+
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
     private static final int MAX_INBOUND_MESSAGE_BYTES = 2 * 1024 * 1024; // 2 MB
-    
+
     // Heartbeat (ping/pong)
     private ScheduledExecutorService scheduler;
     private volatile long lastPongAtNanos;
     private static final long HEARTBEAT_INTERVAL_SECONDS = 5L;
     private static final long HEARTBEAT_MAX_SILENCE_MS = 15_000L;
     private volatile boolean heartbeatScheduled = false;
-    
+
     // Reconnect state
     private final Object stateLock = new Object();
     private volatile boolean userClosed = false;
-    
+
     // Reconnection policy (Phase 4: stubs)
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
@@ -56,13 +56,13 @@ public class WebSocketAdapter {
      */
     public WebSocketAdapter(URI serverUri) {
         this.serverUri = serverUri;
-        
+
         // Create HTTP client with TLS configuration
         // Phase 4: Basic TLS setup
         // Phase 5: Will add certificate pinning here
         SSLContext sslContext = createSSLContext();
         SSLParameters sslParameters = createSSLParameters();
-        
+
         this.httpClient = HttpClient.newBuilder()
                 .sslContext(sslContext)
                 .sslParameters(sslParameters)
@@ -97,9 +97,9 @@ public class WebSocketAdapter {
     private SSLParameters createSSLParameters() {
         SSLParameters params = new SSLParameters();
         // Phase 4: Enable TLS 1.3
-        params.setProtocols(new String[]{"TLSv1.3"});
+        params.setProtocols(new String[] { "TLSv1.3" });
         // Phase 5: Add cipher suite allowlist (docs requirement)
-        params.setCipherSuites(new String[]{
+        params.setCipherSuites(new String[] {
                 "TLS_AES_256_GCM_SHA384",
                 "TLS_CHACHA20_POLY1305_SHA256"
         });
@@ -124,7 +124,7 @@ public class WebSocketAdapter {
      * Connects to the WebSocket server.
      *
      * @param onMessage callback for incoming messages
-     * @param onError callback for errors
+     * @param onError   callback for errors
      * @throws IOException if connection fails
      */
     public void connect(Consumer<String> onMessage, Consumer<Throwable> onError) throws IOException {
@@ -241,9 +241,9 @@ public class WebSocketAdapter {
         if (webSocket == null || !isConnected) {
             throw new IOException("WebSocket is not connected");
         }
-        
+
         CompletableFuture<WebSocket> sendFuture = webSocket.sendText(message, true);
-        
+
         // Wait for send to complete (with timeout)
         try {
             sendFuture.get(5, TimeUnit.SECONDS);
@@ -337,7 +337,7 @@ public class WebSocketAdapter {
                     try {
                         WebSocket ws = webSocket;
                         if (ws != null && isConnected) {
-                            ws.sendPing(java.nio.ByteBuffer.wrap(new byte[]{1}));
+                            ws.sendPing(java.nio.ByteBuffer.wrap(new byte[] { 1 }));
                         }
                         long ageMs = (System.nanoTime() - lastPongAtNanos) / 1_000_000L;
                         if (ageMs > HEARTBEAT_MAX_SILENCE_MS) {
@@ -346,7 +346,8 @@ public class WebSocketAdapter {
                                 if (ws != null) {
                                     ws.abort();
                                 }
-                            } catch (Throwable ignored) {}
+                            } catch (Throwable ignored) {
+                            }
                             isConnected = false;
                         }
                     } catch (Throwable t) {
@@ -374,7 +375,8 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Schedules a reconnect attempt if policy allows and the user did not explicitly close.
+     * Schedules a reconnect attempt if policy allows and the user did not
+     * explicitly close.
      */
     private void scheduleReconnect() {
         if (userClosed) {
@@ -396,7 +398,11 @@ public class WebSocketAdapter {
                     return;
                 }
                 try {
-                    // Reuse previous consumers
+                    // Reuse previous consumers.
+                    // TODO (Phase 5): connect() blocks for up to 10 s inside this lock.
+                    // Move the connect call outside synchronized{} to avoid holding
+                    // stateLock during the full handshake and prevent potential deadlocks
+                    // if onClose/onError fire concurrently during reconnect.
                     if (messageConsumer != null || errorConsumer != null) {
                         connect(messageConsumer, errorConsumer);
                     }
@@ -411,4 +417,3 @@ public class WebSocketAdapter {
         });
     }
 }
-

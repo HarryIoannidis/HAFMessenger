@@ -4,7 +4,6 @@
 @font-face {
     font-family: 'Manrope';
     src: url('../fonts/Manrope.ttf');
-    -fx-font-smoothing-type: gray;
 }
 
 .root {
@@ -57,11 +56,6 @@
     -fx-background-color: #cdcdcd;
 }
 
-.title-bar-button-minimize:pressed,
-.title-bar-button-maximize:pressed {
-    -fx-background-color: #c3c3c3;
-}
-
 .title-bar-button-minimize .image-view {
     -fx-fit-width: 16;
     -fx-fit-height: 16;
@@ -88,9 +82,6 @@
     -fx-background-color: #d01020;
 }
 
-.title-bar-button-close:pressed {
-    -fx-background-color: #b80f1c;
-}
 
 .title-bar-button-close .image-view {
     -fx-fit-width: 16;
@@ -107,7 +98,6 @@
     -fx-border-radius: 6;
     -fx-border-color: #acacac;
     -fx-border-width: 2;
-    /*-fx-effect: innershadow(three-pass-box, rgba(0, 0, 0, 0.50), 10, 0, 0, 0);*/
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0), 0, 0, 0, 0);
 }
 
@@ -143,8 +133,8 @@
 
 .text-field,
 .password-field {
-    -fx-background-color: #d9d9d9;
-    -fx-border-color: #d9d9d9;
+    -fx-background-color: #dbdbdb;
+    -fx-border-color: #dbdbdb;
     -fx-border-width: 2;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
@@ -170,7 +160,6 @@
 .text-field:focused,
 .password-field:focused {
     -fx-border-color: #0078d7;
-    -fx-background-color: #dbdbdb;
 }
 
 .field-icon-button {
@@ -251,7 +240,6 @@
     -fx-shape: "M -6 5 L -2 9 L 6 1 L 4 -1 L -2 5 L -4 3 Z";
 }
 
-/* TextButton */
 .text-button {
     -fx-text-alignment: center;
     -fx-font-family: 'Manrope', sans-serif;

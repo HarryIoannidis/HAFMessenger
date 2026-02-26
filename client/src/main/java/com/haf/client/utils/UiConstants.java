@@ -10,6 +10,9 @@ public final class UiConstants {
     public static final String FXML_LOGIN = "/fxml/login.fxml";
     public static final String FXML_REGISTER = "/fxml/register.fxml";
     public static final String FXML_MAIN = "/fxml/main.fxml";
+    public static final String FXML_CHAT = "/fxml/chat.fxml";
+    public static final String FXML_PLACEHOLDER = "/fxml/place_holder.fxml";
+    public static final String FXML_CONTACT_CELL = "/fxml/contact_cell.fxml";
 
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";

@@ -1,8 +1,12 @@
 package com.haf.client.controllers;
 
+import com.haf.client.core.ChatSession;
+import com.haf.client.network.MockMessageReceiver;
+import com.haf.client.network.MockMessageSender;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
+import com.haf.client.viewmodels.MessageViewModel;
 import java.util.logging.Logger;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXCheckBox;
@@ -109,6 +113,21 @@ public class LoginController {
 
         // Disable sign in button while loading
         signInButton.disableProperty().bind(viewModel.loadingProperty());
+
+        // Disable input fields while loading
+        emailField.disableProperty().bind(viewModel.loadingProperty());
+        passwordField.disableProperty().bind(viewModel.loadingProperty());
+        if (passwordVisibleField != null) {
+            passwordVisibleField.disableProperty().bind(viewModel.loadingProperty());
+        }
+
+        rememberCheckBox.disableProperty().bind(viewModel.loadingProperty());
+        if (togglePasswordButton != null) {
+            togglePasswordButton.disableProperty().bind(viewModel.loadingProperty());
+        }
+        if (gotoRegisterButton != null) {
+            gotoRegisterButton.disableProperty().bind(viewModel.loadingProperty());
+        }
     }
 
     /**
@@ -252,8 +271,11 @@ public class LoginController {
                     signInButton.setText(SIGN_IN_TEXT);
 
                     if (success) {
-                        // TODO: Navigate to main chat view
-                        // ViewRouter.switchTo(UiConstants.FXML_MAIN_CHAT);
+                        // Wire up a stub session until real networking is integrated.
+                        ChatSession.set(new MessageViewModel(
+                                new MockMessageSender(),
+                                new MockMessageReceiver()));
+                        ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
                         LOGGER.info("Login successful for: " + viewModel.getEmail());
                     } else {
                         viewModel.setLoginError(LoginViewModel.ERROR_LOGIN_FAILED);
@@ -289,6 +311,13 @@ public class LoginController {
     }
 
     /**
+     * Navigates to the Main screen.
+     */
+    private void navigateToMain() {
+        ViewRouter.switchTo(UiConstants.FXML_MAIN);
+    }
+
+    /**
      * Sets up the custom window control buttons (minimize, maximize, close)
      * and enables title bar dragging for the undecorated stage.
      */
@@ -304,7 +333,10 @@ public class LoginController {
         }
 
         if (closeButton != null) {
-            closeButton.setOnAction(e -> stage.close());
+            closeButton.setOnAction(e -> {
+                javafx.application.Platform.exit();
+                System.exit(0);
+            });
         }
 
         // Enable window dragging via the title bar
