@@ -11,6 +11,7 @@ module client {
 
     // exports com.haf.client.ui;
     // exports com.haf.client.service;
+    exports com.haf.client.models;
     exports com.haf.client.controllers;
     exports com.haf.client.core;
     exports com.haf.client.utils;

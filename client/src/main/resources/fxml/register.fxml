@@ -5,7 +5,6 @@
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.Cursor?>
-<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.Separator?>
@@ -20,13 +19,13 @@
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="800.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/21.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.RegisterController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/register.css" />
    </stylesheets>
    <top>
-      <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" prefHeight="41.0" prefWidth="1198.0" styleClass="title-bar" BorderPane.alignment="CENTER">
+      <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" styleClass="title-bar">
          <children>
             <HBox fx:id="ttileHBox" prefHeight="100.0" styleClass="title-bar-Hbox">
                <children>
@@ -49,35 +48,32 @@
                </padding>
             </HBox>
             <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
-            <HBox fx:id="buttonsHBox" prefHeight="40.0" styleClass="title-bar-buttons-Hbox">
+            <HBox fx:id="buttonsHBox" alignment="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="title-bar-buttons-Hbox">
                <children>
-                  <Button fx:id="minimizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                  <JFXButton fx:id="minimizeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
+                        <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20" />
                      </graphic>
-                  </Button>
-                  <Button fx:id="maximizeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
+                  </JFXButton>
+                  <JFXButton fx:id="maximizeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
+                        <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20" />
                      </graphic>
-                  </Button>
-                  <Button fx:id="closeButton" mnemonicParsing="false" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                  </JFXButton>
+                  <JFXButton fx:id="closeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
                      <graphic>
-                        <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
+                        <FontIcon iconLiteral="mdi2c-close" iconSize="20" />
                      </graphic>
-                  </Button>
+                  </JFXButton>
                </children>
             </HBox>
          </children>
-         <BorderPane.margin>
-            <Insets />
-         </BorderPane.margin>
       </HBox>
    </top>
    <center>
       <HBox BorderPane.alignment="CENTER">
          <children>
-            <StackPane fx:id="leftPanel" prefWidth="360.0" HBox.hgrow="SOMETIMES">
+            <StackPane fx:id="leftPanel" minWidth="300.0" prefWidth="360.0" HBox.hgrow="SOMETIMES">
                <children>
                   <ImageView cache="true" cacheHint="QUALITY" fitHeight="332.0" fitWidth="300.0" pickOnBounds="true" preserveRatio="true">
                      <image>
@@ -97,21 +93,21 @@
             </StackPane>
             <StackPane fx:id="rightPanel" HBox.hgrow="ALWAYS">
                <children>
-                  <VBox alignment="CENTER" minHeight="500.0" minWidth="700.0">
+                  <VBox alignment="CENTER" StackPane.alignment="CENTER">
                      <children>
                         <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="Register">
                            <font>
                               <Font name="System Bold" size="22.0" />
                            </font>
                            <VBox.margin>
-                              <Insets bottom="20.0" top="50.0" />
+                              <Insets bottom="15.0" />
                            </VBox.margin>
                         </Text>
-                        <StackPane VBox.vgrow="ALWAYS">
+                        <StackPane>
                            <children>
-                              <VBox fx:id="credentialsVBox">
+                              <VBox fx:id="credentialsVBox" StackPane.alignment="CENTER">
                                  <children>
-                                    <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
+                                    <VBox minWidth="400.0">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
@@ -123,7 +119,7 @@
                                           </Text>
                                           <StackPane prefWidth="200.0">
                                              <children>
-                                                <TextField fx:id="nameField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
+                                                <TextField fx:id="nameField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" promptText="Γεώργιος Φασούλας" styleClass="text-field">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -132,9 +128,9 @@
                                           </StackPane>
                                        </children>
                                     </VBox>
-                                    <HBox alignment="CENTER" prefWidth="227.0" VBox.vgrow="ALWAYS">
+                                    <HBox alignment="CENTER" minWidth="290.0">
                                        <children>
-                                          <VBox HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -144,21 +140,17 @@
                                                       <Font size="18.0" />
                                                    </font>
                                                 </Text>
-                                                <StackPane prefWidth="200.0">
-                                                   <children>
-                                                      <TextField fx:id="regNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="123456" styleClass="text-field">
-                                                         <font>
-                                                            <Font size="18.0" />
-                                                         </font>
-                                                      </TextField>
-                                                   </children>
-                                                </StackPane>
+                                                <TextField fx:id="regNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" promptText="123456" styleClass="text-field">
+                                                   <font>
+                                                      <Font size="18.0" />
+                                                   </font>
+                                                </TextField>
                                              </children>
                                              <HBox.margin>
                                                 <Insets right="15.0" />
                                              </HBox.margin>
                                           </VBox>
-                                          <VBox layoutX="10.0" layoutY="10.0" HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -168,15 +160,11 @@
                                                       <Font size="18.0" />
                                                    </font>
                                                 </Text>
-                                                <StackPane prefWidth="200.0">
-                                                   <children>
-                                                      <TextField fx:id="idNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="Γ-1234" styleClass="text-field">
-                                                         <font>
-                                                            <Font size="18.0" />
-                                                         </font>
-                                                      </TextField>
-                                                   </children>
-                                                </StackPane>
+                                                <TextField fx:id="idNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" promptText="Γ-1234" styleClass="text-field">
+                                                   <font>
+                                                      <Font size="18.0" />
+                                                   </font>
+                                                </TextField>
                                              </children>
                                              <HBox.margin>
                                                 <Insets left="15.0" />
@@ -184,9 +172,9 @@
                                           </VBox>
                                        </children>
                                     </HBox>
-                                    <HBox alignment="CENTER" VBox.vgrow="ALWAYS">
+                                    <HBox alignment="CENTER" minWidth="290.0">
                                        <children>
-                                          <VBox HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -196,15 +184,15 @@
                                                       <Font size="18.0" />
                                                    </font>
                                                 </Text>
-                                                <StackPane prefWidth="200.0">
+                                                <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefHeight="50.0" prefWidth="200.0">
                                                    <children>
-                                                      <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" prefWidth="277.0" promptText="Choose rank" visibleRowCount="12" />
-                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                                      <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefWidth="200.0" promptText="Choose rank" visibleRowCount="12" />
+                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " focusTraversable="false" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
-                                                            <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="40" />
+                                                            <FontIcon fx:id="dropDownButton" iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="45" />
                                                          </graphic>
                                                          <StackPane.margin>
-                                                            <Insets right="10.0" />
+                                                            <Insets right="5.0" />
                                                          </StackPane.margin>
                                                       </JFXButton>
                                                    </children>
@@ -214,7 +202,7 @@
                                                 <Insets right="15.0" />
                                              </HBox.margin>
                                           </VBox>
-                                          <VBox layoutX="10.0" layoutY="10.0" HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -226,7 +214,7 @@
                                                 </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <TextField fx:id="phoneNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="150.0" promptText="6971978340" styleClass="text-field">
+                                                      <TextField fx:id="phoneNumField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" promptText="6971978340">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -240,7 +228,7 @@
                                           </VBox>
                                        </children>
                                     </HBox>
-                                    <VBox prefWidth="100.0" VBox.vgrow="ALWAYS">
+                                    <VBox minWidth="400.0">
                                        <padding>
                                           <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                        </padding>
@@ -252,7 +240,7 @@
                                           </Text>
                                           <StackPane prefWidth="200.0">
                                              <children>
-                                                <TextField fx:id="emailField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minWidth="350.0" promptText="examplemail@haf.gr" styleClass="text-field">
+                                                <TextField fx:id="emailField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" promptText="examplemail@haf.gr" styleClass="text-field">
                                                    <font>
                                                       <Font size="18.0" />
                                                    </font>
@@ -261,9 +249,9 @@
                                           </StackPane>
                                        </children>
                                     </VBox>
-                                    <HBox VBox.vgrow="ALWAYS">
+                                    <HBox>
                                        <children>
-                                          <VBox HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -275,7 +263,7 @@
                                                 </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -288,12 +276,12 @@
                                                             <Font size="18.0" />
                                                          </font>
                                                       </TextField>
-                                                      <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                                      <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" ellipsisString=" " focusTraversable="false" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
-                                                            <FontIcon fx:id="togglePasswordIcon" iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
+                                                            <FontIcon fx:id="togglePasswordIcon" iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="25" />
                                                          </graphic>
                                                          <StackPane.margin>
-                                                            <Insets right="10.0" />
+                                                            <Insets right="5.0" />
                                                          </StackPane.margin>
                                                       </JFXButton>
                                                    </children>
@@ -303,7 +291,7 @@
                                                 <Insets right="15.0" />
                                              </HBox.margin>
                                           </VBox>
-                                          <VBox layoutX="10.0" layoutY="10.0" HBox.hgrow="ALWAYS">
+                                          <VBox minWidth="200.0" HBox.hgrow="ALWAYS">
                                              <padding>
                                                 <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
                                              </padding>
@@ -315,7 +303,7 @@
                                                 </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -325,12 +313,12 @@
                                                             <Font size="18.0" />
                                                          </font>
                                                       </TextField>
-                                                      <JFXButton fx:id="togglePasswordConfButton" contentDisplay="CENTER" ellipsisString=" " styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                                      <JFXButton fx:id="togglePasswordConfButton" contentDisplay="CENTER" ellipsisString=" " focusTraversable="false" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
                                                          <graphic>
-                                                            <FontIcon fx:id="togglePasswordConfIcon" iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="20" />
+                                                            <FontIcon fx:id="togglePasswordConfIcon" iconColor="#2b2b2b" iconLiteral="mdi2e-eye" iconSize="25" />
                                                          </graphic>
                                                          <StackPane.margin>
-                                                            <Insets right="10.0" />
+                                                            <Insets right="5.0" />
                                                          </StackPane.margin>
                                                       </JFXButton>
                                                    </children>
@@ -344,14 +332,14 @@
                                     </HBox>
                                  </children>
                               </VBox>
-                              <VBox fx:id="photosVBox" visible="false">
+                              <VBox fx:id="photosVBox" alignment="CENTER_LEFT" visible="false">
                                  <children>
                                     <Text fx:id="photoTitleText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="ID Photo">
                                        <font>
                                           <Font size="18.0" />
                                        </font>
                                     </Text>
-                                    <StackPane fx:id="dropZoneContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="drop-zone" VBox.vgrow="ALWAYS">
+                                    <StackPane fx:id="dropZoneContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="350.0" minWidth="350.0" prefHeight="470.0" prefWidth="726.0" styleClass="drop-zone" VBox.vgrow="ALWAYS">
                                        <children>
                                           <VBox fx:id="previewSateZoneId" alignment="CENTER" prefHeight="200.0" prefWidth="100.0" visible="false">
                                              <children>
@@ -451,7 +439,7 @@
                                                 </Text>
                                              </children>
                                           </VBox>
-                                          <VBox fx:id="emptyStateZoneId" alignment="CENTER" maxHeight="1.7976931348623157E308" prefHeight="200.0" prefWidth="100.0">
+                                          <VBox fx:id="emptyStateZoneId" alignment="CENTER" maxHeight="1.7976931348623157E308">
                                              <children>
                                                 <FontIcon iconColor="#2b2b2b" iconLiteral="mdi2f-file-image" iconSize="80" />
                                                 <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Upload the front of your ID">
@@ -495,7 +483,7 @@
                         <Text fx:id="errorText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="error-text" />
                         <HBox minWidth="300.0">
                            <VBox.margin>
-                              <Insets bottom="15.0" left="45.0" right="45.0" top="10.0" />
+                              <Insets bottom="20.0" left="45.0" right="45.0" top="10.0" />
                            </VBox.margin>
                            <children>
                               <JFXButton fx:id="backButton" managed="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" prefWidth="300.0" styleClass="button-primary" text="Previous Step" visible="false" HBox.hgrow="ALWAYS">
@@ -503,13 +491,13 @@
                                     <Insets right="20.0" />
                                  </HBox.margin>
                               </JFXButton>
-                              <JFXButton fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="50.0" prefWidth="300.0" styleClass="button-primary" text="Next Step" HBox.hgrow="ALWAYS">
+                              <JFXButton fx:id="registerButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefHeight="50.0" prefWidth="300.0" styleClass="button-primary" text="Next Step" HBox.hgrow="ALWAYS">
                               </JFXButton>
                            </children>
                         </HBox>
-                        <HBox alignment="CENTER" minHeight="-Infinity" minWidth="-Infinity">
+                        <HBox alignment="CENTER" minHeight="-Infinity" minWidth="100.0" prefHeight="30.0" prefWidth="756.0">
                            <VBox.margin>
-                              <Insets bottom="50.0" left="30.0" right="30.0" />
+                              <Insets left="30.0" right="30.0" />
                            </VBox.margin>
                            <children>
                               <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Already have an account? " textAlignment="CENTER">
@@ -533,7 +521,7 @@
                         </HBox>
                      </children>
                      <padding>
-                        <Insets right="20.0" />
+                        <Insets bottom="20.0" top="20.0" />
                      </padding>
                   </VBox>
                </children>

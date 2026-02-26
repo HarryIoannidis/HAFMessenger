@@ -1,5 +1,7 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.models.MessageVM;
+import com.haf.client.models.MessageType;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
 import com.haf.shared.constants.MessageHeader;
@@ -8,104 +10,115 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import java.nio.charset.StandardCharsets;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+
+/**
+ * ViewModel for the chat screen.
+ * 
+ * Exposes an {@link ObservableList} of {@link MessageVM} records that the
+ * controller feeds straight into {@code MessageBubbleFactory.create()} —
+ * no raw string manipulation lives here.
+ */
 public class MessageViewModel {
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
+
     private final StringProperty status = new SimpleStringProperty("Ready");
-    private final ObservableList<String> messages = FXCollections.observableArrayList();
+    private final ObservableList<MessageVM> messages = FXCollections.observableArrayList();
 
     /**
-     * Creates a MessageViewModel with the specified MessageSender and MessageReceiver.
+     * Creates a MessageViewModel.
      *
-     * @param messageSender the message sender
-     * @param messageReceiver the message receiver
+     * @param messageSender   the outbound message sender
+     * @param messageReceiver the inbound message receiver
      */
     public MessageViewModel(MessageSender messageSender, MessageReceiver messageReceiver) {
         this.messageSender = messageSender;
         this.messageReceiver = messageReceiver;
-        
-        // Set up a message receiver listener
+
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
             public void onMessage(byte[] plaintext, String senderId, String contentType) {
-                // Phase 4: Simple text message handling
-                // Phase 6: Will implement contentType-based rendering
-                if ("text/plain".equals(contentType)) {
-                    String message = new String(plaintext, StandardCharsets.UTF_8);
-                    Platform.runLater(() -> {
-                        messages.add("[" + senderId + "]: " + message);
-                        status.set("Message received from " + senderId);
-                    });
-                } else {
-                    Platform.runLater(() -> {
-                        status.set("Received " + contentType + " message from " + senderId + " (rendering in Phase 6)");
-                    });
-                }
+                MessageVM vm = decodeIncoming(plaintext, senderId, contentType);
+                Platform.runLater(() -> {
+                    messages.add(vm);
+                    status.set("Message received from " + senderId);
+                });
             }
 
             @Override
             public void onError(Throwable error) {
-                Platform.runLater(() -> {
-                    status.set("Error: " + error.getMessage());
-                    messages.add("[ERROR]: " + error.getMessage());
-                });
+                // Errors are surfaced through the status property only —
+                // they do not appear as chat bubbles.
+                Platform.runLater(() -> status.set("Error: " + error.getMessage()));
             }
         });
     }
 
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
     /**
-     * Sends a text message to a recipient.
+     * Sends a plain-text message and immediately adds it to the local list
+     * as an outgoing bubble.
      *
-     * @param recipientId the recipient's ID
-     * @param messageText the message text
+     * @param recipientId the recipient's identifier
+     * @param text        the text to send
      */
-    public void sendTextMessage(String recipientId, String messageText) {
+    public void sendTextMessage(String recipientId, String text) {
         try {
-            byte[] payload = messageText.getBytes(StandardCharsets.UTF_8);
+            byte[] payload = text.getBytes(StandardCharsets.UTF_8);
             messageSender.sendMessage(payload, recipientId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
 
+            MessageVM vm = MessageVM.outgoingText(text, LocalDateTime.now());
             Platform.runLater(() -> {
+                messages.add(vm);
                 status.set("Message sent to " + recipientId);
-                messages.add("[You -> " + recipientId + "]: " + messageText);
             });
         } catch (Exception e) {
-            Platform.runLater(() -> {
-                status.set("Failed to send message: " + e.getMessage());
-                messages.add("[ERROR]: " + e.getMessage());
-            });
+            Platform.runLater(() -> status.set("Failed to send: " + e.getMessage()));
         }
     }
 
     /**
-     * Starts receiving messages.
+     * Starts the message receiver.
      */
     public void startReceiving() {
         try {
             messageReceiver.start();
-            Platform.runLater(() -> {
-                status.set("Receiving messages...");
-            });
+            Platform.runLater(() -> status.set("Receiving messages…"));
         } catch (Exception e) {
-            Platform.runLater(() -> {
-                status.set("Failed to start receiving: " + e.getMessage());
-            });
+            Platform.runLater(() -> status.set("Failed to start receiving: " + e.getMessage()));
         }
     }
 
     /**
-     * Stops receiving messages.
+     * Stops the message receiver.
      */
     public void stopReceiving() {
         messageReceiver.stop();
-        Platform.runLater(() -> {
-            status.set("Stopped receiving messages");
-        });
+        Platform.runLater(() -> status.set("Stopped receiving messages"));
     }
 
     /**
-     * Gets the status property.
+     * Observable list of chat messages, ordered oldest-first.
+     * Bind the chat scroll-pane directly to this list.
+     *
+     * @return the observable message list
+     */
+    public ObservableList<MessageVM> getMessages() {
+        return messages;
+    }
+
+    /**
+     * Status string property (last operation result / error summary).
      *
      * @return the status property
      */
@@ -113,12 +126,76 @@ public class MessageViewModel {
         return status;
     }
 
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
     /**
-     * Gets the messages list.
-     *
-     * @return the observable list of messages
+     * Converts raw network bytes into the correct {@link MessageVM} variant
+     * based on the MIME content-type.
      */
-    public ObservableList<String> getMessages() {
-        return messages;
+    private static MessageVM decodeIncoming(byte[] plaintext, String senderId, String contentType) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (contentType == null) {
+            contentType = "text/plain";
+        }
+
+        if (contentType.startsWith("text/")) {
+            String text = new String(plaintext, StandardCharsets.UTF_8);
+            return new MessageVM(false, MessageType.TEXT, text, null, null, null, now);
+        }
+
+        if (contentType.startsWith("image/")) {
+            // Write image bytes to a temp file and expose a file:// path so
+            // ImageView can load without holding the raw bytes in memory.
+            String localPath = writeTempFile(plaintext, "haf-img-", extensionFor(contentType));
+            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, now);
+        }
+
+        // Everything else is treated as a generic file attachment.
+        String ext = extensionFor(contentType);
+        String fileName = senderId + "-attachment" + ext;
+        String fileSize = formatSize(plaintext.length);
+        String localPath = writeTempFile(plaintext, "haf-file-", ext);
+        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, now);
+    }
+
+    /**
+     * Writes bytes to a temporary file and returns a {@code file://} URI string,
+     * or {@code null} if writing fails.
+     */
+    private static String writeTempFile(byte[] data, String prefix, String suffix) {
+        try {
+            Path tmp = Files.createTempFile(prefix, suffix);
+            Files.write(tmp, data);
+            tmp.toFile().deleteOnExit();
+            return tmp.toUri().toString();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /** Returns a dot-prefixed file extension for common MIME types. */
+    private static String extensionFor(String contentType) {
+        return switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/jpeg" -> ".jpg";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
+            case "application/zip" -> ".zip";
+            case "application/octet-stream" -> ".bin";
+            default -> ".dat";
+        };
+    }
+
+    /** Formats a byte count as a human-readable string (B / KB / MB). */
+    private static String formatSize(long bytes) {
+        if (bytes < 1024)
+            return bytes + " B";
+        if (bytes < 1024 * 1024)
+            return String.format("%.1f KB", bytes / 1024.0);
+        return String.format("%.1f MB", bytes / (1024.0 * 1024));
     }
 }

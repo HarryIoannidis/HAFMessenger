@@ -92,11 +92,20 @@ public class ViewRouter {
             scene.setFill(Color.TRANSPARENT);
             scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
 
+            boolean isSplash = fxmlPath.equals(UiConstants.FXML_SPLASH);
+
+            // Hide before changing a transparent stage's size on Linux to prevent rendering
+            // artifacts (black borders)
+            // We only need this workaround when transitioning from the small Splash screen
+            // to a larger screen (Login/Register)
+            boolean wasShowing = mainStage.isShowing();
+            if (wasShowing && !isSplash && mainStage.getWidth() < 1200) {
+                mainStage.hide();
+            }
+
             mainStage.setResizable(true);
 
             mainStage.setScene(scene);
-
-            boolean isSplash = fxmlPath.equals(UiConstants.FXML_SPLASH);
 
             if (isSplash) {
                 // Splash: use its own FXML dimensions, no resizing
@@ -109,7 +118,7 @@ public class ViewRouter {
             } else {
                 // Open new window at 1200x850 if current window is smaller,
                 // otherwise keep current dimensions
-                if (mainStage.getWidth() < 1200 || mainStage.getHeight() < 850) {
+                if (Double.isNaN(mainStage.getWidth()) || mainStage.getWidth() < 1200 || mainStage.getHeight() < 850) {
                     mainStage.setWidth(1200);
                     mainStage.setHeight(850);
                     mainStage.centerOnScreen();

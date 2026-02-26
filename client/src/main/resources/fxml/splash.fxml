@@ -15,7 +15,7 @@
 <?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
 
-<StackPane fx:id="rootContainer" maxHeight="500.0" maxWidth="550.0" minHeight="-Infinity" minWidth="-Infinity" prefHeight="500.0" prefWidth="550.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SplashController">
+<StackPane fx:id="rootContainer" maxHeight="500.0" maxWidth="550.0" minHeight="-Infinity" minWidth="-Infinity" prefHeight="500.0" prefWidth="550.0" styleClass="window-card" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SplashController">
    <children>
       <VBox alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="500.0" prefWidth="550.0" StackPane.alignment="CENTER">
          <children>

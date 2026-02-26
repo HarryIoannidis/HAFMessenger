@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.JFXButton?>
+<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane prefHeight="647.0" prefWidth="869.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.ChatController">
+   <bottom>
+      <HBox alignment="CENTER_LEFT" minHeight="70.0" minWidth="400.0" prefHeight="70.0" styleClass="bottom-bar" BorderPane.alignment="BOTTOM_CENTER">
+         <BorderPane.margin>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </BorderPane.margin>
+         <children>
+            <StackPane HBox.hgrow="ALWAYS">
+               <children>
+                  <TextField fx:id="messageField" prefHeight="50.0" prefWidth="578.0" promptText="Enter message here...">
+                     <StackPane.margin>
+                        <Insets />
+                     </StackPane.margin>
+                  </TextField>
+                  <JFXButton fx:id="sendButton" contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                     <StackPane.margin>
+                        <Insets right="5.0" />
+                     </StackPane.margin>
+                     <graphic>
+                        <FontIcon iconLiteral="mdi2s-send" iconSize="25" />
+                     </graphic>
+                  </JFXButton>
+               </children>
+               <HBox.margin>
+                  <Insets />
+               </HBox.margin>
+            </StackPane>
+            <Separator opacity="0.0">
+               <HBox.margin>
+                  <Insets left="10.0" />
+               </HBox.margin>
+            </Separator>
+            <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
+               <graphic>
+                  <FontIcon iconLiteral="mdi2i-image-outline" iconSize="27" />
+               </graphic>
+               <HBox.margin>
+                  <Insets right="15.0" />
+               </HBox.margin>
+            </JFXButton>
+            <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
+               <graphic>
+                  <FontIcon iconLiteral="mdi2p-paperclip" iconSize="25" />
+               </graphic>
+               <HBox.margin>
+                  <Insets />
+               </HBox.margin>
+            </JFXButton>
+         </children>
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="15.0" top="10.0" />
+         </padding>
+      </HBox>
+   </bottom>
+   <stylesheets>
+      <URL value="@../css/global.css" />
+      <URL value="@../css/chat.css" />
+   </stylesheets>
+   <center>
+      <ScrollPane fx:id="chatScrollPane" fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" styleClass="chat-area" BorderPane.alignment="CENTER">
+         <content>
+            <VBox fx:id="chatBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" spacing="8">
+               <padding>
+                  <Insets bottom="8.0" left="10.0" right="10.0" top="8.0" />
+               </padding>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </center>
+</BorderPane>

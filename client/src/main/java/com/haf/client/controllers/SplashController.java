@@ -43,8 +43,7 @@ public class SplashController {
     public void initialize() {
         bindViewModel();
         // viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
-        viewModel.startBootstrap(this::navigateTo(UiConstants.FXML_LO), this::showFailureDialog);
-
+        viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
     /**
@@ -64,11 +63,16 @@ public class SplashController {
 
     /**
      * Navigates to the Login screen.
-     * 
-     * @param fxml the FXML file to navigate to
      */
-    private void navigateTo(String fxml) {
-        ViewRouter.switchToTransparent(fxml);
+    private void navigateToLogin() {
+        ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
+    }
+
+    /**
+     * Navigates to the Register screen.
+     */
+    private void navigateToRegister() {
+        ViewRouter.switchToTransparent(UiConstants.FXML_REGISTER);
     }
 
     /**
@@ -86,7 +90,7 @@ public class SplashController {
 
         alert.showAndWait().ifPresent(type -> {
             if (type == ButtonType.OK) {
-                viewModel.startBootstrap(this::navigateTo(UiConstants.FXML_LOGIN), this::showFailureDialog);
+                viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
             } else {
                 ViewRouter.close();
             }

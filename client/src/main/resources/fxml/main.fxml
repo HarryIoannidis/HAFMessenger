@@ -3,7 +3,9 @@
 <?import com.jfoenix.controls.JFXButton?>
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
@@ -17,7 +19,7 @@
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.LoginController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.MainController">
    <top>
       <VBox BorderPane.alignment="CENTER">
          <BorderPane.margin>
@@ -49,19 +51,19 @@
                   <Separator opacity="0.0" HBox.hgrow="ALWAYS" />
                   <HBox fx:id="buttonsHBox" alignment="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="title-bar-buttons-Hbox">
                      <children>
-                        <JFXButton fx:id="minimizeButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                        <JFXButton fx:id="minimizeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
                            <graphic>
-                              <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="18" />
+                              <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20" />
                            </graphic>
                         </JFXButton>
-                        <JFXButton fx:id="maximizeButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
+                        <JFXButton fx:id="maximizeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-maximize">
                            <graphic>
-                              <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="18" />
+                              <FontIcon iconLiteral="mdi2w-window-maximize" iconSize="20" />
                            </graphic>
                         </JFXButton>
-                        <JFXButton fx:id="closeButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                        <JFXButton fx:id="closeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
                            <graphic>
-                              <FontIcon iconLiteral="mdi2c-close" iconSize="18" />
+                              <FontIcon iconLiteral="mdi2c-close" iconSize="20" />
                            </graphic>
                         </JFXButton>
                      </children>
@@ -74,25 +76,28 @@
                      <children>
                         <StackPane>
                            <children>
-                              <JFXButton contentDisplay="GRAPHIC_ONLY" prefHeight="90.0" prefWidth="125.0" styleClass="nav-item" text=" ">
+                              <JFXButton fx:id="navMessages" contentDisplay="GRAPHIC_ONLY" focusTraversable="false" prefHeight="90.0" prefWidth="140.0" styleClass="nav-item" text=" ">
                                  <graphic>
-                                    <FontIcon iconColor="#007abd" iconLiteral="mdi2m-message-outline" iconSize="30" selectionEnd="0" />
+                                    <FontIcon fx:id="iconMessages" iconLiteral="mdi2m-message-outline" iconSize="25" styleClass="nav-item-icon" />
                                  </graphic>
+                                 <padding>
+                                    <Insets left="2.0" />
+                                 </padding>
                               </JFXButton>
-                              <Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="125.0" styleClass="nav-indicator" StackPane.alignment="BOTTOM_CENTER" />
+                              <Pane fx:id="indicatorMessages" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="140.0" styleClass="nav-indicator" StackPane.alignment="BOTTOM_CENTER" />
                            </children>
                         </StackPane>
                         <StackPane>
                            <children>
-                              <JFXButton contentDisplay="CENTER" prefHeight="90.0" prefWidth="125.0" styleClass="nav-item" text=" ">
+                              <JFXButton fx:id="navSearch" contentDisplay="CENTER" focusTraversable="false" prefHeight="90.0" prefWidth="140.0" styleClass="nav-item" text=" ">
                                  <graphic>
-                                    <FontIcon iconLiteral="mdi2m-magnify" iconSize="32" />
+                                    <FontIcon fx:id="iconSearch" iconLiteral="mdi2m-magnify" iconSize="27" styleClass="nav-item-icon" />
                                  </graphic>
                                  <padding>
-                                    <Insets left="5.0" />
+                                    <Insets left="2.0" />
                                  </padding>
                               </JFXButton>
-                              <Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="125.0" styleClass="nav-indicator" visible="false" StackPane.alignment="BOTTOM_CENTER" />
+                              <Pane fx:id="indicatorSearch" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="0.0" prefHeight="4.0" prefWidth="140.0" styleClass="nav-indicator" visible="false" StackPane.alignment="BOTTOM_CENTER" />
                            </children>
                         </StackPane>
                      </children>
@@ -102,9 +107,10 @@
                         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                      </padding>
                      <children>
-                        <HBox prefWidth="200.0" HBox.hgrow="ALWAYS">
+                        <!-- Profile panel: shown in Messages mode -->
+                        <HBox fx:id="profilePanel" alignment="CENTER_LEFT" prefWidth="200.0" HBox.hgrow="ALWAYS">
                            <children>
-                              <ImageView fitHeight="70.0" fitWidth="70.0" pickOnBounds="true" preserveRatio="true">
+                              <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
                                  <image>
                                     <Image url="@../images/misc/avatar.png" />
                                  </image>
@@ -114,7 +120,7 @@
                               </ImageView>
                               <VBox HBox.hgrow="ALWAYS">
                                  <HBox.margin>
-                                    <Insets bottom="5.0" top="5.0" />
+                                    <Insets bottom="5.0" right="5.0" top="5.0" />
                                  </HBox.margin>
                                  <padding>
                                     <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
@@ -122,14 +128,14 @@
                                  <children>
                                     <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Full Name" VBox.vgrow="ALWAYS">
                                        <font>
-                                          <Font size="18.0" />
+                                          <Font size="17.0" />
                                        </font>
                                     </Text>
                                     <HBox alignment="CENTER_LEFT" VBox.vgrow="ALWAYS">
                                        <children>
                                           <Text opacity="0.9" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle" text="Activeness">
                                              <font>
-                                                <Font size="16.0" />
+                                                <Font size="15.0" />
                                              </font>
                                           </Text>
                                           <Circle fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" HBox.hgrow="NEVER">
@@ -141,41 +147,52 @@
                                     </HBox>
                                  </children>
                               </VBox>
-                           </children></HBox>
-                        <StackPane HBox.hgrow="ALWAYS">
+                           </children>
+                        </HBox>
+                        <!-- Search panel: shown only in Search mode -->
+                        <HBox fx:id="searchPanel" alignment="CENTER" managed="false" visible="false" HBox.hgrow="ALWAYS">
                            <children>
-                              <TextField styleClass="search-field">
-                                 <padding>
-                                    <Insets right="20.0" />
-                                 </padding>
-                              </TextField>
-                              <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
-                                 <StackPane.margin>
-                                    <Insets right="5.0" />
-                                 </StackPane.margin>
+                              <StackPane HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <TextField fx:id="toolbarSearchField" promptText="Search contacts..." styleClass="search-field">
+                                       <padding>
+                                          <Insets right="20.0" />
+                                       </padding>
+                                       <StackPane.margin>
+                                          <Insets />
+                                       </StackPane.margin>
+                                    </TextField>
+                                    <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                       <StackPane.margin>
+                                          <Insets right="5.0" />
+                                       </StackPane.margin>
+                                       <graphic>
+                                          <FontIcon iconLiteral="mdi2m-magnify" iconSize="25" textAlignment="CENTER" />
+                                       </graphic>
+                                    </JFXButton>
+                                 </children>
+                                 <HBox.margin>
+                                    <Insets left="10.0" />
+                                 </HBox.margin>
+                              </StackPane>
+                              <Separator halignment="RIGHT" visible="false" />
+                              <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                                  <graphic>
-                                    <FontIcon iconLiteral="mdi2m-magnify" iconSize="30" textAlignment="CENTER" />
+                                    <FontIcon iconLiteral="mdi2f-filter-outline" iconSize="25" />
                                  </graphic>
+                                 <HBox.margin>
+                                    <Insets left="10.0" right="15.0" />
+                                 </HBox.margin>
                               </JFXButton>
                            </children>
-                        </StackPane>
-                        <Separator visible="false" HBox.hgrow="NEVER">
-                           <HBox.margin>
-                              <Insets left="10.0" right="10.0" />
-                           </HBox.margin>
-                        </Separator>
-                        <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="toolbar-icon-button" text=" ">
+                        </HBox>
+                        <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                            <graphic>
-                              <FontIcon iconLiteral="mdi2f-filter-outline" iconSize="30" />
+                              <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="25" />
                            </graphic>
                            <HBox.margin>
-                              <Insets right="15.0" />
+                              <Insets right="10.0" />
                            </HBox.margin>
-                        </JFXButton>
-                        <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="toolbar-icon-button" text=" ">
-                           <graphic>
-                              <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="30" />
-                           </graphic>
                         </JFXButton>
                      </children>
                   </HBox>
@@ -185,11 +202,20 @@
          </children>
       </VBox>
    </top>
-   <left>
-      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" BorderPane.alignment="CENTER" />
-   </left>
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/main.css" />
    </stylesheets>
+   <center>
+      <SplitPane dividerPositions="0.233" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
+        <items>
+            <VBox maxWidth="350.0" minWidth="140.0" prefWidth="280.0">
+               <children>
+                  <ListView fx:id="contactsList" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefWidth="280.0" VBox.vgrow="ALWAYS" />
+               </children>
+            </VBox>
+            <StackPane fx:id="contentPane" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" />
+        </items>
+      </SplitPane>
+   </center>
 </BorderPane>

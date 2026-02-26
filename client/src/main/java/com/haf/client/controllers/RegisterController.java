@@ -114,6 +114,9 @@ public class RegisterController {
     private ComboBox<String> rankComboBox;
 
     @FXML
+    private FontIcon dropDownButton;
+
+    @FXML
     private VBox credentialsVBox;
 
     @FXML
@@ -235,6 +238,15 @@ public class RegisterController {
         // Back button click
         if (backButton != null) {
             backButton.setOnAction(event -> handleBack());
+        }
+
+        // Dropdown button click to open rank ComboBox popup
+        if (dropDownButton != null && rankComboBox != null) {
+            dropDownButton.setOnMouseClicked(event -> {
+                // Ensure focus then show popup
+                rankComboBox.requestFocus();
+                rankComboBox.show();
+            });
         }
 
         // Navigate to Sign In
@@ -755,6 +767,13 @@ public class RegisterController {
     }
 
     /**
+     * Navigates to the Main screen.
+     */
+    private void navigateToMain() {
+        ViewRouter.switchTo(UiConstants.FXML_MAIN);
+    }
+
+    /**
      * Sets up the custom window control buttons (minimize, maximize, close)
      * and enables title bar dragging for the undecorated stage.
      */
@@ -770,7 +789,10 @@ public class RegisterController {
         }
 
         if (closeButton != null) {
-            closeButton.setOnAction(e -> stage.close());
+            closeButton.setOnAction(e -> {
+                javafx.application.Platform.exit();
+                System.exit(0);
+            });
         }
 
         // Enable window dragging via the title bar

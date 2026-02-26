@@ -27,10 +27,11 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param keyProvider the key provider (must be UserKeystoreKeyProvider to access keystore)
      * @param clockProvider the clock provider for deterministic expiry checks
      * @param webSocketAdapter the WebSocket adapter for network communication
-     * @param localRecipientId the local recipient's ID (must match message recipientId)
+     * @param localRecipientId the local recipient's ID (must match message
+     *                         recipientId)
      */
-    public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider, 
-                                  WebSocketAdapter webSocketAdapter, String localRecipientId) {
+    public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
+            WebSocketAdapter webSocketAdapter, String localRecipientId) {
         this.keyProvider = keyProvider;
         this.clockProvider = clockProvider;
         this.webSocketAdapter = webSocketAdapter;
@@ -60,9 +61,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
         // Register message handler with WebSocketAdapter
         webSocketAdapter.connect(
-            this::handleIncomingMessage,
-            this::handleError
-        );
+                this::handleIncomingMessage,
+                this::handleError);
     }
 
     /**
@@ -93,14 +93,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
             }
 
             // 3. Check recipient ID matches local recipient
-            try {
-                MessageValidator.validateRecipientOrThrow(localRecipientId, encryptedMessage);
-            } catch (IllegalArgumentException e) {
-                if (messageListener != null) {
-                    messageListener.onError(new MessageValidationException("Recipient ID mismatch: " + e.getMessage(), List.of()));
-                }
-                return;
-            }
+            validateRecipient(encryptedMessage);
 
             // 4. Check expiry using ClockProvider (before decrypt)
             long now = clockProvider.currentTimeMillis();
@@ -129,15 +122,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
                 messageListener.onMessage(plaintext, senderId, contentType);
             }
 
-        } catch (MessageValidationException e) {
-            if (messageListener != null) {
-                messageListener.onError(e);
-            }
-        } catch (MessageExpiredException e) {
-            if (messageListener != null) {
-                messageListener.onError(e);
-            }
-        } catch (MessageTamperedException e) {
+        } catch (MessageValidationException | MessageExpiredException | MessageTamperedException e) {
             if (messageListener != null) {
                 messageListener.onError(e);
             }
@@ -145,6 +130,22 @@ public class DefaultMessageReceiver implements MessageReceiver {
             if (messageListener != null) {
                 messageListener.onError(new IOException("Failed to process message", e));
             }
+        }
+    }
+
+    /**
+     * Validates that the message is addressed to the local recipient.
+     * Notifies the listener and returns early if the ID does not match.
+     *
+     * @param encryptedMessage the message to validate
+     * @throws MessageValidationException if the recipient ID does not match
+     */
+    private void validateRecipient(com.haf.shared.dto.EncryptedMessage encryptedMessage)
+            throws MessageValidationException {
+        try {
+            MessageValidator.validateRecipientOrThrow(localRecipientId, encryptedMessage);
+        } catch (IllegalArgumentException e) {
+            throw new MessageValidationException("Recipient ID mismatch: " + e.getMessage(), List.of());
         }
     }
 
@@ -166,13 +167,10 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @throws Exception if the key cannot be loaded
      */
     private PrivateKey loadLocalPrivateKey() throws Exception {
-        if (keyProvider instanceof UserKeystoreKeyProvider) {
-            UserKeystoreKeyProvider userKeyProvider = (UserKeystoreKeyProvider) keyProvider;
+        if (keyProvider instanceof UserKeystoreKeyProvider userKeyProvider) {
             char[] passphrase = userKeyProvider.getPassphrase();
             return userKeyProvider.getKeyStore().loadCurrentPrivate(passphrase);
-        } else {
-            throw new IllegalStateException("KeyProvider must be UserKeystoreKeyProvider to load private keys");
         }
+        throw new IllegalStateException("KeyProvider must be UserKeystoreKeyProvider to load private keys");
     }
 }
-
