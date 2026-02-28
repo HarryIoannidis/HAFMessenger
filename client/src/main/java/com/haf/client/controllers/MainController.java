@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.model.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.jfoenix.controls.JFXButton;
@@ -11,6 +12,9 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 
@@ -57,11 +61,19 @@ public class MainController {
     @FXML
     private HBox searchPanel;
 
+    // Profile panel detail nodes
+    @FXML
+    private Text profileNameText;
+    @FXML
+    private Text profileActivenessText;
+    @FXML
+    private Circle profileActivenessCircle;
+
     // Content area
     @FXML
     private StackPane contentPane;
     @FXML
-    private ListView<String> contactsList;
+    private ListView<ContactInfo> contactsList;
 
     private double xOffset;
     private double yOffset;
@@ -78,17 +90,19 @@ public class MainController {
         activateMessagesTab();
     }
 
+    // -------------------------------------------------------------------------
+    // Nav bar
+    // -------------------------------------------------------------------------
+
     private void setupNavBar() {
         navMessages.setOnAction(e -> activateMessagesTab());
         navSearch.setOnAction(e -> activateSearchTab());
     }
 
     private void activateMessagesTab() {
-        // Indicators
         indicatorMessages.setVisible(true);
         indicatorSearch.setVisible(false);
 
-        // Icons
         iconMessages.getStyleClass().remove("nav-item-icon");
         if (!iconMessages.getStyleClass().contains("nav-item-icon-active")) {
             iconMessages.getStyleClass().add("nav-item-icon-active");
@@ -98,19 +112,15 @@ public class MainController {
             iconSearch.getStyleClass().add("nav-item-icon");
         }
 
-        // Toolbar panels
-        profilePanel.setVisible(true);
-        profilePanel.setManaged(true);
+        // Profile panel visibility is controlled by selection, not by tab
         searchPanel.setVisible(false);
         searchPanel.setManaged(false);
     }
 
     private void activateSearchTab() {
-        // Indicators
         indicatorMessages.setVisible(false);
         indicatorSearch.setVisible(true);
 
-        // Icons
         iconSearch.getStyleClass().remove("nav-item-icon");
         if (!iconSearch.getStyleClass().contains("nav-item-icon-active")) {
             iconSearch.getStyleClass().add("nav-item-icon-active");
@@ -120,28 +130,82 @@ public class MainController {
             iconMessages.getStyleClass().add("nav-item-icon");
         }
 
-        // Toolbar panels
-        profilePanel.setVisible(false);
-        profilePanel.setManaged(false);
+        // Hide profile panel when in search mode
+        hideProfilePanel();
         searchPanel.setVisible(true);
         searchPanel.setManaged(true);
     }
 
+    // -------------------------------------------------------------------------
+    // Profile panel helpers
+    // -------------------------------------------------------------------------
+
+    private void showProfilePanel(ContactInfo contact) {
+        profileNameText.setText(contact.name());
+        profileActivenessText.setText(contact.activenessLabel());
+        try {
+            profileActivenessCircle.setFill(Color.web(contact.activenessColor()));
+        } catch (IllegalArgumentException ex) {
+            profileActivenessCircle.setFill(Color.GRAY);
+        }
+        profilePanel.setVisible(true);
+        profilePanel.setManaged(true);
+    }
+
+    private void hideProfilePanel() {
+        profilePanel.setVisible(false);
+        profilePanel.setManaged(false);
+    }
+
+    // -------------------------------------------------------------------------
+    // Contact list
+    // -------------------------------------------------------------------------
+
     private void setupContactList() {
         contactsList.setCellFactory(lv -> new ContactCell());
 
-        // Add a demo contact so chat can be tested
-        contactsList.getItems().add("Demo Contact");
+        // Demo contacts so the UI can be tested immediately
+        contactsList.getItems().addAll(
+                ContactInfo.online("Demo Contact"),
+                ContactInfo.offline("Harry Ioannidis"));
     }
 
     private void setupContactSelection() {
+        // Click on an already-selected item → deselect and revert to placeholder
+        contactsList.setOnMouseClicked(event -> {
+            int clickedIndex = contactsList.getSelectionModel().getSelectedIndex();
+            ContactInfo clicked = contactsList.getSelectionModel().getSelectedItem();
+
+            // We track whether the click target is already selected via a tag on the
+            // ListView
+            Object lastSelected = contactsList.getUserData();
+            if (clicked != null && clicked.equals(lastSelected)) {
+                // Same cell clicked again → deselect
+                contactsList.getSelectionModel().clearSelection();
+                contactsList.setUserData(null);
+                hideProfilePanel();
+                loadPlaceholder();
+                return;
+            }
+            // Record this as the last selected item
+            if (clicked != null) {
+                contactsList.setUserData(clicked);
+            }
+        });
+
         contactsList.getSelectionModel().selectedItemProperty()
                 .addListener((obs, oldContact, newContact) -> {
                     if (newContact != null) {
-                        loadChat(newContact);
+                        showProfilePanel(newContact);
+                        loadChat(newContact.name());
                     }
+                    // If null (cleared above), placeholder + panel hide are already handled
                 });
     }
+
+    // -------------------------------------------------------------------------
+    // Content pane
+    // -------------------------------------------------------------------------
 
     private void loadPlaceholder() {
         try {
@@ -168,6 +232,10 @@ public class MainController {
             LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Window chrome
+    // -------------------------------------------------------------------------
 
     private void setupWindowControls() {
         Stage stage = ViewRouter.getMainStage();

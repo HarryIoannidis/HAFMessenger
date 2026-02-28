@@ -108,7 +108,7 @@
                      </padding>
                      <children>
                         <!-- Profile panel: shown in Messages mode -->
-                        <HBox fx:id="profilePanel" alignment="CENTER_LEFT" prefWidth="200.0" HBox.hgrow="ALWAYS">
+                        <HBox fx:id="profilePanel" alignment="CENTER_LEFT" managed="false" prefWidth="200.0" visible="false">
                            <children>
                               <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
                                  <image>
@@ -126,19 +126,19 @@
                                     <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                  </padding>
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Full Name" VBox.vgrow="ALWAYS">
+                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" fx:id="profileNameText" styleClass="plain-text" text="" VBox.vgrow="ALWAYS">
                                        <font>
                                           <Font size="17.0" />
                                        </font>
                                     </Text>
                                     <HBox alignment="CENTER_LEFT" VBox.vgrow="ALWAYS">
                                        <children>
-                                          <Text opacity="0.9" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle" text="Activeness">
+                                          <Text opacity="0.9" strokeType="OUTSIDE" strokeWidth="0.0" fx:id="profileActivenessText" styleClass="plain-text-subtitle" text="">
                                              <font>
                                                 <Font size="15.0" />
                                              </font>
                                           </Text>
-                                          <Circle fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" HBox.hgrow="NEVER">
+                                          <Circle fx:id="profileActivenessCircle" fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" HBox.hgrow="NEVER">
                                              <HBox.margin>
                                                 <Insets left="10.0" />
                                              </HBox.margin>
@@ -150,7 +150,7 @@
                            </children>
                         </HBox>
                         <!-- Search panel: shown only in Search mode -->
-                        <HBox fx:id="searchPanel" alignment="CENTER" managed="false" visible="false" HBox.hgrow="ALWAYS">
+                        <HBox fx:id="searchPanel" alignment="CENTER" managed="false" visible="false" HBox.hgrow="ALWAYS"><!--keep ALWAYS on searchPanel so the search field stretches-->
                            <children>
                               <StackPane HBox.hgrow="ALWAYS">
                                  <children>
@@ -176,7 +176,9 @@
                                  </HBox.margin>
                               </StackPane>
                               <Separator halignment="RIGHT" visible="false" />
-                              <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
+                              <!-- Permanent spacer: always pushes the dots button to the far right -->
+                        <Pane HBox.hgrow="ALWAYS" />
+                        <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                                  <graphic>
                                     <FontIcon iconLiteral="mdi2f-filter-outline" iconSize="25" />
                                  </graphic>
@@ -186,6 +188,8 @@
                               </JFXButton>
                            </children>
                         </HBox>
+                        <!-- Permanent spacer: always pushes the dots button to the far right -->
+                        <Pane HBox.hgrow="ALWAYS" />
                         <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                            <graphic>
                               <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="25" />
