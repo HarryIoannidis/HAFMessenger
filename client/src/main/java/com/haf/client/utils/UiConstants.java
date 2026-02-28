@@ -21,6 +21,7 @@ public final class UiConstants {
     public static final String IMAGE_APP_LOGO_SVG = "/images/logo/app_logo_svg.svg";
     public static final String IMAGE_LOGO_PNG = "/images/logo/logoPNG.png";
     public static final String IMAGE_AVATAR = "/images/misc/avatar.png";
+    public static final String IMAGE_EMPTY_CHAT = "/images/misc/empty_chat.png";
 
     // Rank names
     public static final String RANK_YPOSMINIAS = "Υποσμηνίας";
@@ -39,19 +40,19 @@ public final class UiConstants {
 
     // Rank Icons
     public static final String ICON_RANK_YPOSMINIAS = "/images/ranks/sminias.png";
-    public static final String ICON_RANK_SMINIAS = "/images/ranks/yposminagos.png";
-    public static final String ICON_RANK_EPISMINIAS = "/images/ranks/sminagos.png";
-    public static final String ICON_RANK_ARCHISMINIAS = "/images/ranks/episminagos.png";
-    public static final String ICON_RANK_ANTHYPASPISTIS = "/images/ranks/anthyposminarchis.png";
-    public static final String ICON_RANK_ANTHYPOSMINAGOS = "/images/ranks/sminarchis.png";
-    public static final String ICON_RANK_YPOSMINAGOS = "/images/ranks/antisminarchos.png";
-    public static final String ICON_RANK_EPISMINAGOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_ANTISMINARCHOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_SMINARCHOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_TAKSIARCOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_YPOPTERARCHOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_ANTIPTERARCHOS = "/images/ranks/sminarchos.png";
-    public static final String ICON_RANK_DEFAULT = "/images/ranks/default.png";
+    public static final String ICON_RANK_SMINIAS = "/images/ranks/episminias.png";
+    public static final String ICON_RANK_EPISMINIAS = "/images/ranks/arxisminias.png";
+    public static final String ICON_RANK_ARCHISMINIAS = "/images/ranks/anthipaspistis.png";
+    public static final String ICON_RANK_ANTHYPASPISTIS = "/images/ranks/anthiposminagos.png";
+    public static final String ICON_RANK_ANTHYPOSMINAGOS = "/images/ranks/yposminagos.png";
+    public static final String ICON_RANK_YPOSMINAGOS = "/images/ranks/sminagos.png";
+    public static final String ICON_RANK_EPISMINAGOS = "/images/ranks/episminagos.png";
+    public static final String ICON_RANK_ANTISMINARCHOS = "/images/ranks/antisminarxos.png";
+    public static final String ICON_RANK_SMINARCHOS = "/images/ranks/sminarxos.png";
+    public static final String ICON_RANK_TAKSIARCOS = "/images/ranks/taxiarxos.png";
+    public static final String ICON_RANK_YPOPTERARCHOS = "/images/ranks/ypopterarxos.png";
+    public static final String ICON_RANK_ANTIPTERARCHOS = "/images/ranks/antipterarxos.png";
+    public static final String ICON_RANK_DEFAULT = "/images/ranks/sminias.png";
 
     // Bootstrap status messages
     public static final String BOOTSTRAP_STARTING = "Starting...";

@@ -767,13 +767,6 @@ public class RegisterController {
     }
 
     /**
-     * Navigates to the Main screen.
-     */
-    private void navigateToMain() {
-        ViewRouter.switchTo(UiConstants.FXML_MAIN);
-    }
-
-    /**
      * Sets up the custom window control buttons (minimize, maximize, close)
      * and enables title bar dragging for the undecorated stage.
      */

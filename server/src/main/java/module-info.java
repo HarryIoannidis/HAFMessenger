@@ -6,6 +6,6 @@ module server {
     requires org.apache.logging.log4j;
     requires org.apache.logging.log4j.core;
     requires org.java_websocket;
-    requires transitive shared;
     requires io.github.cdimascio.dotenv.java;
+    requires transitive shared;
 }
