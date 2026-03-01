@@ -834,6 +834,7 @@ public class RegisterController {
                 UiConstants.RANK_ANTHYPASPISTIS,
                 UiConstants.RANK_ANTHYPOSMINAGOS,
                 UiConstants.RANK_YPOSMINAGOS,
+                UiConstants.RANK_SMINAGOS,
                 UiConstants.RANK_EPISMINAGOS,
                 UiConstants.RANK_ANTISMINARCHOS,
                 UiConstants.RANK_SMINARCHOS,
@@ -851,7 +852,7 @@ public class RegisterController {
     /**
      * Custom ListCell to Display Rank with Icon.
      */
-    private class RankListCell extends ListCell<String> {
+    private static class RankListCell extends ListCell<String> {
         private final ImageView imageView = new ImageView();
 
         @Override
@@ -892,6 +893,7 @@ public class RegisterController {
                 case UiConstants.RANK_ANTHYPASPISTIS -> UiConstants.ICON_RANK_ANTHYPASPISTIS;
                 case UiConstants.RANK_ANTHYPOSMINAGOS -> UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
                 case UiConstants.RANK_YPOSMINAGOS -> UiConstants.ICON_RANK_YPOSMINAGOS;
+                case UiConstants.RANK_SMINAGOS -> UiConstants.ICON_RANK_SMINAGOS;
                 case UiConstants.RANK_EPISMINAGOS -> UiConstants.ICON_RANK_EPISMINAGOS;
                 case UiConstants.RANK_ANTISMINARCHOS -> UiConstants.ICON_RANK_ANTISMINARCHOS;
                 case UiConstants.RANK_SMINARCHOS -> UiConstants.ICON_RANK_SMINARCHOS;
@@ -903,7 +905,7 @@ public class RegisterController {
         }
     }
 
-    // Get selected rank
+    // Get the selected rank
     public String getSelectedRank() {
         return rankComboBox.getValue();
     }

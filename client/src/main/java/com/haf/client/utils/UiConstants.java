@@ -31,6 +31,7 @@ public final class UiConstants {
     public static final String RANK_ANTHYPASPISTIS = "Ανθυπασπιστής";
     public static final String RANK_ANTHYPOSMINAGOS = "Ανθυποσμηναγός";
     public static final String RANK_YPOSMINAGOS = "Υποσμηναγός";
+    public static final String RANK_SMINAGOS = "Σμηναγός";
     public static final String RANK_EPISMINAGOS = "Επισμηναγός";
     public static final String RANK_ANTISMINARCHOS = "Αντισμήναρχος";
     public static final String RANK_SMINARCHOS = "Σμήναρχος";
@@ -39,13 +40,14 @@ public final class UiConstants {
     public static final String RANK_ANTIPTERARCHOS = "Αντιπτέραρχος";
 
     // Rank Icons
-    public static final String ICON_RANK_YPOSMINIAS = "/images/ranks/sminias.png";
-    public static final String ICON_RANK_SMINIAS = "/images/ranks/episminias.png";
-    public static final String ICON_RANK_EPISMINIAS = "/images/ranks/arxisminias.png";
-    public static final String ICON_RANK_ARCHISMINIAS = "/images/ranks/anthipaspistis.png";
-    public static final String ICON_RANK_ANTHYPASPISTIS = "/images/ranks/anthiposminagos.png";
-    public static final String ICON_RANK_ANTHYPOSMINAGOS = "/images/ranks/yposminagos.png";
-    public static final String ICON_RANK_YPOSMINAGOS = "/images/ranks/sminagos.png";
+    public static final String ICON_RANK_YPOSMINIAS = "/images/ranks/yposminias.png";
+    public static final String ICON_RANK_SMINIAS = "/images/ranks/sminias.png";
+    public static final String ICON_RANK_EPISMINIAS = "/images/ranks/episminias.png";
+    public static final String ICON_RANK_ARCHISMINIAS = "/images/ranks/arxisminias.png";
+    public static final String ICON_RANK_ANTHYPASPISTIS = "/images/ranks/anthipaspistis.png";
+    public static final String ICON_RANK_ANTHYPOSMINAGOS = "/images/ranks/anthiposminagos.png";
+    public static final String ICON_RANK_YPOSMINAGOS = "/images/ranks/yposminagos.png";
+    public static final String ICON_RANK_SMINAGOS = "/images/ranks/sminagos.png";
     public static final String ICON_RANK_EPISMINAGOS = "/images/ranks/episminagos.png";
     public static final String ICON_RANK_ANTISMINARCHOS = "/images/ranks/antisminarxos.png";
     public static final String ICON_RANK_SMINARCHOS = "/images/ranks/sminarxos.png";
@@ -69,7 +71,6 @@ public final class UiConstants {
 
     // Stylesheets
     public static final String CSS_GLOBAL = "/css/global.css";
-    public static final String CSS_LOGIN = "/css/login.css";
     public static final String CSS_REGISTER = "/css/register.css";
     public static final String CSS_MAIN = "/css/main.css";
     public static final String CSS_SPLASH = "/css/splash.css";
