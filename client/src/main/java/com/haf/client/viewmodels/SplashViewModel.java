@@ -237,10 +237,23 @@ public class SplashViewModel {
 
     private static ResourceChecker defaultResourceChecker() {
         return () -> {
-            requireResource(UiConstants.FXML_LOGIN, "Login view");
+            // FXML resources
             requireResource(UiConstants.FXML_SPLASH, "Splash view");
-            requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");
+            requireResource(UiConstants.FXML_LOGIN, "Login view");
+            requireResource(UiConstants.FXML_REGISTER, "Register view");
+            requireResource(UiConstants.FXML_MAIN, "Main view");
+            requireResource(UiConstants.FXML_CHAT, "Chat view");
+            requireResource(UiConstants.FXML_PLACEHOLDER, "Placeholder view");
+            requireResource(UiConstants.FXML_CONTACT_CELL, "Contact cell view");
+
+            // CSS resources
             requireResource(UiConstants.CSS_GLOBAL, "Global stylesheet");
+            requireResource(UiConstants.CSS_REGISTER, "Register stylesheet");
+            requireResource(UiConstants.CSS_MAIN, "Main stylesheet");
+            requireResource(UiConstants.CSS_SPLASH, "Splash stylesheet");
+
+            // Images
+            requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");
         };
     }
 
