@@ -48,7 +48,7 @@ public class ClientApp extends Application {
      * @param args command line arguments
      */
     public static void main(String[] args) {
-        System.setProperty("prism.lcdtext", "true"); // επιβάλλει LCD smoothing
+        System.setProperty("prism.lcdtext", "true");
         System.setProperty("prism.text", "t2k");
         launch(args);
     }
