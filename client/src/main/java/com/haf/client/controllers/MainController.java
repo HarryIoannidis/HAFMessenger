@@ -17,7 +17,6 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
-
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -112,9 +111,14 @@ public class MainController {
             iconSearch.getStyleClass().add("nav-item-icon");
         }
 
-        // Profile panel visibility is controlled by selection, not by tab
         searchPanel.setVisible(false);
         searchPanel.setManaged(false);
+
+        // Restore profile panel if a contact is still selected
+        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            showProfilePanel(selected);
+        }
     }
 
     private void activateSearchTab() {
