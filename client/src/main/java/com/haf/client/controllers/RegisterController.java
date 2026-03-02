@@ -646,10 +646,16 @@ public class RegisterController {
         errorStateZoneId.setVisible(false);
 
         previewNameText.setText(file.getName());
-        // Calculate size in MB
+
+        // Calculate size in KB or MB
         double bytes = file.length();
-        double mb = bytes / (1024 * 1024);
-        previewSizeText.setText(String.format("%.2f MB", mb));
+        if (bytes < 1024 * 1024) {
+            double kb = bytes / 1024.0;
+            previewSizeText.setText(String.format("%.2f KB", kb));
+        } else {
+            double mb = bytes / (1024.0 * 1024.0);
+            previewSizeText.setText(String.format("%.2f MB", mb));
+        }
 
         try {
             Image image = new Image(file.toURI().toString());
@@ -677,7 +683,7 @@ public class RegisterController {
             if (event.getDragboard().hasFiles()) {
                 List<File> files = event.getDragboard().getFiles();
                 if (!files.isEmpty()) {
-                    handleFileSelection(files.get(0));
+                    handleFileSelection(files.getFirst());
                     success = true;
                 }
             }
