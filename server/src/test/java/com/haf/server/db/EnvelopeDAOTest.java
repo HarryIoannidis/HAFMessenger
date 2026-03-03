@@ -287,7 +287,7 @@ class EnvelopeDAOTest {
         message.timestampEpochMs = System.currentTimeMillis();
         message.ttlSeconds = 3600;
         message.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        message.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]);
+        message.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
         message.ciphertextB64 = Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8));
         message.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
         message.contentType = "text/plain";

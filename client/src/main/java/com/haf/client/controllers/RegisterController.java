@@ -29,10 +29,32 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import java.io.File;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.haf.shared.dto.RegisterRequest;
+import com.haf.shared.dto.RegisterResponse;
+import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
+import com.haf.shared.utils.FilePerms;
+import com.haf.shared.keystore.KeystoreRoot;
+import com.haf.shared.keystore.UserKeystore;
+import java.security.KeyPair;
+import java.nio.file.Path;
+import com.haf.client.utils.SslContextUtils;
+import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.crypto.CryptoECC;
+import com.haf.shared.crypto.CryptoService;
+import com.haf.shared.utils.EccKeyIO;
+import javax.crypto.SecretKey;
+import java.nio.file.Files;
+import java.util.Base64;
 
 public class RegisterController {
 
@@ -502,23 +524,105 @@ public class RegisterController {
 
         // Store original text to restore if needed
         String originalText = registerButton.getText();
-        registerButton.setText("Register...");
+        registerButton.setText("Registering...");
 
         Thread registrationThread = new Thread(() -> {
             try {
-                // Simulate network delay
-                Thread.sleep(1500);
+                // Build registration request from ViewModel
+                RegisterRequest request = new RegisterRequest();
+                request.fullName = viewModel.getName();
+                request.regNumber = viewModel.getRegNum();
+                request.idNumber = viewModel.getIdNum();
+                request.rank = viewModel.getRank();
+                request.telephone = viewModel.getPhoneNum();
+                request.email = viewModel.getEmail();
+                request.password = viewModel.getPassword();
+                // Generate and set actual public key pair
+                KeyPair registrationKp = EccKeyIO.generate();
+                request.publicKeyPem = EccKeyIO.publicPem(registrationKp.getPublic());
+                request.publicKeyFingerprint = FingerprintUtil
+                        .sha256Hex(EccKeyIO.publicDer(registrationKp.getPublic()));
 
-                // TODO: Replace with actual server registration call
+                // Fetch Admin Public Key for E2E photo encryption
+                HttpClient client = HttpClient.newBuilder()
+                        .sslContext(SslContextUtils.getTrustingSslContext())
+                        .build();
+
+                HttpRequest adminKeyRequest = HttpRequest.newBuilder()
+                        .uri(URI.create("https://localhost:8443/api/v1/config/admin-key"))
+                        .GET()
+                        .build();
+                HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest,
+                        HttpResponse.BodyHandlers.ofString());
+
+                // Parse the PEM from the response JSON (simple extraction, no full JSON lib
+                // needed)
+                String adminPem = null;
+                if (adminKeyResponse.statusCode() == 200) {
+                    String body = adminKeyResponse.body();
+                    // Extract the PEM value: {"adminPublicKeyPem":"..."}
+                    int start = body.indexOf('"', body.indexOf(':') + 1) + 1;
+                    int end = body.lastIndexOf('"');
+                    if (start > 0 && end > start) {
+                        adminPem = body.substring(start, end).replace("\\n", "\n");
+                    }
+                }
+
+                // E2E-encrypt photos if admin key is available and photos are selected
+                if (adminPem != null && !adminPem.isBlank()) {
+                    java.security.PublicKey adminPublicKey = EccKeyIO.publicFromPem(adminPem);
+                    File idPhotoFile = viewModel.idPhotoFileProperty().get();
+                    File selfiePhotoFile = viewModel.selfiePhotoFileProperty().get();
+                    if (idPhotoFile != null) {
+                        request.idPhoto = encryptPhoto(idPhotoFile, adminPublicKey);
+                    }
+                    if (selfiePhotoFile != null) {
+                        request.selfiePhoto = encryptPhoto(selfiePhotoFile, adminPublicKey);
+                    }
+                }
+
+                String json = JsonCodec.toJson(request);
+
+                HttpRequest httpRequest = HttpRequest.newBuilder()
+                        .uri(URI.create("https://localhost:8443/api/v1/register"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
+
+                HttpResponse<String> httpResponse = client.send(httpRequest,
+                        HttpResponse.BodyHandlers.ofString());
+
+                RegisterResponse response = JsonCodec.fromJson(httpResponse.body(), RegisterResponse.class);
 
                 javafx.application.Platform.runLater(() -> {
                     viewModel.loadingProperty().set(false);
-                    // On success, we might navigate away. For now, we restore text or show success.
-                    LOGGER.log(Level.INFO, "Registration validation passed for: {0}", viewModel.getEmail());
-                    LOGGER.log(Level.INFO, "Registration simulated successfully.");
-
-                    // If we stay on this screen:
                     registerButton.setText(originalText);
+
+                    if (httpResponse.statusCode() == 201 && response.error == null) {
+                        try {
+                            Path root;
+                            try {
+                                root = KeystoreRoot.preferred();
+                                FilePerms.ensureDir700(root);
+                            } catch (Exception e) {
+                                root = KeystoreRoot.userFallback();
+                                FilePerms.ensureDir700(root);
+                            }
+
+                            UserKeystore keystore = new UserKeystore(root);
+                            String keyId = UserKeystore.todayKeyId();
+                            keystore.saveKeypair(keyId, registrationKp, viewModel.getPassword().toCharArray());
+                        } catch (Exception e) {
+                            LOGGER.log(Level.SEVERE, "Failed to save Keystore after successful registration", e);
+                            // Even though saving failed, the user registered correctly on the server.
+                        }
+
+                        LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
+                        navigateToLogin();
+                    } else {
+                        String errorMsg = response.error != null ? response.error : "Registration failed.";
+                        viewModel.setRegistrationError(errorMsg);
+                    }
                 });
 
             } catch (InterruptedException e) {
@@ -529,15 +633,67 @@ public class RegisterController {
                     viewModel.setRegistrationError("Registration interrupted.");
                 });
             } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Registration failed", e);
                 javafx.application.Platform.runLater(() -> {
                     viewModel.loadingProperty().set(false);
                     registerButton.setText(originalText);
-                    viewModel.setRegistrationError("Registration failed.");
+                    viewModel.setRegistrationError("Connection failed. Please try again.");
                 });
             }
         });
         registrationThread.setDaemon(true);
         registrationThread.start();
+    }
+
+    /**
+     * Encrypts a photo file end-to-end against the Admin's X25519 public key.
+     *
+     * <p>
+     * Flow:
+     * <ol>
+     * <li>Generate a fresh ephemeral X25519 KeyPair.</li>
+     * <li>Derive an AES-256 session key via ECDH(ephemeral_private, admin_public) +
+     * SHA-256.</li>
+     * <li>Encrypt the file bytes with AES-256-GCM.</li>
+     * <li>Bundle everything into an {@link EncryptedFileDTO}.</li>
+     * </ol>
+     * The server stores the resulting blob opaquely without ever seeing the AES
+     * key.
+     * </p>
+     *
+     * @param file           the photo file to encrypt
+     * @param adminPublicKey the admin's X25519 public key
+     * @return an {@link EncryptedFileDTO} ready to embed in the
+     *         {@link RegisterRequest}
+     */
+    private EncryptedFileDTO encryptPhoto(File file, java.security.PublicKey adminPublicKey) throws Exception {
+        byte[] plaintext = Files.readAllBytes(file.toPath());
+
+        // 1. Ephemeral keypair, unique per file
+        KeyPair ephemeral = EccKeyIO.generate();
+
+        // 2. Derive AES-256-GCM session key via ECDH
+        SecretKey aesKey = CryptoECC.generateAndDeriveAesKey(ephemeral.getPrivate(), adminPublicKey);
+
+        // 3. Random 12-byte IV
+        byte[] iv = CryptoService.generateIv();
+
+        // 4. Encrypt (returns ciphertext || 16-byte GCM tag)
+        byte[] combined = CryptoService.encryptAesGcm(plaintext, aesKey, iv, null);
+
+        int tagLen = 16;
+        byte[] ct = java.util.Arrays.copyOfRange(combined, 0, combined.length - tagLen);
+        byte[] tag = java.util.Arrays.copyOfRange(combined, combined.length - tagLen, combined.length);
+
+        // 5. Build DTO
+        EncryptedFileDTO dto = new EncryptedFileDTO();
+        dto.ciphertextB64 = Base64.getEncoder().encodeToString(ct);
+        dto.ivB64 = Base64.getEncoder().encodeToString(iv);
+        dto.tagB64 = Base64.getEncoder().encodeToString(tag);
+        dto.ephemeralPublicB64 = Base64.getEncoder().encodeToString(EccKeyIO.publicDer(ephemeral.getPublic()));
+        dto.contentType = "image/jpeg";
+        dto.originalSize = plaintext.length;
+        return dto;
     }
 
     private void transitionToIdPhoto() {

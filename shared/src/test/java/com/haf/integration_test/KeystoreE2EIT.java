@@ -3,11 +3,10 @@ package com.haf.integration_test;
 import org.junit.jupiter.api.*;
 import java.nio.file.*;
 import java.security.*;
-import javax.crypto.Cipher;
-import com.haf.shared.constants.CryptoConstants;
-import com.haf.shared.utils.FilePerms;
 import com.haf.shared.keystore.UserKeystore;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FilePerms;
+import javax.crypto.KeyAgreement;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KeystoreE2EIT {
@@ -23,17 +22,20 @@ class KeystoreE2EIT {
     void cleanup() throws Exception {
         if (tmpRoot != null) {
             try (var w = Files.walk(tmpRoot)) {
-                w.sorted((a,b)->b.getNameCount()-a.getNameCount()).forEach(p -> {
-                    try { Files.deleteIfExists(p);} catch (Exception ignored) {}
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (Exception ignored) {
+                    }
                 });
             }
         }
     }
 
     @Test
-    void encrypt_with_public_then_decrypt_with_loaded_private() throws Exception {
+    void perform_ecdh_with_loaded_private() throws Exception {
         String keyId = UserKeystore.todayKeyId();
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         char[] pass = "secret-pass".toCharArray();
 
         UserKeystore ks = new UserKeystore(tmpRoot);
@@ -45,16 +47,22 @@ class KeystoreE2EIT {
         PublicKey pub = ks.loadCurrentPublic();
         PrivateKey prv = ks.loadCurrentPrivate(pass);
 
-        byte[] msg = "HAF-IT-PAYLOAD".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        Cipher enc = Cipher.getInstance(CryptoConstants.RSA_OAEP_TRANSFORMATION);
-        enc.init(Cipher.ENCRYPT_MODE, pub);
-        byte[] ct = enc.doFinal(msg);
+        // Generate an ephemeral keypair to test agreement
+        KeyPair ephemeral = EccKeyIO.generate();
 
-        Cipher dec = Cipher.getInstance(CryptoConstants.RSA_OAEP_TRANSFORMATION);
-        dec.init(Cipher.DECRYPT_MODE, prv);
-        byte[] pt = dec.doFinal(ct);
+        // 1. Agree on sender side
+        KeyAgreement senderKA = KeyAgreement.getInstance("XDH");
+        senderKA.init(ephemeral.getPrivate());
+        senderKA.doPhase(pub, true);
+        byte[] senderSecret = senderKA.generateSecret();
 
-        assertArrayEquals(msg, pt);
+        // 2. Agree on recipient side
+        KeyAgreement recipientKA = KeyAgreement.getInstance("XDH");
+        recipientKA.init(prv);
+        recipientKA.doPhase(ephemeral.getPublic(), true);
+        byte[] recipientSecret = recipientKA.generateSecret();
+
+        assertArrayEquals(senderSecret, recipientSecret);
     }
 
 }

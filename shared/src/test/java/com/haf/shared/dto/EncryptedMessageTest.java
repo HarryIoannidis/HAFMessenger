@@ -24,7 +24,7 @@ class EncryptedMessageTest {
         m.recipientId = "B10";
         m.algorithm = "AES-256-GCM+RSA-OAEP";
         m.ivB64 = Base64.getEncoder().encodeToString(new byte[12]);          // 12B IV
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]); // simulate RSA-2048 wrapped key
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]); // simulate RSA-2048 wrapped key
         m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
         m.tagB64 = Base64.getEncoder().encodeToString(new byte[16]);         // 16B tag
         m.timestampEpochMs = 1;
@@ -37,7 +37,7 @@ class EncryptedMessageTest {
         String json = JsonCodec.toJson(m);
 
         for (String k : new String[]{"version","senderId","recipientId","algorithm","ivB64",
-                "wrappedKeyB64","ciphertextB64","tagB64","timestampEpochMs",
+                "ephemeralPublicB64","ciphertextB64","tagB64","timestampEpochMs",
                 "ttlSeconds","contentType","contentLength","e2e"}) {
             assertTrue(json.contains("\"" + k + "\""), "Missing field: " + k + " in JSON: " + json);
         }

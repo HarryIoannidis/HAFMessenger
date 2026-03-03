@@ -36,17 +36,17 @@ class KeyProviderTest {
 
     @Test
     void getSenderId_returns_sender_id() throws Exception {
-        KeyPair kp = com.haf.shared.utils.RsaKeyIO.generate(2048);
+        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
-        
+
         assertEquals("sender-123", provider.getSenderId());
     }
 
     @Test
     void getRecipientPublicKey_returns_key_for_known_recipient() throws Exception {
-        KeyPair kp = com.haf.shared.utils.RsaKeyIO.generate(2048);
+        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
-        
+
         PublicKey recipientKey = provider.getRecipientPublicKey("known-recipient");
         assertNotNull(recipientKey);
         assertEquals(kp.getPublic(), recipientKey);
@@ -54,12 +54,11 @@ class KeyProviderTest {
 
     @Test
     void getRecipientPublicKey_throws_for_unknown_recipient() throws Exception {
-        KeyPair kp = com.haf.shared.utils.RsaKeyIO.generate(2048);
+        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
-        
+
         assertThrows(KeyNotFoundException.class, () -> {
             provider.getRecipientPublicKey("unknown-recipient");
         });
     }
 }
-

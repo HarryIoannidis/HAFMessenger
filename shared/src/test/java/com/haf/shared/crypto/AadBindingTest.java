@@ -3,7 +3,7 @@ package com.haf.shared.crypto;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +16,7 @@ public class AadBindingTest {
 
     @BeforeAll
     static void keys() throws Exception {
-        kp = RsaKeyIO.generate(2048);
+        kp = EccKeyIO.generate();
         clock = new FixedClockProvider(1000000L);
     }
 

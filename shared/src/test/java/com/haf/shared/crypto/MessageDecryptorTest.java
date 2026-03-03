@@ -3,7 +3,7 @@ package com.haf.shared.crypto;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.security.KeyPair;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +13,7 @@ public class MessageDecryptorTest {
 
     @Test
     public void test_decrypt_message() throws Exception {
-        KeyPair keyPair = RsaKeyIO.generate(2048);
+        KeyPair keyPair = EccKeyIO.generate();
 
         String senderId = "userA";
         String recipientId = "userB";
@@ -31,7 +31,8 @@ public class MessageDecryptorTest {
 
         assertNotNull(decryptedBytes, "Η αποκρυπτογράφηση δεν πρέπει να επιστρέφει null");
         assertArrayEquals(payload, decryptedBytes, "Το αποκρυπτογραφημένο μήνυμα πρέπει να ταιριάζει με το αρχικό");
-        assertEquals("Το μυστικό μήνυμα", decryptedMessage, "Το αποκρυπτογραφημένο μήνυμα πρέπει να ταιριάζει με το αρχικό");
+        assertEquals("Το μυστικό μήνυμα", decryptedMessage,
+                "Το αποκρυπτογραφημένο μήνυμα πρέπει να ταιριάζει με το αρχικό");
     }
 
 }

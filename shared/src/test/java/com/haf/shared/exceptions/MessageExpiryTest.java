@@ -5,7 +5,7 @@ import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -15,7 +15,7 @@ public class MessageExpiryTest {
 
     @Test
     public void test_expired_message_rejected() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         long pastTime = 500000L;
         long currentTime = 1000000L;
@@ -41,7 +41,7 @@ public class MessageExpiryTest {
 
     @Test
     public void test_valid_message_not_expired() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         long messageTime = 1000000L;
         long currentTime = 1000000L + 30000L; // 30 seconds later
@@ -62,10 +62,10 @@ public class MessageExpiryTest {
 
     @Test
     public void test_message_at_exact_ttl_boundary() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
-        long messageTime = 1000000L;  // Epoch milliseconds when message is created
-        long ttlSeconds = 60;          // 60 seconds TTL
+        long messageTime = 1000000L; // Epoch milliseconds when message is created
+        long ttlSeconds = 60; // 60 seconds TTL
         long expiryTime = messageTime + (ttlSeconds * 1000L); // Expires at T=1060000
 
         ClockProvider messageClock = new FixedClockProvider(messageTime);
@@ -85,8 +85,7 @@ public class MessageExpiryTest {
         MessageExpiredException ex = assertThrows(
                 MessageExpiredException.class,
                 () -> expiredDecryptor.decryptMessage(encrypted),
-                "Message must expire 1ms after TTL boundary"
-        );
+                "Message must expire 1ms after TTL boundary");
 
         String msg = ex.getMessage().toLowerCase();
         assertTrue(msg.contains("expired"), "Exception message should contain 'expired'");

@@ -123,22 +123,22 @@ public class SplashViewModel {
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
-                delay(300L);
+                // delay(300L);
 
                 update(UiConstants.BOOTSTRAP_SECURITY, 0.3);
                 cryptoInitializer.initialize();
-                delay(300L);
+                // delay(300L);
 
                 update(UiConstants.BOOTSTRAP_RESOURCES, 0.6);
                 resourceChecker.verify();
-                delay(600L);
+                // delay(600L);
 
                 update(UiConstants.BOOTSTRAP_NETWORK, 0.8);
                 networkChecker.check();
-                delay(400L);
+                // delay(400L);
 
                 update(UiConstants.BOOTSTRAP_READY, 1.0);
-                delay(200L);
+                // delay(200L);
                 return null;
             }
 
@@ -227,11 +227,11 @@ public class SplashViewModel {
             // Verify AES/GCM availability
             javax.crypto.Cipher.getInstance(com.haf.shared.constants.CryptoConstants.AES_GCM_TRANSFORMATION);
 
-            // Verify RSA-OAEP availability (Critical for Key Exchange)
-            javax.crypto.Cipher.getInstance(com.haf.shared.constants.CryptoConstants.RSA_OAEP_TRANSFORMATION);
+            // Verify X25519 (ECDH) availability (Critical for Key Exchange)
+            javax.crypto.KeyAgreement.getInstance(com.haf.shared.constants.CryptoConstants.KEY_AGREEMENT_ALGO);
 
             // Verify SHA-256 availability
-            java.security.MessageDigest.getInstance(com.haf.shared.constants.CryptoConstants.OAEP_HASH);
+            java.security.MessageDigest.getInstance("SHA-256");
         };
     }
 

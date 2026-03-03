@@ -13,7 +13,7 @@ import java.io.Serializable;
  * @ttlSeconds the time to live of the message in seconds.
  * @algorithm the algorithm used to encrypt the message.
  * @ivB64 the initialization vector of the message in base64.
- * @wrappedKeyB64 the wrapped key of the message in base64.
+ * @ephemeralPublicB64 the wrapped key of the message in base64.
  * @ciphertextB64 the ciphertext of the message in base64.
  * @tagB64 the authentication tag of the message in base64.
  * @contentType the content type of the message.
@@ -29,12 +29,12 @@ public class EncryptedMessage implements Serializable {
     public long ttlSeconds;
     public String algorithm;
     public String ivB64;
-    public String wrappedKeyB64;
+    public String ephemeralPublicB64;
     public String ciphertextB64;
     public String tagB64;
     public String contentType;
     public long contentLength;
     public boolean e2e = true;
-    @JsonIgnore public String aadB64;
+    @JsonIgnore
+    public String aadB64;
 }
-

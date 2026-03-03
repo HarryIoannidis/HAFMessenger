@@ -9,23 +9,24 @@ import java.util.Base64;
 import java.util.List;
 
 public final class MessageValidator {
-    private MessageValidator() {}
+    private MessageValidator() {
+    }
 
     public enum ErrorCode {
-        NULL_DTO,           // DTO null
-        BAD_VERSION,        // λάθος έκδοση πρωτοκόλλου
-        BAD_ALGO,           // λάθος δήλωση αλγορίθμων
-        BAD_SENDER,         // senderId λείπει/πολύ μικρό
-        BAD_RECIPIENT,      // recipientId λείπει/πολύ μικρό
-        BAD_TTL,            // ttlSeconds εκτός ορίων
-        BAD_IV,             // ivB64 άκυρο/λάθος μήκος (12B)
-        BAD_CIPHERTEXT,     // ciphertextB64 άκυρο/κενό/υπερβολικά μεγάλο
-        BAD_TAG,            // tagB64 άκυρο/λάθος μήκος (16B)
-        BAD_WRAPPED_KEY,    // wrappedKeyB64 άκυρο/μικρό για RSA-2048 OAEP
-        BAD_TIMESTAMP,      // timestampEpochMs <= 0
+        NULL_DTO, // DTO null
+        BAD_VERSION, // λάθος έκδοση πρωτοκόλλου
+        BAD_ALGO, // λάθος δήλωση αλγορίθμων
+        BAD_SENDER, // senderId λείπει/πολύ μικρό
+        BAD_RECIPIENT, // recipientId λείπει/πολύ μικρό
+        BAD_TTL, // ttlSeconds εκτός ορίων
+        BAD_IV, // ivB64 άκυρο/λάθος μήκος (12B)
+        BAD_CIPHERTEXT, // ciphertextB64 άκυρο/κενό/υπερβολικά μεγάλο
+        BAD_TAG, // tagB64 άκυρο/λάθος μήκος (16B)
+        BAD_WRAPPED_KEY, // ephemeralPublicB64 άκυρο/μικρό για RSA-2048 OAEP
+        BAD_TIMESTAMP, // timestampEpochMs <= 0
         BAD_CONTENT_LENGTH, // contentLength < 0
-        BAD_CONTENT_TYPE,   // contentType null/empty/not allowed
-        BAD_AAD             // aadB64 null/empty
+        BAD_CONTENT_TYPE, // contentType null/empty/not allowed
+        BAD_AAD // aadB64 null/empty
     }
 
     /**
@@ -45,7 +46,7 @@ public final class MessageValidator {
      * Checks if the message is to the specific recipient.
      *
      * @param localRecipientId the ID of the local recipient
-     * @param m encryptedMessage to check
+     * @param m                encryptedMessage to check
      * @throws IllegalArgumentException if recipientId does not match
      */
     public static void validateRecipientOrThrow(String localRecipientId, EncryptedMessage m) {
@@ -130,12 +131,12 @@ public final class MessageValidator {
             }
         }
 
-        // Τυλιγμένο κλειδί (RSA-OAEP) – ύπαρξη και ελάχιστο μήκος για RSA-2048
-        if (m.wrappedKeyB64 == null) {
+        // Εφήμερο κλειδί (X25519) – ύπαρξη και ελάχιστο μήκος
+        if (m.ephemeralPublicB64 == null) {
             errors.add(ErrorCode.BAD_WRAPPED_KEY);
         } else {
-            byte[] wk = safeB64(m.wrappedKeyB64);
-            if (wk == null || wk.length < 256) { // RSA-2048 OAEP min
+            byte[] wk = safeB64(m.ephemeralPublicB64);
+            if (wk == null || wk.length < 32) { // X25519 min
                 errors.add(ErrorCode.BAD_WRAPPED_KEY);
             }
         }
@@ -150,7 +151,8 @@ public final class MessageValidator {
             errors.add(ErrorCode.BAD_CONTENT_LENGTH);
         }
 
-        // Αυθεντικοποιητικά πρόσθετα δεδομένα (AAD) – αν υπάρχουν, πρέπει να είναι θετικά μήκη
+        // Αυθεντικοποιητικά πρόσθετα δεδομένα (AAD) – αν υπάρχουν, πρέπει να είναι
+        // θετικά μήκη
         if (m.aadB64 != null && m.aadB64.isEmpty()) {
             errors.add(ErrorCode.BAD_AAD);
         }
@@ -165,10 +167,12 @@ public final class MessageValidator {
     }
 
     /**
-     * Normalizes the content type string by removing parameters and converting to lowercase.
+     * Normalizes the content type string by removing parameters and converting to
+     * lowercase.
      *
      * @param ct the content type string to normalize
-     * @return the normalized content type string or null if the input is null or empty
+     * @return the normalized content type string or null if the input is null or
+     *         empty
      */
     private static String normalizeContentType(String ct) {
         if (ct == null) {

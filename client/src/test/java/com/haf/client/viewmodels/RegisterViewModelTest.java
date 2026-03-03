@@ -6,7 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class RegisterViewModelTest {
@@ -76,7 +75,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.nameErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_NAME_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -86,7 +85,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.regNumErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_REG_NUM_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -96,7 +95,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.idNumErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_ID_NUM_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -106,7 +105,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.rankErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_RANK_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -116,7 +115,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.rankErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_RANK_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -126,7 +125,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.phoneNumErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_PHONE_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -136,7 +135,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.emailErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_EMAIL_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -146,7 +145,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.passwordErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_PASSWORD_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test
@@ -156,7 +155,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.passwordConfErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_PASSWORD_CONF_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @ParameterizedTest(name = "invalid phone \"{0}\" fails validation")
@@ -306,7 +305,7 @@ class RegisterViewModelTest {
 
         assertFalse(vm.validate());
         assertTrue(vm.nameErrorProperty().get());
-        assertEquals(RegisterViewModel.ERROR_NAME_EMPTY, vm.getErrorMessage());
+        assertEquals(RegisterViewModel.ERROR_ALL_FIELDS_EMPTY, vm.getErrorMessage());
     }
 
     @Test

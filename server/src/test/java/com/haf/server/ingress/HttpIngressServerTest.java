@@ -1,6 +1,9 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.FileUploadDAO;
+import com.haf.server.db.SessionDAO;
+import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
@@ -38,6 +41,14 @@ class HttpIngressServerTest {
     @Mock
     private AuditLogger auditLogger;
 
+    @Mock
+    private UserDAO userDAO;
+
+    @Mock
+    private SessionDAO sessionDAO;
+
+    @Mock
+    private FileUploadDAO fileUploadDAO;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -49,9 +60,8 @@ class HttpIngressServerTest {
         when(config.getHttpPort()).thenReturn(0);
 
         server = new HttpIngressServer(
-            config, sslContext, mailboxRouter, rateLimiterService,
-            auditLogger, metricsRegistry, validator
-        );
+                config, sslContext, mailboxRouter, rateLimiterService,
+                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO);
     }
 
     @Test
@@ -98,19 +108,16 @@ class HttpIngressServerTest {
         keyStore.load(null, "password".toCharArray());
 
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(
-            KeyManagerFactory.getDefaultAlgorithm()
-        );
+                KeyManagerFactory.getDefaultAlgorithm());
 
         kmf.init(keyStore, "password".toCharArray());
 
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-            TrustManagerFactory.getDefaultAlgorithm()
-        );
-        
+                TrustManagerFactory.getDefaultAlgorithm());
+
         tmf.init(keyStore);
         SSLContext ctx = SSLContext.getInstance("TLS");
         ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
         return ctx;
     }
 }
-

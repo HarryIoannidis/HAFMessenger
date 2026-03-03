@@ -7,5 +7,6 @@ module server {
     requires org.apache.logging.log4j.core;
     requires org.java_websocket;
     requires io.github.cdimascio.dotenv.java;
+    requires jbcrypt;
     requires transitive shared;
 }

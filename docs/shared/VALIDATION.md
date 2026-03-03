@@ -8,7 +8,7 @@
 - timestampEpochMs: > 0.
 - ttlSeconds: within [MIN_TTL_SECONDS, MAX_TTL_SECONDS].
 - ivB64: decode to 12 bytes.
-- wrappedKeyB64: non‑empty.
+- ephemeralPublicB64: non‑empty.
 - ciphertextB64/tagB64: non‑empty, tag 16 bytes.
 - contentType: acceptable whitelist values.
 - contentLength: 0 ≤ length ≤ MAX_CONTENT_LENGTH.

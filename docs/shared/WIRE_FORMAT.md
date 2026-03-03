@@ -10,7 +10,7 @@
 - Tag: 16 bytes, tagB64 field (Base64)
 
 ### Envelope Fields (DTO)
-- Required: version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, wrappedKeyB64, ciphertextB64, tagB64, contentType, contentLength
+- Required: version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, ephemeralPublicB64, ciphertextB64, tagB64, contentType, contentLength
 - Optional: e2e
 - contentLength: non-negative, equal to bytes plaintext
 

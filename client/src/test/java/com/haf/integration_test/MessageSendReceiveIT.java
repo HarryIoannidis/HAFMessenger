@@ -6,7 +6,7 @@ import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.FilePerms;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +38,8 @@ class MessageSendReceiveIT {
         }
 
         @Override
-        public void connect(java.util.function.Consumer<String> onMessage, 
-                           java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
+        public void connect(java.util.function.Consumer<String> onMessage,
+                java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
             this.messageConsumer = onMessage;
             this.errorConsumer = onError;
             connected = true;
@@ -105,12 +105,12 @@ class MessageSendReceiveIT {
         // Create sender and recipient keys
         UserKeystore senderKeyStore = new UserKeystore(tmpRoot1);
         UserKeystore recipientKeyStore = new UserKeystore(tmpRoot2);
-        
+
         senderKeyId = "key-sender-001";
         recipientKeyId = "key-recipient-001";
 
-        senderKp = RsaKeyIO.generate(2048);
-        recipientKp = RsaKeyIO.generate(2048);
+        senderKp = EccKeyIO.generate();
+        recipientKp = EccKeyIO.generate();
 
         senderKeyStore.saveKeypair(senderKeyId, senderKp, passphrase);
         recipientKeyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
@@ -179,7 +179,9 @@ class MessageSendReceiveIT {
         messageReceiver.start();
 
         // Connect sender WebSocket
-        senderWebSocket.connect(msg -> {}, err -> {});
+        senderWebSocket.connect(msg -> {
+        }, err -> {
+        });
 
         // Send message
         byte[] payload = "Hello, World!".getBytes(StandardCharsets.UTF_8);
@@ -206,7 +208,8 @@ class MessageSendReceiveIT {
 
         // Recreate sender and receiver with test clock
         MessageSender testSender = new DefaultMessageSender(senderKeyProvider, testClock, senderWebSocket);
-        MessageReceiver testReceiver = new DefaultMessageReceiver(recipientKeyProvider, testClock, recipientWebSocket, recipientKeyId);
+        MessageReceiver testReceiver = new DefaultMessageReceiver(recipientKeyProvider, testClock, recipientWebSocket,
+                recipientKeyId);
 
         CountDownLatch latch = new CountDownLatch(1);
         testReceiver.setMessageListener(new MessageReceiver.MessageListener() {
@@ -222,7 +225,9 @@ class MessageSendReceiveIT {
         });
 
         testReceiver.start();
-        senderWebSocket.connect(msg -> {}, err -> {});
+        senderWebSocket.connect(msg -> {
+        }, err -> {
+        });
 
         byte[] payload = "Test message".getBytes(StandardCharsets.UTF_8);
         testSender.sendMessage(payload, recipientKeyId, "text/plain", 3600);
@@ -230,4 +235,3 @@ class MessageSendReceiveIT {
         assertTrue(latch.await(5, TimeUnit.SECONDS), "Message should be received");
     }
 }
-

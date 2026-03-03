@@ -7,7 +7,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.security.*;
 import static org.junit.jupiter.api.Assertions.*;
 import com.haf.shared.utils.FilePerms;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import java.util.Set;
 
 class KeystorePermsE2EIT {
@@ -23,8 +23,11 @@ class KeystorePermsE2EIT {
     void cleanup() throws Exception {
         if (tmpRoot != null) {
             try (var w = Files.walk(tmpRoot)) {
-                w.sorted((a,b)->b.getNameCount()-a.getNameCount()).forEach(p -> {
-                    try { Files.deleteIfExists(p);} catch (Exception ignored) {}
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (Exception ignored) {
+                    }
                 });
             }
         }
@@ -32,9 +35,9 @@ class KeystorePermsE2EIT {
 
     @Test
     void save_keypair_sets_700_600_on_unix() throws Exception {
-        String os = System.getProperty("os.name","").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase();
         String keyId = UserKeystore.todayKeyId();
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         char[] pass = "secret-pass".toCharArray();
 
         UserKeystore ks = new UserKeystore(tmpRoot);

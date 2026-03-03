@@ -31,7 +31,7 @@
 ┌─────────────────────────────────────────────────────────┐
 │ EncryptedMessage DTO                                    │
 │ - version, algorithm, senderId, recipientId             │
-│ - ciphertextB64, ivB64, tagB64, wrappedKeyB64           │
+│ - ciphertextB64, ivB64, tagB64, ephemeralPublicB64           │
 │ - contentType, contentLength, timestamp, ttl            │
 └───────────────────────────┬─────────────────────────────┘
                             │

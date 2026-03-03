@@ -89,10 +89,10 @@ WHERE expires_at <= NOW();
 ### validate(EncryptedMessage) → ValidationResult
 
 ### Validation rules
-- Required fields: `senderId`, `recipientId`, `ciphertextB64`, `ivB64`, `wrappedKeyB64`, `tagB64` όλα non-null και non-blank.
+- Required fields: `senderId`, `recipientId`, `ciphertextB64`, `ivB64`, `ephemeralPublicB64`, `tagB64` όλα non-null και non-blank.
 - Headers: `CLIENT_TIMESTAMP` και `TTL_MILLIS` must exist στο `message.headers`.
 - Base64 validation:
-    - `ciphertextB64`, `ivB64`, `wrappedKeyB64`, `tagB64` πρέπει να είναι valid Base64 (δοκιμή decode).
+    - `ciphertextB64`, `ivB64`, `ephemeralPublicB64`, `tagB64` πρέπει να είναι valid Base64 (δοκιμή decode).
     - Αν decode αποτύχει → `STRUCTURAL_INVALID`.
 - TTL expiry:
     - `expiresAtMs = clientTimestamp + ttlMillis`.

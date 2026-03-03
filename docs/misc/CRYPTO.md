@@ -210,7 +210,7 @@ public class EncryptedMessageDTO implements Serializable {
   public long ttlSeconds;
   public String algorithm;         // "AES-256-GCM+RSA-OAEP"
   public String ivB64;             // 12 bytes
-  public String wrappedKeyB64;     // RSA-OAEP
+  public String ephemeralPublicB64;     // RSA-OAEP
   public String ciphertextB64;     // AES-GCM ciphertext (without tag)
   public String tagB64;            // GCM tag 16 bytes
   public String contentType;       // "text/plain", "file/chunk"
@@ -246,7 +246,7 @@ dto.timestampEpochMs = System.currentTimeMillis();
 dto.ttlSeconds = 7 * 24 * 3600;
 dto.algorithm = "AES-256-GCM+RSA-OAEP";
 dto.ivB64 = CryptoManager.b64(iv);
-dto.wrappedKeyB64 = CryptoManager.b64(wrapped);
+dto.ephemeralPublicB64 = CryptoManager.b64(wrapped);
 dto.ciphertextB64 = CryptoManager.b64(out.ciphertext);
 dto.tagB64 = CryptoManager.b64(out.tag);
 dto.contentType = "text/plain";
@@ -269,7 +269,7 @@ Steps:
 Code:
 
 ```java
-SecretKey sess = CryptoManager.rsaUnwrapSessionKey(myPrivateKey, CryptoManager.unb64(dto.wrappedKeyB64));
+SecretKey sess = CryptoManager.rsaUnwrapSessionKey(myPrivateKey, CryptoManager.unb64(dto.ephemeralPublicB64));
 byte[] pt = CryptoManager.aesGcmDecrypt(
   CryptoManager.unb64(dto.ciphertextB64),
   CryptoManager.unb64(dto.tagB64),

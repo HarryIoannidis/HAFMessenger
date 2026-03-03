@@ -14,7 +14,7 @@
 - Transmits via `WebSocketAdapter.sendText(json)`.
 
 ### Security rules
-- Does not log payloads (ciphertextB64, wrappedKeyB64, ivB64, tagB64).
+- Does not log payloads (ciphertextB64, ephemeralPublicB64, ivB64, tagB64).
 - Logs only identifiers: senderId, recipientId, timestamp, error types.
 - Validation failure → exception, not silent drop.
 

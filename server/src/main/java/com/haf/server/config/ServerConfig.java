@@ -26,6 +26,7 @@ public final class ServerConfig {
 
     private final int httpPort;
     private final int wsPort;
+    private final String adminPublicKeyPem;
 
     /**
      * Loads the server configuration from environment variables or a .env file.
@@ -64,6 +65,7 @@ public final class ServerConfig {
 
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
         this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
+        this.adminPublicKeyPem = env.getOrDefault("HAF_ADMIN_PUBLIC_KEY", null);
     }
 
     /**
@@ -144,6 +146,15 @@ public final class ServerConfig {
      */
     public int getWsPort() {
         return wsPort;
+    }
+
+    /**
+     * Returns the Admin's X25519 Public Key PEM string, or {@code null} if not
+     * configured.
+     * Clients fetch this key to E2E-encrypt registration photos for admin review.
+     */
+    public String getAdminPublicKeyPem() {
+        return adminPublicKeyPem;
     }
 
     /**
