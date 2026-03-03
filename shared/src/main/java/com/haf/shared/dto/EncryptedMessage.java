@@ -35,6 +35,7 @@ public class EncryptedMessage implements Serializable {
     public String contentType;
     public long contentLength;
     public boolean e2e = true;
+
     @JsonIgnore
     public String aadB64;
 }

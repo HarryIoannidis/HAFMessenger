@@ -1,15 +1,4 @@
-## ViewModels
-
-### Purpose
-- ViewModels provide a separation between UI (Controllers) and business logic/data operations.
-- Expose observable properties for two-way binding with JavaFX UI components.
-- Coordinate background operations (network, file I/O) and update UI properties on FX thread.
-- Enable testability by isolating business logic from JavaFX dependencies.
-
-### Architecture pattern
-- **MVVM (Model-View-ViewModel)**: Controllers (View) bind to ViewModel properties, ViewModel coordinates with Models/Services.
-- **Observable properties**: JavaFX `StringProperty`, `DoubleProperty`, `BooleanProperty`, `ObservableList` for reactive UI updates.
-- **Thread safety**: Background operations run off FX thread, UI updates via `Platform.runLater()` or `Task` property updates.
+# VIEWMODELS
 
 ## SplashViewModel
 
@@ -35,17 +24,47 @@
 ### Dependency injection
 - Constructor accepts functional interfaces: `ConfigLoader`, `CryptoInitializer`, `ResourceChecker`, `NetworkChecker`.
 - `createDefault()`: Factory method creating ViewModel with default implementations.
-- Enables testing with mock dependencies (see `SplashViewModelTest`).
 
-### Threading
-- Bootstrap steps run on background thread (`Thread` with name "splash-bootstrap").
-- UI property updates via `Task` properties (automatically synchronized to FX thread).
-- Callbacks executed on FX thread via `Task.setOnSucceeded()` / `Task.setOnFailed()`.
+---
 
-### Testing
-- Unit tests inject mock dependencies to test success/failure paths.
-- Verify property updates, callback invocations, error state transitions.
-- See `SplashViewModelTest` for examples.
+## LoginViewModel
+
+### Purpose
+- Handles login form validation and state management.
+- Exposes observable properties for email/password validation errors and login status.
+
+### Properties
+- `emailProperty()`: Bound to email input field.
+- `passwordProperty()`: Bound to password input field.
+- `emailErrorProperty()`: Boolean, true when email validation fails.
+- `passwordErrorProperty()`: Boolean, true when password validation fails.
+- `statusProperty()`: Current login status message.
+
+### Validation
+- `validate()`: Validates email format and password requirements.
+    - Email: non-empty, valid format.
+    - Password: non-empty, minimum length.
+    - Sets error properties and returns boolean.
+
+---
+
+## RegisterViewModel
+
+### Purpose
+- Handles multi-step registration validation and state management.
+- Validates personal info fields, password, and photo uploads across steps.
+
+### Properties
+- Personal info: `fullNameProperty()`, `regNumberProperty()`, `idNumberProperty()`, `rankProperty()`, `telephoneProperty()`, `emailProperty()`.
+- Password: `passwordProperty()`, `confirmPasswordProperty()`.
+- Error properties: `*ErrorProperty()` for each field.
+- `currentStepProperty()`: Current step in the registration flow (1-4).
+
+### Validation
+- Step 1: Personal information (name, reg number, ID, rank, telephone, email).
+- Step 2: Password and confirmation (match, strength).
+- Step 3: ID photo (file selected, valid format).
+- Step 4: Selfie photo (file selected, valid format).
 
 ---
 
@@ -57,8 +76,8 @@
 - Exposes status property for operation feedback.
 
 ### Properties
-- `statusProperty()`: Current operation status ("Ready", "Message sent to X", "Receiving messages...", etc.).
-- `getMessages()`: Observable list of message strings for display.
+- `statusProperty()`: Current operation status ("Ready", "Message sent to X", etc.).
+- `getMessages()`: Observable list of `MessageVM` records for display.
 
 ### Dependencies
 - `MessageSender`: Sends encrypted messages to recipients.
@@ -68,49 +87,31 @@
 - `sendTextMessage(String recipientId, String messageText)`:
     - Encodes text to bytes, calls `messageSender.sendMessage()`.
     - Updates status and adds message to list on FX thread.
-    - Handles exceptions, updates status with error message.
-- `startReceiving()`:
-    - Starts message receiver, updates status.
-    - Errors handled with status update.
-- `stopReceiving()`:
-    - Stops message receiver, updates status.
+- `startReceiving()` / `stopReceiving()`: Controls message receiver.
 
 ### Message listener
 - `MessageReceiver.MessageListener` registered in constructor.
 - `onMessage()`: Handles incoming messages, adds to list on FX thread.
-- `onError()`: Handles errors, updates status and adds error message to list.
-- All UI updates via `Platform.runLater()` (receiver callbacks may run on background thread).
-
-### Threading
-- Network operations (`sendMessage()`, `start()`, `stop()`) may block or run on background threads.
-- UI updates always on FX thread via `Platform.runLater()`.
-- Observable list updates trigger UI refresh automatically (JavaFX binding).
-
-### Security rules
-- Does not log message payloads (only sender ID, recipient ID, status).
-- Error messages do not expose sensitive details (network internals, encryption failures).
+- `onError()`: Handles errors, updates status.
+- All UI updates via `Platform.runLater()`.
 
 ---
 
-### ViewModel best practices
+## ViewModel Best Practices
 
 ### Property binding
 - Expose properties via getter methods: `statusProperty()`, `progressProperty()`.
-- Use `SimpleStringProperty`, `SimpleDoubleProperty`, `ReadOnlyStringWrapper` for mutable/read-only properties.
-- Bind derived properties: `percentageProperty()` bound to `progressProperty()` with formatting.
+- Use `SimpleStringProperty`, `SimpleDoubleProperty`, `ReadOnlyStringWrapper`.
 
 ### Thread safety
-- Background operations: use `Task<Void>` or `ExecutorService` for long-running work.
-- UI updates: use `Platform.runLater()` or `Task` property updates (`updateMessage()`, `updateProgress()`).
-- Observable collections: `FXCollections.observableArrayList()` for thread-safe list updates (update on FX thread).
+- Background operations: use `Task<Void>` or `ExecutorService`.
+- UI updates: use `Platform.runLater()` or `Task` property updates.
+- Observable collections: update on FX thread.
 
 ### Error handling
-- Catch exceptions in background operations, update status property with error message.
-- Invoke error callbacks on FX thread for UI dialogs/alerts.
+- Catch exceptions in background operations, update status property.
 - Do not expose internal exceptions to UI (wrap in user-friendly messages).
 
 ### Testing
-- Dependency injection: accept interfaces/services in constructor for mocking.
+- Dependency injection for mocking.
 - Test property updates, callback invocations, error handling.
-- Mock dependencies to simulate success/failure scenarios.
-

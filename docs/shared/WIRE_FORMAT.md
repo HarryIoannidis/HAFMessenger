@@ -1,9 +1,12 @@
+# WIRE_FORMAT
+
 ### Purpose
 - Documents the wire format and validation policies for EncryptedMessage.
 
 ### Version and Profile
 - Version: 1
-- Algorithm profile: AES‑256‑GCM + RSA‑OAEP (SHA‑256/MGF1)
+- Algorithm profile: AES-256-GCM with X25519 ECDH key agreement + SHA-256 KDF
+- Wire string: `"AES-256-GCM+RSA-OAEP"` (legacy, kept for backward compatibility)
 
 ### GCM Parameters
 - IV (nonce): 12 bytes, ivB64 field (Base64)
@@ -12,6 +15,7 @@
 ### Envelope Fields (DTO)
 - Required: version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, ephemeralPublicB64, ciphertextB64, tagB64, contentType, contentLength
 - Optional: e2e
+- ephemeralPublicB64: sender's ephemeral X25519 public key in DER/Base64 (used for ECDH key agreement, not a wrapped key)
 - contentLength: non-negative, equal to bytes plaintext
 
 ### Content type policy
@@ -37,6 +41,5 @@
 - Deserialization: JsonCodec.fromJson(json)
 - Decoding Accuracy:
     - FAIL_ON_UNKNOWN_PROPERTIES = true (fail on unknown fields)
-    - REQUIRE_SETTERS_FOR_GETTERS = true or explicit @JsonProperty for Required fields
-    - Null strings rejected· An empty value is allowed only where specified
+    - Null strings rejected; An empty value is allowed only where specified
     - Checking types/bounds: numbers within bounds, Base64 fields decodable, IV/tag of exact lengths

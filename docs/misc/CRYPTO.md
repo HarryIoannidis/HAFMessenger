@@ -1,12 +1,12 @@
-# Encryption and Security (Implementation Guide)
+# CRYPTO
 
 ### Core objective
 - End-to-end encryption between clients with AES-256-GCM for content and per-message IVs, including integrity verification (GCM tag).
-- Key exchange/wrapping with RSA-OAEP (default 4096-bit keys, minimum 2048-bit), with no server-side decryption of content.
+- Key exchange/wrapping with X25519 ECDH (default 4096-bit keys, minimum 2048-bit), with no server-side decryption of content.
 - TLS 1.3 with certificate pinning at the transport layer, separate from E2E.
 - Storage of ciphertext blobs and metadata only, with TTL/automatic deletion.
 
-***
+---
 
 ### E2E architecture
 
@@ -14,7 +14,7 @@
     - Generates a new random 12-byte IV (96-bit, per NIST recommendation for GCM).
     - Encrypts the payload with AES-256-GCM and stores a 128-bit tag.
     - Uses a session key (symmetric encryption key) that changes per conversation/session for session-level forward secrecy.
-    - Wraps the session key with the recipient’s RSA public key (or multi-recipient envelope for group chats).
+    - Wraps the session key with the recipient’s X25519 public key (or multi-recipient envelope for group chats).
 - The server:
     - Does not decrypt content, only routes and stores ciphertext with TTL metadata.
 - The transport:
@@ -23,12 +23,12 @@
 Logical flow diagram:
 - Client A: Plaintext → AES-256-GCM(IV, SessionKey) → Ciphertext+Tag → Envelope RSA(pubB, SessionKey) → Packet(header, envelope, ciphertext, tag, meta) → TLS → Server (store/route) → TLS → Client B → Unwrap RSA(privB) → Decrypt AES-GCM → Plaintext.
 
-***
+---
 
 ### Message packet format
 
 - Header: version, algorithm id, sender, recipient, timestamp, TTL.
-- EncryptedKey: RSA-OAEP wrapping of the session key to the recipient.
+- EncryptedKey: X25519 ECDH wrapping of the session key to the recipient.
 - EncryptedPayload: AES-256-GCM ciphertext.
 - Tag: GCM authentication tag.
 - Meta: IV, content-type, size, E2E=true flag.
@@ -36,7 +36,7 @@ Logical flow diagram:
 Database (server) stores:
 - messages(id, senderId, receiverId, contentBlob, contentMeta, timestamp, ttl). Always encrypted.
 
-***
+---
 
 ### Key and storage policies
 
@@ -45,7 +45,7 @@ Database (server) stores:
 - No permanent storage of sensitive data on the client unless required by policy.
 - Test/Dev: separate test keystores, never production secrets in the repo.
 
-***
+---
 
 ### TLS and pinning
 
@@ -53,7 +53,7 @@ Database (server) stores:
 - Pin failure → block connection and show clear error/diagnostic.
 - In testing, boot IT server with test CA and pinned cert.
 
-***
+---
 
 ### Authentication and 2FA
 
@@ -61,7 +61,7 @@ Database (server) stores:
 - TOTP and optional WebAuthn/FIDO2 where required.
 - Rate limiting, lockout, and auditing.
 
-***
+---
 
 ### File load
 
@@ -69,7 +69,7 @@ Database (server) stores:
 - Server-side anti-malware policy and filename sanitization.
 - TTL and automatic deletion of encrypted blobs.
 
-***
+---
 
 ### Best practices
 
@@ -79,7 +79,7 @@ Database (server) stores:
 - Certificate pinning on all network calls and background services.
 - Minimal metadata transfer, no sensitive fields in logs.
 
-***
+---
 
 ## Implementation – Step by step
 
@@ -88,7 +88,7 @@ Database (server) stores:
 - Enable JCA/BouncyCastle providers (where required) at bootstrap.
 - Create CryptoManager with:
     - AES-256-GCM encrypt/decrypt.
-    - RSA-OAEP wrap/unwrap of session keys.
+    - X25519 ECDH wrap/unwrap of session keys.
     - SecureRandom for IV/nonce.
 
 Code (simplified):
@@ -114,7 +114,7 @@ public final class CryptoManager {
   private static final int IV_BYTES = 12;
 
   private static final String RSA = "RSA";
-  private static final String RSA_OAEP = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
+  private static final String RSA_OAEP = "XDH (X25519 ECDH)";
   private static final SecureRandom RNG = new SecureRandom();
 
   public static SecretKey newSessionKey() throws Exception {
@@ -190,7 +190,7 @@ Implementation best practices:
 - Use SecureRandom for IV, never counters.
 - OAEP with SHA-256/MGF1 for RSA wrap.
 
-***
+---
 
 ### 2) Define DTO/Packet (shared)
 
@@ -208,9 +208,9 @@ public class EncryptedMessageDTO implements Serializable {
   public String recipientId;
   public long timestampEpochMs;
   public long ttlSeconds;
-  public String algorithm;         // "AES-256-GCM+RSA-OAEP"
+  public String algorithm;         // "AES-256-GCM+X25519 ECDH"
   public String ivB64;             // 12 bytes
-  public String ephemeralPublicB64;     // RSA-OAEP
+  public String ephemeralPublicB64;     // X25519 ECDH
   public String ciphertextB64;     // AES-GCM ciphertext (without tag)
   public String tagB64;            // GCM tag 16 bytes
   public String contentType;       // "text/plain", "file/chunk"
@@ -219,7 +219,7 @@ public class EncryptedMessageDTO implements Serializable {
 }
 ```
 
-***
+---
 
 ### 3) Send pipeline (client ViewModel → network)
 
@@ -227,7 +227,7 @@ Steps:
 - Create a session key if there is no active one for the conversation.
 - Fill a new 12-byte IV.
 - AES-256-GCM encrypt the payload, splitting out the tag.
-- RSA-OAEP wrap the session key with the recipient’s public key.
+- X25519 ECDH wrap the session key with the recipient’s public key.
 - Populate EncryptedMessageDTO and send via TLS WebSocket/TCP.
 
 Code (brief):
@@ -244,7 +244,7 @@ dto.senderId = myId;
 dto.recipientId = peerId;
 dto.timestampEpochMs = System.currentTimeMillis();
 dto.ttlSeconds = 7 * 24 * 3600;
-dto.algorithm = "AES-256-GCM+RSA-OAEP";
+dto.algorithm = "AES-256-GCM+X25519 ECDH";
 dto.ivB64 = CryptoManager.b64(iv);
 dto.ephemeralPublicB64 = CryptoManager.b64(wrapped);
 dto.ciphertextB64 = CryptoManager.b64(out.ciphertext);
@@ -256,13 +256,13 @@ dto.e2e = true;
 network.send(dto); // over TLS with pinning
 ```
 
-***
+---
 
 ### 4) Receive pipeline (client)
 
 Steps:
 - Verify pinning and DTO integrity.
-- RSA-OAEP unwrap wrappedKey with the recipient’s private key (OS keystore).
+- X25519 ECDH unwrap wrappedKey with the recipient’s private key (OS keystore).
 - AES-GCM decrypt using iv, ciphertext, tag.
 - Reject if decryption fails (GCM AuthFail).
 
@@ -279,7 +279,7 @@ byte[] pt = CryptoManager.aesGcmDecrypt(
 // Forward to UI
 ```
 
-***
+---
 
 ### 5) Server handlers
 
@@ -287,7 +287,7 @@ byte[] pt = CryptoManager.aesGcmDecrypt(
 - Stores only ciphertext/tag/iv/wrappedKey and meta, with E2E flag and TTL policy.
 - Never decrypts content. Adds audit event with no plaintext.
 
-***
+---
 
 ### 6) Password and key security
 
@@ -295,7 +295,7 @@ byte[] pt = CryptoManager.aesGcmDecrypt(
 - Private keys: OS keystore where possible, export-protected.
 - Memory clearing where feasible, no logging of sensitive byte arrays.
 
-***
+---
 
 ## Testing and verification
 
@@ -321,7 +321,7 @@ void aes256Gcm_known_answer() throws Exception {
 
 IT negative test (server never decrypts): checks that the DB contains only ciphertext and that there are no plaintext traces.
 
-***
+---
 
 ## Alternative options
 
@@ -329,7 +329,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - Instead of only GCM: AES-256-GCM is preferred, but future support for ChaCha20-Poly1305 is allowed for devices without AES-NI.
 - Server-assisted key agreement: possibility for server-signed key exchange metadata without access to content, while remaining E2E.
 
-***
+---
 
 ## Operational policies
 
@@ -337,7 +337,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - Self-destructing messages: client UI timer + server TTL.
 - Audit logging: encrypted events, no plaintext.
 
-***
+---
 
 ## Integration into Workflow/Scenes
 
@@ -346,7 +346,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - Chat send: CryptoPipeline.encryptAndSend with GCM, per-message IV, session key cache.
 - File send: encrypt-and-upload with chunking and reference forwarding.
 
-***
+---
 
 ## Common mistakes and mitigation
 
@@ -355,13 +355,13 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - Logging sensitive data: forbidden, use redaction.
 - Pinning not enabled: fix in network stack, block handshake.
 
-***
+---
 
 ## Checklists
 
 - Client
     - JCA providers loaded at bootstrap.
-    - AES-256-GCM OK, RSA-OAEP OK, SecureRandom OK.
+    - AES-256-GCM OK, X25519 ECDH OK, SecureRandom OK.
     - OS keystore for private keys.
     - TLS pinning on all endpoints.
 
@@ -375,7 +375,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
     - DTO schema contracts locked.
     - “Never decrypt server” IT passes.
 
-***
+---
 
 ## Immediate implementation items
 
@@ -384,7 +384,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - Pinning in Network.quickTlsCheck and all WebSocket/TCP flows.
 - IT tests for TLS+pinning+TTL.
 
-***
+---
 
 # EXPLANATION
 ### What we are doing in simple terms
@@ -413,7 +413,7 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
     - Use TLS 1.3 and pinning for the connection. If the check fails, block.
 
 ### Preset configurations (do not change them)
-- Algorithms: AES-256-GCM for messages, RSA-OAEP for the “message key”, TLS 1.3 for the connection.
+- Algorithms: AES-256-GCM for messages, X25519 ECDH for the “message key”, TLS 1.3 for the connection.
 - IV: always a new random 12 bytes for each message.
 - Server: never unlocks content, stores only locked blobs with lifetime (TTL).
 
@@ -427,29 +427,29 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - EncryptedMessageDTO: the common “packet schema” that flows from client → server → client.
 - Network layer: enabled TLS pinning at bootstrap and in sends.
 
-***
+---
 
 # ENCRYPTION FLOW
 
-***
+---
 
 ### 1. Basic principles
 
 - End-to-end encryption: Only the sender and intended recipient can read the message; no one else, not even the server, can decrypt the content.
 - Main algorithms:
     - Symmetric encryption (AES-256-GCM): the message itself is encrypted with a random, unique key.
-    - Asymmetric encryption (RSA-OAEP): that key is locked (wrapped) for each recipient with their public key.
+    - Asymmetric encryption (X25519 ECDH): that key is locked (wrapped) for each recipient with their public key.
 
-***
+---
 
 ### 2. Prerequisites (before sending)
 
 - Each user has:
-    - A long-term RSA key pair: (private key kept secret, public key shareable).
+    - A long-term X25519 key pair: (private key kept secret, public key shareable).
     - The device stores the private key securely.
 - The sender’s application has the recipient’s public key.
 
-***
+---
 
 ### 3. Composition and encryption (Sender)
 
@@ -458,12 +458,12 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 3. The application generates a random AES-256 ‘session’ key only for this message.
 4. A random 12-byte IV is generated.
 5. Encryption with AES-256-GCM: (text, key, IV, metadata as AAD).
-6. Wrap the session key with the recipient’s RSA public key.
+6. Wrap the session key with the recipient’s X25519 public key.
 7. Create the packet (EncryptedMessage DTO) with all fields Base64 encoded.
 8. Execute validity check (MessageValidator).
 9. Convert to JSON and send over secure TLS channel.
 
-***
+---
 
 ### 4. Handling by the server
 
@@ -471,19 +471,19 @@ IT negative test (server never decrypts): checks that the DB contains only ciphe
 - It performs basic validation and routing.
 - It applies policies, limits, and stores as-is.
 
-***
+---
 
 ### 5. Reception and decryption (Recipient)
 
 1. The client receives the JSON packet.
 2. Performs checks and reads fields.
 3. Decodes IV, wrappedKey, ciphertext, tag, and metadata.
-4. Unwraps the session key with the RSA private key.
+4. Unwraps the session key with the X25519 private key.
 5. Decrypts the message with AES-256-GCM, confirms integrity.
 6. Checks contentType and length to display correctly.
 7. On decryption error, the message becomes unreadable.
 
-***
+---
 
 ### 6. Flow diagram
 
@@ -491,14 +491,14 @@ Sender → Generates keys, encrypts, wraps keys, sends JSON.
 Server → Routes, stores, does not read.  
 Recipient → Receives, decrypts, displays.
 
-***
+---
 
 ### 7. Security guarantees
 
 - Neither the server nor any third party can read or silently alter the content.
 - Errors, tampering, or interception are rejected because of the AEAD tag.
 
-***
+---
 
 ### 8. Tips for newcomers
 
@@ -508,6 +508,6 @@ Recipient → Receives, decrypts, displays.
 - Base64 fields must have correct length or be rejected.
 - For multiple recipients, wrap the key separately.
 
-***
+---
 
 This flow ensures military-grade confidentiality and integrity, with only the end users having access to the content.

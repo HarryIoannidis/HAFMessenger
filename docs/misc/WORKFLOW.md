@@ -1,4 +1,4 @@
-# Workflows
+# WORKFLOW
 
 ## Core Workflows
 

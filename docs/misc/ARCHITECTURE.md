@@ -1,9 +1,9 @@
-# **ARCHITECTURE - HAF Messenger**
+# ARCHITECTURE
 
 > **Comprehensive Architecture Documentation**  
 > Architecture documentation for HAF Messenger - Military-Grade Secure Messaging System
 
-***
+---
 
 ## **Table of Contents**
 
@@ -18,7 +18,7 @@
 9. [Technology Stack](#9-technology-stack)
 10. [Development Best Practices](#10-development-best-practices)
 
-***
+---
 
 ## **1. System Overview**
 
@@ -28,7 +28,7 @@ HAF Messenger is an **end-to-end encrypted messaging system** designed for milit
 - **Java Server** (Layered architecture)
 - **MySQL Database** (persistent storage)
 - **TLS 1.3** (transport security)
-- **AES-256-GCM + RSA-OAEP (SHA-256/MGF1), key sizes 2048–4096 (default 2048)** (end-to-end encryption)
+- **AES-256-GCM + X25519 ECDH (SHA-256/MGF1), key sizes 2048–4096 (default 2048)** (end-to-end encryption)
 
 ### **High-Level Architecture**
 
@@ -59,7 +59,7 @@ HAF Messenger is an **end-to-end encrypted messaging system** designed for milit
 | **Security by Design** | Encryption everywhere, TLS 1.3 only | Military-grade protection |
 | **Observable Systems** | Structured logs, metrics tracking | Production visibility |
 
-***
+---
 
 ## **2. Client Architecture: MVVM Pattern**
 
@@ -228,7 +228,7 @@ public record User(
 4. **ViewModel** updates **Observable Properties**
 5. **View** automatically updates via data binding
 
-***
+---
 
 ## **3. Server Architecture: Layered Design**
 
@@ -964,7 +964,7 @@ public class WebSocketIngressServer implements MailboxSubscriber {
 }
 ```
 
-***
+---
 
 ## **6. Security Architecture**
 
@@ -1041,9 +1041,9 @@ HttpsConfigurator configurator = new HttpsConfigurator(sslContext) {
 ```
 1. Sender generates random AES-256 key
 2. Sender encrypts message with AES-256-GCM
-3. Sender wraps AES key with recipient's RSA-OAEP public key (default 2048-bit; supports 2048–4096)
+3. Sender wraps AES key with recipient's X25519 ECDH public key (default 2048-bit; supports 2048–4096)
 4. Send: {encryptedPayload, wrappedKey, iv, authTag}
-5. Recipient unwraps AES key with their RSA private key
+5. Recipient unwraps AES key with their X25519 private key
 6. Recipient decrypts message with AES-256-GCM
 ```
 
@@ -1054,7 +1054,7 @@ public record EncryptedMessage(
     String senderId,
     String recipientId,
     byte[] encryptedPayload,  // AES-256-GCM encrypted
-    byte[] wrappedKey,         // RSA-OAEP (default 2048-bit; supports 2048–4096) wrapped AES key
+    byte[] wrappedKey,         // X25519 ECDH (default 2048-bit; supports 2048–4096) wrapped AES key
     byte[] iv,                 // 12-byte nonce
     byte[] authTag,            // 16-byte authentication tag
     String contentType,
@@ -1196,7 +1196,7 @@ auditLogger.logError(action, requestId, userId, exception);
 | **Audit Everything** | Log all security events |
 | **Defense in Depth** | Multiple security layers |
 
-***
+---
 
 ## **7. Observability & Monitoring**
 
@@ -1263,7 +1263,7 @@ Logs can be sent to:
 - **CloudWatch Logs** (AWS monitoring)
 - **Grafana Loki** (lightweight log aggregation)
 
-***
+---
 
 ## **8. Design Patterns**
 
@@ -1350,7 +1350,7 @@ public class HttpIngressServer {
 }
 ```
 
-***
+---
 
 ## **9. Technology Stack**
 
@@ -1391,7 +1391,7 @@ public class HttpIngressServer {
 | **Maven Surefire** | Test execution |
 | **Maven Compiler** | Java 21 compilation |
 
-***
+---
 
 ## **10. Development Best Practices**
 
@@ -1525,7 +1525,7 @@ void acknowledge_records_delivery_latency() {
 }
 ```
 
-***
+---
 
 ## **Summary**
 
@@ -1544,7 +1544,7 @@ HAF Messenger follows **industry best practices** for secure, scalable, and main
 - **Security**: TLS 1.3 + E2E encryption
 - **Performance**: <500ms avg delivery latency
 
-***
+---
 
 **Document Version**: 1.0  
 **Last Updated**: 2025-11-19  

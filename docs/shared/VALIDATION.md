@@ -1,3 +1,5 @@
+# VALIDATION
+
 ### Purpose
 - Specifies rules and control steps for EncryptedMessage before decrypting.
 
@@ -14,7 +16,7 @@
 - contentLength: 0 ≤ length ≤ MAX_CONTENT_LENGTH.
 
 ### Time Policies
-- now ≤ timestampEpochMs + ttlSeconds· otherwise "Message expired".
+- now ≤ timestampEpochMs + ttlSeconds; otherwise "Message expired".
 - Optional: skew control, e.g. now + ALLOWED_SKEW ≥ timestampEpochMs.
 
 ### Recipient binding
