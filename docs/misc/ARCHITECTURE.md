@@ -1380,7 +1380,7 @@ public class HttpIngressServer {
 |------------|---------|
 | **TLS 1.3** | Transport security |
 | **AES-256-GCM** | Message encryption |
-| **RSA-4096** | Key exchange |
+| **X25519** | Key agreement |
 | **ECDHE** | Perfect forward secrecy |
 
 ### **Build Tools**

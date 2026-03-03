@@ -13,7 +13,7 @@
 ### Flows and checks
 - Bootstrap sequence (via `SplashViewModel.startBootstrap()`):
     1. Loading configuration (0.1): Reads version from manifest or `HAF_APP_VERSION` env var.
-    2. Initializing security modules (0.3): Verifies `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, `RSA/ECB/OAEPWithSHA-256AndMGF1Padding`, `SHA-256`.
+    2. Initializing security modules (0.3): Verifies `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, `X25519` key agreement, `SHA-256`.
     3. Checking local resources (0.6): Verifies `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/app_logo.png`, `/css/global.css` exist.
     4. Verifying network reachability (0.8): HEAD request to server endpoint (if `haf.server.url` or `HAF_SERVER_URL` configured).
     5. Ready (1.0): Navigates to login screen.
@@ -30,7 +30,7 @@
     - Dependency injection: `ConfigLoader`, `CryptoInitializer`, `ResourceChecker`, `NetworkChecker` interfaces.
 
 ### Security
-- Crypto initialization: Verifies strong providers (`SecureRandom.getInstanceStrong()`, AES-GCM, RSA-OAEP, SHA-256) before any encryption operations.
+- Crypto initialization: Verifies strong providers (`SecureRandom.getInstanceStrong()`, AES-GCM, X25519 ECDH, SHA-256) before any encryption operations.
 - Network check: HEAD request only (no credentials, minimal data transfer).
 - No sensitive information loaded: only version, resource paths, endpoint URL.
 - Error messages: do not expose internal paths or system details.

@@ -76,3 +76,23 @@ CREATE TABLE message_envelopes (
 ### Output
 - `ValidationResult(valid, reason, expiresAtMillis)`.
 - Reject codes: `STRUCTURAL_INVALID`, `TTL_EXPIRED`, `PAYLOAD_TOO_LARGE`, `MALFORMED_BASE64`.
+
+---
+
+## UserDAO
+
+### Purpose
+- Data Access Object for user accounts and authentication.
+- Handles user registration, lookup, and password verification based on BCrypt.
+
+## SessionDAO
+
+### Purpose
+- Data Access Object for user sessions.
+- Manages issuance, validation, and revocation of authentication tokens.
+
+## FileUploadDAO
+
+### Purpose
+- Data Access Object for E2E-encrypted file uploads.
+- Stores opaque ciphertext blobs linked to message envelopes or user identities.

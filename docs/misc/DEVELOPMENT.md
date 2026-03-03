@@ -145,7 +145,7 @@ public class RequestDTO implements Serializable {
 ## **8. Secure the Communication (Crypto Layer)**
 
 * Use modules in `client/crypto/` and `server/crypto/` for encryption.
-* Apply **RSA** for key exchange and **AES** for message encryption.
+* Apply **X25519** for key agreement and **AES** for message encryption.
 * Store shared helpers (base64 encoding, key generation) in `shared/utils/`.
 
 ---

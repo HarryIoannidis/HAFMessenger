@@ -44,7 +44,7 @@ CREATE TABLE users (
     full_name VARCHAR(255) NOT NULL,
     joined_date DATE,
     telephone VARCHAR(50),
-    public_key_fingerprint VARCHAR(64) NOT NULL UNIQUE,    -- SHA-256 of RSA public key
+    public_key_fingerprint VARCHAR(64) NOT NULL UNIQUE,    -- SHA-256 of X25519 public key
     public_key_pem TEXT NOT NULL,                          -- Base64-encoded SubjectPublicKeyInfo
     status ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
     role ENUM('USER', 'ADMIN', 'MODERATOR') DEFAULT 'USER',
@@ -73,7 +73,7 @@ CREATE TABLE message_envelopes (
     sender_id VARCHAR(64) NOT NULL,
     recipient_id VARCHAR(64) NOT NULL,
     encrypted_payload BLOB NOT NULL,                       -- AES-256-GCM ciphertext (Base64-decoded)
-    wrapped_key BLOB NOT NULL,                             -- RSA-OAEP wrapped session key
+    ephemeral_public BLOB NOT NULL,                        -- ephemeral X25519 public key
     iv VARBINARY(12) NOT NULL,                             -- 12-byte initialization vector
     auth_tag VARBINARY(16) NOT NULL,                       -- 128-bit GCM authentication tag
     aad_hash VARCHAR(64) NOT NULL,                         -- SHA-256 of AAD (header integrity)
@@ -238,7 +238,7 @@ CREATE TABLE users (
 - `user_id`: Unique identifier (UUID or internal ID).
 - `username`: Human-readable username (unique, case-sensitive).
 - `password_hash`: Argon2id hash (never store plaintext passwords).
-- `public_key_pem`: RSA-4096 public key in PEM format for message encryption.
+- `public_key_pem`: X25519 public key in PEM format for message encryption.
 - `key_fingerprint`: SHA-256 fingerprint of public key for verification.
 
 **Security:** Password hashes use Argon2id; public keys are write-once.
@@ -287,7 +287,7 @@ CREATE TABLE message_envelopes (
     iv_b64 VARCHAR(255) NOT NULL,
     wrapped_key_b64 TEXT NOT NULL,
     tag_b64 VARCHAR(255) NOT NULL,
-    algorithm VARCHAR(50) NOT NULL DEFAULT 'AES-256-GCM+RSA-OAEP',
+    algorithm VARCHAR(50) NOT NULL DEFAULT 'AES-256-GCM+RSA-OAEP', -- legacy wire string
     content_type VARCHAR(100),
     client_timestamp_ms BIGINT NOT NULL,
     ttl_seconds INT NOT NULL,
@@ -303,7 +303,7 @@ CREATE TABLE message_envelopes (
 - `sender_id` / `recipient_id`: User IDs.
 - `ciphertext_b64`: Base64-encoded AES-GCM encrypted payload.
 - `iv_b64`: Base64-encoded 12-byte IV.
-- `wrapped_key_b64`: Base64-encoded RSA-OAEP wrapped AES key.
+- `ephemeral_public_b64`: Base64-encoded ephemeral X25519 public key.
 - `tag_b64`: Base64-encoded 16-byte GCM tag.
 - `expires_at`: Computed expiry (`FROM_UNIXTIME((client_timestamp_ms + ttl_seconds * 1000) / 1000)`).
 
@@ -875,7 +875,7 @@ ALTER TABLE users DROP COLUMN username;
 
 #### Blue-Green Database Deployment (Major Schema Overhaul)
 
-**Scenario:** Change encryption algorithm from RSA-OAEP to Kyber1024 (post-quantum)
+**Scenario:** Change encryption algorithm from X25519 ECDH to Kyber1024 (post-quantum)
 
 ```sql
 -- Step 1: Create parallel table

@@ -60,7 +60,7 @@ haf-messenger/
 ## **Client**
 
 The client represents the presentation layer, implemented in **JavaFX**, following the **MVVM** pattern to separate the presentation from the logic and data models.
-Encryption is applied on the client side (AES-256 for content, RSA for key exchange), and no sensitive data are permanently stored on the workstation.
+Encryption is applied on the client side (AES-256 for content, X25519 for key exchange), and no sensitive data are permanently stored on the workstation.
 The networking stack uses **TLS/WebSocket** for secure communication and integrates **2FA** (TOTP, WebAuthn/FIDO2).
 
 **Folder structure:**
@@ -87,7 +87,7 @@ client/
 * **ui/**: FXML views and loaders for the JavaFX UI, without business logic.
 * **controllers/**: Connects UI with ViewModel, handles events and validation.
 * **viewmodel/**: MVVM bindings, business state, and commands for the views.
-* **crypto/**: AES-256 content encryption, RSA key exchange, and key management.
+* **crypto/**: AES-256 content encryption, X25519 key agreement, and key management.
 * **network/**: TLS/WebSocket client, sending/receiving packets with E2E encryption.
 * **models/**: Object definitions such as User, Message, Session, independent of the UI.
 * **utils/**: Logging, configuration, and shared helper functions.
@@ -451,7 +451,7 @@ Limiting exports to the minimum necessary APIs and selective opens only to javaf
 - Build from the root with mvn -am -pl shared,client,server verify to verify the client↔shared and server↔shared dependency chain without a direct client↔server link.
 
 ### Theory, options, and security issues
-- The Client–Server–Shared distinction enforces a pure data contract and allows E2E crypto to the client with RSA key exchange and AES content, while the server only handles metadata and policies without content decryption.
+- The Client–Server–Shared distinction enforces a pure data contract and allows E2E crypto to the client with X25519 key agreement and AES content, while the server only handles metadata and policies without content decryption.
 - Transport alternatives are raw TCP with framing or WebSocket over TLS, where WebSocket facilitates duplex messaging and connectivity checks in a firewall environment, while raw TCP gives a lower overhead but requires your own heartbeat and backpressure.
 - Common issues include incorrect exports/opens blocking FXML loading, mixing UI/logic on the controller instead of ViewModel, and double DTO definition on client/server instead of shared share, leading to protocol incompatibilities.
 
@@ -682,7 +682,7 @@ public class LoginHandler {
 
 ### **2.3 crypto**
 
-Server-side encryption, key management, and decryption (RSA, AES).
+Server-side encryption, key management, and decryption (X25519, AES).
 
 
 

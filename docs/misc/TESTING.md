@@ -107,7 +107,7 @@ haf-messenger/
 This example shows the intent, test design, and representative code to add tests, run them, and evaluate success.
 
 - Intent
-  - When user sends a message, the client must AES‑256‑GCM encrypt content and wrap the key with RSA; the server must accept the DTO, store only the opaque ciphertext blob with TTL, and never decrypt content; UI shows sent status upon server ACK.
+  - When user sends a message, the client must AES‑256‑GCM encrypt content and derive key via X25519 ECDH; the server must accept the DTO, store only the opaque ciphertext blob with TTL, and never decrypt content; UI shows sent status upon server ACK.
 
 - Tests to add
   - Shared unit: MessageDTO serialize/deserialize, size limits, and required fields; CryptoUtils AES‑GCM vector.
