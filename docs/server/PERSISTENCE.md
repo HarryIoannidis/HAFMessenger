@@ -1,69 +1,78 @@
-## Persistence
-
-### Purpose
-- Database access layer for message_envelopes and related persistence concerns.
-
-***
+# PERSISTENCE
 
 ## EnvelopeDAO
 
 ### Purpose
-- JDBC-based persistence for `message_envelopes` table.
+- Data Access Object for encrypted message envelopes in MySQL.
+- Handles insert, fetch, delivery status update, and TTL-based expiration.
+- Never decrypts message content (zero-knowledge storage).
 
-### Responsibilities
-- Insert validated `EncryptedMessage` into DB.
-- Fetch envelopes by recipient for delivery.
-- Mark delivered and delete expired envelopes (TTL cleanup).
-- Thread-safe via HikariCP connection pooling.
+### Database schema
+```sql
+CREATE TABLE message_envelopes (
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sender_id    VARCHAR(128)  NOT NULL,
+    recipient_id VARCHAR(128)  NOT NULL,
+    payload      LONGBLOB      NOT NULL,
+    aad_hash     CHAR(64)      NOT NULL,
+    created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at   TIMESTAMP     NOT NULL,
+    delivered    BOOLEAN       NOT NULL DEFAULT FALSE,
+    INDEX idx_recipient (recipient_id, delivered, expires_at)
+);
+```
 
-### Database schema (current)
-- Table: `message_envelopes`
-    - `envelope_id` VARCHAR(64) PRIMARY KEY
-    - `sender_id` VARCHAR(64) NOT NULL
-    - `recipient_id` VARCHAR(64) NOT NULL
-    - `encrypted_payload` LONGBLOB NOT NULL
-    - `wrapped_key` BLOB NOT NULL
-    - `iv` VARBINARY(12) NOT NULL
-    - `auth_tag` VARBINARY(16) NOT NULL
-    - `aad_hash` VARCHAR(64) NOT NULL
-    - `content_type` VARCHAR(100) NOT NULL
-    - `content_length` INT NOT NULL
-    - `timestamp` BIGINT NOT NULL
-    - `ttl` INT NOT NULL
-    - `delivered` BOOLEAN DEFAULT FALSE
-    - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    - `expires_at` TIMESTAMP NOT NULL
+### Methods
 
-Notes:
-- `content_length` is INT (32-bit). DTO uses `long`.
-- Server stores encrypted payload and metadata only. It does not decrypt content.
+#### insert(EncryptedMessageDTO dto, long expiresAtMs) → long id
+- PreparedStatement with parameterized query.
+- Stores full JSON payload as BLOB.
+- Computes AAD hash (SHA-256 of canonical AAD bytes).
+- Sets `expires_at` from `timestampEpochMs + ttlSeconds * 1000`.
+- Returns generated ID.
 
-### insert(EncryptedMessage) → QueuedEnvelope
-- Performs INSERT with all fields.
-- Computes `expires_at` from `timestamp + ttl`.
-- Returns hydrated `QueuedEnvelope` DTO for routing.
-- Wraps SQL errors in `IllegalStateException` and logs via AuditLogger.
+#### fetchForRecipient(String recipientId) → List<EnvelopeRow>
+- `WHERE recipient_id = ? AND delivered = FALSE AND expires_at > NOW()`.
+- Returns list of pending envelopes ordered by `created_at`.
 
-### fetch(recipientId, limit) → List<QueuedEnvelope>
-- `WHERE recipient_id = ? AND delivered = FALSE AND expires_at > NOW()` ordered by `timestamp`.
-- Hydrates `EncryptedMessage` fields from row.
+#### fetchByIds(List<Long> ids) → List<EnvelopeRow>
+- `WHERE id IN (?)`.
+- Batch fetch for specific envelopes.
 
-### markDelivered(envelopeIds) → boolean
-- Sets `delivered = TRUE` for the given IDs.
+#### markDelivered(long id) → boolean
+- `UPDATE ... SET delivered = TRUE WHERE id = ?`.
+- Returns true if row was updated.
 
-### deleteExpired() → int deletedCount
-- Deletes rows with `expires_at < NOW()`.
+#### deleteExpired() → int
+- `DELETE FROM message_envelopes WHERE expires_at < NOW()`.
+- Returns number of deleted rows.
+- Called by scheduled cleanup job (every 5 minutes).
 
-***
+### Connection management
+- Uses HikariCP `DataSource` for connection pooling.
+- All methods use try-with-resources for `Connection` and `PreparedStatement`.
+- No connection leaks: `finally` block ensures cleanup.
 
-## EncryptedMessage Validation (ingress)
+### Security rules
+- **Zero-knowledge**: `payload` stored as opaque BLOB, never parsed or decrypted.
+- **Parameterized queries**: all SQL uses `PreparedStatement` (no string concatenation).
+- **AAD hash**: integrity verification without decryption.
+- **Audit**: all operations logged via `AuditLogger` (no payload content in logs).
+
+---
+
+## Ingress validation (EncryptedMessageValidator)
 
 ### Purpose
-- Pre-persistence validation for `EncryptedMessage` payloads before persistence.
+- Structural validation of incoming envelopes before persistence.
 
-### Rules (summary)
-- Required fields present and non-empty.
-- Base64 fields decodable; IV=12 bytes, tag=16 bytes.
-- TTL within bounds; not expired.
-- ContentType allowlist.
-- `algorithm` must match `MessageHeader.ALGO_AEAD`.
+### Checks
+- Required fields: `senderId`, `recipientId`, `ciphertextB64`, `ivB64`, `tagB64`, `ephemeralPublicB64`.
+- TTL: within `[MIN_TTL_SECONDS, MAX_TTL_SECONDS]`.
+- Payload size: `ciphertextB64.length() <= MAX_CIPHERTEXT_BASE64`.
+- Base64 fields: decodable without error.
+- Timestamp: not in future, not older than `MAX_TTL_SECONDS`.
+
+### Output
+- `ValidationResult(valid, reason, expiresAtMillis)`.
+- Reject codes: `STRUCTURAL_INVALID`, `TTL_EXPIRED`, `PAYLOAD_TOO_LARGE`, `MALFORMED_BASE64`.

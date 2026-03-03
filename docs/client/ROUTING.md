@@ -1,3 +1,5 @@
+# ROUTING
+
 ### Purpose
 - Centralized navigation utility for switching between FXML views in the JavaFX application.
 - Manages the primary application stage and handles style transitions (decorated/transparent).
@@ -10,31 +12,31 @@
 
 ### Navigation methods
 
-### switchTo(String fxmlPath)
+#### switchTo(String fxmlPath)
 - Switches to decorated window style (standard window with title bar).
 - If stage is currently transparent, recreates stage with `StageStyle.DECORATED`.
 - Loads FXML file, creates or updates scene, centers window, shows stage.
 - Throws `RuntimeException` if FXML file not found or load fails.
 
-### switchToTransparent(String fxmlPath)
+#### switchToTransparent(String fxmlPath)
 - Switches to transparent window style (custom window without OS decorations).
 - If stage is currently decorated, recreates stage with `StageStyle.TRANSPARENT`.
 - Sets scene fill to `Color.TRANSPARENT` for custom window styling.
 - Loads FXML file, creates scene, centers window, shows stage.
 - Throws `RuntimeException` if FXML file not found or load fails.
 
-### close()
+#### close()
 - Closes the main application stage.
 - Used for application exit (e.g., from error dialogs).
 
 ### Stage management
 
-### Stage registration
+#### Stage registration
 - `setMainStage(Stage stage)`: Called once during `ClientApp.start()`.
 - Stores stage reference for subsequent navigation calls.
 - Stage must be set before calling navigation methods.
 
-### Stage recreation
+#### Stage recreation
 - `recreateStage(StageStyle style)`: Private method for style transitions.
 - Closes current stage, creates new stage with specified style.
 - Preserves icons and title from previous stage.
@@ -77,4 +79,3 @@
 - Use `switchTo()` for main application screens (standard window).
 - Register stage early in application lifecycle (`ClientApp.start()`).
 - Handle navigation failures gracefully (show error dialog, allow retry/exit).
-

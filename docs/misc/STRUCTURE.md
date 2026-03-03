@@ -1,4 +1,4 @@
-# PROJECT FOLDERS
+# STRUCTURE
 
 ## **Project Structure**
 
@@ -184,7 +184,7 @@ docs/
 
 # FINAL TREE
 
-### Τελικό tree
+### Final tree
 
 ```
 haf-messenger/
@@ -403,7 +403,7 @@ Minimal poms are provided for pure separation, with Java 21 and JavaFX only on t
       <artifactId>shared</artifactId>
       <version>1.0.0</version>
     </dependency>
-    <!-- πρόσθεσε JDBC/WebSocket libs ανά επιλογή DB/μεταφοράς -->
+    <!-- add JDBC/WebSocket libs per DB/transport choice -->
   </dependencies>
 </project>
 ```
@@ -467,7 +467,7 @@ FXML (client/resources)
  -> ViewModel update 
  -> UI refresh
 ```
-Η ροή αυτή εφαρμόζεται για κάθε δυνατότητα σύμφωνα με το WORKFLOW, διασφαλίζοντας καθαρή οριοθέτηση και ευκολία δοκιμών end‑to‑end ανά feature.
+This flow is applied for every feature following the WORKFLOW, ensuring clean boundaries and ease of end‑to‑end testing per feature.
 
 ---
 # STRUCTURE BREAKDOWN

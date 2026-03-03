@@ -1,3 +1,5 @@
+# SPLASH
+
 ### Purpose
 - Performs controlled initialization of client subsystems (configuration, crypto, resources, network) before displaying the login screen.
 - Provides visual feedback via progress bar and status messages during bootstrap.
@@ -15,7 +17,7 @@
     - Falls back to "1.0.0" if no version detected.
 2. **Crypto initialization** (progress: 0.3):
     - `CryptoInitializer.initialize()`: Verifies availability of cryptographic providers.
-    - Checks: `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, `RSA/ECB/OAEPWithSHA-256AndMGF1Padding`, `SHA-256`.
+    - Checks: `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, X25519/XDH key agreement, `SHA-256`.
     - Throws exception if any provider unavailable (prevents runtime crypto failures).
 3. **Resource verification** (progress: 0.6):
     - `ResourceChecker.verify()`: Ensures required FXML, images, and CSS files exist.
@@ -56,30 +58,16 @@
     - Dialog options: Retry (restarts bootstrap) or Exit (closes application).
 - Resource missing:
     - `ResourceChecker` throws `IOException` with descriptive path.
-    - Error message displayed in dialog: "Login view missing at /fxml/login.fxml".
-- Network failure:
-    - `NetworkChecker` throws `IOException` with server status or connection error.
-    - Error message: "Server unreachable, status 503" or "Failed to check server reachability".
 - Crypto provider unavailable:
-    - `CryptoInitializer` throws `NoSuchAlgorithmException` or `NoSuchProviderException`.
-    - Error message displayed, prevents application from running with weak crypto.
+    - `CryptoInitializer` throws `NoSuchAlgorithmException`.
+    - Error message displayed, prevents application from running with missing X25519/AES-GCM support.
 
 ### Threading
 - Bootstrap steps run on background thread (`Thread` with name "splash-bootstrap").
 - UI updates via `Task.updateMessage()` and `Task.updateProgress()` (thread-safe property updates).
 - Success/failure callbacks executed on FX thread via `Task.setOnSucceeded()` / `Task.setOnFailed()`.
-- Error dialog shown on FX thread (JavaFX `Alert` requires FX thread).
 
 ### Security rules
 - No sensitive data loaded during bootstrap (only version, resource paths, endpoint URL).
-- Crypto initialization verifies strong providers before any encryption operations.
+- Crypto initialization verifies X25519 and AES-GCM providers before any encryption operations.
 - Network check uses HEAD request (no credentials, minimal data transfer).
-- Error messages do not expose internal paths or system details to end users.
-
-### Testing
-- `SplashViewModelTest`: Unit tests with mock dependencies.
-    - Happy path: all steps succeed, progress reaches 1.0, success callback invoked.
-    - Failure path: each step can throw exception, error callback invoked with exception.
-    - Message ordering: status updates appear in correct sequence.
-- Dependency injection: ViewModel accepts functional interfaces for easy mocking.
-

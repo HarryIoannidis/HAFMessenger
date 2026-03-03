@@ -213,7 +213,7 @@ CREATE TABLE file_uploads (
 - No PII stored in plaintext; all message content is end-to-end encrypted.
 - Phase 5 focuses on: `users`, `sessions`, `message_envelopes`, `audit_logs`, `rate_limits`, `file_uploads`.
 
-***
+---
 
 ### users
 
@@ -243,7 +243,7 @@ CREATE TABLE users (
 
 **Security:** Password hashes use Argon2id; public keys are write-once.
 
-***
+---
 
 ### sessions
 
@@ -271,7 +271,7 @@ CREATE TABLE sessions (
 
 **Security:** Tokens hashed before storage; expired sessions cleaned via background task.
 
-***
+---
 
 ### message_envelopes
 
@@ -309,7 +309,7 @@ CREATE TABLE message_envelopes (
 
 **Security:** No plaintext content stored; server cannot decrypt messages; TTL enforced via cleanup task.
 
-***
+---
 
 ### audit_logs
 
@@ -336,7 +336,7 @@ CREATE TABLE audit_logs (
 
 **Security:** Never log sensitive data (ciphertext, keys, tokens); retention policy 90 days.
 
-***
+---
 
 ### rate_limits
 
@@ -355,7 +355,7 @@ CREATE TABLE rate_limits (
 
 **Behavior:** Sliding window (60 sec), threshold 100 messages → 15-min lockout; atomic UPSERT.
 
-***
+---
 
 ### file_uploads
 

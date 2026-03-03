@@ -1,3 +1,5 @@
+# AAD
+
 ### Purpose
 - Set canonical AAD so that encrypt and decrypt use the same bytes for metadata authentication (AEAD).
 

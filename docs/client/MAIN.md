@@ -1,3 +1,5 @@
+# MAIN
+
 ### Purpose
 - The central entry point of the HAF Messenger client, responsible for initializing JavaFX and launching the application UI.
 - Coordinates JavaFX Application lifecycle, sets up the primary stage, and delegates to ViewRouter for navigation to the splash screen.
@@ -51,4 +53,3 @@
     - Bootstrap steps run on background thread via `Task` in `SplashViewModel`.
     - UI updates via `Task.updateMessage()` and `Task.updateProgress()` (thread-safe property updates).
     - Success/failure callbacks executed on FX thread via `Platform.runLater()`.
-

@@ -1,3 +1,5 @@
+# WEBSOCKET
+
 ### Purpose
 - Manages WebSocket lifecycle (connect, send, receive, close) with TLS policy, retry logic, and backpressure for client-side messaging.
 

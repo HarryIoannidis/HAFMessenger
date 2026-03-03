@@ -1,4 +1,4 @@
-# **Development**
+# DEVELOPMENT
 
 This document describes the recommended workflow for adding new features or UI modules to **HAF Messenger**.
 It follows an **MVVM (Model–View–ViewModel)** structure with a secure **Client–Server** architecture.

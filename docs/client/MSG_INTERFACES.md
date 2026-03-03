@@ -1,3 +1,5 @@
+# MSG_INTERFACES
+
 ## MessageSender
 
 ### Purpose
@@ -18,33 +20,31 @@
 - Logs only identifiers: senderId, recipientId, timestamp, error types.
 - Validation failure → exception, not silent drop.
 
-
-***
+---
 
 ## MessageReceiver
 
 ### Purpose
-- Default implementation of `MessageSender` that sends encrypted messages via WebSocket with strict validation and JSON serialization.
+- Defines the contract for receiving encrypted messages from the network.
 
 ### Dependencies
 - `WebSocketAdapter`: transport layer.
 - `MessageValidator`: structural validation.
-- `JsonCodec`: JSON serialization with strict mode.
+- `JsonCodec`: JSON deserialization with strict mode.
 - `Logger`: logging without payloads.
 
-### Send flow
+### Receive flow
 1. Constructor injection: `WebSocketAdapter adapter`.
-2. `send(EncryptedMessage m)`:
+2. `onMessage(String jsonText)`:
+    - `JsonCodec.fromJson(jsonText, EncryptedMessage.class)` → strict JSON parsing.
     - `MessageValidator.validateEncryptedMessage(m)` → throws on failure.
-    - `JsonCodec.toJson(m)` → strict JSON string.
-    - `adapter.sendText(json)` → transmission.
-    - Log success with senderId/recipientId/timestamp (not payload).
+    - Dispatch to registered `MessageListener`.
 3. Exception handling:
     - Validation → `IllegalArgumentException`.
-    - JSON serialization → `JsonProcessingException`.
+    - JSON deserialization → `JsonProcessingException`.
     - Network → propagated from adapter.
 
 ### Security rules
-- Log format: `"Sent message: sender={}, recipient={}, timestamp={}"` (no ciphertext/keys).
+- Log format: `"Received message: sender={}, recipient={}, timestamp={}"` (no ciphertext/keys).
 - Does not perform retry at this layer (retry in WebSocketAdapter).
-- Validation before serialization for fast-fail.
+- Validation before processing for fast-fail.

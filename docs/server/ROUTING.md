@@ -1,96 +1,91 @@
-### Purpose
-- In-memory queue management for outbound delivery and subscription management for real-time notifications.
+# ROUTING
 
-***
+### Purpose
+- In-memory queue management for routing encrypted envelopes to recipients.
+- Manages subscriptions, polling, and TTL-based cleanup.
+
+---
 
 ## MailboxRouter
 
 ### Purpose
-- Central component for routing validated envelopes in recipient queues.
+- Routes validated envelopes from ingress to recipient mailboxes.
 
-### Responsibilities
-- Accepts 'EncryptedMessage' from ingress (HTTP/WebSocket).
-- Saves to DB via 'EnvelopeDAO.insert()'.
-- Enqueue in in-memory 'ConcurrentHashMap<recipientId, Queue<QueuedEnvelope>>'.
-- Notify active WebSocket subscriptions for new messages.
-- Increment `MetricsRegistry.increaseQueueDepth()`.
+### Dependencies
+- `EnvelopeDAO`: persistence layer for envelope storage.
+- `MetricsRegistry`: queue depth tracking.
+- `AuditLogger`: logging for routing events.
 
-### enqueue(EncryptedMessage) flow
-- Validate that 'recipientId' != null.
-- It calls 'EnvelopeDAO.insert(message)' → gets 'envelopeId'.
-- Creates 'QueuedEnvelope(envelopeId, recipientId, expiresAtMs)'.
-- Places in the recipient's queue: 'queues.computeIfAbsent(recipientId, k -> new ConcurrentLinkedQueue<>()).offer(envelope)'.
-- If the recipient has an active WebSocket subscription, it sends a notification frame.
-- Increment queue depth counter.
+### Methods
 
-### subscribe(recipientId, WebSocketSession) flow
-- Registers sessions on the 'subscriptions' map.
-- Flush all pending envelopes from the recipient's queue to WebSocket.
-- Every new envelope that arrives afterwards is pushed immediately.
+#### ingressEnvelope(EncryptedMessageDTO dto, String senderId, String recipientId, long ttlSeconds)
+- Validates envelope metadata (sender, recipient, TTL).
+- Stores via `EnvelopeDAO.insert()`.
+- Adds to in-memory queue for recipient.
+- If recipient is subscribed (online via WebSocket): delivers immediately.
+- Increments `MetricsRegistry.increaseQueueDepth()`.
 
-### unsubscribe(recipientId, WebSocketSession) flow
-- Removes sessions from 'subscriptions'.
-- Pending envelopes stay in the queue for next connection or HTTP poll.
+#### subscribe(String userId, WebSocket connection)
+- Registers WebSocket connection for real-time delivery.
+- Flushes any pending envelopes for the user.
 
-### poll(recipientId, limit) flow
-- HTTP clients can do 'GET /api/v1/messages?recipientId=...&limit=10'.
-- Router returns up to 'limit' envelopes from the queue.
-- Each delivered envelope is deducted from queue and decrement queue depth.
+#### unsubscribe(String userId)
+- Removes WebSocket connection.
+- Pending envelopes remain in queue for polling.
 
-### TTL cleanup
-- Periodic background task (e.g. every 60 sec) scans queues.
-- Removes expired envelopes (current time > expiresAtMs).
-- Calls 'EnvelopeDAO.deleteExpired()' to cleanup the DB.
-- Audit log with 'logCleanup(deletedCount, durationMs)'.
+#### poll(String userId) → List<QueuedEnvelope>
+- Returns pending envelopes for offline delivery.
+- Marks delivered envelopes via `EnvelopeDAO.markDelivered()`.
+- Decrements `MetricsRegistry.decreaseQueueDepth()`.
 
-***
+#### cleanupExpired()
+- Called by scheduled task (every 5 minutes).
+- Delegates to `EnvelopeDAO.deleteExpired()`.
+- Decrements queue depth for expired envelopes.
+- Logs cleanup via `AuditLogger.logCleanup()`.
+
+---
 
 ## QueuedEnvelope
 
 ### Purpose
-- Lightweight DTO for in-memory queue entries.
+- Internal DTO representing an envelope in the routing queue.
 
 ### Fields
-- 'long envelopeId': primary key from DB.
+- `long id`: database ID.
+- `String senderId`: sender user ID.
 - `String recipientId`: recipient user ID.
-- 'long expiresAtMs': Unix timestamp in ms (clientTimestamp + TTL).
+- `byte[] payload`: encrypted payload (opaque blob).
+- `long createdAtMs`: creation timestamp.
+- `long expiresAtMs`: expiration timestamp.
+- `boolean delivered`: delivery status.
 
-### Usage
-- It is created after the DB insert.
-- Used for queue management and TTL checks.
-- The full 'EncryptedMessage' is loaded by DB only upon delivery (lazy load).
-
-***
+---
 
 ## Thread safety
+- In-memory queues use `ConcurrentHashMap<String, Queue<QueuedEnvelope>>`.
+- Queue operations are atomic per recipient.
+- Subscribe/unsubscribe are thread-safe (ConcurrentHashMap).
+- Cleanup scheduled via `ScheduledExecutorService`.
 
-### Concurrent access
-- 'queues': 'ConcurrentHashMap' with 'ConcurrentLinkedQueue' values.
-- 'subscriptions': 'ConcurrentHashMap<String, Set<WebSocketSession>>' with thread-safe collections.
-- Enqueue/poll/cleanup operations are thread-safe with no external locking.
-
-### Lock-free design
-- Each recipient queue is independent, no contention between different recipients.
-- Subscription updates (add/remove) using atomic operations.
-
-***
+---
 
 ## Metrics
+- `increaseQueueDepth()`: on enqueue.
+- `decreaseQueueDepth()`: on delivery or expiry.
+- `snapshot().queueDepth`: current pending count.
 
-### MetricsRegistry integration
-- 'increaseQueueDepth()': every time you enqueue.
-- 'decreaseQueueDepth()': whenever deliver or expire.
-- `snapshot().queueDepth()`: current total pending envelopes across all recipients.
-
-***
+---
 
 ## Error handling
+- Database errors during insert: throws exception, ingress returns 500.
+- Delivery errors (WebSocket send failure): log error, keep envelope in queue for polling.
+- Cleanup errors: log via `AuditLogger`, retry on next scheduled run.
 
-### DB errors during insert
-- 'EnvelopeDAO.insert()' throws exception → MailboxRouter propagates to ingress.
-- Ingress returns '500' and audit log error.
-- Envelope **doesn't** enter the in-memory queue.
+---
 
-### WebSocket send failures
-- If a notification frame fails (broken connection), it removes the subscription.
-- Envelope stays in the queue for retry in next connection or HTTP poll.
+## TTL cleanup job
+- Scheduled every 5 minutes via `ScheduledExecutorService.scheduleAtFixedRate()`.
+- Calls `EnvelopeDAO.deleteExpired()`.
+- Logs results via `AuditLogger.logCleanup(deleted, durationMs)`.
+- Thread-safe: runs on dedicated thread, does not block ingress.

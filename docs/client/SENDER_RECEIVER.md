@@ -1,3 +1,5 @@
+# SENDER_RECEIVER
+
 ## DefaultMessageSender
 
 ### Purpose
@@ -26,7 +28,7 @@
 - Does not perform retry at this layer (retry in WebSocketAdapter).
 - Validation before serialization for fast-fail.
 
-***
+---
 
 ## DefaultMessageReceiver
 

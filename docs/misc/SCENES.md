@@ -1,3 +1,5 @@
+# SCENES
+
 ## SPLASH SCREEN
 
 ### Screen objective
@@ -39,7 +41,7 @@
 - Error state: Progress bar and percentage hidden when `errorProperty()` is true.
 - See [SPLASH.md](../client/SPLASH.md) for detailed error handling documentation.
 
-***
+---
 
 ## LOGIN SCREEN
 
@@ -138,7 +140,7 @@ public class LoginViewModel {
 - TOTP error: “Incorrect code. Please retry.” with countdown for new code.
 - In general: no disclosure of internal causes (e.g. “user not found”), only neutral messages.
 
-***
+---
 
 ## REGISTER (Step 1: Details)
 
@@ -218,7 +220,7 @@ public boolean validateStep1(){
 - Field-specific messages, not generic alerts.
 - On email/registry conflict: indication on the corresponding field and blocking of continuation.
 
-***
+---
 
 ## REGISTER (Step 2: Uploads – Drag & Drop)
 
@@ -431,7 +433,7 @@ public class MainChatViewModel {
 - Virtualized ListView for performance on large sets, lazy avatars, and debounced search 150–250 ms.
 - Accessibility: keyboard navigation, focus management on overflow, aria labels for status dots.
 
-***
+---
 
 ## MAIN CHAT (Active conversation)
 

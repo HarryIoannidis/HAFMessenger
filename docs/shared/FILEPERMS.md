@@ -1,3 +1,5 @@
+# FILEPERMS
+
 ### Purpose
 - Describes using FilePerms to enforce 700/600 permissions on the root and keychain files, regardless of UMask/OS.
 
@@ -15,4 +17,4 @@
 - FilePerms.writeFile600(Path file, byte[] data): creates/writes file to 600.
 
 ### Tests
-- Verify that root dir is drwx------ and the -rw files------- in Unix, idempotent on the second run.
+- Verify that root dir is drwx------ and the files are -rw------- in Unix, idempotent on the second run.
