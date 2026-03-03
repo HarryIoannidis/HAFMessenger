@@ -20,18 +20,18 @@
 │ MessageEncryptor.encrypt()                              │
 │ 1. Generate random 256-bit AES key (ephemeral)          │
 │ 2. Generate random 12-byte IV                           │
-│ 3. Build AAD from metadata (version, algorithm, IDs, etc.)   │
+│ 3. Build AAD from metadata (version, algorithm, IDs...) │
 │ 4. Encrypt payload with AES-256-GCM                     │
 │    → produces: ciphertext + 128-bit auth tag            │
-│ 5. Wrap AES key with recipient's RSA public key         │
-│    (RSA-OAEP SHA-256/MGF1)                              │ 
+│ 5. Derive AES key via X25519 ECDH key agreement         │
+│    (ECDH + SHA-256 KDF)                                 │ 
 └───────────────────────────┬─────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────┐
 │ EncryptedMessage DTO                                    │
 │ - version, algorithm, senderId, recipientId             │
-│ - ciphertextB64, ivB64, tagB64, ephemeralPublicB64           │
+│ - ciphertextB64, ivB64, tagB64, ephemeralPublicB64      │
 │ - contentType, contentLength, timestamp, ttl            │
 └───────────────────────────┬─────────────────────────────┘
                             │
@@ -114,8 +114,8 @@
                             ▼
 ┌─────────────────────────────────────────────────────────┐
 │ MessageDecryptor.decrypt()                              │
-│ 1. Unwrap AES key with recipient's RSA private key      │
-│    (RSA-OAEP SHA-256/MGF1)                              │
+│ 1. Derive AES key via X25519 ECDH key agreement       │
+│    (recipient_private + ephemeral_public → SHA-256)     │
 │ 2. Rebuild AAD from message metadata                    │
 │ 3. Decrypt ciphertext with AES-256-GCM                  │
 │    - Uses IV, auth tag, AAD                             │ 
@@ -152,8 +152,8 @@
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────┐
-│ RsaKeyIO.generateKeyPair()                              │
-│ - RSA 2048/3072 bit key generation                      │
+│ EccKeyIO.generate()                                     │
+│ - X25519 (Curve25519) key generation                    │
 └───────────────────────────┬─────────────────────────────┘ 
                             │
                             ▼

@@ -8,12 +8,16 @@
 
 ## com/haf/client/controllers
 
+* ChatController.java — *Controller for the chat view*
+* ContactCell.java — *Custom ListCell for displaying contacts*
 * LoginController.java — *Controller for login view*
+* MainController.java — *Controller for the main application shell*
 * RegisterController.java — *Controller for registration view*
 * SplashController.java — *Controller for splash screen*
 
 ## com/haf/client/core
 
+* ChatSession.java — *Container for the active chat session context*
 * ClientApp.java — *Main client application class*
 * Launcher.java — *Application launcher*
 
@@ -21,22 +25,38 @@
 
 * UserKeystoreKeyProvider.java — *Provides keys from the user keystore*
 
+## com/haf/client/model
+
+* ContactInfo.java — *Data model for a contact*
+
+## com/haf/client/models
+
+* MessageType.java — *Enum defining the type of a message (TEXT, IMAGE, FILE)*
+* MessageVM.java — *ViewModel representation of a single message*
+
 ## com/haf/client/network
 
 * DefaultMessageReceiver.java — *Default implementation for receiving messages*
 * DefaultMessageSender.java — *Default implementation for sending messages*
 * MessageReceiver.java — *Interface for receiving messages*
 * MessageSender.java — *Interface for sending messages*
+* MockMessageReceiver.java — *Mock implementation for testing message reception*
+* MockMessageSender.java — *Mock implementation for testing message sending*
 * WebSocketAdapter.java — *Adapter for WebSocket connections*
 
 ## com/haf/client/utils
 
+* MessageBubbleFactory.java — *Factory for creating chat bubble UI components*
+* SslContextUtils.java — *Utilities for configuring SSL/TLS contexts*
 * UiConstants.java — *Constants for UI*
 * ViewRouter.java — *Handles view routing*
+* WindowResizeHelper.java — *Utility to add resize handles to undecorated windows*
 
 ## com/haf/client/viewmodels
 
+* LoginViewModel.java — *ViewModel for login screen*
 * MessageViewModel.java — *ViewModel for handling message UI logic*
+* RegisterViewModel.java — *ViewModel for registration screen*
 * SplashViewModel.java — *ViewModel for splash screen*
 
 ---
@@ -58,6 +78,9 @@
 ## com/haf/server/db
 
 * EnvelopeDAO.java — *Data Access Object for message envelopes*
+* FileUploadDAO.java — *Data Access Object for encrypted file uploads*
+* SessionDAO.java — *Data Access Object for user sessions*
+* UserDAO.java — *Data Access Object for users*
 
 ## com/haf/server/handlers
 
@@ -95,15 +118,20 @@
 ## com/haf/shared/crypto
 
 * AadCodec.java — *Codec for Additional Authenticated Data*
-* CryptoRSA.java — *RSA encryption and decryption utilities*
+* CryptoECC.java — *ECC encryption and decryption utilities*
 * CryptoService.java — *Service for cryptographic operations*
 * MessageDecryptor.java — *Handles message decryption*
 * MessageEncryptor.java — *Handles message encryption*
 
 ## com/haf/shared/dto
 
+* EncryptedFileDTO.java — *DTO for end-to-end encrypted files*
 * EncryptedMessage.java — *DTO representing an encrypted message*
 * KeyMetadata.java — *Metadata for cryptographic keys*
+* LoginRequest.java — *DTO for login request*
+* LoginResponse.java — *DTO for login response*
+* RegisterRequest.java — *DTO for registration request*
+* RegisterResponse.java — *DTO for registration response*
 
 ## com/haf/shared/exceptions
 
@@ -129,5 +157,5 @@
 * JsonCodec.java — *Utilities for JSON encoding and decoding*
 * MessageValidator.java — *Validates messages*
 * PemCodec.java — *Utilities for PEM encoding and decoding*
-* RsaKeyIO.java — *Input/Output utilities for RSA keys*
+* EccKeyIO.java — *Input/Output utilities for ECC keys*
 * SystemClockProvider.java — *Clock provider using the system clock*

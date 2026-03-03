@@ -12,12 +12,12 @@
 ---
 ### Phase 2 – Crypto core (Complete)
 - **Deliverables**
-    - Cryptography: `CryptoService` (AES-256-GCM, IV 12B, 128-bit tag), `CryptoECC` (RSA-OAEP SHA-256/MGF1 wrap/unwrap), `CryptoConstants`. 
+    - Cryptography: `CryptoService` (AES-256-GCM, IV 12B, 128-bit tag), `CryptoECC` (X25519 ECDH key agreement), `CryptoConstants`. 
     - AAD policy: `AadCodec` builds deterministic AAD from {version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength}.
     - Encrypt/Decrypt helpers: `MessageEncryptor`/`MessageDecryptor` round-trip APIs + `MessageFlowTest` scaffolding, with strict separation payload vs metadata. 
     - Hardening: use `SecureRandom`, zero-copy conversions where possible, avoid key/IV reuse. 
 - **Tests**
-    - Unit: AES-GCM round-trip, tamper detection (expected `AEADBadTagException`), wrong key/IV, RSA wrap/unwrap, AAD binding tests. 
+    - Unit: AES-GCM round-trip, tamper detection (expected `AEADBadTagException`), wrong key/IV, ECDH key derivation, AAD binding tests. 
     - Reports: surefire/failsafe artifacts in `shared/target/*` document green pipeline. 
 ---
 
@@ -38,7 +38,7 @@
 
 ### Phase 4 – Client integration (send/receive) (Complete)
 - **Deliverables**
-    - Send pipeline: `DefaultMessageSender` synthesizes payloads, validates with `MessageValidator`, encrypts via `MessageEncryptor` (AES-256-GCM + RSA-OAEP), serializes with `JsonCodec`, and sends with `WebSocketAdapter`. 
+    - Send pipeline: `DefaultMessageSender` synthesizes payloads, validates with `MessageValidator`, encrypts via `MessageEncryptor` (AES-256-GCM + X25519 ECDH), serializes with `JsonCodec`, and sends with `WebSocketAdapter`. 
     - Receive pipeline: `DefaultMessageReceiver` consumes WebSocket frames, makes `JsonCodec.fromJson`, runs `MessageValidator.validate/validateRecipientOrThrow`, checks TTL with `ClockProvider`, decrypts via `MessageDecryptor` and routes to `MessageListener` based on `contentType`. 
     - Error handling: typed exceptions (`MessageValidationException`, `MessageExpiredException`, `MessageTamperedException`, `KeyNotFoundException`), bubbling in UI via `onError`, retry/backoff stubs (`shouldRetry`, `getRetryDelayMs`) in `WebSocketAdapter`, status binding in `MessageViewModel`. 
 - **Interfaces / Infrastructure**
