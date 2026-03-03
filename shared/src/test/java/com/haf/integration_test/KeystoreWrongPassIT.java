@@ -6,7 +6,7 @@ import java.security.*;
 import static org.junit.jupiter.api.Assertions.*;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.keystore.UserKeystore;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 
 class KeystoreWrongPassIT {
     Path tmpRoot;
@@ -21,8 +21,11 @@ class KeystoreWrongPassIT {
     void cleanup() throws Exception {
         if (tmpRoot != null) {
             try (var w = Files.walk(tmpRoot)) {
-                w.sorted((a,b)->b.getNameCount()-a.getNameCount()).forEach(p -> {
-                    try { Files.deleteIfExists(p);} catch (Exception ignored) {}
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (Exception ignored) {
+                    }
                 });
             }
         }
@@ -32,7 +35,7 @@ class KeystoreWrongPassIT {
     void load_private_with_wrong_pass_must_fail() throws Exception {
         // 1) Δημιουργία CURRENT με σωστό pass
         String keyId = UserKeystore.todayKeyId();
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         char[] correct = "secret-pass".toCharArray();
         UserKeystore ks = new UserKeystore(tmpRoot);
         ks.saveKeypair(keyId, kp, correct);

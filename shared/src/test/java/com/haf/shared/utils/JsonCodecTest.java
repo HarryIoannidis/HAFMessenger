@@ -21,7 +21,7 @@ class JsonCodecTest {
         m.ttlSeconds = 86400;
         m.algorithm = "AES-256-GCM+RSA-OAEP";
         m.ivB64 = Base64.getEncoder().encodeToString(new byte[12]);
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]);
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
         m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
         m.tagB64 = Base64.getEncoder().encodeToString(new byte[16]);
         m.contentType = "text/plain";
@@ -39,7 +39,7 @@ class JsonCodecTest {
         assertEquals(m.recipientId, back.recipientId);
         assertEquals(m.algorithm, back.algorithm);
         assertEquals(m.ivB64, back.ivB64);
-        assertEquals(m.wrappedKeyB64, back.wrappedKeyB64);
+        assertEquals(m.ephemeralPublicB64, back.ephemeralPublicB64);
         assertEquals(m.ciphertextB64, back.ciphertextB64);
         assertEquals(m.tagB64, back.tagB64);
         assertEquals(m.contentType, back.contentType);
@@ -60,7 +60,7 @@ class JsonCodecTest {
         m.ttlSeconds = 600;
         m.algorithm = MessageHeader.ALGO_AEAD;
         m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]);
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
         m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
         m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
         m.contentType = "application/pdf";
@@ -86,7 +86,7 @@ class JsonCodecTest {
             "ttlSeconds":86400,
             "algo":"AES-256-GCM+RSA-OAEP",
             "ivB64":"AAAAAAAAAAAAAA==",
-            "wrappedKeyB64":"%s",
+            "ephemeralPublicB64":"%s",
             "ciphertextB64":"%s",
             "tagB64":"AAAAAAAAAAAAAAAAAAAAAA==",
             "contentType":"text/plain",

@@ -21,7 +21,7 @@ public class AadCodecTest {
         m.contentType = "text/plain";
         m.contentLength = 11L;
         m.ivB64 = Base64.getEncoder().encodeToString("0123456789AB".getBytes(StandardCharsets.UTF_8)); // 12B dummy
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString("k".getBytes(StandardCharsets.UTF_8));
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString("k".getBytes(StandardCharsets.UTF_8));
         return m;
     }
 

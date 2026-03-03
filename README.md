@@ -150,7 +150,7 @@ haf-messenger/
   2. AES key is wrapped (encrypted) with the recipient’s public RSA key using RSA-OAEP (SHA-256/MGF1).
   3. Payload is encrypted using AES-256-GCM with a 12-byte IV and 128-bit authentication tag.
   4. AAD (Additional Authenticated Data) is constructed from DTO metadata fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength) — not transmitted, reconstructed during decryption.
-  5. Packet structure: `{version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, wrappedKeyB64, ciphertextB64, tagB64, contentType, contentLength, e2e}`
+  5. Packet structure: `{version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, ephemeralPublicB64, ciphertextB64, tagB64, contentType, contentLength, e2e}`
 
 * The server must **not decrypt messages** — true **E2E encryption** ensures the server only handles encrypted blobs and metadata.
 

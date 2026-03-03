@@ -6,7 +6,7 @@ import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.MessageValidator;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -18,7 +18,7 @@ public class MessageTamperingTests {
 
     @Test
     public void test_tampered_IV_fails() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor enc = new MessageEncryptor(kp.getPublic(), "userA", "userB", clock);
@@ -35,7 +35,7 @@ public class MessageTamperingTests {
 
     @Test
     public void test_wrong_aad_fails() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor enc = new MessageEncryptor(kp.getPublic(), "userA", "userB", clock);
@@ -51,7 +51,7 @@ public class MessageTamperingTests {
 
     @Test
     public void test_tampered_ciphertext_fails() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor enc = new MessageEncryptor(kp.getPublic(), "userA", "userB", clock);
@@ -68,7 +68,7 @@ public class MessageTamperingTests {
 
     @Test
     public void test_tampered_tag_fails() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         ClockProvider clock = new FixedClockProvider(1000000L);
 
         MessageEncryptor enc = new MessageEncryptor(kp.getPublic(), "userA", "userB", clock);
@@ -86,14 +86,12 @@ public class MessageTamperingTests {
         MessageValidationException ex = assertThrows(
                 MessageValidationException.class,
                 () -> dec.decryptMessage(m),
-                "Tampered AEAD tag must trigger validation failure"
-        );
+                "Tampered AEAD tag must trigger validation failure");
 
         List<MessageValidator.ErrorCode> errorCodes = ex.getErrorCodes();
         assertTrue(
                 errorCodes.contains(MessageValidator.ErrorCode.BAD_TAG),
-                "Error codes should contain BAD_TAG"
-        );
+                "Error codes should contain BAD_TAG");
     }
 
 }

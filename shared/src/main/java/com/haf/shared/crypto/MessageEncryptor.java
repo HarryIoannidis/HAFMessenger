@@ -8,7 +8,8 @@ import java.util.Base64;
 import javax.crypto.SecretKey;
 
 /**
- * Encrypts messages for transmission using AES-256-GCM and RSA-OAEP key wrapping.
+ * Encrypts messages for transmission using AES-256-GCM and RSA-OAEP key
+ * wrapping.
  */
 public class MessageEncryptor {
     private final PublicKey recipientPublicKey;
@@ -20,11 +21,12 @@ public class MessageEncryptor {
      * Creates a MessageEncryptor with RSA public key of recipient and metadata.
      *
      * @param recipientPublicKey the recipient's public RSA key
-     * @param senderId the sender's ID
-     * @param recipientId the recipient's ID
-     * @param clockProvider the clock provider for deterministic timestamps
+     * @param senderId           the sender's ID
+     * @param recipientId        the recipient's ID
+     * @param clockProvider      the clock provider for deterministic timestamps
      */
-    public MessageEncryptor(PublicKey recipientPublicKey, String senderId, String recipientId, ClockProvider clockProvider) {
+    public MessageEncryptor(PublicKey recipientPublicKey, String senderId, String recipientId,
+            ClockProvider clockProvider) {
         this.recipientPublicKey = recipientPublicKey;
         this.senderId = senderId;
         this.recipientId = recipientId;
@@ -34,12 +36,13 @@ public class MessageEncryptor {
     /**
      * Encrypts a payload and creates an EncryptedMessage DTO.
      *
-     * @param payload the plaintext bytes to encrypt
+     * @param payload     the plaintext bytes to encrypt
      * @param contentType the content type (MIME type) of the payload
-     * @param ttlSeconds the time-to-live in seconds (must be between MIN_TTL_SECONDS and MAX_TTL_SECONDS)
+     * @param ttlSeconds  the time-to-live in seconds (must be between
+     *                    MIN_TTL_SECONDS and MAX_TTL_SECONDS)
      * @return the complete EncryptedMessage DTO
      * @throws IllegalArgumentException if parameters are invalid
-     * @throws Exception if encryption fails
+     * @throws Exception                if encryption fails
      */
     public EncryptedMessage encrypt(byte[] payload, String contentType, long ttlSeconds) throws Exception {
         if (payload == null) {
@@ -49,21 +52,24 @@ public class MessageEncryptor {
             throw new IllegalArgumentException("ContentType cannot be null or empty");
         }
         if (ttlSeconds < MessageHeader.MIN_TTL_SECONDS || ttlSeconds > MessageHeader.MAX_TTL_SECONDS) {
-            throw new IllegalArgumentException("TTL must be between " + MessageHeader.MIN_TTL_SECONDS + 
+            throw new IllegalArgumentException("TTL must be between " + MessageHeader.MIN_TTL_SECONDS +
                     " and " + MessageHeader.MAX_TTL_SECONDS + " seconds");
         }
 
-        SecretKey aesKey = CryptoService.generateAesKey();
-        byte[] iv = CryptoService.generateIv();
+        // 1. Generate an ephemeral X25519 keypair for this specific message
+        java.security.KeyPair ephemeralPair = com.haf.shared.utils.EccKeyIO.generate();
 
+        // 2. Derive the 256-bit AES session key using ECDH + SHA-256
+        SecretKey aesKey = CryptoECC.generateAndDeriveAesKey(ephemeralPair.getPrivate(), recipientPublicKey);
+
+        // 3. Generate AES-GCM IV
+        byte[] iv = CryptoService.generateIv();
         if (iv == null || iv.length != MessageHeader.IV_BYTES) {
             throw new IllegalStateException("IV is null or invalid length");
         }
 
-        byte[] wrappedKey = CryptoRSA.wrapKey(aesKey, recipientPublicKey);
-        if (wrappedKey == null || wrappedKey.length == 0) {
-            throw new IllegalStateException("Wrapped AES key is null or empty");
-        }
+        // 4. Capture the ephemeral public key to send to the recipient
+        byte[] ephemeralPublicDer = com.haf.shared.utils.EccKeyIO.publicDer(ephemeralPair.getPublic());
 
         EncryptedMessage m = new EncryptedMessage();
         m.version = MessageHeader.VERSION;
@@ -76,7 +82,7 @@ public class MessageEncryptor {
         m.contentLength = payload.length;
 
         m.ivB64 = Base64.getEncoder().encodeToString(iv);
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(wrappedKey);
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(ephemeralPublicDer);
 
         // Build AAD before encryption (AAD is built from DTO fields)
         byte[] aad = AadCodec.buildAAD(m);

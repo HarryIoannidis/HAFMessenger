@@ -3,13 +3,24 @@ package com.haf.client.controllers;
 import com.haf.client.core.ChatSession;
 import com.haf.client.network.MockMessageReceiver;
 import com.haf.client.network.MockMessageSender;
+import com.haf.client.utils.SslContextUtils;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.shared.dto.LoginRequest;
+import com.haf.shared.dto.LoginResponse;
+import com.haf.shared.utils.JsonCodec;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXCheckBox;
+import com.jfoenix.controls.JFXPasswordField;
+import com.jfoenix.controls.JFXTextField;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
@@ -253,24 +264,36 @@ public class LoginController {
         viewModel.loadingProperty().set(true);
         signInButton.setText("Signing in...");
 
-        // TODO: Replace with actual server authentication call
         Thread loginThread = new Thread(() -> {
             try {
-                // Simulated network delay
-                Thread.sleep(1500);
+                // Build login request from ViewModel
+                LoginRequest request = new LoginRequest();
+                request.email = viewModel.getEmail();
+                request.password = viewModel.getPassword();
 
-                // TODO: Perform actual authentication here
-                // Example:
-                // boolean success = authService.login(viewModel.getEmail(),
-                // viewModel.getPassword());
+                String json = JsonCodec.toJson(request);
 
-                boolean success = true; // Placeholder — replace with real auth
+                // POST to server login endpoint
+                HttpClient client = HttpClient.newBuilder()
+                        .sslContext(SslContextUtils.getTrustingSslContext())
+                        .build();
+
+                HttpRequest httpRequest = HttpRequest.newBuilder()
+                        .uri(URI.create("https://localhost:8443/api/v1/login"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
+
+                HttpResponse<String> httpResponse = client.send(httpRequest,
+                        HttpResponse.BodyHandlers.ofString());
+
+                LoginResponse response = JsonCodec.fromJson(httpResponse.body(), LoginResponse.class);
 
                 javafx.application.Platform.runLater(() -> {
                     viewModel.loadingProperty().set(false);
                     signInButton.setText(SIGN_IN_TEXT);
 
-                    if (success) {
+                    if (httpResponse.statusCode() == 200 && response.error == null) {
                         // Wire up a stub session until real networking is integrated.
                         ChatSession.set(new MessageViewModel(
                                 new MockMessageSender(),
@@ -278,7 +301,8 @@ public class LoginController {
                         ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
                         LOGGER.info("Login successful for: " + viewModel.getEmail());
                     } else {
-                        viewModel.setLoginError(LoginViewModel.ERROR_LOGIN_FAILED);
+                        String errorMsg = response.error != null ? response.error : "Login failed.";
+                        viewModel.setLoginError(errorMsg);
                         shakeNode(signInButton);
                     }
                 });
@@ -291,10 +315,11 @@ public class LoginController {
                     viewModel.setLoginError("Connection was interrupted.");
                 });
             } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Login failed", e);
                 javafx.application.Platform.runLater(() -> {
                     viewModel.loadingProperty().set(false);
                     signInButton.setText(SIGN_IN_TEXT);
-                    viewModel.setLoginError(e.getMessage());
+                    viewModel.setLoginError("Connection failed. Please try again.");
                 });
             }
         }, "login-thread");
@@ -308,13 +333,6 @@ public class LoginController {
      */
     private void navigateToRegister() {
         ViewRouter.switchToTransparent(UiConstants.FXML_REGISTER);
-    }
-
-    /**
-     * Navigates to the Main screen.
-     */
-    private void navigateToMain() {
-        ViewRouter.switchTo(UiConstants.FXML_MAIN);
     }
 
     /**

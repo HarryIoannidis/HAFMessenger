@@ -2,6 +2,9 @@ package com.haf.server.core;
 
 import com.haf.server.config.ServerConfig;
 import com.haf.server.db.EnvelopeDAO;
+import com.haf.server.db.FileUploadDAO;
+import com.haf.server.db.SessionDAO;
+import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.ingress.HttpIngressServer;
 import com.haf.server.ingress.WebSocketIngressServer;
@@ -62,11 +65,15 @@ public final class Main {
             EncryptedMessageValidator validator = new EncryptedMessageValidator();
 
             EnvelopeDAO envelopeDAO = new EnvelopeDAO(dataSource, auditLogger);
+            UserDAO userDAO = new UserDAO(dataSource, auditLogger);
+            SessionDAO sessionDAO = new SessionDAO(dataSource, auditLogger);
+            FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
             MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
 
             HttpIngressServer httpServer = new HttpIngressServer(
-                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator);
+                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
+                    sessionDAO, fileUploadDAO);
             WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry);
 

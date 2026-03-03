@@ -48,8 +48,8 @@ class MessageSenderTest {
         }
 
         @Override
-        public void connect(java.util.function.Consumer<String> onMessage, 
-                           java.util.function.Consumer<Throwable> onError) throws IOException {
+        public void connect(java.util.function.Consumer<String> onMessage,
+                java.util.function.Consumer<Throwable> onError) throws IOException {
             connected = true;
         }
 
@@ -83,20 +83,22 @@ class MessageSenderTest {
 
     @BeforeEach
     void setup() throws Exception {
-        KeyPair kp = com.haf.shared.utils.RsaKeyIO.generate(2048);
+        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
         keyProvider = new MockKeyProvider("sender-123", kp.getPublic());
         clockProvider = new FixedClockProvider(1000000L);
         webSocketAdapter = new MockWebSocketAdapter();
         messageSender = new DefaultMessageSender(keyProvider, clockProvider, webSocketAdapter);
-        
+
         // Connect WebSocket
-        webSocketAdapter.connect(msg -> {}, err -> {});
+        webSocketAdapter.connect(msg -> {
+        }, err -> {
+        });
     }
 
     @Test
     void send_message_encrypts_and_sends() throws Exception {
         byte[] payload = "Hello, World!".getBytes(StandardCharsets.UTF_8);
-        
+
         messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
 
         assertNotNull(webSocketAdapter.getLastSentMessage());
@@ -107,7 +109,7 @@ class MessageSenderTest {
     @Test
     void send_message_throws_on_unknown_recipient() {
         byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-        
+
         assertThrows(KeyNotFoundException.class, () -> {
             messageSender.sendMessage(payload, "unknown-recipient", "text/plain", 3600);
         });
@@ -116,7 +118,7 @@ class MessageSenderTest {
     @Test
     void send_message_validates_message() {
         byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-        
+
         // This should work (validation happens after encryption)
         assertDoesNotThrow(() -> {
             messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
@@ -134,10 +136,9 @@ class MessageSenderTest {
     void send_message_throws_when_not_connected() throws Exception {
         webSocketAdapter.close();
         byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-        
+
         assertThrows(IOException.class, () -> {
             messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
         });
     }
 }
-

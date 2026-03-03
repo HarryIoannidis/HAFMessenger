@@ -8,11 +8,12 @@ import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.FilePerms;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 
 public final class KeystoreBootstrap {
 
-    private KeystoreBootstrap() {}
+    private KeystoreBootstrap() {
+    }
 
     /**
      * Bootstraps the keystore if needed.
@@ -44,24 +45,27 @@ public final class KeystoreBootstrap {
      */
     private static void firstRunIfMissing(Path root) throws Exception {
         try (var s = Files.list(root)) {
-            if (s.findAny().isPresent()) return;
+            if (s.findAny().isPresent())
+                return;
         }
 
         String keyId = UserKeystore.todayKeyId();
         Path dir = root.resolve(keyId);
         FilePerms.ensureDir700(dir);
 
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         FilePerms.writeFile600(dir.resolve("public.pem"),
-                RsaKeyIO.publicPem(kp.getPublic()).getBytes(StandardCharsets.US_ASCII));
+                EccKeyIO.publicPem(kp.getPublic()).getBytes(StandardCharsets.US_ASCII));
 
         char[] pass = getPass();
-        byte[] prvPem = RsaKeyIO.privatePem(kp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
+        byte[] prvPem = EccKeyIO.privatePem(kp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
         byte[] sealed = KeystoreSealing.sealWithPass(pass, prvPem);
         FilePerms.writeFile600(dir.resolve("private.enc"), sealed);
 
-        String fp = com.haf.shared.utils.FingerprintUtil.sha256Hex(com.haf.shared.utils.RsaKeyIO.publicDer(kp.getPublic()));
-        KeyMetadata meta = new KeyMetadata(keyId, CryptoConstants.RSA_ALGORITHM, fp, "Primary-" + keyId, System.currentTimeMillis()/1000, "CURRENT");
+        String fp = com.haf.shared.utils.FingerprintUtil
+                .sha256Hex(com.haf.shared.utils.EccKeyIO.publicDer(kp.getPublic()));
+        KeyMetadata meta = new KeyMetadata(keyId, CryptoConstants.X25519_CURVE, fp, "Primary-" + keyId,
+                System.currentTimeMillis() / 1000, "CURRENT");
         FilePerms.writeFile600(dir.resolve("metadata.json"), JsonCodec.toJson(meta).getBytes(StandardCharsets.UTF_8));
     }
 

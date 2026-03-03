@@ -37,3 +37,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Admin Private Key ###
+server/src/main/resources/config/admin_private_key.txt

@@ -9,13 +9,15 @@ public final class CryptoConstants {
     public static final int GCM_IV_BYTES = 12;
     public static final int SALT_LEN = 16;
 
-    // RSA-OAEP (SHA-256)
-    public static final String RSA_OAEP_TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
-    public static final String OAEP_MGF_ALGO = "MGF1";
-    public static final String OAEP_HASH = "SHA-256";
-    public static final int RSA_MIN_BITS = 2048;
-    public static final int RSA_MAX_BITS = 4096;
-    public static final String RSA_ALGORITHM = "RSA".concat(Integer.toString(RSA_MIN_BITS));
+    // X25519 Key Agreement
+    public static final String XDH_ALGORITHM = "XDH";
+    public static final String X25519_CURVE = "X25519";
+    public static final String KEY_AGREEMENT_ALGO = "XDH";
 
-    private CryptoConstants() {}
+    // HKDF (Key Derivation)
+    public static final String KDF_ALGORITHM = "HKDF";
+    public static final String KDF_HASH_ALGO = "SHA-256";
+
+    private CryptoConstants() {
+    }
 }

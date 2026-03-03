@@ -89,10 +89,6 @@ public class MainController {
         activateMessagesTab();
     }
 
-    // -------------------------------------------------------------------------
-    // Nav bar
-    // -------------------------------------------------------------------------
-
     private void setupNavBar() {
         navMessages.setOnAction(e -> activateMessagesTab());
         navSearch.setOnAction(e -> activateSearchTab());
@@ -140,10 +136,6 @@ public class MainController {
         searchPanel.setManaged(true);
     }
 
-    // -------------------------------------------------------------------------
-    // Profile panel helpers
-    // -------------------------------------------------------------------------
-
     private void showProfilePanel(ContactInfo contact) {
         profileNameText.setText(contact.name());
         profileActivenessText.setText(contact.activenessLabel());
@@ -161,10 +153,6 @@ public class MainController {
         profilePanel.setManaged(false);
     }
 
-    // -------------------------------------------------------------------------
-    // Contact list
-    // -------------------------------------------------------------------------
-
     private void setupContactList() {
         contactsList.setCellFactory(lv -> new ContactCell());
 
@@ -177,7 +165,6 @@ public class MainController {
     private void setupContactSelection() {
         // Click on an already-selected item → deselect and revert to placeholder
         contactsList.setOnMouseClicked(event -> {
-            int clickedIndex = contactsList.getSelectionModel().getSelectedIndex();
             ContactInfo clicked = contactsList.getSelectionModel().getSelectedItem();
 
             // We track whether the click target is already selected via a tag on the
@@ -207,10 +194,6 @@ public class MainController {
                 });
     }
 
-    // -------------------------------------------------------------------------
-    // Content pane
-    // -------------------------------------------------------------------------
-
     private void loadPlaceholder() {
         try {
             FXMLLoader loader = new FXMLLoader(
@@ -236,10 +219,6 @@ public class MainController {
             LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Window chrome
-    // -------------------------------------------------------------------------
 
     private void setupWindowControls() {
         Stage stage = ViewRouter.getMainStage();

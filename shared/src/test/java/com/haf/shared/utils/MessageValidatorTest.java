@@ -19,7 +19,7 @@ public class MessageValidatorTest {
         m.ttlSeconds = Math.min(MessageHeader.MAX_TTL_SECONDS, 86400);
         m.algorithm = MessageHeader.ALGO_AEAD;
         m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]);
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
         m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
         m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
         m.contentType = "text/plain";
@@ -75,7 +75,7 @@ public class MessageValidatorTest {
         m.ivB64 = "!!";
         m.ciphertextB64 = "";
         m.tagB64 = "AAA=";
-        m.wrappedKeyB64 = "AAA=";
+        m.ephemeralPublicB64 = "AAA=";
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_IV), "Errors: " + errs);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_CIPHERTEXT), "Errors: " + errs);
@@ -127,7 +127,7 @@ public class MessageValidatorTest {
         m.ttlSeconds = 600;
         m.algorithm = MessageHeader.ALGO_AEAD;
         m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        m.wrappedKeyB64 = Base64.getEncoder().encodeToString(new byte[256]);
+        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
         m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
         m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
         m.contentType = "application/pdf";

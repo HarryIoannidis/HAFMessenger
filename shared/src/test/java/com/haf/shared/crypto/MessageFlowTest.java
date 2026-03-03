@@ -4,7 +4,7 @@ import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.MessageValidator;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -15,7 +15,7 @@ public class MessageFlowTest {
 
     @Test
     public void test_happy_flow_encrypt_validate_bind_decrypt_ok() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         String localRecipientId = "userB";
         String senderId = "userA";
@@ -36,7 +36,7 @@ public class MessageFlowTest {
 
     @Test
     public void test_negative_wrong_aad_decrypt_fails() throws Exception {
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
 
         String localRecipientId = "userB";
         String senderId = "userA";

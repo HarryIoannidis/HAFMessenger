@@ -27,76 +27,76 @@ public final class EnvelopeDAO {
      * SQL query for inserting a new envelope into the database.
      */
     private static final String INSERT_SQL = """
-        INSERT INTO message_envelopes (
-            envelope_id,
-            sender_id,
-            recipient_id,
-            encrypted_payload,
-            wrapped_key,
-            iv,
-            auth_tag,
-            aad_hash,
-            content_type,
-            content_length,
-            timestamp,
-            ttl,
-            expires_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """;
+            INSERT INTO message_envelopes (
+                envelope_id,
+                sender_id,
+                recipient_id,
+                encrypted_payload,
+                wrapped_key,
+                iv,
+                auth_tag,
+                aad_hash,
+                content_type,
+                content_length,
+                timestamp,
+                ttl,
+                expires_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """;
 
     /**
      * SQL query for fetching envelopes from the database.
      */
     private static final String FETCH_SQL = """
-        SELECT envelope_id,
-               sender_id,
-               recipient_id,
-               encrypted_payload,
-               wrapped_key,
-               iv,
-               auth_tag,
-               content_type,
-               content_length,
-               timestamp,
-               ttl,
-               created_at,
-               expires_at
-          FROM message_envelopes
-         WHERE recipient_id = ?
-           AND delivered = FALSE
-           AND expires_at > NOW()
-         ORDER BY timestamp ASC
-         LIMIT ?
-        """;
+            SELECT envelope_id,
+                   sender_id,
+                   recipient_id,
+                   encrypted_payload,
+                   wrapped_key,
+                   iv,
+                   auth_tag,
+                   content_type,
+                   content_length,
+                   timestamp,
+                   ttl,
+                   created_at,
+                   expires_at
+              FROM message_envelopes
+             WHERE recipient_id = ?
+               AND delivered = FALSE
+               AND expires_at > NOW()
+             ORDER BY timestamp ASC
+             LIMIT ?
+            """;
 
     /**
      * SQL query for fetching multiple envelopes by IDs.
      * Placeholder %s will be replaced with IN clause placeholders.
      */
     private static final String FETCH_BY_IDS_SQL = """
-        SELECT envelope_id,
-               sender_id,
-               recipient_id,
-               encrypted_payload,
-               wrapped_key,
-               iv,
-               auth_tag,
-               content_type,
-               content_length,
-               timestamp,
-               ttl,
-               created_at,
-               expires_at
-          FROM message_envelopes
-         WHERE envelope_id IN (%s)
-           AND delivered = FALSE
-           AND expires_at > NOW()
-        """;
+            SELECT envelope_id,
+                   sender_id,
+                   recipient_id,
+                   encrypted_payload,
+                   wrapped_key,
+                   iv,
+                   auth_tag,
+                   content_type,
+                   content_length,
+                   timestamp,
+                   ttl,
+                   created_at,
+                   expires_at
+              FROM message_envelopes
+             WHERE envelope_id IN (%s)
+               AND delivered = FALSE
+               AND expires_at > NOW()
+            """;
 
     /**
      * Creates an EnvelopeDAO with a DataSource.
      *
-     * @param dataSource the DataSource
+     * @param dataSource  the DataSource
      * @param auditLogger the AuditLogger
      */
     public EnvelopeDAO(DataSource dataSource, AuditLogger auditLogger) {
@@ -116,13 +116,13 @@ public final class EnvelopeDAO {
         long expiresAtMillis = message.timestampEpochMs + (message.ttlSeconds * 1000L);
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
+                PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
 
             ps.setString(1, envelopeId);
             ps.setString(2, message.senderId);
             ps.setString(3, message.recipientId);
             ps.setBytes(4, decodeB64("ciphertext", message.ciphertextB64));
-            ps.setBytes(5, decodeB64("wrappedKey", message.wrappedKeyB64));
+            ps.setBytes(5, decodeB64("wrappedKey", message.ephemeralPublicB64));
             ps.setBytes(6, decodeB64("iv", message.ivB64));
             ps.setBytes(7, decodeB64("tag", message.tagB64));
             ps.setString(8, computeAadHash(message));
@@ -146,14 +146,14 @@ public final class EnvelopeDAO {
      * Fetches envelopes for a specific recipient.
      *
      * @param recipientId The ID of the recipient.
-     * @param limit The maximum number of messages to fetch.
+     * @param limit       The maximum number of messages to fetch.
      * @return list of envelopes for the recipient.
      */
     public List<QueuedEnvelope> fetchForRecipient(String recipientId, int limit) {
         List<QueuedEnvelope> envelopes = new ArrayList<>();
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement ps = connection.prepareStatement(FETCH_SQL)) {
+                PreparedStatement ps = connection.prepareStatement(FETCH_SQL)) {
 
             ps.setString(1, recipientId);
             ps.setInt(2, limit);
@@ -163,11 +163,10 @@ public final class EnvelopeDAO {
                 EncryptedMessage message = hydrateMessage(rs);
 
                 envelopes.add(new QueuedEnvelope(
-                    rs.getString("envelope_id"),
-                    message,
-                    rs.getTimestamp("created_at").getTime(),
-                    rs.getTimestamp("expires_at").getTime()
-                ));
+                        rs.getString("envelope_id"),
+                        message,
+                        rs.getTimestamp("created_at").getTime(),
+                        rs.getTimestamp("expires_at").getTime()));
             }
         } catch (SQLException ex) {
             auditLogger.logError("db_fetch_mailbox", null, recipientId, ex);
@@ -197,7 +196,7 @@ public final class EnvelopeDAO {
 
         Map<String, QueuedEnvelope> envelopes = new HashMap<>();
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement ps = connection.prepareStatement(sql)) {
+                PreparedStatement ps = connection.prepareStatement(sql)) {
 
             int index = 1;
             for (String envelopeId : envelopeIds) {
@@ -211,8 +210,7 @@ public final class EnvelopeDAO {
                         rs.getString("envelope_id"),
                         message,
                         rs.getTimestamp("created_at").getTime(),
-                        rs.getTimestamp("expires_at").getTime()
-                );
+                        rs.getTimestamp("expires_at").getTime());
                 envelopes.put(envelope.envelopeId(), envelope);
             }
         } catch (SQLException ex) {
@@ -238,7 +236,7 @@ public final class EnvelopeDAO {
         String sql = "UPDATE message_envelopes SET delivered = TRUE WHERE envelope_id IN (" + placeholders + ")";
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement ps = connection.prepareStatement(sql)) {
+                PreparedStatement ps = connection.prepareStatement(sql)) {
 
             for (int i = 0; i < envelopeIds.size(); i++) {
                 ps.setString(i + 1, envelopeIds.get(i));
@@ -259,7 +257,7 @@ public final class EnvelopeDAO {
      */
     public int deleteExpired() {
         try (Connection connection = dataSource.getConnection();
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             return statement.executeUpdate("DELETE FROM message_envelopes WHERE expires_at < NOW()");
         } catch (SQLException ex) {
@@ -270,28 +268,28 @@ public final class EnvelopeDAO {
     }
 
     /**
-     * Computes the Authentication and Authorization (AAD) hash for an encrypted message.
+     * Computes the Authentication and Authorization (AAD) hash for an encrypted
+     * message.
      *
      * @param message the encrypted message
      * @return the AAD hash
      */
     private String computeAadHash(EncryptedMessage message) {
         String aad = String.join("|",
-            message.version,
-            message.algorithm,
-            message.senderId,
-            message.recipientId,
-            String.valueOf(message.timestampEpochMs),
-            String.valueOf(message.ttlSeconds),
-            message.contentType,
-            String.valueOf(message.contentLength)
-        );
+                message.version,
+                message.algorithm,
+                message.senderId,
+                message.recipientId,
+                String.valueOf(message.timestampEpochMs),
+                String.valueOf(message.ttlSeconds),
+                message.contentType,
+                String.valueOf(message.contentLength));
         try {
-            MessageDigest digest = MessageDigest.getInstance(com.haf.shared.constants.CryptoConstants.OAEP_HASH);
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
             return HexFormat.of().formatHex(digest.digest(aad.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(com.haf.shared.constants.CryptoConstants.OAEP_HASH + " not available", e);
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 
@@ -324,7 +322,7 @@ public final class EnvelopeDAO {
         message.senderId = rs.getString("sender_id");
         message.recipientId = rs.getString("recipient_id");
         message.ciphertextB64 = encoder.encodeToString(rs.getBytes("encrypted_payload"));
-        message.wrappedKeyB64 = encoder.encodeToString(rs.getBytes("wrapped_key"));
+        message.ephemeralPublicB64 = encoder.encodeToString(rs.getBytes("wrapped_key"));
         message.ivB64 = encoder.encodeToString(rs.getBytes("iv"));
         message.tagB64 = encoder.encodeToString(rs.getBytes("auth_tag"));
         message.contentType = rs.getString("content_type");
@@ -334,4 +332,3 @@ public final class EnvelopeDAO {
         return message;
     }
 }
-

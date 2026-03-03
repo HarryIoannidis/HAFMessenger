@@ -3,20 +3,20 @@ package com.haf.shared.utils;
 import java.security.*;
 import java.security.spec.*;
 
-public final class RsaKeyIO {
-    private RsaKeyIO() {}
+public final class EccKeyIO {
+    private EccKeyIO() {
+    }
 
     /**
-     * Generates new RSA KeyPair with bits size.
+     * Generates new X25519 KeyPair.
      *
-     * @param bits key size (2048 or 3072)
-     * @return new RSA key pair
+     * @return new X25519 key pair
      * @throws IllegalStateException if creation fails
      */
-    public static KeyPair generate(int bits) {
+    public static KeyPair generate() {
         try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-            kpg.initialize(bits, new SecureRandom());
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("XDH");
+            kpg.initialize(new NamedParameterSpec("X25519"), new SecureRandom());
             return kpg.generateKeyPair();
         } catch (Exception e) {
             throw new IllegalStateException(e);
@@ -67,16 +67,16 @@ public final class RsaKeyIO {
      * Import public key from PEM (X.509 SPKI DER).
      *
      * @param pem pEM of public key
-     * @return publicKey RSA
+     * @return publicKey X25519
      * @throws IllegalArgumentException if PEM/DER is invalid
      */
     public static PublicKey publicFromPem(String pem) {
         try {
             byte[] der = PemCodec.fromPem(pem);
             X509EncodedKeySpec spec = new X509EncodedKeySpec(der);
-            return KeyFactory.getInstance("RSA").generatePublic(spec);
+            return KeyFactory.getInstance("XDH").generatePublic(spec);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid RSA public PEM", e);
+            throw new IllegalArgumentException("Invalid X25519 public PEM", e);
         }
     }
 
@@ -84,7 +84,7 @@ public final class RsaKeyIO {
      * Private key import from PEM (PKCS#8 DER).
      *
      * @param pem pEM of private key
-     * @return privateKey RSA
+     * @return privateKey X25519
      * @throws IllegalArgumentException if PEM/DER is invalid
      */
     public static PrivateKey privateFromPem(String pem) {
@@ -92,9 +92,9 @@ public final class RsaKeyIO {
             byte[] der = PemCodec.fromPem(pem);
             PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(der);
 
-            return KeyFactory.getInstance("RSA").generatePrivate(spec);
+            return KeyFactory.getInstance("XDH").generatePrivate(spec);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid RSA private PEM", e);
+            throw new IllegalArgumentException("Invalid X25519 private PEM", e);
         }
     }
 }

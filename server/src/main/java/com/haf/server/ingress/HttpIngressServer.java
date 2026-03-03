@@ -1,6 +1,9 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.FileUploadDAO;
+import com.haf.server.db.SessionDAO;
+import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
@@ -8,7 +11,12 @@ import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
+import com.haf.shared.dto.EncryptedFileDTO;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.dto.LoginRequest;
+import com.haf.shared.dto.LoginResponse;
+import com.haf.shared.dto.RegisterRequest;
+import com.haf.shared.dto.RegisterResponse;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -16,6 +24,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
+import org.mindrot.jbcrypt.BCrypt;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.ByteArrayOutputStream;
@@ -32,8 +41,11 @@ import java.util.concurrent.Executors;
 public final class HttpIngressServer {
 
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
-    private static final String REQUEST_PATH = "/api/v1/messages";
+    private static final String MESSAGES_PATH = "/api/v1/messages";
+    private static final String REGISTER_PATH = "/api/v1/register";
+    private static final String LOGIN_PATH = "/api/v1/login";
     private static final String TEST_USER_ID = "test-user";
+    private static final int BCRYPT_LOG_ROUNDS = 12;
 
     private final ServerConfig config;
     private final MailboxRouter mailboxRouter;
@@ -41,6 +53,9 @@ public final class HttpIngressServer {
     private final AuditLogger auditLogger;
     private final MetricsRegistry metricsRegistry;
     private final EncryptedMessageValidator validator;
+    private final UserDAO userDAO;
+    private final SessionDAO sessionDAO;
+    private final FileUploadDAO fileUploadDAO;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private HttpsServer server;
@@ -48,27 +63,33 @@ public final class HttpIngressServer {
     /**
      * Creates an HttpIngressServer with a default MetricsRegistry.
      *
-     * @param config the ServerConfig
-     * @param sslContext the SSLContext
-     * @param mailboxRouter the MailboxRouter
+     * @param config             the ServerConfig
+     * @param sslContext         the SSLContext
+     * @param mailboxRouter      the MailboxRouter
      * @param rateLimiterService the RateLimiterService
-     * @param auditLogger the AuditLogger
-     * @param validator the EncryptedMessageValidator
+     * @param auditLogger        the AuditLogger
+     * @param validator          the EncryptedMessageValidator
      * @throws IOException if an error occurs while creating the HttpsServer
      */
     public HttpIngressServer(ServerConfig config,
-                             SSLContext sslContext,
-                             MailboxRouter mailboxRouter,
-                             RateLimiterService rateLimiterService,
-                             AuditLogger auditLogger,
-                             MetricsRegistry metricsRegistry,
-                             EncryptedMessageValidator validator) throws IOException {
+            SSLContext sslContext,
+            MailboxRouter mailboxRouter,
+            RateLimiterService rateLimiterService,
+            AuditLogger auditLogger,
+            MetricsRegistry metricsRegistry,
+            EncryptedMessageValidator validator,
+            UserDAO userDAO,
+            SessionDAO sessionDAO,
+            FileUploadDAO fileUploadDAO) throws IOException {
         this.config = config;
         this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
         this.auditLogger = auditLogger;
         this.metricsRegistry = metricsRegistry;
         this.validator = validator;
+        this.userDAO = userDAO;
+        this.sessionDAO = sessionDAO;
+        this.fileUploadDAO = fileUploadDAO;
         this.server = createServer(sslContext);
     }
 
@@ -85,8 +106,8 @@ public final class HttpIngressServer {
             @Override
             public void configure(HttpsParameters params) {
                 SSLParameters sslParameters = sslContext.getDefaultSSLParameters();
-                sslParameters.setProtocols(new String[]{"TLSv1.3"});
-                sslParameters.setCipherSuites(new String[]{
+                sslParameters.setProtocols(new String[] { "TLSv1.3" });
+                sslParameters.setCipherSuites(new String[] {
                         "TLS_AES_256_GCM_SHA384",
                         "TLS_CHACHA20_POLY1305_SHA256"
                 });
@@ -95,7 +116,10 @@ public final class HttpIngressServer {
             }
         });
 
-        httpsServer.createContext(REQUEST_PATH, new IngressHandler());
+        httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
+        httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
+        httpsServer.createContext(LOGIN_PATH, new LoginHandler());
+        httpsServer.createContext("/api/v1/config/admin-key", new AdminKeyHandler());
         httpsServer.setExecutor(executor);
 
         return httpsServer;
@@ -158,20 +182,21 @@ public final class HttpIngressServer {
                 if (!rateDecision.allowed()) {
                     auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
                     respond(exchange, requestId, 429,
-                        "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds() + "}");
+                            "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds()
+                                    + "}");
                     return;
                 }
 
                 QueuedEnvelope envelope = mailboxRouter.ingress(message);
                 auditLogger.logIngressAccepted(
-                    requestId,
-                    userId,
-                    message.recipientId,
-                    202,
-                    Duration.ofNanos(System.nanoTime() - start).toMillis()
-                );
+                        requestId,
+                        userId,
+                        message.recipientId,
+                        202,
+                        Duration.ofNanos(System.nanoTime() - start).toMillis());
 
-                String response = JsonCodec.toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
+                String response = JsonCodec
+                        .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
                 respond(exchange, requestId, 202, response);
             } catch (Exception ex) {
                 auditLogger.logError("ingress_http_error", requestId, userId, ex);
@@ -219,10 +244,10 @@ public final class HttpIngressServer {
         /**
          * Sends a response to the given HttpExchange.
          *
-         * @param exchange the HttpExchange
+         * @param exchange  the HttpExchange
          * @param requestId the request ID
-         * @param status the response status code
-         * @param body the response body
+         * @param status    the response status code
+         * @param body      the response body
          * @throws IOException if an error occurs while sending the response
          */
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
@@ -247,11 +272,288 @@ public final class HttpIngressServer {
     }
 
     /**
+     * Handles registration requests.
+     */
+    private final class RegistrationHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            try {
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    respond(exchange, requestId, 405, JsonCodec.toJson(RegisterResponse.error("method not allowed")));
+                    return;
+                }
+
+                String body = readBody(exchange.getRequestBody());
+                RegisterRequest request = JsonCodec.fromJson(body, RegisterRequest.class);
+
+                // Validate required fields
+                String validationError = validateRegistration(request);
+                if (validationError != null) {
+                    respond(exchange, requestId, 400, JsonCodec.toJson(RegisterResponse.error(validationError)));
+                    return;
+                }
+
+                // Check for duplicate email
+                if (userDAO.existsByEmail(request.email)) {
+                    respond(exchange, requestId, 409,
+                            JsonCodec.toJson(RegisterResponse.error("Email already registered")));
+                    return;
+                }
+
+                // Hash password and insert user first (photos link back to this user_id)
+                String hashedPassword = BCrypt.hashpw(request.password, BCrypt.gensalt(BCRYPT_LOG_ROUNDS));
+                String userId = userDAO.insert(request, hashedPassword);
+
+                // Store E2E-encrypted photos using the real userId (respects FK constraint)
+                String idPhotoId = storePhoto(request.idPhoto, userId);
+                String selfiePhotoId = storePhoto(request.selfiePhoto, userId);
+
+                // Link photos to user row if any were provided
+                if (idPhotoId != null || selfiePhotoId != null) {
+                    userDAO.updatePhotoIds(userId, idPhotoId, selfiePhotoId);
+                }
+
+                auditLogger.logRegistration(requestId, userId, request.email);
+
+                respond(exchange, requestId, 201, JsonCodec.toJson(RegisterResponse.success(userId)));
+            } catch (Exception ex) {
+                auditLogger.logError("registration_error", requestId, null, ex);
+                respond(exchange, requestId, 500, JsonCodec.toJson(RegisterResponse.error("internal server error")));
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private String validateRegistration(RegisterRequest r) {
+            if (isBlank(r.fullName))
+                return "fullName is required";
+            if (isBlank(r.email))
+                return "email is required";
+            if (isBlank(r.password))
+                return "password is required";
+            if (r.password.length() < 6)
+                return "password must be at least 6 characters";
+            if (isBlank(r.publicKeyPem))
+                return "publicKeyPem is required";
+            if (isBlank(r.publicKeyFingerprint))
+                return "publicKeyFingerprint is required";
+            return null;
+        }
+
+        /** Persists a photo blob if present, returns file_id or null. */
+        private String storePhoto(EncryptedFileDTO dto, String userId) {
+            if (dto == null || dto.ciphertextB64 == null || dto.ciphertextB64.isBlank()) {
+                return null;
+            }
+            return fileUploadDAO.insert(dto, userId);
+        }
+
+        private boolean isBlank(String value) {
+            return value == null || value.isBlank();
+        }
+
+        private String readBody(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException("Request body exceeds limit");
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.add("Content-Type", "application/json");
+
+            if (!responseHeaders.containsKey("X-Request-Id")) {
+                responseHeaders.add("X-Request-Id", requestId);
+            }
+
+            exchange.sendResponseHeaders(status, payload.length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
      * Represents the response to an ingress request.
      *
      * @param envelopeId the envelope ID
-     * @param expiresAt the expiration time of the envelope
+     * @param expiresAt  the expiration time of the envelope
      */
-    private record IngressResponse(String envelopeId, long expiresAt) { }
-}
+    private record IngressResponse(String envelopeId, long expiresAt) {
+    }
 
+    /**
+     * Handles login requests.
+     */
+    private final class LoginHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            try {
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    respond(exchange, requestId, 405, JsonCodec.toJson(LoginResponse.error("method not allowed")));
+                    return;
+                }
+
+                String body = readBody(exchange.getRequestBody());
+                LoginRequest request = JsonCodec.fromJson(body, LoginRequest.class);
+
+                // Validate required fields
+                if (isBlank(request.email) || isBlank(request.password)) {
+                    respond(exchange, requestId, 400,
+                            JsonCodec.toJson(LoginResponse.error("email and password are required")));
+                    return;
+                }
+
+                // Look up user by email
+                UserDAO.UserRecord user = userDAO.findByEmail(request.email);
+                if (user == null) {
+                    respond(exchange, requestId, 401,
+                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
+                    return;
+                }
+
+                // Verify password
+                if (!BCrypt.checkpw(request.password, user.passwordHash())) {
+                    respond(exchange, requestId, 401,
+                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
+                    return;
+                }
+
+                // Check account status
+                if (!"APPROVED".equals(user.status())) {
+                    respond(exchange, requestId, 403,
+                            JsonCodec.toJson(LoginResponse.error(
+                                    "Account is " + user.status().toLowerCase()
+                                            + ". Please contact an administrator.")));
+                    return;
+                }
+
+                // Create session
+                String sessionId = sessionDAO.createSession(user.userId());
+
+                auditLogger.logLogin(requestId, user.userId(), request.email);
+
+                respond(exchange, requestId, 200,
+                        JsonCodec.toJson(LoginResponse.success(
+                                user.userId(), sessionId, user.fullName(), user.rank(), user.status())));
+            } catch (Exception ex) {
+                auditLogger.logError("login_error", requestId, null, ex);
+                respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error("internal server error")));
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private boolean isBlank(String value) {
+            return value == null || value.isBlank();
+        }
+
+        private String readBody(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException("Request body exceeds limit");
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.add("Content-Type", "application/json");
+
+            if (!responseHeaders.containsKey("X-Request-Id")) {
+                responseHeaders.add("X-Request-Id", requestId);
+            }
+
+            exchange.sendResponseHeaders(status, payload.length);
+
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Serves the Admin's X25519 public key so clients can E2E-encrypt
+     * registration photos before sending them.
+     */
+    private final class AdminKeyHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.getResponseHeaders().add("X-Request-Id", UUID.randomUUID().toString());
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendPlain(exchange, 405, "{\"error\":\"method not allowed\"}");
+                return;
+            }
+
+            String pem = config.getAdminPublicKeyPem();
+            String body = pem != null
+                    ? "{\"adminPublicKeyPem\":\"" + pem.replace("\n", "\\n") + "\"}"
+                    : "{\"adminPublicKeyPem\":null}";
+
+            sendPlain(exchange, 200, body);
+            exchange.close();
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+}

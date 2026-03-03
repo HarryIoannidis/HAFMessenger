@@ -15,12 +15,10 @@ class CryptoConstantsTest {
     }
 
     @Test
-    void rsa_oaep_constants_are_correct() {
-        assertEquals("RSA/ECB/OAEPWithSHA-256AndMGF1Padding", CryptoConstants.RSA_OAEP_TRANSFORMATION, "RSA_OAEP_TRANSFORMATION mismatch");
-        assertEquals("MGF1", CryptoConstants.OAEP_MGF_ALGO, "OAEP_MGF_ALGO should be 'MGF1'");
-        assertEquals("SHA-256", CryptoConstants.OAEP_HASH, "OAEP_HASH should be 'SHA-256'");
-        assertEquals(2048, CryptoConstants.RSA_MIN_BITS, "RSA_MIN_BITS should be 2048");
-        assertEquals(4096, CryptoConstants.RSA_MAX_BITS, "RSA_MAX_BITS should be 4096");
+    void ecc_constants_are_correct() {
+        assertEquals("XDH", CryptoConstants.KEY_AGREEMENT_ALGO, "KEY_AGREEMENT_ALGO mismatch");
+        assertEquals("X25519", CryptoConstants.X25519_CURVE, "X25519_CURVE mismatch");
+        assertEquals("SHA-256", CryptoConstants.KDF_HASH_ALGO, "KDF_HASH_ALGO should be 'SHA-256'");
     }
 
 }

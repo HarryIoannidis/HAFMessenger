@@ -3,7 +3,7 @@ package com.haf.client.crypto;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.utils.FilePerms;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,7 +40,7 @@ class UserKeystoreKeyProviderTest {
         // Create a key in keystore
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String keyId = UserKeystore.todayKeyId();
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         keyStore.saveKeypair(keyId, kp, passphrase);
 
         // Create KeyProvider
@@ -57,8 +57,8 @@ class UserKeystoreKeyProviderTest {
         String senderKeyId = "key-sender-001";
         String recipientKeyId = "key-recipient-001";
 
-        KeyPair senderKp = RsaKeyIO.generate(2048);
-        KeyPair recipientKp = RsaKeyIO.generate(2048);
+        KeyPair senderKp = EccKeyIO.generate();
+        KeyPair recipientKp = EccKeyIO.generate();
 
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
         keyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
@@ -78,7 +78,7 @@ class UserKeystoreKeyProviderTest {
         // Create only sender key
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String senderKeyId = "key-sender-001";
-        KeyPair senderKp = RsaKeyIO.generate(2048);
+        KeyPair senderKp = EccKeyIO.generate();
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
 
         UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
@@ -93,7 +93,7 @@ class UserKeystoreKeyProviderTest {
     void get_key_store_returns_keystore_instance() throws Exception {
         UserKeystore keyStore = new UserKeystore(tmpRoot);
         String keyId = UserKeystore.todayKeyId();
-        KeyPair kp = RsaKeyIO.generate(2048);
+        KeyPair kp = EccKeyIO.generate();
         keyStore.saveKeypair(keyId, kp, passphrase);
 
         UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
@@ -101,4 +101,3 @@ class UserKeystoreKeyProviderTest {
         assertNotNull(provider.getKeyStore());
     }
 }
-

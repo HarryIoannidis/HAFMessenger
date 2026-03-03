@@ -9,7 +9,7 @@ import com.haf.shared.exceptions.MessageValidationException;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.JsonCodec;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,8 +33,8 @@ class MessageReceiverTest {
         }
 
         @Override
-        public void connect(java.util.function.Consumer<String> onMessage, 
-                           java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
+        public void connect(java.util.function.Consumer<String> onMessage,
+                java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
             this.messageConsumer = onMessage;
             connected = true;
         }
@@ -61,14 +61,14 @@ class MessageReceiverTest {
 
     KeyPair senderKp;
     KeyPair recipientKp;
-    
+
     String senderKeyId;
     String recipientKeyId;
-    
+
     UserKeystoreKeyProvider keyProvider;
-    
+
     ClockProvider clockProvider;
-    
+
     MockWebSocketAdapter webSocketAdapter;
     MessageReceiver messageReceiver;
     List<byte[]> receivedMessages = new ArrayList<>();
@@ -84,8 +84,8 @@ class MessageReceiverTest {
         senderKeyId = "key-sender-001";
         recipientKeyId = "key-recipient-001";
 
-        senderKp = RsaKeyIO.generate(2048);
-        recipientKp = RsaKeyIO.generate(2048);
+        senderKp = EccKeyIO.generate();
+        recipientKp = EccKeyIO.generate();
 
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
         keyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
@@ -192,4 +192,3 @@ class MessageReceiverTest {
         assertTrue(receivedErrors.get(0) instanceof MessageValidationException);
     }
 }
-

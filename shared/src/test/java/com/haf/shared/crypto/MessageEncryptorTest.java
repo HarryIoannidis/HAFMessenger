@@ -4,7 +4,7 @@ import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.RsaKeyIO;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.security.KeyPair;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +14,7 @@ public class MessageEncryptorTest {
 
     @Test
     public void test_encrypt_message() throws Exception {
-        KeyPair keyPair = RsaKeyIO.generate(2048);
+        KeyPair keyPair = EccKeyIO.generate();
 
         String senderId = "userA";
         String recipientId = "userB";
@@ -36,15 +36,16 @@ public class MessageEncryptorTest {
         assertEquals(contentType, encryptedMessage.contentType, "Το contentType πρέπει να ταιριάζει");
         assertEquals(MessageHeader.ALGO_AEAD, encryptedMessage.algorithm, "Το αλγόριθμο πρέπει να ταιριάζει");
         assertNotNull(encryptedMessage.ivB64, "Το ivB64 δεν πρέπει να είναι null");
-        assertNotNull(encryptedMessage.wrappedKeyB64, "Το wrappedKeyB64 δεν πρέπει να είναι null");
+        assertNotNull(encryptedMessage.ephemeralPublicB64, "Το ephemeralPublicB64 δεν πρέπει να είναι null");
         assertNotNull(encryptedMessage.ciphertextB64, "Το ciphertextB64 δεν πρέπει να είναι null");
-        assertEquals(payload.length, encryptedMessage.contentLength, "Το contentLength πρέπει να ταιριάζει με το μήκος του αρχικού μηνύματος");
+        assertEquals(payload.length, encryptedMessage.contentLength,
+                "Το contentLength πρέπει να ταιριάζει με το μήκος του αρχικού μηνύματος");
         assertTrue(encryptedMessage.e2e, "Το e2e flag πρέπει να είναι true");
     }
 
     @Test
     public void test_encrypt_rejects_null_payload() {
-        KeyPair keyPair = RsaKeyIO.generate(2048);
+        KeyPair keyPair = EccKeyIO.generate();
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor encryptor = new MessageEncryptor(keyPair.getPublic(), "sender", "recipient", clock);
 
@@ -55,7 +56,7 @@ public class MessageEncryptorTest {
 
     @Test
     public void test_encrypt_rejects_invalid_ttl() {
-        KeyPair keyPair = RsaKeyIO.generate(2048);
+        KeyPair keyPair = EccKeyIO.generate();
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor encryptor = new MessageEncryptor(keyPair.getPublic(), "sender", "recipient", clock);
         byte[] payload = "test".getBytes(StandardCharsets.UTF_8);
