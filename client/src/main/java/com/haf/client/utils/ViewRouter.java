@@ -22,9 +22,6 @@ public class ViewRouter {
 
     private static final Logger logger = Logger.getLogger(ViewRouter.class.getName());
 
-    /**
-     * Loads the Manrope font once at class initialization.
-     */
     static {
         try {
             Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE),
@@ -116,7 +113,7 @@ public class ViewRouter {
                 mainStage.setResizable(false);
                 mainStage.centerOnScreen();
             } else {
-                // Open new window at 1200x850 if current window is smaller,
+                // Open the new window at 1200x850 if the current window is smaller,
                 // otherwise keep current dimensions
                 if (Double.isNaN(mainStage.getWidth()) || mainStage.getWidth() < 1200 || mainStage.getHeight() < 850) {
                     mainStage.setWidth(1200);
