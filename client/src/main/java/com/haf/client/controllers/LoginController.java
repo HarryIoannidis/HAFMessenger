@@ -294,12 +294,32 @@ public class LoginController {
                     signInButton.setText(SIGN_IN_TEXT);
 
                     if (httpResponse.statusCode() == 200 && response.error == null) {
-                        // Wire up a stub session until real networking is integrated.
-                        ChatSession.set(new MessageViewModel(
-                                new MockMessageSender(),
-                                new MockMessageReceiver()));
-                        ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
-                        LOGGER.info("Login successful for: " + viewModel.getEmail());
+                        try {
+                            com.haf.shared.utils.ClockProvider clockProvider = com.haf.shared.utils.SystemClockProvider
+                                    .getInstance();
+                            char[] passphrase = viewModel.getPassword().toCharArray();
+                            com.haf.client.crypto.UserKeystoreKeyProvider keyProvider = new com.haf.client.crypto.UserKeystoreKeyProvider(
+                                    passphrase);
+
+                            com.haf.client.network.WebSocketAdapter wsAdapter = new com.haf.client.network.WebSocketAdapter(
+                                    URI.create("wss://localhost:8443/ws"), response.sessionId);
+
+                            com.haf.client.network.DefaultMessageSender sender = new com.haf.client.network.DefaultMessageSender(
+                                    keyProvider, clockProvider, wsAdapter);
+
+                            com.haf.client.network.DefaultMessageReceiver receiver = new com.haf.client.network.DefaultMessageReceiver(
+                                    keyProvider, clockProvider, wsAdapter, keyProvider.getSenderId());
+
+                            ChatSession.set(new MessageViewModel(sender, receiver));
+                            receiver.start();
+
+                            ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
+                            LOGGER.info("Login successful for: " + viewModel.getEmail() + ", Socket connected.");
+                        } catch (Exception ex) {
+                            LOGGER.log(Level.SEVERE, "Failed to initialize WebSocket session", ex);
+                            viewModel.setLoginError("Failed to initialize secure session locally.");
+                            shakeNode(signInButton);
+                        }
                     } else {
                         String errorMsg = response.error != null ? response.error : "Login failed.";
                         viewModel.setLoginError(errorMsg);

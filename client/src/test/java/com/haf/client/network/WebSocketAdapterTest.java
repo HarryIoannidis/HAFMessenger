@@ -13,18 +13,22 @@ class WebSocketAdapterTest {
 
     @BeforeEach
     void setUp() {
-        // We can't directly mock the HttpClient builder chain easily without more setup.
-        // For this test, we will focus on the logic inside the WebSocketAdapter that we can control.
+        // We can't directly mock the HttpClient builder chain easily without more
+        // setup.
+        // For this test, we will focus on the logic inside the WebSocketAdapter that we
+        // can control.
         // A full test would require a more complex setup or refactoring the adapter.
-        webSocketAdapter = new WebSocketAdapter(serverUri);
+        webSocketAdapter = new WebSocketAdapter(serverUri, "test-session-id");
     }
 
     @Test
     void connect_should_complete_successfully() throws IOException {
-        // This test is limited because we cannot easily mock the final `buildAsync` call.
-        // A real implementation would require refactoring WebSocketAdapter to inject the HttpClient.
+        // This test is limited because we cannot easily mock the final `buildAsync`
+        // call.
+        // A real implementation would require refactoring WebSocketAdapter to inject
+        // the HttpClient.
         // For now, we'll test the parts we can.
-        
+
         // Since we can't mock the builder, we can't fully test connect.
         // We'll assert that the adapter is not connected initially.
         assertFalse(webSocketAdapter.isConnected());

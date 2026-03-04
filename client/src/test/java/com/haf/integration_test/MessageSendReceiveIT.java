@@ -30,7 +30,7 @@ class MessageSendReceiveIT {
         private InMemoryWebSocketAdapter peer;
 
         InMemoryWebSocketAdapter() {
-            super(java.net.URI.create("ws://localhost:8080"));
+            super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
         }
 
         void setPeer(InMemoryWebSocketAdapter peer) {

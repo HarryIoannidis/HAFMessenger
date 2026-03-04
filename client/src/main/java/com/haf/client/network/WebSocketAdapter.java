@@ -22,6 +22,7 @@ import com.haf.client.utils.SslContextUtils;
  */
 public class WebSocketAdapter {
     private final URI serverUri;
+    private final String sessionId;
     private final HttpClient httpClient;
     private WebSocket webSocket;
     private Consumer<String> messageConsumer;
@@ -43,7 +44,7 @@ public class WebSocketAdapter {
     private final Object stateLock = new Object();
     private volatile boolean userClosed = false;
 
-    // Reconnection policy (Phase 4: stubs)
+    // Reconnection policy
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
     private static final long MAX_RETRY_DELAY_MS = 5000;
@@ -53,13 +54,13 @@ public class WebSocketAdapter {
      * Creates a WebSocketAdapter for the specified server URI.
      *
      * @param serverUri the WebSocket server URI (e.g., "wss://server:8080/ws")
+     * @param sessionId the authentication session ID to be passed as a bearer token
      */
-    public WebSocketAdapter(URI serverUri) {
+    public WebSocketAdapter(URI serverUri, String sessionId) {
         this.serverUri = serverUri;
+        this.sessionId = sessionId;
 
         // Create HTTP client with TLS configuration
-        // Phase 4: Basic TLS setup
-        // Phase 5: Will add certificate pinning here
         SSLContext sslContext = createSSLContext();
         SSLParameters sslParameters = createSSLParameters();
 
@@ -117,6 +118,7 @@ public class WebSocketAdapter {
 
         try {
             CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
+                    .header("Authorization", "Bearer " + sessionId)
                     .buildAsync(serverUri, listener);
 
             // Wait for connection to complete (with 10 second timeout)
