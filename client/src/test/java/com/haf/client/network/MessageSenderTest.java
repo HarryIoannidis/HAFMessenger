@@ -44,7 +44,7 @@ class MessageSenderTest {
         private boolean connected = false;
 
         MockWebSocketAdapter() {
-            super(URI.create("ws://localhost:8080"));
+            super(URI.create("ws://localhost:8080"), "test-session-id");
         }
 
         @Override

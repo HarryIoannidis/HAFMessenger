@@ -29,7 +29,7 @@ class MessageReceiverTest {
         private boolean connected = false;
 
         MockWebSocketAdapter() {
-            super(java.net.URI.create("ws://localhost:8080"));
+            super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
         }
 
         @Override
