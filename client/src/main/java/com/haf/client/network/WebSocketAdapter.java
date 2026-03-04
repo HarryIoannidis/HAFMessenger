@@ -14,11 +14,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import com.haf.client.utils.SslContextUtils;
+
 /**
  * WebSocket adapter for client-server communication over TLS.
- * 
- * Phase 4: Basic WebSocket implementation with TLS hooks.
- * Phase 5: Will add certificate pinning and full TLS configuration.
+ * Features implement exponential backoff and certificate pinning.
  */
 public class WebSocketAdapter {
     private final URI serverUri;
@@ -72,16 +72,13 @@ public class WebSocketAdapter {
 
     /**
      * Creates SSL context for TLS connections.
-     * Phase 4: Uses default SSL context.
-     * Phase 5: Will add certificate pinning here.
+     * Uses the custom truststore for certificate pinning.
      *
      * @return the SSL context
      */
     private SSLContext createSSLContext() {
         try {
-            // Phase 4: Use default SSL context
-            // Phase 5: Will create custom SSL context with certificate pinning
-            return SSLContext.getDefault();
+            return SslContextUtils.getTrustingSslContext();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to create SSL context", e);
         }
@@ -89,35 +86,19 @@ public class WebSocketAdapter {
 
     /**
      * Creates SSL parameters for TLS connections.
-     * Phase 4: Basic TLS 1.3 parameters.
-     * Phase 5: Will add certificate pinning validation here.
+     * Ensures TLS 1.3 and specific secure cipher suites are used.
      *
      * @return the SSL parameters
      */
     private SSLParameters createSSLParameters() {
         SSLParameters params = new SSLParameters();
-        // Phase 4: Enable TLS 1.3
         params.setProtocols(new String[] { "TLSv1.3" });
-        // Phase 5: Add cipher suite allowlist (docs requirement)
         params.setCipherSuites(new String[] {
                 "TLS_AES_256_GCM_SHA384",
                 "TLS_CHACHA20_POLY1305_SHA256"
         });
-        // Phase 5: Will add certificate pinning checks here
+        params.setEndpointIdentificationAlgorithm("HTTPS");
         return params;
-    }
-
-    /**
-     * Hook for certificate pinning validation (Phase 5 placeholder).
-     *
-     * @param certificateChain the server certificate chain
-     * @return true if certificate is trusted, false otherwise
-     */
-    @SuppressWarnings("unused")
-    private boolean validateCertificatePinning(java.security.cert.X509Certificate[] certificateChain) {
-        // Phase 5: Implement certificate pinning validation
-        // For now, return true to allow connection
-        return true;
     }
 
     /**
@@ -132,7 +113,39 @@ public class WebSocketAdapter {
         this.errorConsumer = onError;
         this.userClosed = false;
 
-        WebSocket.Listener listener = new WebSocket.Listener() {
+        WebSocket.Listener listener = createWebSocketListener();
+
+        try {
+            CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
+                    .buildAsync(serverUri, listener);
+
+            // Wait for connection to complete (with 10 second timeout)
+            this.webSocket = future.get(10, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException e) {
+            isConnected = false;
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw new IOException("Failed to connect WebSocket", cause);
+        } catch (java.util.concurrent.TimeoutException e) {
+            isConnected = false;
+            throw new IOException("WebSocket connection timeout", e);
+        } catch (InterruptedException e) {
+            isConnected = false;
+            Thread.currentThread().interrupt();
+            throw new IOException("WebSocket connection interrupted", e);
+        } catch (Exception e) {
+            isConnected = false;
+            if (e instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw new IOException("Failed to connect WebSocket", e);
+        }
+    }
+
+    private WebSocket.Listener createWebSocketListener() {
+        return new WebSocket.Listener() {
             @Override
             public void onOpen(WebSocket webSocket) {
                 isConnected = true;
@@ -145,39 +158,8 @@ public class WebSocketAdapter {
 
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                try {
-                    // Accumulate fragments until last == true
-                    if (data != null) {
-                        // Guard against oversize messages (approx by char count)
-                        if (inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES) {
-                            inboundBuffer.setLength(0);
-                            if (errorConsumer != null) {
-                                errorConsumer.accept(new IOException("Inbound message too large"));
-                            }
-                            // Drop this message and request next
-                            webSocket.request(1);
-                            return null;
-                        }
-                        inboundBuffer.append(data);
-                    }
-                    if (last) {
-                        String message = inboundBuffer.toString();
-                        inboundBuffer.setLength(0);
-                        if (messageConsumer != null) {
-                            try {
-                                messageConsumer.accept(message);
-                            } catch (Exception e) {
-                                if (errorConsumer != null) {
-                                    errorConsumer.accept(e);
-                                }
-                            }
-                        }
-                    }
-                } finally {
-                    // Request next message
-                    webSocket.request(1);
-                }
-                return null;
+                handleIncomingText(webSocket, data, last);
+                return WebSocket.Listener.super.onText(webSocket, data, last);
             }
 
             @Override
@@ -196,7 +178,7 @@ public class WebSocketAdapter {
                 WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
                 stopHeartbeat();
                 scheduleReconnect();
-                return null;
+                return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
             }
 
             @Override
@@ -205,29 +187,39 @@ public class WebSocketAdapter {
                 return WebSocket.Listener.super.onPong(webSocket, message);
             }
         };
+    }
 
+    private void handleIncomingText(WebSocket webSocket, CharSequence data, boolean last) {
         try {
-            CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
-                    .buildAsync(serverUri, listener);
-
-            // Wait for connection to complete (with 10 second timeout)
-            this.webSocket = future.get(10, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.ExecutionException e) {
-            isConnected = false;
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException) {
-                throw (IOException) cause;
+            // Accumulate fragments until last == true
+            if (data != null) {
+                // Guard against oversize messages (approx by char count)
+                if (inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES) {
+                    inboundBuffer.setLength(0);
+                    if (errorConsumer != null) {
+                        errorConsumer.accept(new IOException("Inbound message too large"));
+                    }
+                    // Drop this message and request next
+                    return;
+                }
+                inboundBuffer.append(data);
             }
-            throw new IOException("Failed to connect WebSocket", cause);
-        } catch (java.util.concurrent.TimeoutException e) {
-            isConnected = false;
-            throw new IOException("WebSocket connection timeout", e);
-        } catch (Exception e) {
-            isConnected = false;
-            if (e instanceof IOException) {
-                throw (IOException) e;
+            if (last) {
+                String message = inboundBuffer.toString();
+                inboundBuffer.setLength(0);
+                if (messageConsumer != null) {
+                    try {
+                        messageConsumer.accept(message);
+                    } catch (Exception e) {
+                        if (errorConsumer != null) {
+                            errorConsumer.accept(e);
+                        }
+                    }
+                }
             }
-            throw new IOException("Failed to connect WebSocket", e);
+        } finally {
+            // Request next message
+            webSocket.request(1);
         }
     }
 
@@ -249,6 +241,9 @@ public class WebSocketAdapter {
             sendFuture.get(5, TimeUnit.SECONDS);
         } catch (java.util.concurrent.TimeoutException te) {
             throw new IOException("Failed to send message: timeout", te);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Failed to send message: interrupted", ie);
         } catch (Exception e) {
             throw new IOException("Failed to send message", e);
         }
@@ -265,7 +260,10 @@ public class WebSocketAdapter {
         if (ws != null) {
             try {
                 ws.sendClose(WebSocket.NORMAL_CLOSURE, "Client closing").get(3, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
             } catch (Exception ignored) {
+                // Ignore failure during close
             } finally {
                 isConnected = false;
             }
@@ -284,8 +282,8 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Reconnection policy stub (Phase 4 placeholder).
-     * Phase 5: Will implement exponential backoff and bounded retries.
+     * Reconnection policy check. Evaluates whether reconnection should be attempted
+     * based on maximum retry limits.
      *
      * @return true if reconnection should be attempted
      */
@@ -298,8 +296,7 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Gets the retry delay in milliseconds (Phase 4 placeholder).
-     * Phase 5: Will implement exponential backoff.
+     * Gets the retry delay in milliseconds using exponential backoff.
      *
      * @return the retry delay in milliseconds
      */
@@ -333,31 +330,39 @@ public class WebSocketAdapter {
             }
             lastPongAtNanos = System.nanoTime();
             if (!heartbeatScheduled) {
-                scheduler.scheduleAtFixedRate(() -> {
-                    try {
-                        WebSocket ws = webSocket;
-                        if (ws != null && isConnected) {
-                            ws.sendPing(java.nio.ByteBuffer.wrap(new byte[] { 1 }));
-                        }
-                        long ageMs = (System.nanoTime() - lastPongAtNanos) / 1_000_000L;
-                        if (ageMs > HEARTBEAT_MAX_SILENCE_MS) {
-                            // Consider connection stale; close and attempt reconnect
-                            try {
-                                if (ws != null) {
-                                    ws.abort();
-                                }
-                            } catch (Throwable ignored) {
-                            }
-                            isConnected = false;
-                        }
-                    } catch (Throwable t) {
-                        if (errorConsumer != null) {
-                            errorConsumer.accept(t);
-                        }
-                    }
-                }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+                scheduler.scheduleAtFixedRate(this::heartbeatTask, HEARTBEAT_INTERVAL_SECONDS,
+                        HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
                 heartbeatScheduled = true;
             }
+        }
+    }
+
+    private void heartbeatTask() {
+        try {
+            WebSocket ws = webSocket;
+            if (ws != null && isConnected) {
+                ws.sendPing(java.nio.ByteBuffer.wrap(new byte[] { 1 }));
+            }
+            long ageMs = (System.nanoTime() - lastPongAtNanos) / 1_000_000L;
+            if (ageMs > HEARTBEAT_MAX_SILENCE_MS) {
+                // Consider connection stale; close and attempt reconnect
+                abortWebSocket(ws);
+                isConnected = false;
+            }
+        } catch (Exception t) {
+            if (errorConsumer != null) {
+                errorConsumer.accept(t);
+            }
+        }
+    }
+
+    private void abortWebSocket(WebSocket ws) {
+        try {
+            if (ws != null) {
+                ws.abort();
+            }
+        } catch (Exception ignored) {
+            // Abort failed, ignore
         }
     }
 
@@ -393,26 +398,28 @@ public class WebSocketAdapter {
                 Thread.currentThread().interrupt();
                 return;
             }
+            Consumer<String> mc;
+            Consumer<Throwable> ec;
+
             synchronized (stateLock) {
                 if (isConnected || userClosed) {
                     return;
                 }
-                try {
-                    // Reuse previous consumers.
-                    // TODO (Phase 5): connect() blocks for up to 10 s inside this lock.
-                    // Move the connect call outside synchronized{} to avoid holding
-                    // stateLock during the full handshake and prevent potential deadlocks
-                    // if onClose/onError fire concurrently during reconnect.
-                    if (messageConsumer != null || errorConsumer != null) {
-                        connect(messageConsumer, errorConsumer);
-                    }
-                } catch (IOException e) {
-                    if (errorConsumer != null) {
-                        errorConsumer.accept(e);
-                    }
-                    // Chain next retry if still allowed
-                    scheduleReconnect();
+                mc = messageConsumer;
+                ec = errorConsumer;
+            }
+
+            try {
+                // Reuse previous consumers outside the lock to avoid deadlocks.
+                if (mc != null || ec != null) {
+                    connect(mc, ec);
                 }
+            } catch (IOException e) {
+                if (ec != null) {
+                    ec.accept(e);
+                }
+                // Chain next retry if still allowed
+                scheduleReconnect();
             }
         });
     }

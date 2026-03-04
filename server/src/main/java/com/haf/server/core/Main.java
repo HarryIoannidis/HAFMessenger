@@ -75,7 +75,7 @@ public final class Main {
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
                     sessionDAO, fileUploadDAO);
             WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
-                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry);
+                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO);
 
             metricsFutureRef[0] = scheduler.scheduleAtFixedRate(
                     () -> auditLogger.logMetricsSnapshot(metricsRegistry.snapshot()),
