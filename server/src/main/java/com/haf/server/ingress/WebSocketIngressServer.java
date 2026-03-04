@@ -3,6 +3,7 @@ package com.haf.server.ingress;
 import com.haf.server.config.ServerConfig;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
+import com.haf.server.db.SessionDAO;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.MailboxRouter.MailboxSubscriber;
 import com.haf.server.router.MailboxRouter.MailboxSubscription;
@@ -33,9 +34,11 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     private final Map<WebSocket, MailboxSubscription> subscriptions = new ConcurrentHashMap<>();
     private final Map<WebSocket, String> connectionUsers = new ConcurrentHashMap<>();
+    private final SessionDAO sessionDAO;
 
     /**
-     * Creates a WebSocketIngressServer with the given configuration and dependencies.
+     * Creates a WebSocketIngressServer with the given configuration and
+     * dependencies.
      * 
      * @param config             the server configuration.
      * @param sslContext         the SSL context.
@@ -43,13 +46,15 @@ public final class WebSocketIngressServer extends WebSocketServer {
      * @param rateLimiterService the rate limiter service.
      * @param auditLogger        the audit logger.
      * @param metricsRegistry    the metrics registry.
+     * @param sessionDAO         the session DAO.
      */
     public WebSocketIngressServer(ServerConfig config,
             SSLContext sslContext,
             MailboxRouter mailboxRouter,
             RateLimiterService rateLimiterService,
             AuditLogger auditLogger,
-            MetricsRegistry metricsRegistry) {
+            MetricsRegistry metricsRegistry,
+            SessionDAO sessionDAO) {
         super(new InetSocketAddress(config.getWsPort()));
         setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
 
@@ -64,6 +69,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
         this.rateLimiterService = rateLimiterService;
         this.auditLogger = auditLogger;
         this.metricsRegistry = metricsRegistry;
+        this.sessionDAO = sessionDAO;
     }
 
     /**
@@ -74,9 +80,18 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        // TODO(auth): Replace TEST_USER_ID with authenticated principal once auth is
-        // wired.
-        String userId = TEST_USER_ID;
+        String authHeader = handshake.getFieldValue("Authorization");
+        String userId = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String sessionId = authHeader.substring(7);
+            userId = sessionDAO.getUserIdForSession(sessionId);
+        }
+
+        if (userId == null) {
+            conn.closeConnection(CloseFrame.POLICY_VALIDATION, "Unauthorized");
+            return;
+        }
+
         connectionUsers.put(conn, userId);
 
         MailboxSubscriber subscriber = envelope -> sendEnvelope(conn, envelope);

@@ -9,6 +9,8 @@ import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.server.db.SessionDAO;
+import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +51,9 @@ class WebSocketIngressServerTest {
     @Mock
     private MetricsRegistry metricsRegistry;
 
+    @Mock
+    private SessionDAO sessionDAO;
+
     private SSLContext sslContext;
     private WebSocketIngressServer server;
 
@@ -60,16 +65,20 @@ class WebSocketIngressServerTest {
         when(config.getWsPort()).thenReturn(0);
 
         server = new WebSocketIngressServer(
-            config, sslContext, mailboxRouter, rateLimiterService,
-            auditLogger, metricsRegistry
-        );
+                config, sslContext, mailboxRouter, rateLimiterService,
+                auditLogger, metricsRegistry, sessionDAO);
     }
 
     @Test
     void on_open_subscribes_user_and_sends_pending() {
         String userId = "test-user";
+        String sessionId = "valid-session";
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer " + sessionId);
+        when(sessionDAO.getUserIdForSession(sessionId)).thenReturn(userId);
+
         QueuedEnvelope envelope = createQueuedEnvelope();
-        when(mailboxRouter.subscribe(eq(userId), any())).thenReturn(new MailboxSubscription(userId, mock(MailboxRouter.MailboxSubscriber.class)));
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenReturn(new MailboxSubscription(userId, mock(MailboxRouter.MailboxSubscriber.class)));
         when(mailboxRouter.fetchUndelivered(eq(userId), eq(100))).thenReturn(List.of(envelope));
 
         server.onOpen(webSocket, handshake);
@@ -77,6 +86,16 @@ class WebSocketIngressServerTest {
         verify(mailboxRouter, times(1)).subscribe(eq(userId), any());
         verify(mailboxRouter, times(1)).fetchUndelivered(eq(userId), eq(100));
         verify(webSocket, atLeastOnce()).send(anyString());
+    }
+
+    @Test
+    void on_open_rejects_unauthorized() {
+        when(handshake.getFieldValue("Authorization")).thenReturn(null);
+
+        server.onOpen(webSocket, handshake);
+
+        verify(webSocket, times(1)).closeConnection(CloseFrame.POLICY_VALIDATION, "Unauthorized");
+        verify(mailboxRouter, never()).subscribe(anyString(), any());
     }
 
     @Test
@@ -89,7 +108,8 @@ class WebSocketIngressServerTest {
     @Test
     void on_message_processes_ack_when_allowed() {
         String ackJson = "{\"envelopeIds\":[\"id1\",\"id2\"]}";
-        when(rateLimiterService.checkAndConsume(anyString(), anyString())).thenReturn(RateLimiterService.RateLimitDecision.allow());
+        when(rateLimiterService.checkAndConsume(anyString(), anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
 
         server.onMessage(webSocket, ackJson);
 
@@ -100,7 +120,7 @@ class WebSocketIngressServerTest {
     void on_message_rejects_when_rate_limited() {
         String ackJson = "{\"envelopeIds\":[\"id1\"]}";
         when(rateLimiterService.checkAndConsume(anyString(), anyString()))
-            .thenReturn(RateLimiterService.RateLimitDecision.block(60));
+                .thenReturn(RateLimiterService.RateLimitDecision.block(60));
 
         server.onMessage(webSocket, ackJson);
 
@@ -112,7 +132,8 @@ class WebSocketIngressServerTest {
     @Test
     void on_message_closes_on_exception() {
         String invalidJson = "not json";
-        when(rateLimiterService.checkAndConsume(anyString(), anyString())).thenReturn(RateLimiterService.RateLimitDecision.allow());
+        when(rateLimiterService.checkAndConsume(anyString(), anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
 
         server.onMessage(webSocket, invalidJson);
 
@@ -133,12 +154,10 @@ class WebSocketIngressServerTest {
         KeyStore keyStore = KeyStore.getInstance("JKS");
         keyStore.load(null, "password".toCharArray());
         javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(
-            javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm()
-        );
+                javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(keyStore, "password".toCharArray());
         javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance(
-            javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm()
-        );
+                javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(keyStore);
         SSLContext ctx = SSLContext.getInstance("TLS");
         ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
@@ -167,4 +186,3 @@ class WebSocketIngressServerTest {
         return new QueuedEnvelope("envelope-1", message, createdAt, expiresAt);
     }
 }
-

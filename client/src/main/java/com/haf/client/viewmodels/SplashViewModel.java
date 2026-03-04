@@ -123,22 +123,22 @@ public class SplashViewModel {
                 if (detectedVersion != null && !detectedVersion.isBlank()) {
                     version.set(detectedVersion);
                 }
-                // delay(300L);
+                delay(200L);
 
                 update(UiConstants.BOOTSTRAP_SECURITY, 0.3);
                 cryptoInitializer.initialize();
-                // delay(300L);
+                delay(200L);
 
                 update(UiConstants.BOOTSTRAP_RESOURCES, 0.6);
                 resourceChecker.verify();
-                // delay(600L);
+                delay(400L);
 
                 update(UiConstants.BOOTSTRAP_NETWORK, 0.8);
                 networkChecker.check();
-                // delay(400L);
+                delay(200L);
 
                 update(UiConstants.BOOTSTRAP_READY, 1.0);
-                // delay(200L);
+                delay(200L);
                 return null;
             }
 

@@ -69,4 +69,36 @@ public final class SessionDAO {
             throw new IllegalStateException("Failed to create session", ex);
         }
     }
+
+    private static final String SELECT_USER_SQL = """
+            SELECT user_id FROM sessions
+            WHERE session_id = ? AND expires_at > ?
+            """;
+
+    /**
+     * Retrieves the user ID for a given valid session ID.
+     *
+     * @param sessionId the session ID
+     * @return the user ID, or null if invalid/expired
+     */
+    public String getUserIdForSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return null;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(SELECT_USER_SQL)) {
+
+            ps.setString(1, sessionId);
+            ps.setTimestamp(2, Timestamp.from(Instant.now()));
+
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("user_id");
+                }
+            }
+        } catch (SQLException ex) {
+            auditLogger.logError("db_verify_session", null, "unknown", ex);
+        }
+        return null;
+    }
 }

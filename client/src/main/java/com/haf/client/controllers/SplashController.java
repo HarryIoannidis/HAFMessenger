@@ -42,7 +42,7 @@ public class SplashController {
     @FXML
     public void initialize() {
         bindViewModel();
-        // viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
+        // viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
         viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
