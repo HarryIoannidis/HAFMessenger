@@ -1,0 +1,41 @@
+.card {
+    -fx-background-color: #D9D9D9;
+    -fx-background-radius: 8;
+    -fx-background-insets: 2;
+    -fx-border-insets: 0;
+}
+
+.plain-text-bold {
+    -fx-fill: #202020;
+    -fx-text-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-weight: bolder;
+    -fx-font-smoothing-type: gray;
+    -fx-font-size: 16px;
+}
+
+.plain-text {
+    -fx-fill: #333333;
+    -fx-text-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-weight: bold;
+    -fx-font-smoothing-type: gray;
+    -fx-font-size: 16px;
+}
+
+.button {
+    -fx-background-color: #EDEDED;
+    -fx-text-fill: #202020;
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+    -fx-border-color: #A3A3A3;
+    -fx-min-height: 45;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #DEDEDE;
+}
