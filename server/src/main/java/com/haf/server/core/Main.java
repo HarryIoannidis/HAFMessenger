@@ -108,12 +108,7 @@ public final class Main {
 
             LOGGER.info("Servers started on HTTP {} / WS {}", config.getHttpPort(), config.getWsPort());
 
-            try {
-                shutdownLatch.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOGGER.warn("Shutdown latch interrupted", e);
-            }
+            awaitShutdown(shutdownLatch);
         } catch (Exception e) {
             LOGGER.error("Server startup failed", e);
 
@@ -212,5 +207,14 @@ public final class Main {
         };
 
         return Executors.newScheduledThreadPool(2, factory);
+    }
+
+    private static void awaitShutdown(CountDownLatch shutdownLatch) {
+        try {
+            shutdownLatch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Shutdown latch interrupted", e);
+        }
     }
 }

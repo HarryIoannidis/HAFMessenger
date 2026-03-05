@@ -5,6 +5,8 @@ import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -145,6 +147,31 @@ public class WebSocketAdapter {
             }
             throw new IOException("Failed to connect WebSocket", e);
         }
+    }
+
+    /**
+     * Executes an authenticated GET request against the server using the trusting
+     * HttpClient.
+     *
+     * @param path The API path to request (e.g., "/api/v1/users/{id}/key")
+     * @return CompletableFuture containing the response body string
+     */
+    public CompletableFuture<String> getAuthenticated(String path) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(serverUri.resolve(path))
+                .header("Authorization", "Bearer " + sessionId)
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        return response.body();
+                    } else {
+                        throw new RuntimeException(
+                                "HTTP GET failed with status " + response.statusCode() + ": " + response.body());
+                    }
+                });
     }
 
     private WebSocket.Listener createWebSocketListener() {

@@ -48,8 +48,8 @@ class SessionDAOTest {
 
         assertNotNull(sessionId);
         assertFalse(sessionId.isBlank());
-        verify(preparedStatement).setString(eq(1), eq(sessionId)); // session_id
-        verify(preparedStatement).setString(eq(2), eq("user-123")); // user_id
+        verify(preparedStatement).setString(1, sessionId); // session_id
+        verify(preparedStatement).setString(2, "user-123"); // user_id
         verify(preparedStatement, times(1)).executeUpdate();
     }
 

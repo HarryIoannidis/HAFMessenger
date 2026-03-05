@@ -23,6 +23,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     private final UserKeystore keyStore;
     private final String senderId;
     private final char[] passphrase;
+    private java.util.function.Function<String, String> directoryServiceFetcher;
 
     /**
      * Creates a UserKeystoreKeyProvider with the specified keystore root and
@@ -70,6 +71,18 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         }
     }
 
+    /**
+     * Sets a callback to fetch public keys from a directory service (e.g., the
+     * server).
+     * The function should take a recipient ID and return the PEM-encoded public
+     * key.
+     *
+     * @param fetcher the function to fetch the public key
+     */
+    public void setDirectoryServiceFetcher(java.util.function.Function<String, String> fetcher) {
+        this.directoryServiceFetcher = fetcher;
+    }
+
     @Override
     public PublicKey getRecipientPublicKey(String recipientId) throws KeyNotFoundException {
         // Phase 4 placeholder: Try to load recipient key from local keystore
@@ -83,21 +96,37 @@ public class UserKeystoreKeyProvider implements KeyProvider {
             for (KeyMetadata meta : metadataList) {
                 if (recipientId.equals(meta.keyId())) {
                     // Found matching keyId, load public key
-                    try {
-                        return keyStore.loadPublicKeyByKeyId(recipientId);
-                    } catch (Exception e) {
-                        throw new KeyNotFoundException("Failed to load public key for recipient: " + recipientId, e);
-                    }
+                    return loadRecipientKey(recipientId);
                 }
             }
 
             // Key not found in local keystore
+            if (directoryServiceFetcher != null) {
+                try {
+                    String pem = directoryServiceFetcher.apply(recipientId);
+                    if (pem != null) {
+                        return com.haf.shared.utils.EccKeyIO.publicFromPem(pem);
+                    }
+                } catch (Exception fetchEx) {
+                    throw new KeyNotFoundException(
+                            "Failed to fetch public key from directory service for recipient: " + recipientId, fetchEx);
+                }
+            }
+
             throw new KeyNotFoundException("Recipient key not found in local keystore: " + recipientId +
                     " (directory service integration will be available in Phase 5)");
         } catch (KeyNotFoundException e) {
             throw e;
         } catch (Exception e) {
             throw new KeyNotFoundException("Error looking up recipient key: " + recipientId, e);
+        }
+    }
+
+    private PublicKey loadRecipientKey(String recipientId) throws KeyNotFoundException {
+        try {
+            return keyStore.loadPublicKeyByKeyId(recipientId);
+        } catch (Exception e) {
+            throw new KeyNotFoundException("Failed to load public key for recipient: " + recipientId, e);
         }
     }
 

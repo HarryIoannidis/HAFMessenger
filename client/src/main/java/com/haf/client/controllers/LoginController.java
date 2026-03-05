@@ -18,8 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXCheckBox;
-import com.jfoenix.controls.JFXPasswordField;
-import com.jfoenix.controls.JFXTextField;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
@@ -263,88 +261,111 @@ public class LoginController {
         viewModel.loadingProperty().set(true);
         signInButton.setText("Signing in...");
 
-        Thread loginThread = new Thread(() -> {
-            try {
-                // Build login request from ViewModel
-                LoginRequest request = new LoginRequest();
-                request.email = viewModel.getEmail();
-                request.password = viewModel.getPassword();
-
-                String json = JsonCodec.toJson(request);
-
-                // POST to server login endpoint
-                HttpClient client = HttpClient.newBuilder()
-                        .sslContext(SslContextUtils.getTrustingSslContext())
-                        .build();
-
-                HttpRequest httpRequest = HttpRequest.newBuilder()
-                        .uri(URI.create("https://localhost:8443/api/v1/login"))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(json))
-                        .build();
-
-                HttpResponse<String> httpResponse = client.send(httpRequest,
-                        HttpResponse.BodyHandlers.ofString());
-
-                LoginResponse response = JsonCodec.fromJson(httpResponse.body(), LoginResponse.class);
-
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    signInButton.setText(SIGN_IN_TEXT);
-
-                    if (httpResponse.statusCode() == 200 && response.error == null) {
-                        try {
-                            com.haf.shared.utils.ClockProvider clockProvider = com.haf.shared.utils.SystemClockProvider
-                                    .getInstance();
-                            char[] passphrase = viewModel.getPassword().toCharArray();
-                            com.haf.client.crypto.UserKeystoreKeyProvider keyProvider = new com.haf.client.crypto.UserKeystoreKeyProvider(
-                                    passphrase);
-
-                            com.haf.client.network.WebSocketAdapter wsAdapter = new com.haf.client.network.WebSocketAdapter(
-                                    URI.create("wss://localhost:8443/ws"), response.sessionId);
-
-                            com.haf.client.network.DefaultMessageSender sender = new com.haf.client.network.DefaultMessageSender(
-                                    keyProvider, clockProvider, wsAdapter);
-
-                            com.haf.client.network.DefaultMessageReceiver receiver = new com.haf.client.network.DefaultMessageReceiver(
-                                    keyProvider, clockProvider, wsAdapter, keyProvider.getSenderId());
-
-                            ChatSession.set(new MessageViewModel(sender, receiver));
-                            receiver.start();
-
-                            ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
-                            LOGGER.info("Login successful for: " + viewModel.getEmail() + ", Socket connected.");
-                        } catch (Exception ex) {
-                            LOGGER.log(Level.SEVERE, "Failed to initialize WebSocket session", ex);
-                            viewModel.setLoginError("Failed to initialize secure session locally.");
-                            shakeNode(signInButton);
-                        }
-                    } else {
-                        String errorMsg = response.error != null ? response.error : "Login failed.";
-                        viewModel.setLoginError(errorMsg);
-                        shakeNode(signInButton);
-                    }
-                });
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    signInButton.setText(SIGN_IN_TEXT);
-                    viewModel.setLoginError("Connection was interrupted.");
-                });
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Login failed", e);
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    signInButton.setText(SIGN_IN_TEXT);
-                    viewModel.setLoginError("Connection failed. Please try again.");
-                });
-            }
-        }, "login-thread");
-
+        Thread loginThread = new Thread(this::performLoginTask, "login-thread");
         loginThread.setDaemon(true);
         loginThread.start();
+    }
+
+    private void performLoginTask() {
+        try {
+            // Build login request from ViewModel
+            LoginRequest request = new LoginRequest();
+            request.email = viewModel.getEmail();
+            request.password = viewModel.getPassword();
+
+            String json = JsonCodec.toJson(request);
+
+            // POST to server login endpoint
+            HttpClient client = HttpClient.newBuilder()
+                    .sslContext(SslContextUtils.getTrustingSslContext())
+                    .build();
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create("https://localhost:8443/api/v1/login"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+
+            HttpResponse<String> httpResponse = client.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            LoginResponse response = JsonCodec.fromJson(httpResponse.body(), LoginResponse.class);
+
+            javafx.application.Platform.runLater(() -> handleLoginResponse(httpResponse.statusCode(), response));
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            handleLoginError("Connection was interrupted.");
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Login failed", e);
+            handleLoginError("Connection failed. Please try again.");
+        }
+    }
+
+    private void handleLoginResponse(int statusCode, LoginResponse response) {
+        viewModel.loadingProperty().set(false);
+        signInButton.setText(SIGN_IN_TEXT);
+
+        if (statusCode == 200 && response.error == null) {
+            try {
+                initializeSecureSession(response.sessionId, viewModel.getPassword());
+                ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
+                LOGGER.info("Login successful for: " + viewModel.getEmail() + ", Socket connected.");
+            } catch (Exception ex) {
+                LOGGER.log(Level.SEVERE, "Failed to initialize WebSocket session", ex);
+                viewModel.setLoginError("Failed to initialize secure session locally.");
+                shakeNode(signInButton);
+            }
+        } else {
+            String errorMsg = response.error != null ? response.error : "Login failed.";
+            viewModel.setLoginError(errorMsg);
+            shakeNode(signInButton);
+        }
+    }
+
+    private void initializeSecureSession(String sessionId, String passphraseStr) throws Exception {
+        com.haf.shared.utils.ClockProvider clockProvider = com.haf.shared.utils.SystemClockProvider.getInstance();
+        char[] passphrase = passphraseStr.toCharArray();
+        com.haf.client.crypto.UserKeystoreKeyProvider keyProvider = new com.haf.client.crypto.UserKeystoreKeyProvider(
+                passphrase);
+
+        com.haf.client.network.WebSocketAdapter wsAdapter = new com.haf.client.network.WebSocketAdapter(
+                URI.create("wss://localhost:8443/ws"), sessionId);
+
+        // Configure directory service lookup
+        keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));
+
+        com.haf.client.network.DefaultMessageSender sender = new com.haf.client.network.DefaultMessageSender(
+                keyProvider, clockProvider, wsAdapter);
+
+        com.haf.client.network.DefaultMessageReceiver receiver = new com.haf.client.network.DefaultMessageReceiver(
+                keyProvider, clockProvider, wsAdapter, keyProvider.getSenderId());
+
+        ChatSession.set(new MessageViewModel(sender, receiver));
+        receiver.start();
+    }
+
+    private String fetchPublicKey(com.haf.client.network.WebSocketAdapter wsAdapter, String recipientId) {
+        try {
+            String path = "/api/v1/users/" + recipientId + "/key";
+            String jsonResponse = wsAdapter.getAuthenticated(path).get();
+            com.haf.shared.dto.PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse,
+                    com.haf.shared.dto.PublicKeyResponse.class);
+            if (keyRes.success && keyRes.publicKeyPem != null) {
+                return keyRes.publicKeyPem;
+            }
+            return null;
+        } catch (Exception networkEx) {
+            throw new RuntimeException("Directory service fetch failed", networkEx);
+        }
+    }
+
+    private void handleLoginError(String message) {
+        javafx.application.Platform.runLater(() -> {
+            viewModel.loadingProperty().set(false);
+            signInButton.setText(SIGN_IN_TEXT);
+            viewModel.setLoginError(message);
+        });
     }
 
     /**
