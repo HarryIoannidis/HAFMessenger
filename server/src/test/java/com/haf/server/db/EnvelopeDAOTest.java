@@ -74,8 +74,8 @@ class EnvelopeDAOTest {
         assertEquals(message, result.payload());
         verify(insertStatement, times(1)).executeUpdate();
         verify(insertStatement, times(1)).setString(eq(1), anyString()); // envelope_id
-        verify(insertStatement, times(1)).setString(eq(2), eq(message.senderId));
-        verify(insertStatement, times(1)).setString(eq(3), eq(message.recipientId));
+        verify(insertStatement, times(1)).setString(2, message.senderId);
+        verify(insertStatement, times(1)).setString(3, message.recipientId);
     }
 
     @Test

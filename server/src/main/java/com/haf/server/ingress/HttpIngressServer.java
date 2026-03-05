@@ -13,6 +13,7 @@ import com.haf.server.router.RateLimiterService;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
 import com.haf.shared.dto.EncryptedFileDTO;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.dto.PublicKeyResponse;
 import com.haf.shared.dto.LoginRequest;
 import com.haf.shared.dto.LoginResponse;
 import com.haf.shared.dto.RegisterRequest;
@@ -44,6 +45,7 @@ public final class HttpIngressServer {
     private static final String MESSAGES_PATH = "/api/v1/messages";
     private static final String REGISTER_PATH = "/api/v1/register";
     private static final String LOGIN_PATH = "/api/v1/login";
+    private static final String USERS_PATH = "/api/v1/users";
     private static final String TEST_USER_ID = "test-user";
     private static final int BCRYPT_LOG_ROUNDS = 12;
 
@@ -119,6 +121,7 @@ public final class HttpIngressServer {
         httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
         httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
+        httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext("/api/v1/config/admin-key", new AdminKeyHandler());
         httpsServer.setExecutor(executor);
 
@@ -538,6 +541,76 @@ public final class HttpIngressServer {
 
             sendPlain(exchange, 200, body);
             exchange.close();
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Handles requests for users' public keys.
+     */
+    private final class UserKeyHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error("method not allowed")));
+                return;
+            }
+
+            // Path must match /api/v1/users/{userId}/key
+            String path = exchange.getRequestURI().getPath();
+            if (path == null || !path.endsWith("/key")) {
+                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("invalid request path")));
+                return;
+            }
+
+            // Extract userId
+            String prefix = USERS_PATH + "/";
+            if (!path.startsWith(prefix)) {
+                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("invalid request path")));
+                return;
+            }
+
+            String remainder = path.substring(prefix.length());
+            int slashIndex = remainder.indexOf('/');
+            if (slashIndex == -1) {
+                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("missing userId")));
+                return;
+            }
+            String targetUserId = remainder.substring(0, slashIndex);
+
+            try {
+                UserDAO.PublicKeyRecord record = userDAO.getPublicKey(targetUserId);
+                if (record == null) {
+                    sendPlain(exchange, 404, JsonCodec.toJson(PublicKeyResponse.error("user not found")));
+                    return;
+                }
+
+                sendPlain(exchange, 200, JsonCodec.toJson(
+                        PublicKeyResponse.success(targetUserId, record.publicKeyPem(), record.fingerprint())));
+            } catch (Exception ex) {
+                auditLogger.logError("user_key_lookup_error", requestId, null, ex);
+                sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error("internal server error")));
+            }
         }
 
         private void applySecurityHeaders(Headers headers) {

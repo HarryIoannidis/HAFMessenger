@@ -157,6 +157,7 @@ class MessageSendReceiveIT {
                     try {
                         Files.deleteIfExists(p);
                     } catch (Exception ignored) {
+                        // Ignore failure
                     }
                 });
             }
@@ -167,6 +168,7 @@ class MessageSendReceiveIT {
                     try {
                         Files.deleteIfExists(p);
                     } catch (Exception ignored) {
+                        // Ignore failure
                     }
                 });
             }
@@ -233,5 +235,104 @@ class MessageSendReceiveIT {
         testSender.sendMessage(payload, recipientKeyId, "text/plain", 3600);
 
         assertTrue(latch.await(5, TimeUnit.SECONDS), "Message should be received");
+    }
+
+    @Test
+    void send_receive_with_directory_service_fetch_roundtrip() throws Exception {
+        // Create new keys and providers to isolate this test
+        Path tmpSenderDir = Files.createTempDirectory("haf-test-ds-sender");
+        Path tmpRecipientDir = Files.createTempDirectory("haf-test-ds-recipient");
+
+        try {
+            UserKeystore newSenderKeyStore = new UserKeystore(tmpSenderDir);
+            UserKeystore newRecipientKeyStore = new UserKeystore(tmpRecipientDir);
+
+            String newSenderKeyId = "sender-ds-001";
+            String newRecipientKeyId = "recipient-ds-001";
+
+            KeyPair newSenderKp = EccKeyIO.generate();
+            KeyPair newRecipientKp = EccKeyIO.generate();
+
+            newSenderKeyStore.saveKeypair(newSenderKeyId, newSenderKp, passphrase);
+            newRecipientKeyStore.saveKeypair(newRecipientKeyId, newRecipientKp, passphrase);
+
+            // CRITICAL: DO NOT save the recipient key in the sender's keystore!
+            // The sender should not know the recipient's key yet.
+
+            UserKeystoreKeyProvider newSenderKeyProvider = new UserKeystoreKeyProvider(tmpSenderDir, passphrase);
+            UserKeystoreKeyProvider newRecipientKeyProvider = new UserKeystoreKeyProvider(tmpRecipientDir, passphrase);
+
+            // Configure directory service callback on the sender
+            final String recipientPem = EccKeyIO.publicPem(newRecipientKp.getPublic());
+            newSenderKeyProvider.setDirectoryServiceFetcher(recipientId -> {
+                if (newRecipientKeyId.equals(recipientId)) {
+                    return recipientPem;
+                }
+                return null;
+            });
+
+            InMemoryWebSocketAdapter newSenderWs = new InMemoryWebSocketAdapter();
+            InMemoryWebSocketAdapter newRecipientWs = new InMemoryWebSocketAdapter();
+            newSenderWs.setPeer(newRecipientWs);
+            newRecipientWs.setPeer(newSenderWs);
+
+            MessageSender dsSender = new DefaultMessageSender(newSenderKeyProvider, clock, newSenderWs);
+            MessageReceiver dsReceiver = new DefaultMessageReceiver(newRecipientKeyProvider, clock, newRecipientWs,
+                    newRecipientKeyId);
+
+            CountDownLatch latch = new CountDownLatch(1);
+            dsReceiver.setMessageListener(new MessageReceiver.MessageListener() {
+                @Override
+                public void onMessage(byte[] plaintext, String senderId, String contentType) {
+                    receivedPayload = plaintext;
+                    receivedSenderId = senderId;
+                    receivedContentType = contentType;
+                    latch.countDown();
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    fail("Unexpected error: " + error.getMessage(), error);
+                }
+            });
+
+            dsReceiver.start();
+            newSenderWs.connect(msg -> {
+            }, err -> {
+            });
+
+            // Send message. This should trigger the fetcher callback.
+            byte[] payload = "Hello, Directory Service!".getBytes(StandardCharsets.UTF_8);
+            String contentType = "text/plain";
+            dsSender.sendMessage(payload, newRecipientKeyId, contentType, 3600);
+
+            assertTrue(latch.await(5, TimeUnit.SECONDS), "Message should be received");
+
+            assertNotNull(receivedPayload);
+            assertArrayEquals(payload, receivedPayload);
+            assertEquals(newSenderKeyId, receivedSenderId);
+            assertEquals(contentType, receivedContentType);
+
+        } finally {
+            // Cleanup local temp directories
+            try (var w = Files.walk(tmpSenderDir)) {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (Exception ignored) {
+                        // Ignore failure
+                    }
+                });
+            }
+            try (var w = Files.walk(tmpRecipientDir)) {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (Exception ignored) {
+                        // Ignore failure
+                    }
+                });
+            }
+        }
     }
 }

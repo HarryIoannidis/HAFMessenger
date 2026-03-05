@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haf.shared.exceptions.JsonCodecException;
 
 public final class JsonCodec {
+
+    /**
+     * Private constructor to prevent instantiation.
+     */
     private JsonCodec() {
     }
 

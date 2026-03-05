@@ -133,7 +133,7 @@ class MessageSenderTest {
     }
 
     @Test
-    void send_message_throws_when_not_connected() throws Exception {
+    void send_message_throws_when_not_connected() {
         webSocketAdapter.close();
         byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
 

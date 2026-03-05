@@ -79,12 +79,12 @@ class WebSocketIngressServerTest {
         QueuedEnvelope envelope = createQueuedEnvelope();
         when(mailboxRouter.subscribe(eq(userId), any()))
                 .thenReturn(new MailboxSubscription(userId, mock(MailboxRouter.MailboxSubscriber.class)));
-        when(mailboxRouter.fetchUndelivered(eq(userId), eq(100))).thenReturn(List.of(envelope));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of(envelope));
 
         server.onOpen(webSocket, handshake);
 
         verify(mailboxRouter, times(1)).subscribe(eq(userId), any());
-        verify(mailboxRouter, times(1)).fetchUndelivered(eq(userId), eq(100));
+        verify(mailboxRouter, times(1)).fetchUndelivered(userId, 100);
         verify(webSocket, atLeastOnce()).send(anyString());
     }
 
@@ -139,7 +139,7 @@ class WebSocketIngressServerTest {
 
         verify(auditLogger, times(1)).logError(eq("ws_ingress_error"), anyString(), anyString(), any());
         verify(metricsRegistry, times(1)).incrementRejects();
-        verify(webSocket, times(1)).close(eq(1011), eq("internal"));
+        verify(webSocket, times(1)).close(1011, "internal");
     }
 
     @Test

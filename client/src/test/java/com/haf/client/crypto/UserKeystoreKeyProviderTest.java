@@ -100,4 +100,39 @@ class UserKeystoreKeyProviderTest {
 
         assertNotNull(provider.getKeyStore());
     }
+
+    @Test
+    void get_recipient_public_key_fetches_from_directory_service_when_missing_locally() throws Exception {
+        // Create sender key
+        String senderKeyId = "key-sender-001";
+        KeyPair senderKp = EccKeyIO.generate();
+        UserKeystore keyStore = new UserKeystore(tmpRoot);
+        keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
+
+        // Generate an external recipient key (not in keystore)
+        String externalRecipientId = "key-external-002";
+        KeyPair externalKp = EccKeyIO.generate();
+        String externalPem = EccKeyIO.publicPem(externalKp.getPublic());
+
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+
+        // Ensure exception is thrown without fetcher
+        assertThrows(KeyNotFoundException.class, () -> {
+            provider.getRecipientPublicKey(externalRecipientId);
+        });
+
+        // Set the fetcher to return the generated PEM
+        provider.setDirectoryServiceFetcher(recipientId -> {
+            if (externalRecipientId.equals(recipientId)) {
+                return externalPem;
+            }
+            return null;
+        });
+
+        // Load key through provider (should use fetcher)
+        PublicKey loadedKey = provider.getRecipientPublicKey(externalRecipientId);
+
+        assertNotNull(loadedKey);
+        assertArrayEquals(externalKp.getPublic().getEncoded(), loadedKey.getEncoded());
+    }
 }

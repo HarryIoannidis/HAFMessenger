@@ -80,7 +80,7 @@ class FileUploadDAOTest {
         dao.insert(dto, uploaderId);
 
         // param 2 = uploader_id
-        verify(insertStatement).setString(eq(2), eq(uploaderId));
+        verify(insertStatement).setString(2, uploaderId);
     }
 
     @Test
@@ -95,7 +95,7 @@ class FileUploadDAOTest {
         dao.insert(dto, "user-id");
 
         // param 4 = content_type
-        verify(insertStatement).setString(eq(4), eq("image/png"));
+        verify(insertStatement).setString(4, "image/png");
     }
 
     @Test
@@ -110,7 +110,7 @@ class FileUploadDAOTest {
         dao.insert(dto, "user-id");
 
         // Should fall back to "application/octet-stream"
-        verify(insertStatement).setString(eq(4), eq("application/octet-stream"));
+        verify(insertStatement).setString(4, "application/octet-stream");
     }
 
     @Test

@@ -178,4 +178,37 @@ public final class UserDAO {
             throw new DatabaseOperationException("Failed to find user by email", ex);
         }
     }
+
+    /**
+     * DTO for returning public key information.
+     */
+    public record PublicKeyRecord(String publicKeyPem, String fingerprint) {
+    }
+
+    /**
+     * Fetches public key details by user ID.
+     *
+     * @param userId the user ID to search for
+     * @return the record, or null if not found
+     * @throws DatabaseOperationException if a database error occurs
+     */
+    public PublicKeyRecord getPublicKey(String userId) {
+        String sql = "SELECT public_key_pem, public_key_fingerprint FROM users WHERE user_id = ?";
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new PublicKeyRecord(
+                            rs.getString("public_key_pem"),
+                            rs.getString("public_key_fingerprint"));
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            auditLogger.logError("db_find_public_key", null, userId, e);
+            throw new DatabaseOperationException("Failed to fetch public key for user: " + userId, e);
+        }
+    }
 }

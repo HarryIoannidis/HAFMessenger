@@ -51,7 +51,6 @@ import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.dto.EncryptedFileDTO;
 import com.haf.shared.crypto.CryptoECC;
 import com.haf.shared.crypto.CryptoService;
-import com.haf.shared.utils.EccKeyIO;
 import javax.crypto.SecretKey;
 import java.nio.file.Files;
 import java.util.Base64;
@@ -526,141 +525,158 @@ public class RegisterController {
         String originalText = registerButton.getText();
         registerButton.setText("Registering...");
 
-        Thread registrationThread = new Thread(() -> {
-            try {
-                // Build registration request from ViewModel
-                RegisterRequest request = new RegisterRequest();
-                request.fullName = viewModel.getName();
-                request.regNumber = viewModel.getRegNum();
-                request.idNumber = viewModel.getIdNum();
-                request.rank = viewModel.getRank();
-                request.telephone = viewModel.getPhoneNum();
-                request.email = viewModel.getEmail();
-                request.password = viewModel.getPassword();
-                // Generate and set actual public key pair
-                KeyPair registrationKp = EccKeyIO.generate();
-                request.publicKeyPem = EccKeyIO.publicPem(registrationKp.getPublic());
-                request.publicKeyFingerprint = FingerprintUtil
-                        .sha256Hex(EccKeyIO.publicDer(registrationKp.getPublic()));
-
-                // Fetch Admin Public Key for E2E photo encryption
-                HttpClient client = HttpClient.newBuilder()
-                        .sslContext(SslContextUtils.getTrustingSslContext())
-                        .build();
-
-                HttpRequest adminKeyRequest = HttpRequest.newBuilder()
-                        .uri(URI.create("https://localhost:8443/api/v1/config/admin-key"))
-                        .GET()
-                        .build();
-                HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest,
-                        HttpResponse.BodyHandlers.ofString());
-
-                // Parse the PEM from the response JSON (simple extraction, no full JSON lib
-                // needed)
-                String adminPem = null;
-                if (adminKeyResponse.statusCode() == 200) {
-                    String body = adminKeyResponse.body();
-                    // Extract the PEM value: {"adminPublicKeyPem":"..."}
-                    int start = body.indexOf('"', body.indexOf(':') + 1) + 1;
-                    int end = body.lastIndexOf('"');
-                    if (start > 0 && end > start) {
-                        adminPem = body.substring(start, end).replace("\\n", "\n");
-                    }
-                }
-
-                // E2E-encrypt photos if admin key is available and photos are selected
-                if (adminPem != null && !adminPem.isBlank()) {
-                    java.security.PublicKey adminPublicKey = EccKeyIO.publicFromPem(adminPem);
-                    File idPhotoFile = viewModel.idPhotoFileProperty().get();
-                    File selfiePhotoFile = viewModel.selfiePhotoFileProperty().get();
-                    if (idPhotoFile != null) {
-                        request.idPhoto = encryptPhoto(idPhotoFile, adminPublicKey);
-                    }
-                    if (selfiePhotoFile != null) {
-                        request.selfiePhoto = encryptPhoto(selfiePhotoFile, adminPublicKey);
-                    }
-                }
-
-                String json = JsonCodec.toJson(request);
-
-                HttpRequest httpRequest = HttpRequest.newBuilder()
-                        .uri(URI.create("https://localhost:8443/api/v1/register"))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(json))
-                        .build();
-
-                HttpResponse<String> httpResponse = client.send(httpRequest,
-                        HttpResponse.BodyHandlers.ofString());
-
-                RegisterResponse response = JsonCodec.fromJson(httpResponse.body(), RegisterResponse.class);
-
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    registerButton.setText(originalText);
-
-                    if (httpResponse.statusCode() == 201 && response.error == null) {
-                        try {
-                            Path root;
-                            try {
-                                root = KeystoreRoot.preferred();
-                                FilePerms.ensureDir700(root);
-                            } catch (Exception e) {
-                                root = KeystoreRoot.userFallback();
-                                FilePerms.ensureDir700(root);
-                            }
-
-                            UserKeystore keystore = new UserKeystore(root);
-                            String keyId = UserKeystore.todayKeyId();
-                            keystore.saveKeypair(keyId, registrationKp, viewModel.getPassword().toCharArray());
-                        } catch (Exception e) {
-                            LOGGER.log(Level.SEVERE, "Failed to save Keystore after successful registration", e);
-                            // Even though saving failed, the user registered correctly on the server.
-                        }
-
-                        LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
-                        navigateToLogin();
-                    } else {
-                        String errorMsg = response.error != null ? response.error : "Registration failed.";
-                        viewModel.setRegistrationError(errorMsg);
-                    }
-                });
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    registerButton.setText(originalText);
-                    viewModel.setRegistrationError("Registration interrupted.");
-                });
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Registration failed", e);
-                javafx.application.Platform.runLater(() -> {
-                    viewModel.loadingProperty().set(false);
-                    registerButton.setText(originalText);
-                    viewModel.setRegistrationError("Connection failed. Please try again.");
-                });
-            }
-        });
+        Thread registrationThread = new Thread(() -> executeRegistrationFlow(originalText));
         registrationThread.setDaemon(true);
         registrationThread.start();
+    }
+
+    private void executeRegistrationFlow(String originalText) {
+        try {
+            KeyPair registrationKp = EccKeyIO.generate();
+            RegisterRequest request = buildRegistrationRequest(registrationKp);
+
+            HttpClient client = HttpClient.newBuilder()
+                    .sslContext(SslContextUtils.getTrustingSslContext())
+                    .build();
+
+            String adminPem = fetchAdminPublicKeyPem(client);
+            encryptPhotosIfAdminKeyAvailable(request, adminPem);
+
+            HttpResponse<String> httpResponse = sendRegistrationRequest(client, request);
+            RegisterResponse response = JsonCodec.fromJson(httpResponse.body(), RegisterResponse.class);
+
+            javafx.application.Platform
+                    .runLater(() -> handleRegistrationResponse(httpResponse, response, registrationKp, originalText));
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            handleRegistrationError(originalText, "Registration interrupted.");
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Registration failed", e);
+            handleRegistrationError(originalText, "Connection failed. Please try again.");
+        }
+    }
+
+    private RegisterRequest buildRegistrationRequest(KeyPair registrationKp) throws Exception {
+        RegisterRequest request = new RegisterRequest();
+        request.fullName = viewModel.getName();
+        request.regNumber = viewModel.getRegNum();
+        request.idNumber = viewModel.getIdNum();
+        request.rank = viewModel.getRank();
+        request.telephone = viewModel.getPhoneNum();
+        request.email = viewModel.getEmail();
+        request.password = viewModel.getPassword();
+
+        request.publicKeyPem = EccKeyIO.publicPem(registrationKp.getPublic());
+        request.publicKeyFingerprint = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(registrationKp.getPublic()));
+        return request;
+    }
+
+    private String fetchAdminPublicKeyPem(HttpClient client) {
+        try {
+            HttpRequest adminKeyRequest = HttpRequest.newBuilder()
+                    .uri(URI.create("https://localhost:8443/api/v1/config/admin-key"))
+                    .GET()
+                    .build();
+            HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (adminKeyResponse.statusCode() == 200) {
+                String body = adminKeyResponse.body();
+                int start = body.indexOf('"', body.indexOf(':') + 1) + 1;
+                int end = body.lastIndexOf('"');
+                if (start > 0 && end > start) {
+                    return body.substring(start, end).replace("\\n", "\n");
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Failed to fetch admin public key", e);
+        }
+        return null;
+    }
+
+    private void encryptPhotosIfAdminKeyAvailable(RegisterRequest request, String adminPem) throws Exception {
+        if (adminPem != null && !adminPem.isBlank()) {
+            java.security.PublicKey adminPublicKey = EccKeyIO.publicFromPem(adminPem);
+            File idPhotoFile = viewModel.idPhotoFileProperty().get();
+            File selfiePhotoFile = viewModel.selfiePhotoFileProperty().get();
+            if (idPhotoFile != null) {
+                request.idPhoto = encryptPhoto(idPhotoFile, adminPublicKey);
+            }
+            if (selfiePhotoFile != null) {
+                request.selfiePhoto = encryptPhoto(selfiePhotoFile, adminPublicKey);
+            }
+        }
+    }
+
+    private HttpResponse<String> sendRegistrationRequest(HttpClient client, RegisterRequest request) throws Exception {
+        String json = JsonCodec.toJson(request);
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create("https://localhost:8443/api/v1/register"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        return client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private void handleRegistrationResponse(HttpResponse<String> httpResponse, RegisterResponse response,
+            KeyPair registrationKp, String originalText) {
+        viewModel.loadingProperty().set(false);
+        registerButton.setText(originalText);
+
+        if (httpResponse.statusCode() == 201 && response.error == null) {
+            saveKeysToKeystore(registrationKp);
+            LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
+            navigateToLogin();
+        } else {
+            String errorMsg = response.error != null ? response.error : "Registration failed.";
+            viewModel.setRegistrationError(errorMsg);
+        }
+    }
+
+    private void saveKeysToKeystore(KeyPair registrationKp) {
+        try {
+            Path root = getOrCreateKeystoreRoot();
+
+            UserKeystore keystore = new UserKeystore(root);
+            String keyId = UserKeystore.todayKeyId();
+            keystore.saveKeypair(keyId, registrationKp, viewModel.getPassword().toCharArray());
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to save Keystore after successful registration", e);
+        }
+    }
+
+    private Path getOrCreateKeystoreRoot() throws Exception {
+        try {
+            Path root = KeystoreRoot.preferred();
+            FilePerms.ensureDir700(root);
+            return root;
+        } catch (Exception e) {
+            Path root = KeystoreRoot.userFallback();
+            FilePerms.ensureDir700(root);
+            return root;
+        }
+    }
+
+    private void handleRegistrationError(String originalText, String errorMessage) {
+        javafx.application.Platform.runLater(() -> {
+            viewModel.loadingProperty().set(false);
+            registerButton.setText(originalText);
+            viewModel.setRegistrationError(errorMessage);
+        });
     }
 
     /**
      * Encrypts a photo file end-to-end against the Admin's X25519 public key.
      *
-     * <p>
      * Flow:
-     * <ol>
-     * <li>Generate a fresh ephemeral X25519 KeyPair.</li>
-     * <li>Derive an AES-256 session key via ECDH(ephemeral_private, admin_public) +
-     * SHA-256.</li>
-     * <li>Encrypt the file bytes with AES-256-GCM.</li>
-     * <li>Bundle everything into an {@link EncryptedFileDTO}.</li>
-     * </ol>
+     * Generate a fresh ephemeral X25519 KeyPair.
+     * Derive an AES-256 session key via ECDH(ephemeral_private, admin_public) +
+     * SHA-256.
+     * Encrypt the file bytes with AES-256-GCM.
+     * Bundle everything into an {@link EncryptedFileDTO}.
      * The server stores the resulting blob opaquely without ever seeing the AES
      * key.
-     * </p>
-     *
+     * 
      * @param file           the photo file to encrypt
      * @param adminPublicKey the admin's X25519 public key
      * @return an {@link EncryptedFileDTO} ready to embed in the
