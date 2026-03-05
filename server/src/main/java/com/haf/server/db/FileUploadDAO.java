@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.shared.dto.EncryptedFileDTO;
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -54,7 +55,7 @@ public final class FileUploadDAO {
      * @param uploaderId the user_id of the uploader (may not yet exist in
      *                   {@code users})
      * @return the new {@code file_id} UUID string
-     * @throws IllegalStateException if the insert fails
+     * @throws DatabaseOperationException if the insert fails
      */
     public String insert(EncryptedFileDTO dto, String uploaderId) {
         Objects.requireNonNull(dto, "dto");
@@ -78,7 +79,7 @@ public final class FileUploadDAO {
             ps.executeUpdate();
             return fileId;
         } catch (SQLException ex) {
-            throw new IllegalStateException("Failed to store encrypted file upload", ex);
+            throw new DatabaseOperationException("Failed to store encrypted file upload", ex);
         }
     }
 }

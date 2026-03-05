@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.shared.dto.RegisterRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +70,7 @@ class UserDAOTest {
         when(connection.prepareStatement(contains("INSERT"))).thenReturn(insertStatement);
         when(insertStatement.executeUpdate()).thenThrow(new SQLException("Duplicate entry"));
 
-        assertThrows(IllegalStateException.class, () -> dao.insert(request, "hashedPass"));
+        assertThrows(DatabaseOperationException.class, () -> dao.insert(request, "hashedPass"));
         verify(auditLogger, times(1)).logError(eq("db_insert_user"), isNull(), eq(request.email), any());
     }
 
@@ -100,7 +101,7 @@ class UserDAOTest {
         when(connection.prepareStatement(contains("SELECT"))).thenReturn(existsStatement);
         when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.existsByEmail("test@haf.gr"));
+        assertThrows(DatabaseOperationException.class, () -> dao.existsByEmail("test@haf.gr"));
         verify(auditLogger, times(1)).logError(eq("db_check_email"), isNull(), eq("test@haf.gr"), any());
     }
 
@@ -152,7 +153,7 @@ class UserDAOTest {
         when(connection.prepareStatement(contains("SELECT user_id"))).thenReturn(existsStatement);
         when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.findByEmail("test@haf.gr"));
+        assertThrows(DatabaseOperationException.class, () -> dao.findByEmail("test@haf.gr"));
         verify(auditLogger, times(1)).logError(eq("db_find_user"), isNull(), eq("test@haf.gr"), any());
     }
 

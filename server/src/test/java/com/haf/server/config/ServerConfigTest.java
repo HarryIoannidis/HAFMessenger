@@ -1,5 +1,6 @@
 package com.haf.server.config;
 
+import com.haf.server.exceptions.ConfigurationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
@@ -59,7 +60,7 @@ class ServerConfigTest {
         env.put("HAF_DB_URL", "jdbc:mysql://localhost:3306/test");
         // Missing HAF_DB_USER
 
-        assertThrows(IllegalStateException.class, () -> ServerConfig.fromEnv(env));
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @Test
@@ -67,7 +68,7 @@ class ServerConfigTest {
         Map<String, String> env = createMinimalEnv();
         env.put("HAF_DB_URL", "   ");
 
-        assertThrows(IllegalStateException.class, () -> ServerConfig.fromEnv(env));
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @Test
@@ -75,7 +76,7 @@ class ServerConfigTest {
         Map<String, String> env = createMinimalEnv();
         env.put("HAF_DB_POOL_SIZE", "not-a-number");
 
-        assertThrows(IllegalStateException.class, () -> ServerConfig.fromEnv(env));
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @Test
@@ -114,4 +115,3 @@ class ServerConfigTest {
         return env;
     }
 }
-

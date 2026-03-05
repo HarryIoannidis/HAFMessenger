@@ -5,6 +5,7 @@ import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
+import com.haf.shared.exceptions.KeystoreOperationException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.KeyPair;
@@ -120,7 +121,7 @@ public final class UserKeystore {
      */
     private Path selectCurrentKeyDir() throws Exception {
         if (!Files.isDirectory(root)) {
-            throw new IllegalStateException("keystore root not a directory: " + root);
+            throw new KeystoreOperationException("keystore root not a directory: " + root);
         }
         List<Path> dirs;
 
@@ -129,7 +130,7 @@ public final class UserKeystore {
         }
 
         if (dirs.isEmpty()) {
-            throw new IllegalStateException("no keys in keystore root: " + root);
+            throw new KeystoreOperationException("no keys in keystore root: " + root);
         }
 
         record Entry(Path dir, KeyMetadata meta, long ts) {
@@ -189,7 +190,7 @@ public final class UserKeystore {
      */
     public Path selectOldestKeyDirPreferCurrent() throws Exception {
         if (!Files.isDirectory(root)) {
-            throw new IllegalStateException("keystore root not a directory: " + root);
+            throw new KeystoreOperationException("keystore root not a directory: " + root);
         }
         List<Path> dirs;
 
@@ -198,7 +199,7 @@ public final class UserKeystore {
         }
 
         if (dirs.isEmpty()) {
-            throw new IllegalStateException("no keys in keystore root: " + root);
+            throw new KeystoreOperationException("no keys in keystore root: " + root);
         }
 
         record Entry(Path dir, KeyMetadata meta, long tsMeta, long tsMtime) {
@@ -291,7 +292,7 @@ public final class UserKeystore {
         Path publicPemPath = keyDir.resolve("public.pem");
 
         if (!Files.exists(publicPemPath)) {
-            throw new IllegalStateException("Public key not found for keyId: " + keyId);
+            throw new KeystoreOperationException("Public key not found for keyId: " + keyId);
         }
 
         String pem = Files.readString(publicPemPath, StandardCharsets.US_ASCII);

@@ -1,8 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.core.ChatSession;
-import com.haf.client.network.MockMessageReceiver;
-import com.haf.client.network.MockMessageSender;
+
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;

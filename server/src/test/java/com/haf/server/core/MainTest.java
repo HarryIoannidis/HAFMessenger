@@ -1,6 +1,7 @@
 package com.haf.server.core;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.exceptions.ConfigurationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
@@ -31,22 +32,24 @@ class MainTest {
     @Test
     void main_requires_environment_variables() {
         // This test verifies that Main.main() will fail without proper env vars
-        // We can't easily test the full startup without a real database and TLS keystore
+        // We can't easily test the full startup without a real database and TLS
+        // keystore
         // But we can verify the structure is correct
-        
+
         // Main should call ServerConfig.load() which requires env vars
         Map<String, String> emptyEnv = new HashMap<>();
-        
-        // This will throw IllegalStateException if env vars are missing
-        // Note: fromEnv is package-private, so we test via reflection or just verify structure
-        assertThrows(IllegalStateException.class, () -> {
+
+        // This will throw ConfigurationException if env vars are missing
+        // Note: fromEnv is package-private, so we test via reflection or just verify
+        // structure
+        assertThrows(ConfigurationException.class, () -> {
             try {
                 var method = ServerConfig.class.getDeclaredMethod("fromEnv", Map.class);
                 method.setAccessible(true);
                 method.invoke(null, emptyEnv);
             } catch (Exception e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    throw (IllegalStateException) e.getCause();
+                if (e.getCause() instanceof ConfigurationException) {
+                    throw (ConfigurationException) e.getCause();
                 }
                 throw new RuntimeException(e);
             }
@@ -71,4 +74,3 @@ class MainTest {
         }
     }
 }
-

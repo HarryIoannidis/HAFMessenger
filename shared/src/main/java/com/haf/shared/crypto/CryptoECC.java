@@ -1,6 +1,7 @@
 package com.haf.shared.crypto;
 
 import com.haf.shared.constants.CryptoConstants;
+import com.haf.shared.exceptions.CryptoOperationException;
 import javax.crypto.KeyAgreement;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.MessageDigest;
@@ -22,7 +23,7 @@ public final class CryptoECC {
      * @param myPrivate   my private X25519 key
      * @param theirPublic their public X25519 key
      * @return the raw shared secret bytes
-     * @throws IllegalStateException if the agreement fails
+     * @throws CryptoOperationException if the agreement fails
      */
     public static byte[] generateSharedSecret(PrivateKey myPrivate, PublicKey theirPublic) {
         try {
@@ -31,7 +32,7 @@ public final class CryptoECC {
             keyAgreement.doPhase(theirPublic, true);
             return keyAgreement.generateSecret();
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to generate ECDH shared secret", e);
+            throw new CryptoOperationException("Failed to generate ECDH shared secret", e);
         }
     }
 
@@ -41,7 +42,7 @@ public final class CryptoECC {
      *
      * @param sharedSecret the raw bytes from ECDH
      * @return a 256-bit AES SecretKey
-     * @throws IllegalStateException if derivation fails
+     * @throws CryptoOperationException if derivation fails
      */
     public static SecretKeySpec deriveAesKey(byte[] sharedSecret) {
         try {
@@ -49,7 +50,7 @@ public final class CryptoECC {
             byte[] derivedKey = hash.digest(sharedSecret);
             return new SecretKeySpec(derivedKey, CryptoConstants.AES);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to derive AES key from shared secret", e);
+            throw new CryptoOperationException("Failed to derive AES key from shared secret", e);
         }
     }
 

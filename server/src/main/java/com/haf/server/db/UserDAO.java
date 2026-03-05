@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.shared.dto.RegisterRequest;
 import javax.sql.DataSource;
@@ -77,7 +78,7 @@ public final class UserDAO {
      * @param request        the registration request
      * @param hashedPassword the BCrypt-hashed password
      * @return the generated user ID
-     * @throws IllegalStateException if the insert fails
+     * @throws DatabaseOperationException if the insert fails
      */
     public String insert(RegisterRequest request, String hashedPassword) {
         String userId = UUID.randomUUID().toString();
@@ -103,7 +104,7 @@ public final class UserDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_insert_user", null, request.email, ex);
 
-            throw new IllegalStateException("Failed to register user", ex);
+            throw new DatabaseOperationException("Failed to register user", ex);
         }
     }
 
@@ -123,7 +124,7 @@ public final class UserDAO {
             ps.executeUpdate();
         } catch (SQLException ex) {
             auditLogger.logError("db_update_photos", null, userId, ex);
-            throw new IllegalStateException("Failed to update user photo IDs", ex);
+            throw new DatabaseOperationException("Failed to update user photo IDs", ex);
         }
     }
 
@@ -144,7 +145,7 @@ public final class UserDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_check_email", null, email, ex);
 
-            throw new IllegalStateException("Failed to check email existence", ex);
+            throw new DatabaseOperationException("Failed to check email existence", ex);
         }
     }
 
@@ -174,7 +175,7 @@ public final class UserDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_find_user", null, email, ex);
 
-            throw new IllegalStateException("Failed to find user by email", ex);
+            throw new DatabaseOperationException("Failed to find user by email", ex);
         }
     }
 }

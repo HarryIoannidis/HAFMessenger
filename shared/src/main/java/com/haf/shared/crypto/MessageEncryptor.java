@@ -1,5 +1,6 @@
 package com.haf.shared.crypto;
 
+import com.haf.shared.exceptions.CryptoOperationException;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.utils.ClockProvider;
@@ -65,7 +66,7 @@ public class MessageEncryptor {
         // 3. Generate AES-GCM IV
         byte[] iv = CryptoService.generateIv();
         if (iv == null || iv.length != MessageHeader.IV_BYTES) {
-            throw new IllegalStateException("IV is null or invalid length");
+            throw new CryptoOperationException("IV is null or invalid length");
         }
 
         // 4. Capture the ephemeral public key to send to the recipient
@@ -89,12 +90,12 @@ public class MessageEncryptor {
 
         byte[] combined = CryptoService.encryptAesGcm(payload, aesKey, iv, aad);
         if (combined == null || combined.length == 0) {
-            throw new IllegalStateException("Ciphertext is null or empty");
+            throw new CryptoOperationException("Ciphertext is null or empty");
         }
 
         final int TAG_LEN = MessageHeader.GCM_TAG_BYTES;
         if (combined.length <= TAG_LEN) {
-            throw new IllegalStateException("Combined output too short");
+            throw new CryptoOperationException("Combined output too short");
         }
 
         int ctLen = combined.length - TAG_LEN;

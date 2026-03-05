@@ -1,5 +1,6 @@
 package com.haf.shared.utils;
 
+import com.haf.shared.exceptions.CryptoOperationException;
 import java.security.*;
 import java.security.spec.*;
 
@@ -11,7 +12,7 @@ public final class EccKeyIO {
      * Generates new X25519 KeyPair.
      *
      * @return new X25519 key pair
-     * @throws IllegalStateException if creation fails
+     * @throws CryptoOperationException if creation fails
      */
     public static KeyPair generate() {
         try {
@@ -19,7 +20,7 @@ public final class EccKeyIO {
             kpg.initialize(new NamedParameterSpec("X25519"), new SecureRandom());
             return kpg.generateKeyPair();
         } catch (Exception e) {
-            throw new IllegalStateException(e);
+            throw new CryptoOperationException("Failed to generate X25519 keypair", e);
         }
     }
 
