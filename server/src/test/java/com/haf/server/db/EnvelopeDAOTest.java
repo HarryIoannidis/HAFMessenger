@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.shared.constants.MessageHeader;
@@ -84,7 +85,7 @@ class EnvelopeDAOTest {
         when(connection.prepareStatement(contains("INSERT"))).thenReturn(insertStatement);
         when(insertStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.insert(message));
+        assertThrows(DatabaseOperationException.class, () -> dao.insert(message));
         verify(auditLogger, times(1)).logError(eq("db_insert_envelope"), isNull(), eq(message.senderId), any());
     }
 
@@ -123,7 +124,7 @@ class EnvelopeDAOTest {
         when(connection.prepareStatement(contains("SELECT"))).thenReturn(fetchStatement);
         when(fetchStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.fetchForRecipient("recipient-123", 10));
+        assertThrows(DatabaseOperationException.class, () -> dao.fetchForRecipient("recipient-123", 10));
         verify(auditLogger, times(1)).logError(eq("db_fetch_mailbox"), isNull(), eq("recipient-123"), any());
     }
 
@@ -173,7 +174,7 @@ class EnvelopeDAOTest {
         when(connection.createStatement()).thenReturn(deleteStatement);
         when(deleteStatement.executeUpdate(anyString())).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.deleteExpired());
+        assertThrows(DatabaseOperationException.class, () -> dao.deleteExpired());
         verify(auditLogger, times(1)).logError(eq("db_delete_expired"), isNull(), eq("system"), any());
     }
 
@@ -274,7 +275,7 @@ class EnvelopeDAOTest {
         when(connection.prepareStatement(contains("IN"))).thenReturn(fetchByIdsStatement);
         when(fetchByIdsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.fetchByIds(envelopeIds));
+        assertThrows(DatabaseOperationException.class, () -> dao.fetchByIds(envelopeIds));
         verify(auditLogger, times(1)).logError(eq("db_fetch_by_ids"), isNull(), isNull(), any());
     }
 
@@ -297,4 +298,3 @@ class EnvelopeDAOTest {
         return message;
     }
 }
-

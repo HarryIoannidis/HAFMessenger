@@ -3,9 +3,11 @@ package com.haf.shared.utils;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.haf.shared.exceptions.JsonCodecException;
 
 public final class JsonCodec {
-    private JsonCodec() {}
+    private JsonCodec() {
+    }
 
     private static final ObjectMapper M = new ObjectMapper()
             .setSerializationInclusion(JsonInclude.Include.NON_NULL)
@@ -16,11 +18,14 @@ public final class JsonCodec {
      *
      * @param value any DTO (KeyMetadata, EncryptedMessage, etc.)
      * @return jSON string
-     * @throws RuntimeException if serialization fails
+     * @throws JsonCodecException if serialization fails
      */
     public static String toJson(Object value) {
-        try { return M.writeValueAsString(value); }
-        catch (Exception e) { throw new RuntimeException("toJson failed", e); }
+        try {
+            return M.writeValueAsString(value);
+        } catch (Exception e) {
+            throw new JsonCodecException("toJson failed", e);
+        }
     }
 
     /**
@@ -28,12 +33,15 @@ public final class JsonCodec {
      *
      * @param JSON incoming JSON
      * @param type target class
-     * @param <T> type of return
+     * @param <T>  type of return
      * @return t-type object
-     * @throws RuntimeException if deserialization fails
+     * @throws JsonCodecException if deserialization fails
      */
     public static <T> T fromJson(String json, Class<T> type) {
-        try { return M.readValue(json, type); }
-        catch (Exception e) { throw new RuntimeException("fromJson failed", e); }
+        try {
+            return M.readValue(json, type);
+        } catch (Exception e) {
+            throw new JsonCodecException("fromJson failed", e);
+        }
     }
 }

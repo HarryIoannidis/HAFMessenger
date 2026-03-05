@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -44,7 +45,7 @@ public final class SessionDAO {
      *
      * @param userId the user ID
      * @return the generated session ID
-     * @throws IllegalStateException if the insert fails
+     * @throws DatabaseOperationException if the insert fails
      */
     public String createSession(String userId) {
         String sessionId = UUID.randomUUID().toString();
@@ -66,7 +67,7 @@ public final class SessionDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_create_session", null, userId, ex);
 
-            throw new IllegalStateException("Failed to create session", ex);
+            throw new DatabaseOperationException("Failed to create session", ex);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,7 @@ class SessionDAOTest {
         when(connection.prepareStatement(contains("INSERT"))).thenReturn(preparedStatement);
         when(preparedStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(IllegalStateException.class, () -> dao.createSession("user-123"));
+        assertThrows(DatabaseOperationException.class, () -> dao.createSession("user-123"));
         verify(auditLogger, times(1)).logError(eq("db_create_session"), isNull(), eq("user-123"), any());
     }
 

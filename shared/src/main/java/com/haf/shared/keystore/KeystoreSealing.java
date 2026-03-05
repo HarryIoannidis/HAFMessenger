@@ -5,40 +5,44 @@ import javax.crypto.spec.*;
 import java.security.SecureRandom;
 import java.util.Base64;
 import com.haf.shared.constants.CryptoConstants;
+import com.haf.shared.exceptions.KeystoreOperationException;
 
 public final class KeystoreSealing {
     private static final SecureRandom RNG = new SecureRandom();
 
-    private KeystoreSealing() {}
+    private KeystoreSealing() {
+    }
 
     /**
      * Seals the given plaintext with the given password.
      *
-     * @param pass the password to use for sealing
+     * @param pass      the password to use for sealing
      * @param plaintext the plaintext to seal
      * @return the sealed ciphertext
      * @throws Exception if sealing fails
      */
     public static byte[] sealWithPass(char[] pass, byte[] plaintext) throws Exception {
-        byte[] salt = new byte[CryptoConstants.SALT_LEN]; RNG.nextBytes(salt);
+        byte[] salt = new byte[CryptoConstants.SALT_LEN];
+        RNG.nextBytes(salt);
 
         SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         PBEKeySpec spec = new PBEKeySpec(pass, salt, 200_000, CryptoConstants.AES_KEY_BITS);
         SecretKey tmp = skf.generateSecret(spec);
         SecretKey key = new SecretKeySpec(tmp.getEncoded(), CryptoConstants.AES);
 
-        byte[] iv = new byte[CryptoConstants.GCM_IV_BYTES]; RNG.nextBytes(iv);
+        byte[] iv = new byte[CryptoConstants.GCM_IV_BYTES];
+        RNG.nextBytes(iv);
         Cipher cipher = Cipher.getInstance(CryptoConstants.AES_GCM_TRANSFORMATION);
         cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(CryptoConstants.GCM_TAG_BITS, iv));
         byte[] ct = cipher.doFinal(plaintext);
 
-        return ("v1."+b64(salt)+"."+b64(iv)+"."+b64(ct)).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        return ("v1." + b64(salt) + "." + b64(iv) + "." + b64(ct)).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
     }
 
     /**
      * Opens the given envelope with the given password.
      *
-     * @param pass the password to use for opening
+     * @param pass     the password to use for opening
      * @param envelope the envelope to open
      * @return the plaintext
      * @throws Exception
@@ -48,7 +52,7 @@ public final class KeystoreSealing {
         String[] parts = env.split("\\.");
 
         if (parts.length != 4 || !"v1".equals(parts[0])) {
-            throw new IllegalArgumentException("bad envelope");
+            throw new KeystoreOperationException("bad envelope");
         }
 
         byte[] salt = b64d(parts[1]);

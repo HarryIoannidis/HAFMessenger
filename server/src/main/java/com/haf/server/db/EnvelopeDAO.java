@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.shared.constants.MessageHeader;
@@ -138,7 +139,7 @@ public final class EnvelopeDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_insert_envelope", null, message.senderId, ex);
 
-            throw new IllegalStateException("Failed to store envelope", ex);
+            throw new DatabaseOperationException("Failed to store envelope", ex);
         }
     }
 
@@ -171,7 +172,7 @@ public final class EnvelopeDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_fetch_mailbox", null, recipientId, ex);
 
-            throw new IllegalStateException("Failed to fetch mailbox", ex);
+            throw new DatabaseOperationException("Failed to fetch mailbox", ex);
         }
 
         return envelopes;
@@ -215,7 +216,7 @@ public final class EnvelopeDAO {
             }
         } catch (SQLException ex) {
             auditLogger.logError("db_fetch_by_ids", null, null, ex);
-            throw new IllegalStateException("Failed to fetch envelopes by IDs", ex);
+            throw new DatabaseOperationException("Failed to fetch envelopes by IDs", ex);
         }
 
         return envelopes;
@@ -246,7 +247,7 @@ public final class EnvelopeDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_mark_delivered", null, null, ex);
 
-            throw new IllegalStateException("Failed to mark delivered", ex);
+            throw new DatabaseOperationException("Failed to mark delivered", ex);
         }
     }
 
@@ -263,7 +264,7 @@ public final class EnvelopeDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_delete_expired", null, "system", ex);
 
-            throw new IllegalStateException("Failed to delete expired envelopes", ex);
+            throw new DatabaseOperationException("Failed to delete expired envelopes", ex);
         }
     }
 
@@ -289,7 +290,7 @@ public final class EnvelopeDAO {
 
             return HexFormat.of().formatHex(digest.digest(aad.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            throw new DatabaseOperationException("SHA-256 not available", e);
         }
     }
 
@@ -304,7 +305,7 @@ public final class EnvelopeDAO {
         try {
             return decoder.decode(value);
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("Invalid Base64 field: " + field, e);
+            throw new DatabaseOperationException("Invalid Base64 field: " + field, e);
         }
     }
 

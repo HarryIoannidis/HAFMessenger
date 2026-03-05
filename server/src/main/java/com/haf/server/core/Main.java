@@ -12,6 +12,7 @@ import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.RateLimiterService;
+import com.haf.server.exceptions.StartupException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.flywaydb.core.Flyway;
@@ -118,7 +119,7 @@ public final class Main {
 
             shutdownLatch.countDown();
 
-            throw new IllegalStateException("Startup failed", e);
+            throw new StartupException("Startup failed", e);
         } finally {
             if (metricsFutureRef[0] != null) {
                 metricsFutureRef[0].cancel(true);

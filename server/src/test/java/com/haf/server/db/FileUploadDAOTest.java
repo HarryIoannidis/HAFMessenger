@@ -1,5 +1,6 @@
 package com.haf.server.db;
 
+import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.shared.dto.EncryptedFileDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,7 +118,7 @@ class FileUploadDAOTest {
         EncryptedFileDTO dto = buildValidDto();
         when(dataSource.getConnection()).thenThrow(new SQLException("connection failed"));
 
-        assertThrows(IllegalStateException.class, () -> dao.insert(dto, "user-id"));
+        assertThrows(DatabaseOperationException.class, () -> dao.insert(dto, "user-id"));
     }
 
     @Test

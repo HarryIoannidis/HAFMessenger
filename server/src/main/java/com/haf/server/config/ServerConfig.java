@@ -1,5 +1,6 @@
 package com.haf.server.config;
 
+import com.haf.server.exceptions.ConfigurationException;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -158,12 +159,12 @@ public final class ServerConfig {
     }
 
     /**
-     * Throws an IllegalStateException if the given key is missing or blank.
+     * Throws a ConfigurationException if the given key is missing or blank.
      */
     private static String require(Map<String, String> env, String key) {
         String value = env.get(key);
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Missing required environment variable: " + key);
+            throw new ConfigurationException("Missing required environment variable: " + key);
         }
         return value;
     }
@@ -183,7 +184,7 @@ public final class ServerConfig {
         try {
             return Integer.parseInt(candidate);
         } catch (NumberFormatException ex) {
-            throw new IllegalStateException("Invalid integer value: " + candidate, ex);
+            throw new ConfigurationException("Invalid integer value: " + candidate, ex);
         }
     }
 

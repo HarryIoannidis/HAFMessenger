@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.haf.client.utils.SslContextUtils;
+import com.haf.shared.exceptions.SslConfigurationException;
 
 /**
  * WebSocket adapter for client-server communication over TLS.
@@ -81,7 +82,7 @@ public class WebSocketAdapter {
         try {
             return SslContextUtils.getTrustingSslContext();
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to create SSL context", e);
+            throw new SslConfigurationException("Failed to create SSL context", e);
         }
     }
 
