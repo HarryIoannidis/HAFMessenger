@@ -254,6 +254,33 @@ public class SplashViewModel {
 
             // Images
             requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");
+            requireResource(UiConstants.IMAGE_APP_LOGO_DOWNSCALE, "Application logo downscale");
+            requireResource(UiConstants.IMAGE_APP_LOGO_UPSCALE, "Application logo upscale");
+            requireResource(UiConstants.IMAGE_APP_LOGO_SVG, "Application logo SVG");
+            requireResource(UiConstants.IMAGE_LOGO_PNG, "Logo PNG");
+            requireResource(UiConstants.IMAGE_AVATAR, "Avatar image");
+            requireResource(UiConstants.IMAGE_EMPTY_CHAT, "Empty chat image");
+
+            // Rank Icons
+            requireResource(UiConstants.ICON_RANK_YPOSMINIAS, "Yposminias rank icon");
+            requireResource(UiConstants.ICON_RANK_SMINIAS, "Sminias rank icon");
+            requireResource(UiConstants.ICON_RANK_EPISMINIAS, "Episminias rank icon");
+            requireResource(UiConstants.ICON_RANK_ARCHISMINIAS, "Archisminias rank icon");
+            requireResource(UiConstants.ICON_RANK_ANTHYPASPISTIS, "Anthypaspistis rank icon");
+            requireResource(UiConstants.ICON_RANK_ANTHYPOSMINAGOS, "Anthyposminagos rank icon");
+            requireResource(UiConstants.ICON_RANK_YPOSMINAGOS, "Yposminagos rank icon");
+            requireResource(UiConstants.ICON_RANK_SMINAGOS, "Sminagos rank icon");
+            requireResource(UiConstants.ICON_RANK_EPISMINAGOS, "Episminagos rank icon");
+            requireResource(UiConstants.ICON_RANK_ANTISMINARCHOS, "Antisminarchos rank icon");
+            requireResource(UiConstants.ICON_RANK_SMINARCHOS, "Sminarchos rank icon");
+            requireResource(UiConstants.ICON_RANK_TAKSIARCOS, "Taksiarcos rank icon");
+            requireResource(UiConstants.ICON_RANK_YPOPTERARCHOS, "Ypopterarchos rank icon");
+            requireResource(UiConstants.ICON_RANK_ANTIPTERARCHOS, "Antipterarchos rank icon");
+            requireResource(UiConstants.ICON_RANK_DEFAULT, "Default rank icon");
+
+            // Fonts
+            requireResource(UiConstants.FONT_MANROPE, "Manrope font");
+            requireResource(UiConstants.FONT_MANROPE_BOLD, "Manrope Bold font");
         };
     }
 
@@ -278,14 +305,22 @@ public class SplashViewModel {
      */
     private static NetworkChecker defaultNetworkChecker() {
         return () -> {
-            String endpoint = System.getProperty("haf.server.url", System.getenv("HAF_SERVER_URL"));
+            String endpoint = loadServerUrl();
             if (endpoint == null || endpoint.isBlank()) {
                 // No endpoint configured: skip reachability check
                 return;
             }
 
+            javax.net.ssl.SSLContext sslContext;
+            try {
+                sslContext = com.haf.client.utils.SslContextUtils.getTrustingSslContext();
+            } catch (Exception e) {
+                throw new IOException("Failed to initialize SSL context for network check", e);
+            }
+
             try (
                     HttpClient client = HttpClient.newBuilder()
+                            .sslContext(sslContext)
                             .connectTimeout(Duration.ofSeconds(2))
                             .build()) {
                 HttpRequest request = HttpRequest.newBuilder()
@@ -305,6 +340,37 @@ public class SplashViewModel {
                 throw new IOException("Interrupted while checking server reachability", e);
             }
         };
+    }
+
+    /**
+     * Loads the server URL from client.properties, falling back to
+     * system property {@code haf.server.url} and then environment variable
+     * {@code HAF_SERVER_URL}.
+     *
+     * @return the server URL, or {@code null} if none configured
+     */
+    private static String loadServerUrl() {
+        // 1. Try client.properties
+        try (java.io.InputStream in = SplashViewModel.class.getResourceAsStream("/config/client.properties")) {
+            if (in != null) {
+                java.util.Properties props = new java.util.Properties();
+                props.load(in);
+                String url = props.getProperty("server.url");
+                if (url != null && !url.isBlank()) {
+                    return url;
+                }
+            }
+        } catch (IOException ignored) {
+            // Fall through to next source
+        }
+
+        // 2. Try system property / environment variable
+        String fromSysProp = System.getProperty("haf.server.url");
+        if (fromSysProp != null && !fromSysProp.isBlank()) {
+            return fromSysProp;
+        }
+
+        return System.getenv("HAF_SERVER_URL");
     }
 
 }
