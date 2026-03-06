@@ -3,16 +3,11 @@ package com.haf.server.core;
 import com.haf.server.config.ServerConfig;
 import com.haf.server.exceptions.ConfigurationException;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MainTest {
-
-    @TempDir
-    Path tempDir;
 
     @Test
     void main_has_private_constructor() {
