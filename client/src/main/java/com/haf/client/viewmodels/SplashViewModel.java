@@ -318,13 +318,20 @@ public class SplashViewModel {
                 throw new IOException("Failed to initialize SSL context for network check", e);
             }
 
+            String healthEndpoint = endpoint;
+            if (healthEndpoint.endsWith("/")) {
+                healthEndpoint += "api/v1/health";
+            } else {
+                healthEndpoint += "/api/v1/health";
+            }
+
             try (
                     HttpClient client = HttpClient.newBuilder()
                             .sslContext(sslContext)
                             .connectTimeout(Duration.ofSeconds(2))
                             .build()) {
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(endpoint))
+                        .uri(URI.create(healthEndpoint))
                         .method("HEAD", HttpRequest.BodyPublishers.noBody())
                         .timeout(Duration.ofSeconds(3))
                         .build();

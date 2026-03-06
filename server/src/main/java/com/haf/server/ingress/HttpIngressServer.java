@@ -50,6 +50,7 @@ public final class HttpIngressServer {
     private static final String LOGIN_PATH = "/api/v1/login";
     private static final String USERS_PATH = "/api/v1/users";
     private static final String SEARCH_PATH = "/api/v1/search";
+    private static final String HEALTH_PATH = "/api/v1/health";
     private static final String TEST_USER_ID = "test-user";
     private static final int BCRYPT_LOG_ROUNDS = 12;
 
@@ -127,6 +128,7 @@ public final class HttpIngressServer {
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext(SEARCH_PATH, new SearchHandler());
+        httpsServer.createContext(HEALTH_PATH, new HealthHandler());
         httpsServer.createContext("/api/v1/config/admin-key", new AdminKeyHandler());
         httpsServer.setExecutor(executor);
 
@@ -694,6 +696,43 @@ public final class HttpIngressServer {
                 auditLogger.logError("search_error", requestId, callerId, ex);
                 sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error("internal server error")));
             }
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Handles health check requests.
+     */
+    private final class HealthHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.getResponseHeaders().add("X-Request-Id", UUID.randomUUID().toString());
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            String method = exchange.getRequestMethod();
+            if ("HEAD".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method)) {
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, -1);
+            } else {
+                sendPlain(exchange, 405, "{\"error\":\"method not allowed\"}");
+            }
+            exchange.close();
         }
 
         private void applySecurityHeaders(Headers headers) {

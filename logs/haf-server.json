@@ -1,72 +1,8 @@
-{
-    "@timestamp": "2026-03-03T19:34:43.853Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Database: jdbc:mysql://localhost:3306/haf_messenger (MySQL 8.4)",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.FlywayExecutor"
-}
-{
-    "@timestamp": "2026-03-03T19:34:43.974Z",
-    "ecs.version": "1.2.0",
-    "log.level": "WARN",
-    "message": "Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.database.base.Database"
-}
-{
-    "@timestamp": "2026-03-03T19:34:44.069Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Successfully validated 8 migrations (execution time 00:00.070s)",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.command.DbValidate"
-}
-{
-    "@timestamp": "2026-03-03T19:34:44.109Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Current version of schema `haf_messenger`: 6",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
-}
-{
-    "@timestamp": "2026-03-03T19:34:44.146Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Migrating schema `haf_messenger` to version \"7 - add users id and photos\"",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
-}
-{
-    "@timestamp": "2026-03-03T19:34:44.624Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Migrating schema `haf_messenger` to version \"8 - contacts and encryption meta\"",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
-}
-{
-    "@timestamp": "2026-03-03T19:34:44.800Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Successfully applied 2 migrations to schema `haf_messenger`, now at version v8 (execution time 00:00.500s)",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
-}
-{
-    "@timestamp": "2026-03-03T19:34:45.470Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Servers started on HTTP 8443 / WS 8444",
-    "process.thread.name": "com.haf.server.core.Main.main()",
-    "log.logger": "com.haf.server.core.Main"
-}
-{
-    "@timestamp": "2026-03-03T20:39:12.788Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "Shutdown initiated",
-    "process.thread.name": "Thread-7",
-    "log.logger": "com.haf.server.core.Main"
-}
+{"@timestamp":"2026-03-06T08:59:29.103Z","ecs.version":"1.2.0","log.level":"INFO","message":"Database: jdbc:mysql://127.0.0.1:3306/haf_messenger (MySQL 8.4)","process.thread.name":"main","log.logger":"org.flywaydb.core.FlywayExecutor"}
+{"@timestamp":"2026-03-06T08:59:29.209Z","ecs.version":"1.2.0","log.level":"WARN","message":"Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.database.base.Database"}
+{"@timestamp":"2026-03-06T09:01:33.274Z","ecs.version":"1.2.0","log.level":"ERROR","message":"Skipping filesystem location: src/main/resources/db/migration (not found)","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.scanner.filesystem.FileSystemScanner"}
+{"@timestamp":"2026-03-06T09:01:33.587Z","ecs.version":"1.2.0","log.level":"INFO","message":"Database: jdbc:mysql://127.0.0.1:3306/haf_messenger (MySQL 8.4)","process.thread.name":"main","log.logger":"org.flywaydb.core.FlywayExecutor"}
+{"@timestamp":"2026-03-06T09:01:33.675Z","ecs.version":"1.2.0","log.level":"WARN","message":"Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.database.base.Database"}
+{"@timestamp":"2026-03-06T09:04:03.715Z","ecs.version":"1.2.0","log.level":"ERROR","message":"Server startup failed","process.thread.name":"main","log.logger":"com.haf.server.core.Main","error.type":"java.net.BindException","error.message":"Address already in use","error.stack_trace":"java.net.BindException: Address already in use\n\tat java.base/sun.nio.ch.Net.bind0(Native Method)\n\tat java.base/sun.nio.ch.Net.bind(Net.java:565)\n\tat java.base/sun.nio.ch.ServerSocketChannelImpl.netBind(ServerSocketChannelImpl.java:344)\n\tat java.base/sun.nio.ch.ServerSocketChannelImpl.bind(ServerSocketChannelImpl.java:301)\n\tat java.base/sun.nio.ch.ServerSocketAdaptor.bind(ServerSocketAdaptor.java:89)\n\tat jdk.httpserver/sun.net.httpserver.ServerImpl.<init>(ServerImpl.java:144)\n\tat jdk.httpserver/sun.net.httpserver.HttpsServerImpl.<init>(HttpsServerImpl.java:50)\n\tat jdk.httpserver/sun.net.httpserver.DefaultHttpServerProvider.createHttpsServer(DefaultHttpServerProvider.java:39)\n\tat jdk.httpserver/com.sun.net.httpserver.HttpsServer.create(HttpsServer.java:95)\n\tat server@1.0-SNAPSHOT/com.haf.server.ingress.HttpIngressServer.createServer(HttpIngressServer.java:111)\n\tat server@1.0-SNAPSHOT/com.haf.server.ingress.HttpIngressServer.<init>(HttpIngressServer.java:100)\n\tat server@1.0-SNAPSHOT/com.haf.server.core.Main.start(Main.java:75)\n\tat server@1.0-SNAPSHOT/com.haf.server.core.Main.main(Main.java:47)\n"}
+{"@timestamp":"2026-03-06T09:24:50.427Z","ecs.version":"1.2.0","log.level":"INFO","message":"Servers started on HTTP 8443 / WS 8444","process.thread.name":"main","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-06T09:26:05.868Z","ecs.version":"1.2.0","log.level":"INFO","message":"Shutdown initiated","process.thread.name":"Thread-6","log.logger":"com.haf.server.core.Main"}
