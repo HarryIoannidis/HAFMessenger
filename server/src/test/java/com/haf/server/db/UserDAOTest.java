@@ -157,6 +157,54 @@ class UserDAOTest {
         verify(auditLogger, times(1)).logError(eq("db_find_user"), isNull(), eq("test@haf.gr"), any());
     }
 
+    // ── searchUsers tests ────────────────────────────────────────────────
+
+    @Test
+    void searchUsers_returns_matching_records() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("LIKE"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, true, false); // two rows
+
+        when(resultSet.getString("user_id")).thenReturn("uid-1", "uid-2");
+        when(resultSet.getString("full_name")).thenReturn("Alice", "Bob");
+        when(resultSet.getString("reg_number")).thenReturn("REG-001", "REG-002");
+        when(resultSet.getString("email")).thenReturn("alice@haf.gr", "bob@haf.gr");
+        when(resultSet.getString("rank")).thenReturn("Σμηναγός", "Σμηνίας");
+
+        var results = dao.searchUsers("a", 20);
+
+        assertEquals(2, results.size());
+        assertEquals("uid-1", results.get(0).userId());
+        assertEquals("Alice", results.get(0).fullName());
+        assertEquals("uid-2", results.get(1).userId());
+        verify(existsStatement).setString(1, "%a%");
+        verify(existsStatement).setString(2, "%a%");
+        verify(existsStatement).setInt(3, 20);
+    }
+
+    @Test
+    void searchUsers_returns_empty_for_no_match() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("LIKE"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        var results = dao.searchUsers("zzz", 10);
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    void searchUsers_throws_on_sql_exception() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("LIKE"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.searchUsers("test", 10));
+        verify(auditLogger, times(1)).logError(eq("db_search_users"), isNull(), eq("test"), any());
+    }
+
     private RegisterRequest createValidRequest() {
         RegisterRequest request = new RegisterRequest();
         request.fullName = "John Doe";

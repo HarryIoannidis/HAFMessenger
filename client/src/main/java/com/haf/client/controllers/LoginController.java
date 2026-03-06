@@ -1,13 +1,13 @@
 package com.haf.client.controllers;
 
 import com.haf.client.core.ChatSession;
-
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
 import com.haf.shared.dto.LoginRequest;
+import com.haf.shared.exceptions.CryptoOperationException;
 import com.haf.shared.dto.LoginResponse;
 import com.haf.shared.utils.JsonCodec;
 import java.net.URI;
@@ -341,6 +341,7 @@ public class LoginController {
         com.haf.client.network.DefaultMessageReceiver receiver = new com.haf.client.network.DefaultMessageReceiver(
                 keyProvider, clockProvider, wsAdapter, keyProvider.getSenderId());
 
+        com.haf.client.core.NetworkSession.set(wsAdapter);
         ChatSession.set(new MessageViewModel(sender, receiver));
         receiver.start();
     }
@@ -355,8 +356,11 @@ public class LoginController {
                 return keyRes.publicKeyPem;
             }
             return null;
-        } catch (Exception networkEx) {
-            throw new RuntimeException("Directory service fetch failed", networkEx);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CryptoOperationException("Directory service fetch interrupted", e);
+        } catch (java.util.concurrent.ExecutionException | com.haf.shared.exceptions.JsonCodecException e) {
+            throw new CryptoOperationException("Directory service fetch failed", e);
         }
     }
 

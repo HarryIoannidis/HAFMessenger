@@ -42,7 +42,6 @@ public class SplashController {
     @FXML
     public void initialize() {
         bindViewModel();
-        // viewModel.startBootstrap(this::navigateToRegister, this::showFailureDialog);
         viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
     }
 
@@ -66,13 +65,6 @@ public class SplashController {
      */
     private void navigateToLogin() {
         ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
-    }
-
-    /**
-     * Navigates to the Register screen.
-     */
-    private void navigateToRegister() {
-        ViewRouter.switchToTransparent(UiConstants.FXML_REGISTER);
     }
 
     /**
