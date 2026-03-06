@@ -1,0 +1,171 @@
+{
+    "@timestamp": "2026-03-06T08:56:22.609Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Database: jdbc:mysql://127.0.0.1:3306/haf_messenger (MySQL 8.4)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.FlywayExecutor"
+}
+{
+    "@timestamp": "2026-03-06T08:56:22.658Z",
+    "ecs.version": "1.2.0",
+    "log.level": "WARN",
+    "message": "Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.database.base.Database"
+}
+{
+    "@timestamp": "2026-03-06T08:56:22.708Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Successfully validated 8 migrations (execution time 00:00.034s)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbValidate"
+}
+{
+    "@timestamp": "2026-03-06T08:56:22.725Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Current version of schema `haf_messenger`: 8",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T08:56:22.731Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Schema `haf_messenger` is up to date. No migration necessary.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T08:56:22.783Z",
+    "ecs.version": "1.2.0",
+    "log.level": "ERROR",
+    "message": "Server startup failed",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "com.haf.server.core.Main",
+    "error.type": "java.nio.file.NoSuchFileException",
+    "error.message": "server/src/main/resources/config/server.p12",
+    "error.stack_trace": "java.nio.file.NoSuchFileException: server/src/main/resources/config/server.p12\n\tat java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)\n\tat java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106)\n\tat java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)\n\tat java.base/sun.nio.fs.UnixFileSystemProvider.newFileChannel(UnixFileSystemProvider.java:213)\n\tat java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:244)\n\tat java.base/java.nio.file.Files.newByteChannel(Files.java:357)\n\tat java.base/java.nio.file.Files.newByteChannel(Files.java:399)\n\tat java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:371)\n\tat java.base/java.nio.file.Files.newInputStream(Files.java:154)\n\tat com.haf.server.core.Main.buildSslContext(Main.java:172)\n\tat com.haf.server.core.Main.start(Main.java:63)\n\tat com.haf.server.core.Main.main(Main.java:47)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:565)\n\tat org.codehaus.mojo.exec.AbstractExecJavaBase.executeMainMethod(AbstractExecJavaBase.java:402)\n\tat org.codehaus.mojo.exec.ExecJavaMojo.executeMainMethod(ExecJavaMojo.java:142)\n\tat org.codehaus.mojo.exec.AbstractExecJavaBase.doExecClassLoader(AbstractExecJavaBase.java:377)\n\tat org.codehaus.mojo.exec.AbstractExecJavaBase.lambda$execute$0(AbstractExecJavaBase.java:287)\n\tat java.base/java.lang.Thread.run(Thread.java:1447)\n"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.056Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Database: jdbc:mysql://127.0.0.1:3306/haf_messenger (MySQL 8.4)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.FlywayExecutor"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.097Z",
+    "ecs.version": "1.2.0",
+    "log.level": "WARN",
+    "message": "Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.database.base.Database"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.144Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Successfully validated 8 migrations (execution time 00:00.034s)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbValidate"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.164Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Current version of schema `haf_messenger`: 8",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.169Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Schema `haf_messenger` is up to date. No migration necessary.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T08:57:52.578Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Servers started on HTTP 8443 / WS 8444",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "com.haf.server.core.Main"
+}
+{
+    "@timestamp": "2026-03-06T08:58:22.888Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Shutdown initiated",
+    "process.thread.name": "Thread-7",
+    "log.logger": "com.haf.server.core.Main"
+}
+{
+    "@timestamp": "2026-03-06T09:00:36.509Z",
+    "ecs.version": "1.2.0",
+    "log.level": "ERROR",
+    "message": "Skipping filesystem location: server/src/main/resources/db/migration (not found)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.scanner.filesystem.FileSystemScanner"
+}
+{
+    "@timestamp": "2026-03-06T09:00:36.824Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Database: jdbc:mysql://127.0.0.1:3306/haf_messenger (MySQL 8.4)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.FlywayExecutor"
+}
+{
+    "@timestamp": "2026-03-06T09:00:36.871Z",
+    "ecs.version": "1.2.0",
+    "log.level": "WARN",
+    "message": "Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.database.base.Database"
+}
+{
+    "@timestamp": "2026-03-06T09:00:36.974Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Successfully validated 8 migrations (execution time 00:00.082s)",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbValidate"
+}
+{
+    "@timestamp": "2026-03-06T09:00:36.999Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Current version of schema `haf_messenger`: 8",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T09:00:37.007Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Schema `haf_messenger` is up to date. No migration necessary.",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "org.flywaydb.core.internal.command.DbMigrate"
+}
+{
+    "@timestamp": "2026-03-06T09:00:37.700Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Servers started on HTTP 8443 / WS 8444",
+    "process.thread.name": "com.haf.server.core.Main.main()",
+    "log.logger": "com.haf.server.core.Main"
+}
+{
+    "@timestamp": "2026-03-06T09:08:20.727Z",
+    "ecs.version": "1.2.0",
+    "log.level": "INFO",
+    "message": "Shutdown initiated",
+    "process.thread.name": "Thread-7",
+    "log.logger": "com.haf.server.core.Main"
+}

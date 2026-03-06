@@ -33,15 +33,30 @@ public final class ServerConfig {
      * Loads the server configuration from environment variables or a .env file.
      */
     public static ServerConfig load() {
-        io.github.cdimascio.dotenv.Dotenv dotenv = io.github.cdimascio.dotenv.Dotenv.configure()
-                .directory("src/main/resources/config")
-                .filename("variables.env")
-                .ignoreIfMissing()
-                .load();
-
         Map<String, String> env = new java.util.HashMap<>(System.getenv());
-        if (dotenv != null) {
-            dotenv.entries().forEach(entry -> env.putIfAbsent(entry.getKey(), entry.getValue()));
+
+        java.io.File envFile = new java.io.File("server/src/main/resources/config/variables.env");
+        if (!envFile.exists()) {
+            envFile = new java.io.File("src/main/resources/config/variables.env");
+        }
+
+        if (envFile.exists()) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!line.isEmpty() && !line.startsWith("#")) {
+                        int eqIndex = line.indexOf('=');
+                        if (eqIndex > 0) {
+                            String key = line.substring(0, eqIndex).trim();
+                            String value = line.substring(eqIndex + 1).trim();
+                            env.put(key, value);
+                        }
+                    }
+                }
+            } catch (java.io.IOException e) {
+                // Ignore
+            }
         }
 
         return new ServerConfig(env);
@@ -61,7 +76,15 @@ public final class ServerConfig {
         this.keystoreRoot = env.get("HAF_KEYSTORE_ROOT") != null ? Path.of(env.get("HAF_KEYSTORE_ROOT")) : null;
         this.keyPassword = require(env, "HAF_KEY_PASS").toCharArray();
 
-        this.tlsKeystorePath = Path.of(require(env, "HAF_TLS_KEYSTORE_PATH"));
+        Path tls = Path.of(require(env, "HAF_TLS_KEYSTORE_PATH"));
+        if (!java.nio.file.Files.exists(tls) && tls.toString().startsWith("server/")) {
+            tls = Path.of(tls.toString().substring(7));
+        } else if (!java.nio.file.Files.exists(tls) && !tls.toString().startsWith("server/")) {
+            Path altTls = Path.of("server").resolve(tls);
+            if (java.nio.file.Files.exists(altTls))
+                tls = altTls;
+        }
+        this.tlsKeystorePath = tls;
         this.tlsKeystorePassword = require(env, "HAF_TLS_KEYSTORE_PASS").toCharArray();
 
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);

@@ -12,12 +12,12 @@ import java.util.List;
 
 /**
  * KeyProvider implementation that uses UserKeystore for key management.
- * 
- * For Phase 4, this is a placeholder implementation:
- * - Sender ID: Derived from current key's keyId in metadata
- * - Recipient public key lookup: Attempts to load from local keystore if keyId
- * matches.
- * Full directory service integration will be in Phase 5.
+ * <p>
+ * Sender ID is derived from the oldest CURRENT key directory in the local
+ * keystore.
+ * Recipient public keys are resolved by first checking the local keystore and
+ * then
+ * falling back to an optional directory-service fetcher callback.
  */
 public class UserKeystoreKeyProvider implements KeyProvider {
     private final UserKeystore keyStore;
@@ -37,9 +37,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         this.keyStore = new UserKeystore(keystoreRoot);
         this.passphrase = passphrase != null ? passphrase.clone() : null;
 
-        // Derive sender ID from current key's metadata
-        // For Phase 4, we use the keyId as the sender identifier
-        // In Phase 5, this might come from a user profile or directory service
+        // Derive sender ID from the oldest CURRENT key directory name
         this.senderId = deriveSenderId();
     }
 
@@ -85,9 +83,8 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
     @Override
     public PublicKey getRecipientPublicKey(String recipientId) throws KeyNotFoundException {
-        // Phase 4 placeholder: Try to load recipient key from local keystore
-        // This assumes recipientId is a keyId that exists in the local keystore
-        // In Phase 5, this will query a directory service
+        // Try to load recipient key from local keystore first,
+        // then fall back to the directory service if configured.
 
         try {
             // Check if recipientId matches a keyId in local keystore
@@ -113,8 +110,8 @@ public class UserKeystoreKeyProvider implements KeyProvider {
                 }
             }
 
-            throw new KeyNotFoundException("Recipient key not found in local keystore: " + recipientId +
-                    " (directory service integration will be available in Phase 5)");
+            throw new KeyNotFoundException(
+                    "Recipient key not found for: " + recipientId);
         } catch (KeyNotFoundException e) {
             throw e;
         } catch (Exception e) {
