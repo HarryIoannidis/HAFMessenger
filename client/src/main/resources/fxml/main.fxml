@@ -162,12 +162,12 @@
                                            <Insets />
                                         </StackPane.margin>
                                      </TextField>
-                                     <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
+                                     <JFXButton fx:id="searchActionButton" contentDisplay="CENTER" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
                                         <StackPane.margin>
                                            <Insets right="5.0" />
                                         </StackPane.margin>
                                         <graphic>
-                                           <FontIcon iconLiteral="mdi2m-magnify" iconSize="25" textAlignment="CENTER" />
+                                           <FontIcon fx:id="searchActionIcon" iconLiteral="mdi2m-magnify" iconSize="25" textAlignment="CENTER" />
                                         </graphic>
                                      </JFXButton>
                                   </children>

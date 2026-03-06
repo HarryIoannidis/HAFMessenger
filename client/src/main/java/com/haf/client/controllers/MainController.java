@@ -8,6 +8,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -60,6 +61,14 @@ public class MainController {
     @FXML
     private HBox searchPanel;
 
+    // Search field and action button
+    @FXML
+    private TextField toolbarSearchField;
+    @FXML
+    private JFXButton searchActionButton;
+    @FXML
+    private FontIcon searchActionIcon;
+
     // Profile panel detail nodes
     @FXML
     private Text profileNameText;
@@ -77,6 +86,12 @@ public class MainController {
     private double xOffset;
     private double yOffset;
 
+    /** Reference to the loaded SearchController (null when not in search mode). */
+    private SearchController searchController;
+
+    /** Tracks whether results are currently displayed (for clear/search toggle). */
+    private boolean hasSearchResults;
+
     @FXML
     public void initialize() {
         setupWindowControls();
@@ -84,6 +99,7 @@ public class MainController {
         setupContactList();
         loadPlaceholder();
         setupContactSelection();
+        setupSearchField();
 
         // Messages tab is active by default
         activateMessagesTab();
@@ -92,6 +108,58 @@ public class MainController {
     private void setupNavBar() {
         navMessages.setOnAction(e -> activateMessagesTab());
         navSearch.setOnAction(e -> activateSearchTab());
+    }
+
+    /**
+     * Wires Enter key on the search field and the action button (magnify / clear).
+     */
+    private void setupSearchField() {
+        // Enter key triggers search
+        toolbarSearchField.setOnAction(e -> performSearch());
+
+        // Action button: search or clear depending on state
+        if (searchActionButton != null) {
+            searchActionButton.setOnAction(e -> {
+                if (hasSearchResults) {
+                    clearSearch();
+                } else {
+                    performSearch();
+                }
+            });
+        }
+    }
+
+    /**
+     * Performs the search using the current text in the toolbar field.
+     */
+    private void performSearch() {
+        if (searchController == null) {
+            return;
+        }
+        String query = toolbarSearchField.getText();
+        if (query != null && !query.isBlank()) {
+            searchController.search(query);
+            hasSearchResults = true;
+            // Switch icon to clear (X)
+            if (searchActionIcon != null) {
+                searchActionIcon.setIconLiteral("mdi2c-close");
+            }
+        }
+    }
+
+    /**
+     * Clears the search results and resets the field and icon.
+     */
+    private void clearSearch() {
+        toolbarSearchField.clear();
+        if (searchController != null) {
+            searchController.clearResults();
+        }
+        hasSearchResults = false;
+        // Restore magnify icon
+        if (searchActionIcon != null) {
+            searchActionIcon.setIconLiteral("mdi2m-magnify");
+        }
     }
 
     private void activateMessagesTab() {
@@ -110,10 +178,20 @@ public class MainController {
         searchPanel.setVisible(false);
         searchPanel.setManaged(false);
 
+        // Discard the search controller
+        searchController = null;
+        hasSearchResults = false;
+        if (searchActionIcon != null) {
+            searchActionIcon.setIconLiteral("mdi2m-magnify");
+        }
+
         // Restore profile panel if a contact is still selected
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null) {
             showProfilePanel(selected);
+            loadChat(selected.name());
+        } else {
+            loadPlaceholder();
         }
     }
 
@@ -134,6 +212,24 @@ public class MainController {
         hideProfilePanel();
         searchPanel.setVisible(true);
         searchPanel.setManaged(true);
+
+        // Load search FXML into contentPane
+        loadSearchView();
+    }
+
+    /**
+     * Loads search.fxml into the content pane and stores the SearchController ref.
+     */
+    private void loadSearchView() {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource(UiConstants.FXML_SEARCH));
+            Parent searchView = loader.load();
+            searchController = loader.getController();
+            contentPane.getChildren().setAll(searchView);
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
+        }
     }
 
     private void showProfilePanel(ContactInfo contact) {

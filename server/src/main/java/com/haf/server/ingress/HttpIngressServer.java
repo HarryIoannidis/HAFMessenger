@@ -18,6 +18,8 @@ import com.haf.shared.dto.LoginRequest;
 import com.haf.shared.dto.LoginResponse;
 import com.haf.shared.dto.RegisterRequest;
 import com.haf.shared.dto.RegisterResponse;
+import com.haf.shared.dto.UserSearchResponse;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -35,6 +37,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +49,7 @@ public final class HttpIngressServer {
     private static final String REGISTER_PATH = "/api/v1/register";
     private static final String LOGIN_PATH = "/api/v1/login";
     private static final String USERS_PATH = "/api/v1/users";
+    private static final String SEARCH_PATH = "/api/v1/search";
     private static final String TEST_USER_ID = "test-user";
     private static final int BCRYPT_LOG_ROUNDS = 12;
 
@@ -122,6 +126,7 @@ public final class HttpIngressServer {
         httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
+        httpsServer.createContext(SEARCH_PATH, new SearchHandler());
         httpsServer.createContext("/api/v1/config/admin-key", new AdminKeyHandler());
         httpsServer.setExecutor(executor);
 
@@ -610,6 +615,84 @@ public final class HttpIngressServer {
             } catch (Exception ex) {
                 auditLogger.logError("user_key_lookup_error", requestId, null, ex);
                 sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error("internal server error")));
+            }
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("X-Frame-Options", "DENY");
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Handles search requests: {@code GET /api/v1/search?q=<query>}.
+     * Requires a valid session via the {@code Authorization: Bearer <sessionId>}
+     * header.
+     */
+    private final class SearchHandler implements HttpHandler {
+
+        private static final int MAX_RESULTS = 20;
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error("method not allowed")));
+                return;
+            }
+
+            // Authenticate via session
+            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error("missing or invalid auth")));
+                return;
+            }
+            String sessionId = authHeader.substring("Bearer ".length());
+            String callerId = sessionDAO.getUserIdForSession(sessionId);
+            if (callerId == null) {
+                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error("invalid session")));
+                return;
+            }
+
+            // Extract query
+            String rawQuery = exchange.getRequestURI().getQuery(); // e.g. "q=john"
+            String searchTerm = "";
+            if (rawQuery != null) {
+                for (String param : rawQuery.split("&")) {
+                    if (param.startsWith("q=")) {
+                        searchTerm = java.net.URLDecoder.decode(param.substring(2), StandardCharsets.UTF_8);
+                        break;
+                    }
+                }
+            }
+            if (searchTerm.isBlank()) {
+                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(List.of())));
+                return;
+            }
+
+            try {
+                List<UserDAO.SearchRecord> records = userDAO.searchUsers(searchTerm, MAX_RESULTS);
+                List<UserSearchResult> results = records.stream()
+                        .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
+                        .toList();
+                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results)));
+            } catch (Exception ex) {
+                auditLogger.logError("search_error", requestId, callerId, ex);
+                sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error("internal server error")));
             }
         }
 

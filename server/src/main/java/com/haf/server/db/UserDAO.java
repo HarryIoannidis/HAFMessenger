@@ -8,6 +8,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -209,6 +211,58 @@ public final class UserDAO {
         } catch (SQLException e) {
             auditLogger.logError("db_find_public_key", null, userId, e);
             throw new DatabaseOperationException("Failed to fetch public key for user: " + userId, e);
+        }
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────
+
+    /**
+     * Represents a user record returned by {@link #searchUsers(String, int)}.
+     */
+    public record SearchRecord(String userId, String fullName,
+            String regNumber, String email, String rank) {
+    }
+
+    private static final String SEARCH_USERS_SQL = """
+            SELECT user_id, full_name, reg_number, email, `rank`
+            FROM users
+            WHERE `status` = 'APPROVED'
+              AND (full_name LIKE ? OR reg_number LIKE ?)
+            LIMIT ?
+            """;
+
+    /**
+     * Searches for approved users whose name or registration number matches.
+     *
+     * @param query the search term (matched with {@code %query%})
+     * @param limit maximum number of results
+     * @return list of matching records, never null
+     * @throws DatabaseOperationException if the query fails
+     */
+    public List<SearchRecord> searchUsers(String query, int limit) {
+        String pattern = "%" + query + "%";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(SEARCH_USERS_SQL)) {
+
+            ps.setString(1, pattern);
+            ps.setString(2, pattern);
+            ps.setInt(3, limit);
+
+            List<SearchRecord> results = new ArrayList<>();
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    results.add(new SearchRecord(
+                            rs.getString("user_id"),
+                            rs.getString("full_name"),
+                            rs.getString("reg_number"),
+                            rs.getString("email"),
+                            rs.getString("rank")));
+                }
+            }
+            return results;
+        } catch (SQLException ex) {
+            auditLogger.logError("db_search_users", null, query, ex);
+            throw new DatabaseOperationException("Failed to search users", ex);
         }
     }
 }
