@@ -157,8 +157,17 @@ public class WebSocketAdapter {
      * @return CompletableFuture containing the response body string
      */
     public CompletableFuture<String> getAuthenticated(String path) {
+        // Must rewrite scheme from wss to https for standard HTTP calls
+        URI requestUri = serverUri.resolve(path);
+        try {
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+                    requestUri.getQuery(), requestUri.getFragment());
+        } catch (java.net.URISyntaxException e) {
+            throw new RuntimeException("Failed to construct HTTPS URI", e);
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(serverUri.resolve(path))
+                .uri(requestUri)
                 .header("Authorization", "Bearer " + sessionId)
                 .GET()
                 .build();

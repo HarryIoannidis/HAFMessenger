@@ -23,20 +23,48 @@ public class ContactCell extends ListCell<ContactInfo> {
 
     private static final Logger LOGGER = Logger.getLogger(ContactCell.class.getName());
 
+    private static byte[] cachedFXMLBytes;
+    private Runnable clickCallback;
+
     private StackPane cellRoot;
     private Text nameText;
     private Text activenessText;
     private Circle activenessCircle;
 
-    public ContactCell() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource(UiConstants.FXML_CONTACT_CELL));
-            cellRoot = loader.load();
+    public void setOnClick(Runnable clickCallback) {
+        this.clickCallback = clickCallback;
+    }
 
-            // Tree: StackPane → HBox (index 0) → VBox (index 1)
-            // VBox: Text (name, index 0) , HBox (activeness row, index 1)
-            // activeness HBox: Text (label, index 0), Circle (dot, index 1)
+    public ContactCell() {
+        // We move the loading logic out of the constructor to avoid
+        // "burst" loading when the ListView pre-instantiates cells.
+    }
+
+    private void ensureLoaded() {
+        if (cellRoot != null) {
+            return;
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(UiConstants.FXML_CONTACT_CELL));
+
+            // Optimization: If we already have the bytes in memory, use them
+            // instead of hitting the disk again.
+            if (cachedFXMLBytes == null) {
+                try (var is = getClass().getResourceAsStream(UiConstants.FXML_CONTACT_CELL)) {
+                    if (is != null) {
+                        cachedFXMLBytes = is.readAllBytes();
+                    }
+                }
+            }
+
+            if (cachedFXMLBytes != null) {
+                cellRoot = loader.load(new java.io.ByteArrayInputStream(cachedFXMLBytes));
+            } else {
+                cellRoot = loader.load();
+            }
+
+            // Bind references
             if (!cellRoot.getChildren().isEmpty()) {
                 var hbox = (HBox) cellRoot.getChildren().get(0);
                 if (hbox.getChildren().size() > 1) {
@@ -55,13 +83,17 @@ public class ContactCell extends ListCell<ContactInfo> {
                     }
                 }
 
-                // The transparent JFXButton overlay (index 1) triggers selection
+                // The transparent JFXButton overlay (index 1) triggers selection and tab switch
                 if (cellRoot.getChildren().size() > 1) {
                     var button = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
-                    button.setOnAction(e -> getListView().getSelectionModel().select(getItem()));
+                    button.setOnAction(e -> {
+                        getListView().getSelectionModel().select(getItem());
+                        if (clickCallback != null) {
+                            clickCallback.run();
+                        }
+                    });
                 }
             }
-
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Could not load contact_cell.fxml", e);
         }
@@ -71,9 +103,15 @@ public class ContactCell extends ListCell<ContactInfo> {
     protected void updateItem(ContactInfo contact, boolean empty) {
         super.updateItem(contact, empty);
 
-        if (empty || contact == null || cellRoot == null) {
+        if (empty || contact == null) {
             setGraphic(null);
             setText(null);
+            return;
+        }
+
+        ensureLoaded();
+        if (cellRoot == null) {
+            setGraphic(null);
             return;
         }
 

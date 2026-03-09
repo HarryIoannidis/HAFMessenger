@@ -330,7 +330,7 @@ public class LoginController {
                 passphrase);
 
         com.haf.client.network.WebSocketAdapter wsAdapter = new com.haf.client.network.WebSocketAdapter(
-                URI.create("wss://localhost:8443/ws"), sessionId);
+                URI.create("wss://localhost:8444/"), sessionId);
 
         // Configure directory service lookup
         keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));

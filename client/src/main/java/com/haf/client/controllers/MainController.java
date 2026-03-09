@@ -92,6 +92,12 @@ public class MainController {
     /** Tracks whether results are currently displayed (for clear/search toggle). */
     private boolean hasSearchResults;
 
+    // Cached views for performance
+    private Parent cachedSearchView;
+    private Parent cachedPlaceholderView;
+    private Parent currentChatView;
+    private String currentChatRecipientId;
+
     @FXML
     public void initialize() {
         setupWindowControls();
@@ -166,24 +172,8 @@ public class MainController {
         indicatorMessages.setVisible(true);
         indicatorSearch.setVisible(false);
 
-        iconMessages.getStyleClass().remove("nav-item-icon");
-        if (!iconMessages.getStyleClass().contains("nav-item-icon-active")) {
-            iconMessages.getStyleClass().add("nav-item-icon-active");
-        }
-        iconSearch.getStyleClass().remove("nav-item-icon-active");
-        if (!iconSearch.getStyleClass().contains("nav-item-icon")) {
-            iconSearch.getStyleClass().add("nav-item-icon");
-        }
-
-        searchPanel.setVisible(false);
-        searchPanel.setManaged(false);
-
-        // Discard the search controller
-        searchController = null;
-        hasSearchResults = false;
-        if (searchActionIcon != null) {
-            searchActionIcon.setIconLiteral("mdi2m-magnify");
-        }
+        updateNavStyles(true);
+        hideSearchPanel();
 
         // Restore profile panel if a contact is still selected
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
@@ -199,37 +189,55 @@ public class MainController {
         indicatorMessages.setVisible(false);
         indicatorSearch.setVisible(true);
 
-        iconSearch.getStyleClass().remove("nav-item-icon");
-        if (!iconSearch.getStyleClass().contains("nav-item-icon-active")) {
-            iconSearch.getStyleClass().add("nav-item-icon-active");
-        }
-        iconMessages.getStyleClass().remove("nav-item-icon-active");
-        if (!iconMessages.getStyleClass().contains("nav-item-icon")) {
-            iconMessages.getStyleClass().add("nav-item-icon");
-        }
+        updateNavStyles(false);
 
         // Hide profile panel when in search mode
         hideProfilePanel();
-        searchPanel.setVisible(true);
-        searchPanel.setManaged(true);
+        showSearchPanel();
 
         // Load search FXML into contentPane
         loadSearchView();
+    }
+
+    private void updateNavStyles(boolean messagesActive) {
+        if (messagesActive) {
+            iconMessages.getStyleClass().remove("nav-item-icon");
+            if (!iconMessages.getStyleClass().contains("nav-item-icon-active")) {
+                iconMessages.getStyleClass().add("nav-item-icon-active");
+            }
+            iconSearch.getStyleClass().remove("nav-item-icon-active");
+            if (!iconSearch.getStyleClass().contains("nav-item-icon")) {
+                iconSearch.getStyleClass().add("nav-item-icon");
+            }
+        } else {
+            iconSearch.getStyleClass().remove("nav-item-icon");
+            if (!iconSearch.getStyleClass().contains("nav-item-icon-active")) {
+                iconSearch.getStyleClass().add("nav-item-icon-active");
+            }
+            iconMessages.getStyleClass().remove("nav-item-icon-active");
+            if (!iconMessages.getStyleClass().contains("nav-item-icon")) {
+                iconMessages.getStyleClass().add("nav-item-icon");
+            }
+        }
     }
 
     /**
      * Loads search.fxml into the content pane and stores the SearchController ref.
      */
     private void loadSearchView() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource(UiConstants.FXML_SEARCH));
-            Parent searchView = loader.load();
-            searchController = loader.getController();
-            contentPane.getChildren().setAll(searchView);
-        } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
+        if (cachedSearchView == null) {
+            try {
+                FXMLLoader loader = new FXMLLoader(
+                        getClass().getResource(UiConstants.FXML_SEARCH));
+                cachedSearchView = loader.load();
+                searchController = loader.getController();
+                searchController.setMainController(this);
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
+                return;
+            }
         }
+        contentPane.getChildren().setAll(cachedSearchView);
     }
 
     private void showProfilePanel(ContactInfo contact) {
@@ -242,6 +250,7 @@ public class MainController {
         }
         profilePanel.setVisible(true);
         profilePanel.setManaged(true);
+        hideSearchPanel();
     }
 
     private void hideProfilePanel() {
@@ -249,13 +258,78 @@ public class MainController {
         profilePanel.setManaged(false);
     }
 
-    private void setupContactList() {
-        contactsList.setCellFactory(lv -> new ContactCell());
+    private void showSearchPanel() {
+        searchPanel.setVisible(true);
+        searchPanel.setManaged(true);
+        hideProfilePanel();
+    }
 
-        // Demo contacts so the UI can be tested immediately
-        contactsList.getItems().addAll(
-                ContactInfo.online("Demo Contact"),
-                ContactInfo.offline("Harry Ioannidis"));
+    private void hideSearchPanel() {
+        searchPanel.setVisible(false);
+        searchPanel.setManaged(false);
+    }
+
+    private void setupContactList() {
+        contactsList.setCellFactory(lv -> {
+            ContactCell cell = new ContactCell();
+            cell.setOnClick(this::activateMessagesTab);
+            return cell;
+        });
+    }
+
+    /**
+     * Adds a searched user to the contacts list and switches to their chat.
+     */
+    public void startChatWith(String userId, String fullName) {
+        // Switch to messages tab
+        activateMessagesTab();
+
+        // Find if contact already exists
+        ContactInfo target = null;
+        for (ContactInfo info : contactsList.getItems()) {
+            if (info.name().equals(fullName)) { // Using name as identifier for now
+                target = info;
+                break;
+            }
+        }
+
+        // Add if not exists
+        if (target == null) {
+            target = ContactInfo.online(fullName);
+            contactsList.getItems().add(target);
+        }
+
+        // Select and load chat
+        contactsList.getSelectionModel().select(target);
+        contactsList.setUserData(target);
+        showProfilePanel(target);
+        loadChat(userId);
+    }
+
+    public boolean hasContact(String fullName) {
+        for (ContactInfo info : contactsList.getItems()) {
+            if (info.name().equals(fullName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void addContact(String fullName) {
+        if (!hasContact(fullName)) {
+            contactsList.getItems().add(ContactInfo.online(fullName));
+        }
+    }
+
+    public void removeContact(String fullName) {
+        contactsList.getItems().removeIf(info -> info.name().equals(fullName));
+        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+        if (selected != null && selected.name().equals(fullName)) {
+            contactsList.getSelectionModel().clearSelection();
+            contactsList.setUserData(null);
+            hideProfilePanel();
+            loadPlaceholder();
+        }
     }
 
     private void setupContactSelection() {
@@ -263,19 +337,28 @@ public class MainController {
         contactsList.setOnMouseClicked(event -> {
             ContactInfo clicked = contactsList.getSelectionModel().getSelectedItem();
 
-            // We track whether the click target is already selected via a tag on the
-            // ListView
+            if (clicked == null) {
+                return;
+            }
+
+            // If we are currently in Search Mode, clicking any contact (even the current
+            // one)
+            // should transport us back to the Messages tab.
+            if (indicatorSearch.isVisible()) {
+                activateMessagesTab();
+                contactsList.setUserData(clicked);
+                return;
+            }
+
+            // If we are already in Messages Mode, toggle selection (deselect if clicked
+            // again)
             Object lastSelected = contactsList.getUserData();
-            if (clicked != null && clicked.equals(lastSelected)) {
-                // Same cell clicked again → deselect
+            if (clicked.equals(lastSelected)) {
                 contactsList.getSelectionModel().clearSelection();
                 contactsList.setUserData(null);
                 hideProfilePanel();
                 loadPlaceholder();
-                return;
-            }
-            // Record this as the last selected item
-            if (clicked != null) {
+            } else {
                 contactsList.setUserData(clicked);
             }
         });
@@ -283,34 +366,42 @@ public class MainController {
         contactsList.getSelectionModel().selectedItemProperty()
                 .addListener((obs, oldContact, newContact) -> {
                     if (newContact != null) {
-                        showProfilePanel(newContact);
-                        loadChat(newContact.name());
+                        activateMessagesTab();
                     }
-                    // If null (cleared above), placeholder + panel hide are already handled
                 });
     }
 
     private void loadPlaceholder() {
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource(UiConstants.FXML_PLACEHOLDER));
-            Parent placeholder = loader.load();
-            contentPane.getChildren().setAll(placeholder);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
+        if (cachedPlaceholderView == null) {
+            try {
+                FXMLLoader loader = new FXMLLoader(
+                        getClass().getResource(UiConstants.FXML_PLACEHOLDER));
+                cachedPlaceholderView = loader.load();
+            } catch (IOException e) {
+                LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
+                return;
+            }
         }
+        contentPane.getChildren().setAll(cachedPlaceholderView);
     }
 
     private void loadChat(String recipientId) {
+        // Reuse chat view if we are already chatting with the same contact
+        if (currentChatView != null && recipientId.equals(currentChatRecipientId)) {
+            contentPane.getChildren().setAll(currentChatView);
+            return;
+        }
+
         try {
             FXMLLoader loader = new FXMLLoader(
                     getClass().getResource(UiConstants.FXML_CHAT));
-            Parent chatView = loader.load();
+            currentChatView = loader.load();
 
             ChatController chatController = loader.getController();
             chatController.setRecipient(recipientId);
 
-            contentPane.getChildren().setAll(chatView);
+            currentChatRecipientId = recipientId;
+            contentPane.getChildren().setAll(currentChatView);
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
         }

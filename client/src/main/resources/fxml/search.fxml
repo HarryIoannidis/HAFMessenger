@@ -7,13 +7,12 @@
 <?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
 
+<StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="400.0" minWidth="420.0" prefHeight="700.0" prefWidth="900.0" stylesheets="@../css/global.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SearchController">
 
-<StackPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="400.0" minWidth="420.0" prefHeight="700.0" prefWidth="900.0" stylesheets="@../css/global.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SearchController">
-
-   <!-- Layer 1: the result cards -->
-   <FlowPane fx:id="resultsPane" columnHalignment="CENTER" hgap="30.0" vgap="30.0">
+         <!-- Layer 1: the result cards -->
+   <FlowPane fx:id="resultsPane" columnHalignment="CENTER" hgap="30.0" vgap="30.0" visible="false">
       <opaqueInsets>
-         <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+         <Insets />
       </opaqueInsets>
       <padding>
          <Insets bottom="30.0" left="30.0" right="30.0" top="30.0" />
@@ -25,7 +24,7 @@
       <children>
          <Text fx:id="statusText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Search for users by name or registration number.">
             <font>
-               <Font size="14.0" />
+               <Font size="17.0" />
             </font>
          </Text>
       </children>
