@@ -1,8 +1,8 @@
-{
-    "@timestamp": "2026-03-06T09:25:50.403Z",
-    "ecs.version": "1.2.0",
-    "log.level": "INFO",
-    "message": "action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-06T09:25:50.400933004Z\" userId=\"system\"",
-    "process.thread.name": "haf-scheduler-1",
-    "log.logger": "AuditLogger"
-}
+{"@timestamp":"2026-03-09T08:26:52.068Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:26:52.065304362Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:32:12.519Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:32:12.516015107Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:33:12.513Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:33:12.513180925Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:34:12.513Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:34:12.513225361Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:35:12.513Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:35:12.513157696Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:36:12.513Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:36:12.513255943Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:36:12.545Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"ttl_cleanup\" deleted=\"0\" durationMs=\"29\" timestamp=\"2026-03-09T08:36:12.545034680Z\" userId=\"system\"","process.thread.name":"haf-scheduler-2","log.logger":"AuditLogger"}
+{"@timestamp":"2026-03-09T08:38:15.435Z","ecs.version":"1.2.0","log.level":"INFO","message":"action=\"metrics\" avgDeliveryLatencyMs=\"0.0\" deliveredCount=\"0\" ingressCount=\"0\" queueDepth=\"0\" rateLimitRejectCount=\"0\" rejectCount=\"0\" timestamp=\"2026-03-09T08:38:15.430903873Z\" userId=\"system\"","process.thread.name":"haf-scheduler-1","log.logger":"AuditLogger"}
