@@ -471,7 +471,7 @@ public class MainChatViewModel {
 </VBox>
 ```
 - Controller:
-```
+```java
 public class ChatController {
 @FXML private VBox messages; @FXML private TextArea input; @FXML private ScrollPane scroll;
 private final ChatViewModel vm = new ChatViewModel();
@@ -488,7 +488,7 @@ private void enableDnD(){ messages.getScene().setOnDragDropped(e->{ /* forward t
 }
 ```
 - ViewModel:
-```
+```java
 public class ChatViewModel {
 private final ObservableList<MessageVM> items = FXCollections.observableArrayList();
 public ObservableList<MessageVM> messagesProperty(){ return items; }
@@ -546,7 +546,7 @@ public List<Node> renderedNodes(){ return items.stream().map(MessageCellFactory:
 
 ### Implementation (FXML + MVVM)
 - FXML: profile.fxml
-```
+```java
 <?xml version="1.0" encoding="UTF-8"?>
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.ProfileController" spacing="10">
   <GridPane hgap="10" vgap="8">
@@ -566,7 +566,7 @@ public List<Node> renderedNodes(){ return items.stream().map(MessageCellFactory:
 </VBox>
 ```
 - Controller:
-```
+```java
 public class ProfileController {
   @FXML private Label fullName, rank, regNumber, joined, telephone, email, requestStatus;
   private final ProfileViewModel vm = new ProfileViewModel();
@@ -587,7 +587,7 @@ vm.loadProfile();
 }
 ```
 - ViewModel:
-```
+```java
 public class ProfileViewModel {
 private final StringProperty fullName=new SimpleStringProperty(), rank=new SimpleStringProperty(),
 regNumber=new SimpleStringProperty(), joined=new SimpleStringProperty(),
