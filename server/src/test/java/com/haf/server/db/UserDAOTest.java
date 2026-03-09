@@ -172,15 +172,16 @@ class UserDAOTest {
         when(resultSet.getString("email")).thenReturn("alice@haf.gr", "bob@haf.gr");
         when(resultSet.getString("rank")).thenReturn("Σμηναγός", "Σμηνίας");
 
-        var results = dao.searchUsers("a", 20);
+        var results = dao.searchUsers("a", "caller-id", 20);
 
         assertEquals(2, results.size());
         assertEquals("uid-1", results.get(0).userId());
         assertEquals("Alice", results.get(0).fullName());
         assertEquals("uid-2", results.get(1).userId());
-        verify(existsStatement).setString(1, "%a%");
+        verify(existsStatement).setString(1, "caller-id");
         verify(existsStatement).setString(2, "%a%");
-        verify(existsStatement).setInt(3, 20);
+        verify(existsStatement).setString(3, "%a%");
+        verify(existsStatement).setInt(4, 20);
     }
 
     @Test
@@ -190,7 +191,7 @@ class UserDAOTest {
         when(existsStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
-        var results = dao.searchUsers("zzz", 10);
+        var results = dao.searchUsers("zzz", "some-id", 10);
 
         assertTrue(results.isEmpty());
     }
@@ -201,7 +202,7 @@ class UserDAOTest {
         when(connection.prepareStatement(contains("LIKE"))).thenReturn(existsStatement);
         when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(DatabaseOperationException.class, () -> dao.searchUsers("test", 10));
+        assertThrows(DatabaseOperationException.class, () -> dao.searchUsers("test", "caller-id", 10));
         verify(auditLogger, times(1)).logError(eq("db_search_users"), isNull(), eq("test"), any());
     }
 

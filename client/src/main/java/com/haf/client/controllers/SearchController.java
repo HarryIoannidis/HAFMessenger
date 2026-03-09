@@ -109,6 +109,12 @@ public class SearchController {
         }
     }
 
+    private MainController mainController;
+
+    public void setMainController(MainController mainController) {
+        this.mainController = mainController;
+    }
+
     /**
      * Fills in the fx:id nodes of a loaded search_result_item card.
      *
@@ -144,17 +150,44 @@ public class SearchController {
             }
         }
 
-        // Start chat button — TODO: wire to actual chat opening logic
+        // Buttons
+        com.jfoenix.controls.JFXButton removeButton = (com.jfoenix.controls.JFXButton) card.lookup("#removeButton");
         com.jfoenix.controls.JFXButton startChatButton = (com.jfoenix.controls.JFXButton) card
                 .lookup("#startChatButton");
-        if (startChatButton != null) {
-            startChatButton.setOnAction(e -> LOGGER.info("Start chat requested for user: " + result.userId));
+
+        if (removeButton != null) {
+            if (mainController != null && mainController.hasContact(result.fullName)) {
+                removeButton.setText("Remove contact");
+            } else {
+                removeButton.setText("Add contact");
+            }
+
+            removeButton.setOnAction(e -> {
+                if (mainController != null) {
+                    if (mainController.hasContact(result.fullName)) {
+                        mainController.removeContact(result.fullName);
+                        removeButton.setText("Add contact");
+                        LOGGER.info("Remove contact requested for user: " + result.userId);
+                    } else {
+                        mainController.addContact(result.fullName);
+                        removeButton.setText("Remove contact");
+                        LOGGER.info("Add contact requested for user: " + result.userId);
+                    }
+                }
+            });
         }
 
-        // Remove contact button — TODO: wire to contact removal API
-        com.jfoenix.controls.JFXButton removeButton = (com.jfoenix.controls.JFXButton) card.lookup("#removeButton");
-        if (removeButton != null) {
-            removeButton.setOnAction(e -> LOGGER.info("Remove contact requested for user: " + result.userId));
+        if (startChatButton != null) {
+            startChatButton.setOnAction(e -> {
+                LOGGER.info("Start chat requested for user: " + result.userId);
+                if (mainController != null) {
+                    mainController.startChatWith(result.userId, result.fullName);
+                    // Since starting a chat adds them to contacts, update the other button too.
+                    if (removeButton != null) {
+                        removeButton.setText("Remove contact");
+                    }
+                }
+            });
         }
     }
 
@@ -193,9 +226,11 @@ public class SearchController {
     private void showStatus(String message) {
         statusText.setText(message);
         statusBox.setVisible(true);
+        resultsPane.setVisible(false);
     }
 
     private void hideStatus() {
         statusBox.setVisible(false);
+        resultsPane.setVisible(true);
     }
 }

@@ -51,8 +51,7 @@
         <!-- Root Logger - Environment-based -->
         <Root level="info">
             <!-- Use pretty console in dev, JSON in prod -->
-            <AppenderRef ref="${log.environment:-prod}"
-                         if="${sys:log.environment} == 'dev' ? 'ConsoleAppender' : 'JsonConsoleAppender'"/>
+            <AppenderRef ref="ConsoleAppender"/>
             <AppenderRef ref="JsonFileAppender"/>
         </Root>
     </Loggers>

@@ -227,26 +227,30 @@ public final class UserDAO {
             SELECT user_id, full_name, reg_number, email, `rank`
             FROM users
             WHERE `status` = 'APPROVED'
+              AND user_id != ?
               AND (full_name LIKE ? OR reg_number LIKE ?)
             LIMIT ?
             """;
 
     /**
-     * Searches for approved users whose name or registration number matches.
+     * Searches for approved users whose name or registration number matches,
+     * excluding the user performing the search.
      *
-     * @param query the search term (matched with {@code %query%})
-     * @param limit maximum number of results
+     * @param query         the search term (matched with {@code %query%})
+     * @param excludeUserId the user ID to exclude from results
+     * @param limit         maximum number of results
      * @return list of matching records, never null
      * @throws DatabaseOperationException if the query fails
      */
-    public List<SearchRecord> searchUsers(String query, int limit) {
+    public List<SearchRecord> searchUsers(String query, String excludeUserId, int limit) {
         String pattern = "%" + query + "%";
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(SEARCH_USERS_SQL)) {
 
-            ps.setString(1, pattern);
+            ps.setString(1, excludeUserId);
             ps.setString(2, pattern);
-            ps.setInt(3, limit);
+            ps.setString(3, pattern);
+            ps.setInt(4, limit);
 
             List<SearchRecord> results = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {

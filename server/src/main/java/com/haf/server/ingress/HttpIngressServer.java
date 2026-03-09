@@ -687,7 +687,7 @@ public final class HttpIngressServer {
             }
 
             try {
-                List<UserDAO.SearchRecord> records = userDAO.searchUsers(searchTerm, MAX_RESULTS);
+                List<UserDAO.SearchRecord> records = userDAO.searchUsers(searchTerm, callerId, MAX_RESULTS);
                 List<UserSearchResult> results = records.stream()
                         .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
                         .toList();
