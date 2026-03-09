@@ -52,7 +52,7 @@ public final class Main {
      */
     private void start() {
         ServerConfig config = ServerConfig.load();
-        // runFlywayMigrations(config);
+        runFlywayMigrations(config);
 
         HikariDataSource dataSource = createDataSource(config);
         ScheduledExecutorService scheduler = createScheduler();
@@ -133,8 +133,7 @@ public final class Main {
     private static void runFlywayMigrations(ServerConfig config) {
         Flyway flyway = Flyway.configure()
                 .dataSource(config.getDbUrl(), config.getDbUser(), config.getDbPassword())
-                .locations("classpath:db/migration", "filesystem:src/main/resources/db/migration",
-                        "filesystem:server/src/main/resources/db/migration")
+                .locations("filesystem:server/src/main/resources/db/migration")
                 .baselineOnMigrate(true)
                 .load();
         flyway.migrate();

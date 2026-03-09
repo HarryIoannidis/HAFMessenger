@@ -9,4 +9,6 @@ module server {
     requires io.github.cdimascio.dotenv.java;
     requires jbcrypt;
     requires transitive shared;
+
+    opens db.migration to flyway.core;
 }
