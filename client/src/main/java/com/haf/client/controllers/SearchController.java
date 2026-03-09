@@ -221,8 +221,6 @@ public class SearchController {
         }
     }
 
-    // ── Status overlay helpers ───────────────────────────────────────────
-
     private void showStatus(String message) {
         statusText.setText(message);
         statusBox.setVisible(true);
