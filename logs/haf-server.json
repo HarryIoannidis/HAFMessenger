@@ -56,3 +56,4 @@
 {"@timestamp":"2026-03-10T11:32:59.648Z","ecs.version":"1.2.0","log.level":"INFO","message":"Current version of schema `haf_messenger`: 8","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.command.DbMigrate"}
 {"@timestamp":"2026-03-10T11:32:59.659Z","ecs.version":"1.2.0","log.level":"INFO","message":"Schema `haf_messenger` is up to date. No migration necessary.","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.command.DbMigrate"}
 {"@timestamp":"2026-03-10T11:33:00.447Z","ecs.version":"1.2.0","log.level":"INFO","message":"Servers started on HTTP 8443 / WS 8444","process.thread.name":"main","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-10T11:48:30.689Z","ecs.version":"1.2.0","log.level":"INFO","message":"Shutdown initiated","process.thread.name":"Thread-6","log.logger":"com.haf.server.core.Main"}

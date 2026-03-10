@@ -370,7 +370,13 @@ public final class HttpIngressServer {
             return null;
         }
 
-        /** Persists a photo blob if present, returns file_id or null. */
+        /**
+         * Persists a photo blob if present, returns file_id or null.
+         * 
+         * @param dto    the photo to store
+         * @param userId the user ID
+         * @return the file ID or null
+         */
         private String storePhoto(EncryptedFileDTO dto, String userId) {
             if (dto == null || dto.ciphertextB64 == null || dto.ciphertextB64.isBlank()) {
                 return null;
