@@ -46,7 +46,9 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
 
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(UiConstants.FXML_CONTACT_CELL));
+            var resource = getClass().getResource(UiConstants.FXML_CONTACT_CELL);
+            LOGGER.log(Level.INFO, "Loading contact cell FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
 
             // Optimization: If we already have the bytes in memory, use them
             // instead of hitting the disk again.

@@ -167,10 +167,25 @@ public final class HttpIngressServer {
         public void handle(HttpExchange exchange) throws IOException {
             long start = System.nanoTime();
             String requestId = UUID.randomUUID().toString();
-            String userId = TEST_USER_ID;
             exchange.getResponseHeaders().add("X-Request-Id", requestId);
-            exchange.getResponseHeaders().add("X-User-Id", userId);
             applySecurityHeaders(exchange.getResponseHeaders());
+
+            // Extract Authorization header
+            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                respond(exchange, requestId, 401, "{\"error\":\"missing or invalid auth\"}");
+                return;
+            }
+
+            // Retrieve User ID from Session DAO
+            String sessionId = authHeader.substring(7);
+            String userId = sessionDAO.getUserIdForSession(sessionId);
+            if (userId == null) {
+                respond(exchange, requestId, 401, "{\"error\":\"invalid session\"}");
+                return;
+            }
+
+            exchange.getResponseHeaders().add("X-User-Id", userId);
 
             try {
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {

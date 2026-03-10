@@ -276,7 +276,21 @@ public class SplashViewModel {
             requireResource(UiConstants.ICON_RANK_TAKSIARCOS, "Taksiarcos rank icon");
             requireResource(UiConstants.ICON_RANK_YPOPTERARCHOS, "Ypopterarchos rank icon");
             requireResource(UiConstants.ICON_RANK_ANTIPTERARCHOS, "Antipterarchos rank icon");
+            requireResource(UiConstants.ICON_RANK_PTERARCHOS, "Pterarchos rank icon");
             requireResource(UiConstants.ICON_RANK_DEFAULT, "Default rank icon");
+
+            // Rank Cell Icons
+            requireResource(UiConstants.ICON_RANK_ANTHYPASPISTIS_CELL, "Anthypaspistis rank cell icon");
+            requireResource(UiConstants.ICON_RANK_ANTHYPOSMINAGOS_CELL, "Anthyposminagos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_YPOSMINAGOS_CELL, "Yposminagos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_SMINAGOS_CELL, "Sminagos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_EPISMINAGOS_CELL, "Episminagos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_ANTISMINARCHOS_CELL, "Antisminarchos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_SMINARCHOS_CELL, "Sminarchos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_TAKSIARCOS_CELL, "Taksiarcos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_YPOPTERARCHOS_CELL, "Ypopterarchos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_ANTIPTERARCHOS_CELL, "Antipterarchos rank cell icon");
+            requireResource(UiConstants.ICON_RANK_PTERARCHOS_CELL, "Pterarchos rank cell icon");
 
             // Fonts
             requireResource(UiConstants.FONT_MANROPE, "Manrope font");

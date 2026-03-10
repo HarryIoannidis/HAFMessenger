@@ -1018,7 +1018,8 @@ public class RegisterController {
                 UiConstants.RANK_SMINARCHOS,
                 UiConstants.RANK_TAKSIARCOS,
                 UiConstants.RANK_YPOPTERARCHOS,
-                UiConstants.RANK_ANTIPTERARCHOS);
+                UiConstants.RANK_ANTIPTERARCHOS,
+                UiConstants.RANK_PTERARCHOS);
 
         // Set cell factory for rank icons in the dropdown list
         rankComboBox.setCellFactory(listView -> new RankListCell());
@@ -1032,6 +1033,9 @@ public class RegisterController {
      */
     private static class RankListCell extends ListCell<String> {
         private final ImageView imageView = new ImageView();
+
+        public RankListCell() {
+        }
 
         @Override
         protected void updateItem(String rank, boolean empty) {
@@ -1068,16 +1072,17 @@ public class RegisterController {
                 case UiConstants.RANK_SMINIAS -> UiConstants.ICON_RANK_SMINIAS;
                 case UiConstants.RANK_EPISMINIAS -> UiConstants.ICON_RANK_EPISMINIAS;
                 case UiConstants.RANK_ARCHISMINIAS -> UiConstants.ICON_RANK_ARCHISMINIAS;
-                case UiConstants.RANK_ANTHYPASPISTIS -> UiConstants.ICON_RANK_ANTHYPASPISTIS;
-                case UiConstants.RANK_ANTHYPOSMINAGOS -> UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
-                case UiConstants.RANK_YPOSMINAGOS -> UiConstants.ICON_RANK_YPOSMINAGOS;
-                case UiConstants.RANK_SMINAGOS -> UiConstants.ICON_RANK_SMINAGOS;
-                case UiConstants.RANK_EPISMINAGOS -> UiConstants.ICON_RANK_EPISMINAGOS;
-                case UiConstants.RANK_ANTISMINARCHOS -> UiConstants.ICON_RANK_ANTISMINARCHOS;
-                case UiConstants.RANK_SMINARCHOS -> UiConstants.ICON_RANK_SMINARCHOS;
-                case UiConstants.RANK_TAKSIARCOS -> UiConstants.ICON_RANK_TAKSIARCOS;
-                case UiConstants.RANK_YPOPTERARCHOS -> UiConstants.ICON_RANK_YPOPTERARCHOS;
-                case UiConstants.RANK_ANTIPTERARCHOS -> UiConstants.ICON_RANK_ANTIPTERARCHOS;
+                case UiConstants.RANK_ANTHYPASPISTIS -> UiConstants.ICON_RANK_ANTHYPASPISTIS_CELL;
+                case UiConstants.RANK_ANTHYPOSMINAGOS -> UiConstants.ICON_RANK_ANTHYPOSMINAGOS_CELL;
+                case UiConstants.RANK_YPOSMINAGOS -> UiConstants.ICON_RANK_YPOSMINAGOS_CELL;
+                case UiConstants.RANK_SMINAGOS -> UiConstants.ICON_RANK_SMINAGOS_CELL;
+                case UiConstants.RANK_EPISMINAGOS -> UiConstants.ICON_RANK_EPISMINAGOS_CELL;
+                case UiConstants.RANK_ANTISMINARCHOS -> UiConstants.ICON_RANK_ANTISMINARCHOS_CELL;
+                case UiConstants.RANK_SMINARCHOS -> UiConstants.ICON_RANK_SMINARCHOS_CELL;
+                case UiConstants.RANK_TAKSIARCOS -> UiConstants.ICON_RANK_TAKSIARCOS_CELL;
+                case UiConstants.RANK_YPOPTERARCHOS -> UiConstants.ICON_RANK_YPOPTERARCHOS_CELL;
+                case UiConstants.RANK_ANTIPTERARCHOS -> UiConstants.ICON_RANK_ANTIPTERARCHOS_CELL;
+                case UiConstants.RANK_PTERARCHOS -> UiConstants.ICON_RANK_PTERARCHOS_CELL;
                 case null, default -> UiConstants.ICON_RANK_DEFAULT;
             };
         }

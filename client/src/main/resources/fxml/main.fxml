@@ -19,7 +19,7 @@
 <?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.MainController">
+<BorderPane fx:id="rootContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="600.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0" styleClass="window-card" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.MainController">
    <top>
       <VBox BorderPane.alignment="CENTER">
          <BorderPane.margin>
@@ -189,7 +189,7 @@
                           <!-- Permanent spacer: fills when neither panel is active, yields to ALWAYS panels -->
                           <Pane HBox.hgrow="SOMETIMES" />
                           <!-- Dots menu button: always visible at far right -->
-                         <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
+                         <JFXButton focusTraversable="false" contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                             <graphic>
                                <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="25" />
                             </graphic>

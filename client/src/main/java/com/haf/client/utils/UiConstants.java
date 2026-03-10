@@ -40,6 +40,7 @@ public final class UiConstants {
     public static final String RANK_TAKSIARCOS = "Ταξίαρχος";
     public static final String RANK_YPOPTERARCHOS = "Υποπτέραρχος";
     public static final String RANK_ANTIPTERARCHOS = "Αντιπτέραρχος";
+    public static final String RANK_PTERARCHOS = "Πτέραρχος";
 
     // Rank Icons
     public static final String ICON_RANK_YPOSMINIAS = "/images/ranks/yposminias.png";
@@ -56,7 +57,21 @@ public final class UiConstants {
     public static final String ICON_RANK_TAKSIARCOS = "/images/ranks/taxiarxos.png";
     public static final String ICON_RANK_YPOPTERARCHOS = "/images/ranks/ypopterarxos.png";
     public static final String ICON_RANK_ANTIPTERARCHOS = "/images/ranks/antipterarxos.png";
+    public static final String ICON_RANK_PTERARCHOS = "/images/ranks/pterarxos.png";
     public static final String ICON_RANK_DEFAULT = "/images/ranks/sminias.png";
+
+    // Rank Cell Icons
+    public static final String ICON_RANK_ANTHYPASPISTIS_CELL = "/images/ranks/anthipaspistis_cell.png";
+    public static final String ICON_RANK_ANTHYPOSMINAGOS_CELL = "/images/ranks/anthiposminagos_cell.png";
+    public static final String ICON_RANK_YPOSMINAGOS_CELL = "/images/ranks/yposminagos_cell.png";
+    public static final String ICON_RANK_SMINAGOS_CELL = "/images/ranks/sminagos_cell.png";
+    public static final String ICON_RANK_EPISMINAGOS_CELL = "/images/ranks/episminagos_cell.png";
+    public static final String ICON_RANK_ANTISMINARCHOS_CELL = "/images/ranks/antisminarxos_cell.png";
+    public static final String ICON_RANK_SMINARCHOS_CELL = "/images/ranks/sminarxos_cell.png";
+    public static final String ICON_RANK_TAKSIARCOS_CELL = "/images/ranks/taxiarxos_cell.png";
+    public static final String ICON_RANK_YPOPTERARCHOS_CELL = "/images/ranks/ypopterarxos_cell.png";
+    public static final String ICON_RANK_ANTIPTERARCHOS_CELL = "/images/ranks/antipterarxos_cell.png";
+    public static final String ICON_RANK_PTERARCHOS_CELL = "/images/ranks/pterarxos_cell.png";
 
     // Bootstrap status messages
     public static final String BOOTSTRAP_STARTING = "Starting...";
@@ -76,6 +91,8 @@ public final class UiConstants {
     public static final String CSS_REGISTER = "/css/register.css";
     public static final String CSS_MAIN = "/css/main.css";
     public static final String CSS_SPLASH = "/css/splash.css";
+    public static final String CSS_CHAT = "/css/chat.css";
+    public static final String CSS_SEARCH = "/css/search.css";
 
     // Fonts
     public static final String FONT_MANROPE = "/fonts/Manrope.ttf";
@@ -88,7 +105,7 @@ public final class UiConstants {
     public static final String APP_TITLE = "HAF Messenger";
 
     // Common Dimensions
-    public static final double RANK_ICON_SIZE = 24.0;
+    public static final double RANK_ICON_SIZE = 32.0;
 
     // Styles
     public static final String STYLE_TEXT_FIELD_ERROR = "text-field-error";

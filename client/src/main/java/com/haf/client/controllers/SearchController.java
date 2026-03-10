@@ -96,17 +96,28 @@ public class SearchController {
 
         hideStatus();
 
-        for (UserSearchResult result : response.results) {
-            try {
-                FXMLLoader loader = new FXMLLoader(
-                        getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM));
-                javafx.scene.Node card = loader.load();
-                populateCard(card, result);
-                resultsPane.getChildren().add(card);
-            } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Could not load search_result_item.fxml", e);
+        // Offload FXML loading of result cards to a background thread to prevent UI
+        // jank
+        Thread.ofVirtual().name("search-item-loader").start(() -> {
+            java.util.List<javafx.scene.Node> loadedCards = new java.util.ArrayList<>();
+            for (UserSearchResult result : response.results) {
+                try {
+                    var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
+                    LOGGER.log(Level.INFO, "Loading search result item FXML: {0}", resource);
+                    FXMLLoader loader = new FXMLLoader(resource);
+                    javafx.scene.Node card = loader.load();
+                    // We can populate the card's text and set up listeners in the background.
+                    // Just don't touch live scenes.
+                    populateCard(card, result);
+                    loadedCards.add(card);
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Could not load search_result_item.fxml", e);
+                }
             }
-        }
+
+            // Once all cards are prepared, add them to the UI thread
+            Platform.runLater(() -> resultsPane.getChildren().setAll(loadedCards));
+        });
     }
 
     private MainController mainController;
@@ -143,8 +154,11 @@ public class SearchController {
         if (rankImage != null && result.rank != null) {
             String iconPath = RankIconResolver.resolve(result.rank);
             try {
-                rankImage.setImage(new javafx.scene.image.Image(
-                        getClass().getResourceAsStream(iconPath)));
+                var resource = getClass().getResource(iconPath);
+                if (resource != null) {
+                    // Use background loading for images to keep UI thread snappy
+                    rankImage.setImage(new javafx.scene.image.Image(resource.toExternalForm(), true));
+                }
             } catch (Exception ignored) {
                 // leave blank if icon not found
             }
@@ -156,7 +170,7 @@ public class SearchController {
                 .lookup("#startChatButton");
 
         if (removeButton != null) {
-            if (mainController != null && mainController.hasContact(result.fullName)) {
+            if (mainController != null && mainController.hasContact(result.userId)) {
                 removeButton.setText("Remove contact");
             } else {
                 removeButton.setText("Add contact");
@@ -164,12 +178,12 @@ public class SearchController {
 
             removeButton.setOnAction(e -> {
                 if (mainController != null) {
-                    if (mainController.hasContact(result.fullName)) {
-                        mainController.removeContact(result.fullName);
+                    if (mainController.hasContact(result.userId)) {
+                        mainController.removeContact(result.userId);
                         removeButton.setText("Add contact");
                         LOGGER.info("Remove contact requested for user: " + result.userId);
                     } else {
-                        mainController.addContact(result.fullName);
+                        mainController.addContact(result.userId, result.fullName);
                         removeButton.setText("Remove contact");
                         LOGGER.info("Add contact requested for user: " + result.userId);
                     }
