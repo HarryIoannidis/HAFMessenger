@@ -61,6 +61,14 @@ public final class HttpIngressServer {
     private static final String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
     private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
     private static final String X_FRAME_OPTIONS = "X-Frame-Options";
+    private static final String X_REQUEST_ID = "X-Request-Id";
+    private static final String CONTENT_TYPE = "Content-Type";
+    private static final String APPLICATION_JSON = "application/json";
+    private static final String AUTHORIZATION = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String METHOD_GET = "GET";
+    private static final String METHOD_POST = "POST";
+    private static final String REQUEST_BODY_EXCEEDS_LIMIT = "Request body exceeds limit";
     private static final String STRICT_TRANSPORT_SECURITY_VALUE = "max-age=63072000; includeSubDomains; preload";
     private static final String CONTENT_SECURITY_POLICY_VALUE = "default-src 'none'; frame-ancestors 'none'; base-uri 'none';";
     private static final String X_CONTENT_TYPE_OPTIONS_VALUE = "nosniff";
@@ -193,18 +201,18 @@ public final class HttpIngressServer {
         public void handle(HttpExchange exchange) throws IOException {
             long start = System.nanoTime();
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
             // Extract Authorization header
-            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
                 respond(exchange, requestId, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
                 return;
             }
 
             // Retrieve User ID from Session DAO
-            String sessionId = authHeader.substring(7);
+            String sessionId = authHeader.substring(BEARER_PREFIX.length());
             String userId = sessionDAO.getUserIdForSession(sessionId);
             if (userId == null) {
                 respond(exchange, requestId, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
@@ -214,7 +222,7 @@ public final class HttpIngressServer {
             exchange.getResponseHeaders().add("X-User-Id", userId);
 
             try {
-                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
                     respond(exchange, requestId, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
                     return;
                 }
@@ -275,7 +283,7 @@ public final class HttpIngressServer {
             while ((read = body.read(chunk)) != -1) {
                 total += read;
                 if (total > MAX_BODY_BYTES) {
-                    throw new IOException("Request body exceeds limit");
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
                 }
                 buffer.write(chunk, 0, read);
             }
@@ -306,10 +314,10 @@ public final class HttpIngressServer {
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             Headers responseHeaders = exchange.getResponseHeaders();
-            responseHeaders.add("Content-Type", "application/json");
+            responseHeaders.add(CONTENT_TYPE, APPLICATION_JSON);
 
-            if (!responseHeaders.containsKey("X-Request-Id")) {
-                responseHeaders.add("X-Request-Id", requestId);
+            if (!responseHeaders.containsKey(X_REQUEST_ID)) {
+                responseHeaders.add(X_REQUEST_ID, requestId);
             }
 
             exchange.sendResponseHeaders(status, payload.length);
@@ -328,11 +336,11 @@ public final class HttpIngressServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
             try {
-                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
                     respond(exchange, requestId, 405, JsonCodec.toJson(RegisterResponse.error(METHOD_NOT_ALLOWED)));
                     return;
                 }
@@ -421,7 +429,7 @@ public final class HttpIngressServer {
             while ((read = body.read(chunk)) != -1) {
                 total += read;
                 if (total > MAX_BODY_BYTES) {
-                    throw new IOException("Request body exceeds limit");
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
                 }
                 buffer.write(chunk, 0, read);
             }
@@ -438,10 +446,10 @@ public final class HttpIngressServer {
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             Headers responseHeaders = exchange.getResponseHeaders();
-            responseHeaders.add("Content-Type", "application/json");
+            responseHeaders.add(CONTENT_TYPE, APPLICATION_JSON);
 
-            if (!responseHeaders.containsKey("X-Request-Id")) {
-                responseHeaders.add("X-Request-Id", requestId);
+            if (!responseHeaders.containsKey(X_REQUEST_ID)) {
+                responseHeaders.add(X_REQUEST_ID, requestId);
             }
 
             exchange.sendResponseHeaders(status, payload.length);
@@ -469,11 +477,11 @@ public final class HttpIngressServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
             try {
-                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
                     respond(exchange, requestId, 405, JsonCodec.toJson(LoginResponse.error(METHOD_NOT_ALLOWED)));
                     return;
                 }
@@ -540,7 +548,7 @@ public final class HttpIngressServer {
             while ((read = body.read(chunk)) != -1) {
                 total += read;
                 if (total > MAX_BODY_BYTES) {
-                    throw new IOException("Request body exceeds limit");
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
                 }
                 buffer.write(chunk, 0, read);
             }
@@ -557,10 +565,10 @@ public final class HttpIngressServer {
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             Headers responseHeaders = exchange.getResponseHeaders();
-            responseHeaders.add("Content-Type", "application/json");
+            responseHeaders.add(CONTENT_TYPE, APPLICATION_JSON);
 
-            if (!responseHeaders.containsKey("X-Request-Id")) {
-                responseHeaders.add("X-Request-Id", requestId);
+            if (!responseHeaders.containsKey(X_REQUEST_ID)) {
+                responseHeaders.add(X_REQUEST_ID, requestId);
             }
 
             exchange.sendResponseHeaders(status, payload.length);
@@ -579,10 +587,10 @@ public final class HttpIngressServer {
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            exchange.getResponseHeaders().add("X-Request-Id", UUID.randomUUID().toString());
+            exchange.getResponseHeaders().add(X_REQUEST_ID, UUID.randomUUID().toString());
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
                 return;
             }
@@ -605,7 +613,7 @@ public final class HttpIngressServer {
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
             exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
@@ -621,10 +629,10 @@ public final class HttpIngressServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error(METHOD_NOT_ALLOWED)));
                 return;
             }
@@ -675,7 +683,7 @@ public final class HttpIngressServer {
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
             exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
@@ -695,21 +703,21 @@ public final class HttpIngressServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error(METHOD_NOT_ALLOWED)));
                 return;
             }
 
             // Authenticate via session
-            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
                 sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(MISSING_OR_INVALID_AUTH)));
                 return;
             }
-            String sessionId = authHeader.substring("Bearer ".length());
+            String sessionId = authHeader.substring(BEARER_PREFIX.length());
             String callerId = sessionDAO.getUserIdForSession(sessionId);
             if (callerId == null) {
                 sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(INVALID_SESSION)));
@@ -753,7 +761,7 @@ public final class HttpIngressServer {
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
             exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
@@ -768,12 +776,12 @@ public final class HttpIngressServer {
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            exchange.getResponseHeaders().add("X-Request-Id", UUID.randomUUID().toString());
+            exchange.getResponseHeaders().add(X_REQUEST_ID, UUID.randomUUID().toString());
             applySecurityHeaders(exchange.getResponseHeaders());
 
             String method = exchange.getRequestMethod();
-            if ("HEAD".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method)) {
-                exchange.getResponseHeaders().add("Content-Type", "application/json");
+            if ("HEAD".equalsIgnoreCase(method) || METHOD_GET.equalsIgnoreCase(method)) {
+                exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
                 exchange.sendResponseHeaders(200, -1);
             } else {
                 sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
@@ -790,7 +798,7 @@ public final class HttpIngressServer {
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
             exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
@@ -808,16 +816,16 @@ public final class HttpIngressServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
             // Authenticate via session
-            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
                 sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(MISSING_OR_INVALID_AUTH)));
                 return;
             }
-            String sessionId = authHeader.substring("Bearer ".length());
+            String sessionId = authHeader.substring(BEARER_PREFIX.length());
             String callerId = sessionDAO.getUserIdForSession(sessionId);
             if (callerId == null) {
                 sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(INVALID_SESSION)));
@@ -827,9 +835,9 @@ public final class HttpIngressServer {
             String method = exchange.getRequestMethod();
 
             try {
-                if ("GET".equalsIgnoreCase(method)) {
+                if (METHOD_GET.equalsIgnoreCase(method)) {
                     handleGet(exchange, callerId);
-                } else if ("POST".equalsIgnoreCase(method)) {
+                } else if (METHOD_POST.equalsIgnoreCase(method)) {
                     handlePost(exchange, callerId);
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     handleDelete(exchange, callerId);
@@ -891,7 +899,7 @@ public final class HttpIngressServer {
             while ((read = body.read(chunk)) != -1) {
                 total += read;
                 if (total > MAX_BODY_BYTES) {
-                    throw new IOException("Request body exceeds limit");
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
                 }
                 buffer.write(chunk, 0, read);
             }
@@ -907,7 +915,7 @@ public final class HttpIngressServer {
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
             exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
