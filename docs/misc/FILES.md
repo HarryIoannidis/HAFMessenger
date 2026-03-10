@@ -40,8 +40,7 @@
 * DefaultMessageSender.java — *Default implementation for sending messages*
 * MessageReceiver.java — *Interface for receiving messages*
 * MessageSender.java — *Interface for sending messages*
-* MockMessageReceiver.java — *Mock implementation for testing message reception*
-* MockMessageSender.java — *Mock implementation for testing message sending*
+
 * WebSocketAdapter.java — *Adapter for WebSocket connections*
 
 ## com/haf/client/utils
