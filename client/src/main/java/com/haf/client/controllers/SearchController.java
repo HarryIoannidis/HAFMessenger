@@ -135,6 +135,18 @@ public class SearchController {
      * </p>
      */
     private void populateCard(javafx.scene.Node card, UserSearchResult result) {
+        populateTextElements(card, result);
+        populateRankIcon(card, result);
+        populateActionButtons(card, result);
+    }
+
+    /**
+     * Populates the text elements of a search result card.
+     * 
+     * @param card   The search result card.
+     * @param result The search result.
+     */
+    private void populateTextElements(javafx.scene.Node card, UserSearchResult result) {
         Text fullNameText = (Text) card.lookup("#fullNameText");
         Text regNumberText = (Text) card.lookup("#regNumberText");
         Text emailText = (Text) card.lookup("#emailText");
@@ -148,8 +160,15 @@ public class SearchController {
         if (emailText != null) {
             emailText.setText(result.email != null ? result.email : "");
         }
+    }
 
-        // Rank icon
+    /**
+     * Populates the rank icon of a search result card.
+     * 
+     * @param card   The search result card.
+     * @param result The search result.
+     */
+    private void populateRankIcon(javafx.scene.Node card, UserSearchResult result) {
         javafx.scene.image.ImageView rankImage = (javafx.scene.image.ImageView) card.lookup("#rankImage");
         if (rankImage != null && result.rank != null) {
             String iconPath = RankIconResolver.resolve(result.rank);
@@ -163,45 +182,87 @@ public class SearchController {
                 // leave blank if icon not found
             }
         }
+    }
 
-        // Buttons
+    /**
+     * Populates the action buttons of a search result card.
+     * 
+     * @param card   The search result card.
+     * @param result The search result.
+     */
+    private void populateActionButtons(javafx.scene.Node card, UserSearchResult result) {
         com.jfoenix.controls.JFXButton removeButton = (com.jfoenix.controls.JFXButton) card.lookup("#removeButton");
         com.jfoenix.controls.JFXButton startChatButton = (com.jfoenix.controls.JFXButton) card
                 .lookup("#startChatButton");
 
-        if (removeButton != null) {
-            if (mainController != null && mainController.hasContact(result.userId)) {
-                removeButton.setText("Remove contact");
+        setupRemoveButton(removeButton, result);
+        setupStartChatButton(startChatButton, removeButton, result);
+    }
+
+    /**
+     * Sets up the remove button.
+     * 
+     * @param removeButton The remove button.
+     * @param result       The search result.
+     */
+    private void setupRemoveButton(com.jfoenix.controls.JFXButton removeButton, UserSearchResult result) {
+        if (removeButton == null)
+            return;
+
+        updateRemoveButtonText(removeButton, result.userId);
+
+        removeButton.setOnAction(e -> {
+            if (mainController == null)
+                return;
+
+            if (mainController.hasContact(result.userId)) {
+                mainController.removeContact(result.userId);
+                LOGGER.info("Remove contact requested for user: " + result.userId);
             } else {
-                removeButton.setText("Add contact");
+                mainController.addContact(result.userId, result.fullName);
+                LOGGER.info("Add contact requested for user: " + result.userId);
             }
+            updateRemoveButtonText(removeButton, result.userId);
+        });
+    }
 
-            removeButton.setOnAction(e -> {
-                if (mainController != null) {
-                    if (mainController.hasContact(result.userId)) {
-                        mainController.removeContact(result.userId);
-                        removeButton.setText("Add contact");
-                        LOGGER.info("Remove contact requested for user: " + result.userId);
-                    } else {
-                        mainController.addContact(result.userId, result.fullName);
-                        removeButton.setText("Remove contact");
-                        LOGGER.info("Add contact requested for user: " + result.userId);
-                    }
-                }
-            });
-        }
+    /**
+     * Sets up the start chat button.
+     * 
+     * @param startChatButton The start chat button.
+     * @param removeButton    The remove button.
+     * @param result          The search result.
+     */
+    private void setupStartChatButton(com.jfoenix.controls.JFXButton startChatButton,
+            com.jfoenix.controls.JFXButton removeButton,
+            UserSearchResult result) {
+        if (startChatButton == null)
+            return;
 
-        if (startChatButton != null) {
-            startChatButton.setOnAction(e -> {
-                LOGGER.info("Start chat requested for user: " + result.userId);
-                if (mainController != null) {
-                    mainController.startChatWith(result.userId, result.fullName);
-                    // Since starting a chat adds them to contacts, update the other button too.
-                    if (removeButton != null) {
-                        removeButton.setText("Remove contact");
-                    }
+        startChatButton.setOnAction(e -> {
+            LOGGER.info("Start chat requested for user: " + result.userId);
+            if (mainController != null) {
+                mainController.startChatWith(result.userId, result.fullName);
+                // Since starting a chat adds them to contacts, update the other button too.
+                if (removeButton != null) {
+                    updateRemoveButtonText(removeButton, result.userId);
                 }
-            });
+            }
+        });
+    }
+
+    /**
+     * Updates the text of the remove button based on whether the user is already a
+     * contact.
+     * 
+     * @param removeButton The remove button.
+     * @param userId       The user ID.
+     */
+    private void updateRemoveButtonText(com.jfoenix.controls.JFXButton removeButton, String userId) {
+        if (mainController != null && mainController.hasContact(userId)) {
+            removeButton.setText("Remove contact");
+        } else {
+            removeButton.setText("Add contact");
         }
     }
 
