@@ -1,6 +1,7 @@
 package com.haf.server.core;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.ContactDAO;
 import com.haf.server.db.EnvelopeDAO;
 import com.haf.server.db.FileUploadDAO;
 import com.haf.server.db.SessionDAO;
@@ -69,12 +70,13 @@ public final class Main {
             UserDAO userDAO = new UserDAO(dataSource, auditLogger);
             SessionDAO sessionDAO = new SessionDAO(dataSource, auditLogger);
             FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
+            ContactDAO contactDAO = new ContactDAO(dataSource);
             MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
 
             HttpIngressServer httpServer = new HttpIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
-                    sessionDAO, fileUploadDAO);
+                    sessionDAO, fileUploadDAO, contactDAO);
             WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO);
 

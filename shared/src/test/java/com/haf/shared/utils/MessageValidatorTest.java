@@ -8,24 +8,24 @@ import java.util.Base64;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class MessageValidatorTest {
+class MessageValidatorTest {
 
     private EncryptedMessage valid() {
         EncryptedMessage m = new EncryptedMessage();
-        m.version = MessageHeader.VERSION;
-        m.senderId = "A10";
-        m.recipientId = "B10";
-        m.timestampEpochMs = System.currentTimeMillis();
-        m.ttlSeconds = Math.min(MessageHeader.MAX_TTL_SECONDS, 86400);
-        m.algorithm = MessageHeader.ALGO_AEAD;
-        m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-        m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
-        m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-        m.contentType = "text/plain";
-        m.contentLength = 1;
-        m.aadB64 = Base64.getEncoder().encodeToString("authenticated metadata".getBytes(StandardCharsets.UTF_8));
-        m.e2e = true;
+        m.setVersion(MessageHeader.VERSION);
+        m.setSenderId("A10");
+        m.setRecipientId("B10");
+        m.setTimestampEpochMs(System.currentTimeMillis());
+        m.setTtlSeconds(Math.min(MessageHeader.MAX_TTL_SECONDS, 86400));
+        m.setAlgorithm(MessageHeader.ALGO_AEAD);
+        m.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+        m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
+        m.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        m.setContentType("text/plain");
+        m.setContentLength(1);
+        m.setAadB64(Base64.getEncoder().encodeToString("authenticated metadata".getBytes(StandardCharsets.UTF_8)));
+        m.setE2e(true);
         return m;
     }
 
@@ -50,8 +50,8 @@ public class MessageValidatorTest {
     @Test
     void bad_version_and_algo_reported() {
         EncryptedMessage m = valid();
-        m.version = "x";
-        m.algorithm = "X";
+        m.setVersion("x");
+        m.setAlgorithm("X");
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_VERSION), "Errors: " + errs);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_ALGO), "Errors: " + errs);
@@ -60,9 +60,9 @@ public class MessageValidatorTest {
     @Test
     void bad_ids_and_ttl_reported() {
         EncryptedMessage m = valid();
-        m.senderId = "A";
-        m.recipientId = "B";
-        m.ttlSeconds = MessageHeader.MAX_TTL_SECONDS + 1;
+        m.setSenderId("A");
+        m.setRecipientId("B");
+        m.setTtlSeconds(MessageHeader.MAX_TTL_SECONDS + 1);
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_SENDER), "Errors: " + errs);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_RECIPIENT), "Errors: " + errs);
@@ -72,10 +72,10 @@ public class MessageValidatorTest {
     @Test
     void bad_b64_fields_reported() {
         EncryptedMessage m = valid();
-        m.ivB64 = "!!";
-        m.ciphertextB64 = "";
-        m.tagB64 = "AAA=";
-        m.ephemeralPublicB64 = "AAA=";
+        m.setIvB64("!!");
+        m.setCiphertextB64("");
+        m.setTagB64("AAA=");
+        m.setEphemeralPublicB64("AAA=");
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_IV), "Errors: " + errs);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_CIPHERTEXT), "Errors: " + errs);
@@ -86,8 +86,8 @@ public class MessageValidatorTest {
     @Test
     void bad_timestamp_and_length_reported() {
         EncryptedMessage m = valid();
-        m.timestampEpochMs = 0;
-        m.contentLength = -1;
+        m.setTimestampEpochMs(0);
+        m.setContentLength(-1);
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_TIMESTAMP), "Errors: " + errs);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_CONTENT_LENGTH), "Errors: " + errs);
@@ -96,7 +96,7 @@ public class MessageValidatorTest {
     @Test
     void contentType_allowed_passes_validation() {
         EncryptedMessage m = valid();
-        m.contentType = "image/png";
+        m.setContentType("image/png");
         assertTrue(MessageValidator.isValid(m), errsMsg(m));
         assertTrue(MessageValidator.validateOrCollectErrors(m).isEmpty(), errsMsg(m));
     }
@@ -104,7 +104,7 @@ public class MessageValidatorTest {
     @Test
     void contentType_unknown_is_rejected() {
         EncryptedMessage m = valid();
-        m.contentType = "application/x-shockwave-flash";
+        m.setContentType("application/x-shockwave-flash");
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_CONTENT_TYPE), "Errors: " + errs);
     }
@@ -112,7 +112,7 @@ public class MessageValidatorTest {
     @Test
     void aad_null_is_ok() {
         EncryptedMessage m = valid();
-        m.aadB64 = null;
+        m.setAadB64(null);
         assertTrue(MessageValidator.isValid(m), errsMsg(m));
         assertTrue(MessageValidator.validateOrCollectErrors(m).isEmpty(), errsMsg(m));
     }
@@ -120,57 +120,57 @@ public class MessageValidatorTest {
     @Test
     void content_type_roundtrip_json_ok() {
         EncryptedMessage m = new EncryptedMessage();
-        m.version = MessageHeader.VERSION;
-        m.senderId = "A12";
-        m.recipientId = "B34";
-        m.timestampEpochMs = System.currentTimeMillis();
-        m.ttlSeconds = 600;
-        m.algorithm = MessageHeader.ALGO_AEAD;
-        m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-        m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
-        m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-        m.contentType = "application/pdf";
-        m.contentLength = 1;
-        m.aadB64 = "SHOULD_NOT_APPEAR";
-        m.e2e = true;
+        m.setVersion(MessageHeader.VERSION);
+        m.setSenderId("A12");
+        m.setRecipientId("B34");
+        m.setTimestampEpochMs(System.currentTimeMillis());
+        m.setTtlSeconds(600);
+        m.setAlgorithm(MessageHeader.ALGO_AEAD);
+        m.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+        m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
+        m.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        m.setContentType("application/pdf");
+        m.setContentLength(1);
+        m.setAadB64("SHOULD_NOT_APPEAR");
+        m.setE2e(true);
 
         String json = JsonCodec.toJson(m);
         assertFalse(json.contains("\"aadB64\""), "AAD must NOT be serialized");
 
         EncryptedMessage back = JsonCodec.fromJson(json, EncryptedMessage.class);
 
-        assertEquals("application/pdf", back.contentType, "JSON: " + json);
-        assertEquals(m.version, back.version, "JSON: " + json);
-        assertEquals(m.senderId, back.senderId, "JSON: " + json);
-        assertEquals(m.recipientId, back.recipientId, "JSON: " + json);
-        assertEquals(m.timestampEpochMs, back.timestampEpochMs, "JSON: " + json);
-        assertEquals(m.algorithm, back.algorithm, "JSON: " + json);
+        assertEquals("application/pdf", back.getContentType(), "JSON: " + json);
+        assertEquals(m.getVersion(), back.getVersion(), "JSON: " + json);
+        assertEquals(m.getSenderId(), back.getSenderId(), "JSON: " + json);
+        assertEquals(m.getRecipientId(), back.getRecipientId(), "JSON: " + json);
+        assertEquals(m.getTimestampEpochMs(), back.getTimestampEpochMs(), "JSON: " + json);
+        assertEquals(m.getAlgorithm(), back.getAlgorithm(), "JSON: " + json);
 
-        assertEquals(MessageHeader.IV_BYTES, Base64.getDecoder().decode(back.ivB64).length);
-        assertEquals(MessageHeader.GCM_TAG_BYTES, Base64.getDecoder().decode(back.tagB64).length);
+        assertEquals(MessageHeader.IV_BYTES, Base64.getDecoder().decode(back.getIvB64()).length);
+        assertEquals(MessageHeader.GCM_TAG_BYTES, Base64.getDecoder().decode(back.getTagB64()).length);
     }
 
     @Test
-    public void test_validate_recipient_ok() {
+    void test_validate_recipient_ok() {
         EncryptedMessage m = new EncryptedMessage();
-        m.recipientId = "userB";
+        m.setRecipientId("userB");
         assertDoesNotThrow(() -> MessageValidator.validateRecipientOrThrow("userB", m));
     }
 
     @Test
-    public void test_validate_recipient_mismatch() {
+    void test_validate_recipient_mismatch() {
         EncryptedMessage m = new EncryptedMessage();
-        m.recipientId = "userB";
+        m.setRecipientId("userB");
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> MessageValidator.validateRecipientOrThrow("userC", m));
         assertTrue(ex.getMessage().toLowerCase().contains("mismatch"));
     }
 
     @Test
-    public void test_validate_recipient_invalid() {
+    void test_validate_recipient_invalid() {
         EncryptedMessage m = new EncryptedMessage();
-        m.recipientId = "ab"; // κάτω από ελάχιστο
+        m.setRecipientId("ab"); // below minimum
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> MessageValidator.validateRecipientOrThrow("userB", m));
         assertTrue(ex.getMessage().toLowerCase().contains("invalid"));

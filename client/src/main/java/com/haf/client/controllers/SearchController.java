@@ -84,23 +84,22 @@ public class SearchController {
     private void displayResults(UserSearchResponse response) {
         resultsPane.getChildren().clear();
 
-        if (response.error != null) {
-            showStatus("Error: " + response.error);
+        if (response.getError() != null) {
+            showStatus("Error: " + response.getError());
             return;
         }
 
-        if (response.results == null || response.results.isEmpty()) {
+        if (response.getResults() == null || response.getResults().isEmpty()) {
             showStatus("No results found.");
             return;
         }
 
         hideStatus();
 
-        // Offload FXML loading of result cards to a background thread to prevent UI
-        // jank
+        // Offload FXML loading of results to a background thread to prevent UI jank
         Thread.ofVirtual().name("search-item-loader").start(() -> {
             java.util.List<javafx.scene.Node> loadedCards = new java.util.ArrayList<>();
-            for (UserSearchResult result : response.results) {
+            for (UserSearchResult result : response.getResults()) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
                     LOGGER.log(Level.INFO, "Loading search result item FXML: {0}", resource);
@@ -122,6 +121,11 @@ public class SearchController {
 
     private MainController mainController;
 
+    /**
+     * Sets the main controller.
+     * 
+     * @param mainController The main controller.
+     */
     public void setMainController(MainController mainController) {
         this.mainController = mainController;
     }
@@ -152,13 +156,13 @@ public class SearchController {
         Text emailText = (Text) card.lookup("#emailText");
 
         if (fullNameText != null) {
-            fullNameText.setText(result.fullName != null ? result.fullName : "");
+            fullNameText.setText(result.getFullName() != null ? result.getFullName() : "");
         }
         if (regNumberText != null) {
-            regNumberText.setText(result.regNumber != null ? result.regNumber : "");
+            regNumberText.setText(result.getRegNumber() != null ? result.getRegNumber() : "");
         }
         if (emailText != null) {
-            emailText.setText(result.email != null ? result.email : "");
+            emailText.setText(result.getEmail() != null ? result.getEmail() : "");
         }
     }
 
@@ -170,8 +174,8 @@ public class SearchController {
      */
     private void populateRankIcon(javafx.scene.Node card, UserSearchResult result) {
         javafx.scene.image.ImageView rankImage = (javafx.scene.image.ImageView) card.lookup("#rankImage");
-        if (rankImage != null && result.rank != null) {
-            String iconPath = RankIconResolver.resolve(result.rank);
+        if (rankImage != null && result.getRank() != null) {
+            String iconPath = RankIconResolver.resolve(result.getRank());
             try {
                 var resource = getClass().getResource(iconPath);
                 if (resource != null) {
@@ -209,20 +213,20 @@ public class SearchController {
         if (removeButton == null)
             return;
 
-        updateRemoveButtonText(removeButton, result.userId);
+        updateRemoveButtonText(removeButton, result.getUserId());
 
         removeButton.setOnAction(e -> {
             if (mainController == null)
                 return;
 
-            if (mainController.hasContact(result.userId)) {
-                mainController.removeContact(result.userId);
-                LOGGER.info("Remove contact requested for user: " + result.userId);
+            if (mainController.hasContact(result.getUserId())) {
+                mainController.removeContact(result.getUserId());
+                LOGGER.info("Remove contact requested for user: " + result.getUserId());
             } else {
-                mainController.addContact(result.userId, result.fullName);
-                LOGGER.info("Add contact requested for user: " + result.userId);
+                mainController.addContact(result.getUserId(), result.getFullName());
+                LOGGER.info("Add contact requested for user: " + result.getUserId());
             }
-            updateRemoveButtonText(removeButton, result.userId);
+            updateRemoveButtonText(removeButton, result.getUserId());
         });
     }
 
@@ -240,12 +244,12 @@ public class SearchController {
             return;
 
         startChatButton.setOnAction(e -> {
-            LOGGER.info("Start chat requested for user: " + result.userId);
+            LOGGER.info("Start chat requested for user: " + result.getUserId());
             if (mainController != null) {
-                mainController.startChatWith(result.userId, result.fullName);
+                mainController.startChatWith(result.getUserId(), result.getFullName());
                 // Since starting a chat adds them to contacts, update the other button too.
                 if (removeButton != null) {
-                    updateRemoveButtonText(removeButton, result.userId);
+                    updateRemoveButtonText(removeButton, result.getUserId());
                 }
             }
         });
@@ -296,12 +300,20 @@ public class SearchController {
         }
     }
 
+    /**
+     * Shows a status message.
+     * 
+     * @param message The status message.
+     */
     private void showStatus(String message) {
         statusText.setText(message);
         statusBox.setVisible(true);
         resultsPane.setVisible(false);
     }
 
+    /**
+     * Hides the status message.
+     */
     private void hideStatus() {
         statusBox.setVisible(false);
         resultsPane.setVisible(true);

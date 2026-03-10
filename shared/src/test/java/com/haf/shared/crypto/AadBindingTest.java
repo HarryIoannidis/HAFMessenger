@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AadBindingTest {
+class AadBindingTest {
     static KeyPair kp;
     static ClockProvider clock;
 
@@ -32,59 +32,59 @@ public class AadBindingTest {
     }
 
     @Test
-    public void test_aad_binding_version() throws Exception {
+    void test_aad_binding_version() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
         assertNotNull(tryDecrypt(m));
-        m.version = "X";
+        m.setVersion("X");
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_algo() throws Exception {
+    void test_aad_binding_algo() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.algorithm = "OTHER";
+        m.setAlgorithm("OTHER");
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_sender() throws Exception {
+    void test_aad_binding_sender() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.senderId = "userX";
+        m.setSenderId("userX");
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_recipient() throws Exception {
+    void test_aad_binding_recipient() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.recipientId = "userC";
+        m.setRecipientId("userC");
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_timestamp() throws Exception {
+    void test_aad_binding_timestamp() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.timestampEpochMs += 1;
+        m.setTimestampEpochMs(m.getTimestampEpochMs() + 1);
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_ttl() throws Exception {
+    void test_aad_binding_ttl() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.ttlSeconds += 1;
+        m.setTtlSeconds(m.getTtlSeconds() + 1);
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_content_type() throws Exception {
+    void test_aad_binding_content_type() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.contentType = "application/octet-stream";
+        m.setContentType("application/octet-stream");
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 
     @Test
-    public void test_aad_binding_content_length() throws Exception {
+    void test_aad_binding_content_length() throws Exception {
         EncryptedMessage m = fresh("hello", "userA", "userB");
-        m.contentLength += 1;
+        m.setContentLength(m.getContentLength() + 1);
         assertThrows(Exception.class, () -> tryDecrypt(m));
     }
 

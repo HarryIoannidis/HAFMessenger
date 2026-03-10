@@ -74,8 +74,8 @@ class EnvelopeDAOTest {
         assertEquals(message, result.payload());
         verify(insertStatement, times(1)).executeUpdate();
         verify(insertStatement, times(1)).setString(eq(1), anyString()); // envelope_id
-        verify(insertStatement, times(1)).setString(2, message.senderId);
-        verify(insertStatement, times(1)).setString(3, message.recipientId);
+        verify(insertStatement, times(1)).setString(2, message.getSenderId());
+        verify(insertStatement, times(1)).setString(3, message.getRecipientId());
     }
 
     @Test
@@ -86,7 +86,7 @@ class EnvelopeDAOTest {
         when(insertStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
 
         assertThrows(DatabaseOperationException.class, () -> dao.insert(message));
-        verify(auditLogger, times(1)).logError(eq("db_insert_envelope"), isNull(), eq(message.senderId), any());
+        verify(auditLogger, times(1)).logError(eq("db_insert_envelope"), isNull(), eq(message.getSenderId()), any());
     }
 
     @Test
@@ -281,20 +281,20 @@ class EnvelopeDAOTest {
 
     private EncryptedMessage createValidMessage() {
         EncryptedMessage message = new EncryptedMessage();
-        message.version = MessageHeader.VERSION;
-        message.algorithm = MessageHeader.ALGO_AEAD;
-        message.senderId = "sender-123";
-        message.recipientId = "recipient-456";
-        message.timestampEpochMs = System.currentTimeMillis();
-        message.ttlSeconds = 3600;
-        message.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        message.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-        message.ciphertextB64 = Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8));
-        message.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-        message.contentType = "text/plain";
-        message.contentLength = 4;
-        message.aadB64 = Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8));
-        message.e2e = true;
+        message.setVersion(MessageHeader.VERSION);
+        message.setAlgorithm(MessageHeader.ALGO_AEAD);
+        message.setSenderId("sender-123");
+        message.setRecipientId("recipient-456");
+        message.setTimestampEpochMs(System.currentTimeMillis());
+        message.setTtlSeconds(3600);
+        message.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+        message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+        message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
+        message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        message.setContentType("text/plain");
+        message.setContentLength(4);
+        message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));
+        message.setE2e(true);
         return message;
     }
 }

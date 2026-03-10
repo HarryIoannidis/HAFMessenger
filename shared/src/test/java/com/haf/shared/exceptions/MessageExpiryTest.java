@@ -11,10 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class MessageExpiryTest {
+class MessageExpiryTest {
 
     @Test
-    public void test_expired_message_rejected() throws Exception {
+    void test_expired_message_rejected() throws Exception {
         KeyPair kp = EccKeyIO.generate();
 
         long pastTime = 500000L;
@@ -28,7 +28,7 @@ public class MessageExpiryTest {
         byte[] payload = "secret".getBytes(StandardCharsets.UTF_8);
         EncryptedMessage m = encryptor.encrypt(payload, "text/plain", ttlSeconds);
 
-        assertEquals(pastTime, m.timestampEpochMs);
+        assertEquals(pastTime, m.getTimestampEpochMs());
 
         MessageDecryptor decryptor = new MessageDecryptor(kp.getPrivate(), currentClock);
 
@@ -40,7 +40,7 @@ public class MessageExpiryTest {
     }
 
     @Test
-    public void test_valid_message_not_expired() throws Exception {
+    void test_valid_message_not_expired() throws Exception {
         KeyPair kp = EccKeyIO.generate();
 
         long messageTime = 1000000L;
@@ -61,7 +61,7 @@ public class MessageExpiryTest {
     }
 
     @Test
-    public void test_message_at_exact_ttl_boundary() throws Exception {
+    void test_message_at_exact_ttl_boundary() throws Exception {
         KeyPair kp = EccKeyIO.generate();
 
         long messageTime = 1000000L; // Epoch milliseconds when message is created

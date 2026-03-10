@@ -86,7 +86,7 @@ class FileUploadDAOTest {
     @Test
     void insert_sets_content_type() throws SQLException {
         EncryptedFileDTO dto = buildValidDto();
-        dto.contentType = "image/png";
+        dto.setContentType("image/png");
 
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenReturn(insertStatement);
@@ -101,7 +101,7 @@ class FileUploadDAOTest {
     @Test
     void insert_uses_fallback_content_type_when_null() throws SQLException {
         EncryptedFileDTO dto = buildValidDto();
-        dto.contentType = null;
+        dto.setContentType(null);
 
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenReturn(insertStatement);
@@ -134,12 +134,12 @@ class FileUploadDAOTest {
     private static EncryptedFileDTO buildValidDto() {
         EncryptedFileDTO dto = new EncryptedFileDTO();
         // Base64-encode some fake ciphertext so the DAO doesn't choke on decode
-        dto.ciphertextB64 = Base64.getEncoder().encodeToString("fake-ciphertext-bytes".getBytes());
-        dto.ivB64 = Base64.getEncoder().encodeToString(new byte[12]);
-        dto.tagB64 = Base64.getEncoder().encodeToString(new byte[16]);
-        dto.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[32]);
-        dto.contentType = "image/jpeg";
-        dto.originalSize = 204800L; // 200 KB
+        dto.setCiphertextB64(Base64.getEncoder().encodeToString("fake-ciphertext-bytes".getBytes()));
+        dto.setIvB64(Base64.getEncoder().encodeToString(new byte[12]));
+        dto.setTagB64(Base64.getEncoder().encodeToString(new byte[16]));
+        dto.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[32]));
+        dto.setContentType("image/jpeg");
+        dto.setOriginalSize(204800L); // 200 KB
         return dto;
     }
 }

@@ -11,6 +11,26 @@ import java.io.Serializable;
  * </p>
  */
 public class LoginRequest implements Serializable {
-    public String email;
-    public String password;
+    private String email;
+    private String password;
+
+    public LoginRequest() {
+        // Required for JSON deserialization
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

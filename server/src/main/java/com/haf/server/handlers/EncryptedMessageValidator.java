@@ -28,12 +28,12 @@ public final class EncryptedMessageValidator {
         }
 
         long now = System.currentTimeMillis();
-        long skew = Math.abs(now - message.timestampEpochMs);
+        long skew = Math.abs(now - message.getTimestampEpochMs());
         if (skew > MAX_CLOCK_SKEW_MS) {
             return ValidationResult.invalid("CLOCK_SKEW");
         }
 
-        long expiresAt = message.timestampEpochMs + (message.ttlSeconds * 1000L);
+        long expiresAt = message.getTimestampEpochMs() + (message.getTtlSeconds() * 1000L);
         if (expiresAt <= now) {
             return ValidationResult.invalid("TTL_EXPIRED");
         }
@@ -42,14 +42,14 @@ public final class EncryptedMessageValidator {
             return ValidationResult.invalid("TTL_TOO_LONG");
         }
 
-        long ciphertextBytes = estimateBytes(message.ciphertextB64);
-        if (ciphertextBytes > MAX_MESSAGE_BYTES || message.contentLength > MAX_MESSAGE_BYTES) {
+        long ciphertextBytes = estimateBytes(message.getCiphertextB64());
+        if (ciphertextBytes > MAX_MESSAGE_BYTES || message.getContentLength() > MAX_MESSAGE_BYTES) {
             return ValidationResult.invalid("MESSAGE_TOO_LARGE");
         }
 
         // Ensure Base64 decoding does not throw later.
         try {
-            decoder.decode(message.ciphertextB64);
+            decoder.decode(message.getCiphertextB64());
         } catch (IllegalArgumentException ex) {
             return ValidationResult.invalid("INVALID_BASE64");
         }
@@ -96,4 +96,3 @@ public final class EncryptedMessageValidator {
         }
     }
 }
-

@@ -1,9 +1,15 @@
 package com.haf.client.controllers;
 
+import com.haf.client.core.NetworkSession;
 import com.haf.client.model.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
+import com.haf.shared.dto.AddContactRequest;
+import com.haf.shared.dto.ContactsResponse;
+import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.utils.JsonCodec;
 import com.jfoenix.controls.JFXButton;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -28,6 +34,8 @@ import java.util.logging.Logger;
 public class MainController {
 
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
+    private static final String NAV_ITEM_ICON = "nav-item-icon";
+    private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
 
     // Window chrome
     @FXML
@@ -114,8 +122,35 @@ public class MainController {
         // Trigger pre-loading immediately
         triggerPreloading();
 
+        // Fetch contacts from server
+        fetchContacts();
+
         // Messages tab is active by default
         activateMessagesTab();
+    }
+
+    private void fetchContacts() {
+        if (NetworkSession.get() == null)
+            return;
+
+        NetworkSession.get().getAuthenticated("/api/v1/contacts")
+                .thenAccept(responseJson -> {
+                    ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
+                    if (response != null && response.getContacts() != null) {
+                        Platform.runLater(() -> {
+                            for (UserSearchResult contact : response.getContacts()) {
+                                if (!hasContact(contact.getUserId())) {
+                                    contactsList.getItems()
+                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName()));
+                                }
+                            }
+                        });
+                    }
+                })
+                .exceptionally(ex -> {
+                    LOGGER.log(Level.SEVERE, "Failed to load contacts", ex);
+                    return null;
+                });
     }
 
     private void triggerPreloading() {
@@ -215,22 +250,22 @@ public class MainController {
 
     private void updateNavStyles(boolean messagesActive) {
         if (messagesActive) {
-            iconMessages.getStyleClass().remove("nav-item-icon");
-            if (!iconMessages.getStyleClass().contains("nav-item-icon-active")) {
-                iconMessages.getStyleClass().add("nav-item-icon-active");
+            iconMessages.getStyleClass().remove(NAV_ITEM_ICON);
+            if (!iconMessages.getStyleClass().contains(NAV_ITEM_ICON_ACTIVE)) {
+                iconMessages.getStyleClass().add(NAV_ITEM_ICON_ACTIVE);
             }
-            iconSearch.getStyleClass().remove("nav-item-icon-active");
-            if (!iconSearch.getStyleClass().contains("nav-item-icon")) {
-                iconSearch.getStyleClass().add("nav-item-icon");
+            iconSearch.getStyleClass().remove(NAV_ITEM_ICON_ACTIVE);
+            if (!iconSearch.getStyleClass().contains(NAV_ITEM_ICON)) {
+                iconSearch.getStyleClass().add(NAV_ITEM_ICON);
             }
         } else {
-            iconSearch.getStyleClass().remove("nav-item-icon");
-            if (!iconSearch.getStyleClass().contains("nav-item-icon-active")) {
-                iconSearch.getStyleClass().add("nav-item-icon-active");
+            iconSearch.getStyleClass().remove(NAV_ITEM_ICON);
+            if (!iconSearch.getStyleClass().contains(NAV_ITEM_ICON_ACTIVE)) {
+                iconSearch.getStyleClass().add(NAV_ITEM_ICON_ACTIVE);
             }
-            iconMessages.getStyleClass().remove("nav-item-icon-active");
-            if (!iconMessages.getStyleClass().contains("nav-item-icon")) {
-                iconMessages.getStyleClass().add("nav-item-icon");
+            iconMessages.getStyleClass().remove(NAV_ITEM_ICON_ACTIVE);
+            if (!iconMessages.getStyleClass().contains(NAV_ITEM_ICON)) {
+                iconMessages.getStyleClass().add(NAV_ITEM_ICON);
             }
         }
     }
@@ -239,9 +274,8 @@ public class MainController {
      * Loads search.fxml into the content pane.
      */
     private void loadSearchView() {
-        searchFuture.thenAccept(view -> javafx.application.Platform.runLater(() -> {
-            contentPane.getChildren().setAll(view);
-        }));
+        searchFuture.thenAccept(view -> javafx.application.Platform.runLater(
+                () -> contentPane.getChildren().setAll(view)));
 
         // If not already loading, trigger it (non-blocking)
         if (!searchLoadingStarted.get()) {
@@ -345,6 +379,17 @@ public class MainController {
     public void addContact(String userId, String fullName) {
         if (!hasContact(userId)) {
             contactsList.getItems().add(ContactInfo.online(userId, fullName));
+
+            // Persist to server
+            if (NetworkSession.get() != null) {
+                AddContactRequest request = new AddContactRequest(userId);
+                String body = JsonCodec.toJson(request);
+                NetworkSession.get().postAuthenticated("/api/v1/contacts", body)
+                        .exceptionally(ex -> {
+                            LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
+                            return null;
+                        });
+            }
         }
     }
 
@@ -356,6 +401,17 @@ public class MainController {
             contactsList.setUserData(null);
             hideProfilePanel();
             loadPlaceholder();
+        }
+
+        // Persist removal to server
+        if (NetworkSession.get() != null) {
+            String path = "/api/v1/contacts?contactId="
+                    + java.net.URLEncoder.encode(userId, java.nio.charset.StandardCharsets.UTF_8);
+            NetworkSession.get().deleteAuthenticated(path)
+                    .exceptionally(ex -> {
+                        LOGGER.log(Level.SEVERE, "Failed to remove contact on server", ex);
+                        return null;
+                    });
         }
     }
 

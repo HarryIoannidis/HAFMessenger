@@ -270,8 +270,8 @@ public class LoginController {
         try {
             // Build login request from ViewModel
             LoginRequest request = new LoginRequest();
-            request.email = viewModel.getEmail();
-            request.password = viewModel.getPassword();
+            request.setEmail(viewModel.getEmail());
+            request.setPassword(viewModel.getPassword());
 
             String json = JsonCodec.toJson(request);
 
@@ -306,9 +306,9 @@ public class LoginController {
         viewModel.loadingProperty().set(false);
         signInButton.setText(SIGN_IN_TEXT);
 
-        if (statusCode == 200 && response.error == null) {
+        if (statusCode == 200 && response.getError() == null) {
             try {
-                initializeSecureSession(response.sessionId, viewModel.getPassword());
+                initializeSecureSession(response.getSessionId(), viewModel.getPassword());
                 ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
                 LOGGER.info("Login successful for: " + viewModel.getEmail() + ", Socket connected.");
             } catch (Exception ex) {
@@ -317,7 +317,7 @@ public class LoginController {
                 shakeNode(signInButton);
             }
         } else {
-            String errorMsg = response.error != null ? response.error : "Login failed.";
+            String errorMsg = response.getError() != null ? response.getError() : "Login failed.";
             viewModel.setLoginError(errorMsg);
             shakeNode(signInButton);
         }
@@ -352,8 +352,8 @@ public class LoginController {
             String jsonResponse = wsAdapter.getAuthenticated(path).get();
             com.haf.shared.dto.PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse,
                     com.haf.shared.dto.PublicKeyResponse.class);
-            if (keyRes.success && keyRes.publicKeyPem != null) {
-                return keyRes.publicKeyPem;
+            if (keyRes.isSuccess() && keyRes.getPublicKeyPem() != null) {
+                return keyRes.getPublicKeyPem();
             }
             return null;
         } catch (InterruptedException e) {

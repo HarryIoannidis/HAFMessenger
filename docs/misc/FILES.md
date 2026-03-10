@@ -2,9 +2,7 @@
 
 ## client/src/main/java
 
-## module-info.java
-
-*Module descriptor for the client module*
+* module-info.java — *Module descriptor for the client module*
 
 ## com/haf/client/controllers
 
@@ -13,6 +11,7 @@
 * LoginController.java — *Controller for login view*
 * MainController.java — *Controller for the main application shell*
 * RegisterController.java — *Controller for registration view*
+* SearchController.java — *Controller for the search view*
 * SplashController.java — *Controller for splash screen*
 
 ## com/haf/client/core
@@ -20,6 +19,7 @@
 * ChatSession.java — *Container for the active chat session context*
 * ClientApp.java — *Main client application class*
 * Launcher.java — *Application launcher*
+* NetworkSession.java — *Container for network sessions*
 
 ## com/haf/client/crypto
 
@@ -40,7 +40,6 @@
 * DefaultMessageSender.java — *Default implementation for sending messages*
 * MessageReceiver.java — *Interface for receiving messages*
 * MessageSender.java — *Interface for sending messages*
-
 * WebSocketAdapter.java — *Adapter for WebSocket connections*
 
 ## com/haf/client/utils
@@ -60,11 +59,9 @@
 
 ---
 
-# **server/src/main/java**
+## server/src/main/java
 
-## module-info.java
-
-*Module descriptor for the server module*
+* module-info.java — *Module descriptor for the server module*
 
 ## com/haf/server/config
 
@@ -76,10 +73,18 @@
 
 ## com/haf/server/db
 
+* ContactDAO.java — *Data Access Object for user contacts*
 * EnvelopeDAO.java — *Data Access Object for message envelopes*
 * FileUploadDAO.java — *Data Access Object for encrypted file uploads*
 * SessionDAO.java — *Data Access Object for user sessions*
 * UserDAO.java — *Data Access Object for users*
+
+## com/haf/server/exceptions
+
+* ConfigurationException.java — *Exception used for configuration errors*
+* DatabaseOperationException.java — *Exception used for database errors*
+* RateLimitException.java — *Exception thrown when rate limit is exceeded*
+* StartupException.java — *Exception used when startup fails*
 
 ## com/haf/server/handlers
 
@@ -103,11 +108,9 @@
 
 ---
 
-# **shared/src/main/java**
+## shared/src/main/java
 
-## module-info.java
-
-*Module descriptor for the shared module*
+* module-info.java — *Module descriptor for the shared module*
 
 ## com/haf/shared/constants
 
@@ -124,20 +127,29 @@
 
 ## com/haf/shared/dto
 
+* AddContactRequest.java — *DTO for adding a user to contacts*
+* ContactsResponse.java — *DTO for the response listing user contacts*
 * EncryptedFileDTO.java — *DTO for end-to-end encrypted files*
 * EncryptedMessage.java — *DTO representing an encrypted message*
 * KeyMetadata.java — *Metadata for cryptographic keys*
 * LoginRequest.java — *DTO for login request*
 * LoginResponse.java — *DTO for login response*
+* PublicKeyResponse.java — *DTO for the public key response*
 * RegisterRequest.java — *DTO for registration request*
 * RegisterResponse.java — *DTO for registration response*
+* UserSearchResponse.java — *DTO containing the result of a user search*
+* UserSearchResult.java — *DTO containing single user info in search results*
 
 ## com/haf/shared/exceptions
 
+* CryptoOperationException.java — *Exception thrown on general crypto failure*
+* JsonCodecException.java — *Exception thrown on JSON mapping errors*
 * KeyNotFoundException.java — *Exception thrown when a key is not found*
+* KeystoreOperationException.java — *Exception thrown on keystore errors*
 * MessageExpiredException.java — *Exception thrown when a message has expired*
 * MessageTamperedException.java — *Exception thrown when a message is tampered with*
 * MessageValidationException.java — *Exception thrown during message validation*
+* SslConfigurationException.java — *Exception thrown on SSL/TLS setup errors*
 
 ## com/haf/shared/keystore
 
@@ -150,11 +162,11 @@
 ## com/haf/shared/utils
 
 * ClockProvider.java — *Interface for providing the current time*
+* EccKeyIO.java — *Input/Output utilities for ECC keys*
 * FilePerms.java — *Utilities for file permissions*
 * FingerprintUtil.java — *Utilities for generating fingerprints*
 * FixedClockProvider.java — *Clock provider with a fixed time*
 * JsonCodec.java — *Utilities for JSON encoding and decoding*
 * MessageValidator.java — *Validates messages*
 * PemCodec.java — *Utilities for PEM encoding and decoding*
-* EccKeyIO.java — *Input/Output utilities for ECC keys*
 * SystemClockProvider.java — *Clock provider using the system clock*

@@ -62,7 +62,7 @@ public final class FileUploadDAO {
         Objects.requireNonNull(uploaderId, "uploaderId");
 
         String fileId = UUID.randomUUID().toString();
-        byte[] ciphertext = Base64.getDecoder().decode(dto.ciphertextB64);
+        byte[] ciphertext = Base64.getDecoder().decode(dto.getCiphertextB64());
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
@@ -70,11 +70,11 @@ public final class FileUploadDAO {
             ps.setString(1, fileId);
             ps.setString(2, uploaderId);
             ps.setBytes(3, ciphertext);
-            ps.setString(4, dto.contentType != null ? dto.contentType : "application/octet-stream");
-            ps.setLong(5, dto.originalSize);
-            ps.setString(6, dto.ivB64);
-            ps.setString(7, dto.tagB64);
-            ps.setString(8, dto.ephemeralPublicB64);
+            ps.setString(4, dto.getContentType() != null ? dto.getContentType() : "application/octet-stream");
+            ps.setLong(5, dto.getOriginalSize());
+            ps.setString(6, dto.getIvB64());
+            ps.setString(7, dto.getTagB64());
+            ps.setString(8, dto.getEphemeralPublicB64());
 
             ps.executeUpdate();
             return fileId;

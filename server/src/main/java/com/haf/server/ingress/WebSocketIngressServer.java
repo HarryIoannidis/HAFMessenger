@@ -25,8 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class WebSocketIngressServer extends WebSocketServer {
 
-    private static final String TEST_USER_ID = "test-user";
-
     private final MailboxRouter mailboxRouter;
     private final RateLimiterService rateLimiterService;
     private final AuditLogger auditLogger;

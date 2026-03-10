@@ -1,6 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.ContactDAO;
 import com.haf.server.db.FileUploadDAO;
 import com.haf.server.db.SessionDAO;
 import com.haf.server.db.UserDAO;
@@ -20,6 +21,8 @@ import com.haf.shared.dto.RegisterRequest;
 import com.haf.shared.dto.RegisterResponse;
 import com.haf.shared.dto.UserSearchResponse;
 import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.dto.ContactsResponse;
+import com.haf.shared.dto.AddContactRequest;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -42,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@SuppressWarnings("java:S1075")
 public final class HttpIngressServer {
 
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
@@ -50,8 +54,26 @@ public final class HttpIngressServer {
     private static final String LOGIN_PATH = "/api/v1/login";
     private static final String USERS_PATH = "/api/v1/users";
     private static final String SEARCH_PATH = "/api/v1/search";
+    private static final String CONTACTS_PATH = "/api/v1/contacts";
     private static final String HEALTH_PATH = "/api/v1/health";
-    private static final String TEST_USER_ID = "test-user";
+    private static final String ADMIN_KEY_PATH = "/api/v1/config/admin-key";
+    private static final String STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
+    private static final String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
+    private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
+    private static final String X_FRAME_OPTIONS = "X-Frame-Options";
+    private static final String STRICT_TRANSPORT_SECURITY_VALUE = "max-age=63072000; includeSubDomains; preload";
+    private static final String CONTENT_SECURITY_POLICY_VALUE = "default-src 'none'; frame-ancestors 'none'; base-uri 'none';";
+    private static final String X_CONTENT_TYPE_OPTIONS_VALUE = "nosniff";
+    private static final String X_FRAME_OPTIONS_VALUE = "DENY";
+    private static final String METHOD_NOT_ALLOWED = "method not allowed";
+    private static final String INTERNAL_SERVER_ERROR = "internal server error";
+    private static final String MISSING_OR_INVALID_AUTH = "missing or invalid auth";
+    private static final String INVALID_SESSION = "invalid session";
+    private static final String INVALID_REQUEST_PATH = "invalid request path";
+    private static final String INVALID_CONTACT_ID = "invalid contactId";
+    private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
+    private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
+    private static final String JSON_ERROR_SUFFIX = "\"}";
     private static final int BCRYPT_LOG_ROUNDS = 12;
 
     private final ServerConfig config;
@@ -63,6 +85,7 @@ public final class HttpIngressServer {
     private final UserDAO userDAO;
     private final SessionDAO sessionDAO;
     private final FileUploadDAO fileUploadDAO;
+    private final ContactDAO contactDAO;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private HttpsServer server;
@@ -87,7 +110,8 @@ public final class HttpIngressServer {
             EncryptedMessageValidator validator,
             UserDAO userDAO,
             SessionDAO sessionDAO,
-            FileUploadDAO fileUploadDAO) throws IOException {
+            FileUploadDAO fileUploadDAO,
+            ContactDAO contactDAO) throws IOException {
         this.config = config;
         this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
@@ -97,6 +121,7 @@ public final class HttpIngressServer {
         this.userDAO = userDAO;
         this.sessionDAO = sessionDAO;
         this.fileUploadDAO = fileUploadDAO;
+        this.contactDAO = contactDAO;
         this.server = createServer(sslContext);
     }
 
@@ -128,8 +153,9 @@ public final class HttpIngressServer {
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext(SEARCH_PATH, new SearchHandler());
+        httpsServer.createContext(CONTACTS_PATH, new ContactsHandler());
         httpsServer.createContext(HEALTH_PATH, new HealthHandler());
-        httpsServer.createContext("/api/v1/config/admin-key", new AdminKeyHandler());
+        httpsServer.createContext(ADMIN_KEY_PATH, new AdminKeyHandler());
         httpsServer.setExecutor(executor);
 
         return httpsServer;
@@ -173,7 +199,7 @@ public final class HttpIngressServer {
             // Extract Authorization header
             String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                respond(exchange, requestId, 401, "{\"error\":\"missing or invalid auth\"}");
+                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
                 return;
             }
 
@@ -181,7 +207,7 @@ public final class HttpIngressServer {
             String sessionId = authHeader.substring(7);
             String userId = sessionDAO.getUserIdForSession(sessionId);
             if (userId == null) {
-                respond(exchange, requestId, 401, "{\"error\":\"invalid session\"}");
+                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
                 return;
             }
 
@@ -189,7 +215,7 @@ public final class HttpIngressServer {
 
             try {
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, "{\"error\":\"method not allowed\"}");
+                    respond(exchange, requestId, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
                     return;
                 }
 
@@ -198,8 +224,10 @@ public final class HttpIngressServer {
 
                 EncryptedMessageValidator.ValidationResult validationResult = validator.validate(message);
                 if (!validationResult.valid()) {
-                    auditLogger.logValidationFailure(requestId, userId, message.recipientId, validationResult.reason());
-                    respond(exchange, requestId, 400, "{\"error\":\"" + validationResult.reason() + "\"}");
+                    auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
+                            validationResult.reason());
+                    respond(exchange, requestId, 400,
+                            JSON_ERROR_PREFIX + validationResult.reason() + JSON_ERROR_SUFFIX);
                     return;
                 }
 
@@ -216,7 +244,7 @@ public final class HttpIngressServer {
                 auditLogger.logIngressAccepted(
                         requestId,
                         userId,
-                        message.recipientId,
+                        message.getRecipientId(),
                         202,
                         Duration.ofNanos(System.nanoTime() - start).toMillis());
 
@@ -260,10 +288,10 @@ public final class HttpIngressServer {
          * @param headers the Headers
          */
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         /**
@@ -282,10 +310,6 @@ public final class HttpIngressServer {
 
             if (!responseHeaders.containsKey("X-Request-Id")) {
                 responseHeaders.add("X-Request-Id", requestId);
-            }
-
-            if (!responseHeaders.containsKey("X-User-Id")) {
-                responseHeaders.add("X-User-Id", TEST_USER_ID);
             }
 
             exchange.sendResponseHeaders(status, payload.length);
@@ -309,7 +333,7 @@ public final class HttpIngressServer {
 
             try {
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, JsonCodec.toJson(RegisterResponse.error("method not allowed")));
+                    respond(exchange, requestId, 405, JsonCodec.toJson(RegisterResponse.error(METHOD_NOT_ALLOWED)));
                     return;
                 }
 
@@ -324,48 +348,49 @@ public final class HttpIngressServer {
                 }
 
                 // Check for duplicate email
-                if (userDAO.existsByEmail(request.email)) {
+                if (userDAO.existsByEmail(request.getEmail())) {
                     respond(exchange, requestId, 409,
-                            JsonCodec.toJson(RegisterResponse.error("Email already registered")));
+                            JsonCodec.toJson(RegisterResponse.error("Email is already registered")));
                     return;
                 }
 
-                // Hash password and insert user first (photos link back to this user_id)
-                String hashedPassword = BCrypt.hashpw(request.password, BCrypt.gensalt(BCRYPT_LOG_ROUNDS));
+                // Hash password
+                String hashedPassword = BCrypt.hashpw(request.getPassword(), BCrypt.gensalt(BCRYPT_LOG_ROUNDS));
+
+                // Store user (starts in PENDING)
                 String userId = userDAO.insert(request, hashedPassword);
 
-                // Store E2E-encrypted photos using the real userId (respects FK constraint)
-                String idPhotoId = storePhoto(request.idPhoto, userId);
-                String selfiePhotoId = storePhoto(request.selfiePhoto, userId);
+                // Store photos if present (e2e encrypted ciphertext)
+                String idPhotoId = storePhoto(request.getIdPhoto(), userId);
+                String selfiePhotoId = storePhoto(request.getSelfiePhoto(), userId);
 
-                // Link photos to user row if any were provided
-                if (idPhotoId != null || selfiePhotoId != null) {
-                    userDAO.updatePhotoIds(userId, idPhotoId, selfiePhotoId);
-                }
+                // Update user record with photo IDs
+                userDAO.updatePhotoIds(userId, idPhotoId, selfiePhotoId);
 
-                auditLogger.logRegistration(requestId, userId, request.email);
+                auditLogger.logRegistration(requestId, userId, request.getEmail());
 
-                respond(exchange, requestId, 201, JsonCodec.toJson(RegisterResponse.success(userId)));
+                respond(exchange, requestId, 200,
+                        JsonCodec.toJson(RegisterResponse.success(userId)));
             } catch (Exception ex) {
                 auditLogger.logError("registration_error", requestId, null, ex);
-                respond(exchange, requestId, 500, JsonCodec.toJson(RegisterResponse.error("internal server error")));
+                respond(exchange, requestId, 500, JsonCodec.toJson(RegisterResponse.error(INTERNAL_SERVER_ERROR)));
             } finally {
                 exchange.close();
             }
         }
 
         private String validateRegistration(RegisterRequest r) {
-            if (isBlank(r.fullName))
+            if (isBlank(r.getFullName()))
                 return "fullName is required";
-            if (isBlank(r.email))
+            if (isBlank(r.getEmail()))
                 return "email is required";
-            if (isBlank(r.password))
+            if (isBlank(r.getPassword()))
                 return "password is required";
-            if (r.password.length() < 6)
+            if (r.getPassword().length() < 6)
                 return "password must be at least 6 characters";
-            if (isBlank(r.publicKeyPem))
+            if (isBlank(r.getPublicKeyPem()))
                 return "publicKeyPem is required";
-            if (isBlank(r.publicKeyFingerprint))
+            if (isBlank(r.getPublicKeyFingerprint()))
                 return "publicKeyFingerprint is required";
             return null;
         }
@@ -378,7 +403,7 @@ public final class HttpIngressServer {
          * @return the file ID or null
          */
         private String storePhoto(EncryptedFileDTO dto, String userId) {
-            if (dto == null || dto.ciphertextB64 == null || dto.ciphertextB64.isBlank()) {
+            if (dto == null || dto.getCiphertextB64() == null || dto.getCiphertextB64().isBlank()) {
                 return null;
             }
             return fileUploadDAO.insert(dto, userId);
@@ -404,10 +429,10 @@ public final class HttpIngressServer {
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
@@ -449,7 +474,7 @@ public final class HttpIngressServer {
 
             try {
                 if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, JsonCodec.toJson(LoginResponse.error("method not allowed")));
+                    respond(exchange, requestId, 405, JsonCodec.toJson(LoginResponse.error(METHOD_NOT_ALLOWED)));
                     return;
                 }
 
@@ -457,24 +482,24 @@ public final class HttpIngressServer {
                 LoginRequest request = JsonCodec.fromJson(body, LoginRequest.class);
 
                 // Validate required fields
-                if (isBlank(request.email) || isBlank(request.password)) {
+                if (isBlank(request.getEmail()) || isBlank(request.getPassword())) {
                     respond(exchange, requestId, 400,
                             JsonCodec.toJson(LoginResponse.error("email and password are required")));
                     return;
                 }
 
                 // Look up user by email
-                UserDAO.UserRecord user = userDAO.findByEmail(request.email);
+                UserDAO.UserRecord user = userDAO.findByEmail(request.getEmail());
                 if (user == null) {
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
+                            JsonCodec.toJson(LoginResponse.error(INVALID_EMAIL_PASSWORD)));
                     return;
                 }
 
                 // Verify password
-                if (!BCrypt.checkpw(request.password, user.passwordHash())) {
+                if (!BCrypt.checkpw(request.getPassword(), user.passwordHash())) {
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
+                            JsonCodec.toJson(LoginResponse.error(INVALID_EMAIL_PASSWORD)));
                     return;
                 }
 
@@ -490,14 +515,14 @@ public final class HttpIngressServer {
                 // Create session
                 String sessionId = sessionDAO.createSession(user.userId());
 
-                auditLogger.logLogin(requestId, user.userId(), request.email);
+                auditLogger.logLogin(requestId, user.userId(), request.getEmail());
 
                 respond(exchange, requestId, 200,
                         JsonCodec.toJson(LoginResponse.success(
                                 user.userId(), sessionId, user.fullName(), user.rank(), user.status())));
             } catch (Exception ex) {
                 auditLogger.logError("login_error", requestId, null, ex);
-                respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error("internal server error")));
+                respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error(INTERNAL_SERVER_ERROR)));
             } finally {
                 exchange.close();
             }
@@ -523,10 +548,10 @@ public final class HttpIngressServer {
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
@@ -558,7 +583,7 @@ public final class HttpIngressServer {
             applySecurityHeaders(exchange.getResponseHeaders());
 
             if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, "{\"error\":\"method not allowed\"}");
+                sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
                 return;
             }
 
@@ -572,10 +597,10 @@ public final class HttpIngressServer {
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
@@ -600,21 +625,21 @@ public final class HttpIngressServer {
             applySecurityHeaders(exchange.getResponseHeaders());
 
             if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error("method not allowed")));
+                sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error(METHOD_NOT_ALLOWED)));
                 return;
             }
 
             // Path must match /api/v1/users/{userId}/key
             String path = exchange.getRequestURI().getPath();
             if (path == null || !path.endsWith("/key")) {
-                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("invalid request path")));
+                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
                 return;
             }
 
             // Extract userId
             String prefix = USERS_PATH + "/";
             if (!path.startsWith(prefix)) {
-                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("invalid request path")));
+                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
                 return;
             }
 
@@ -627,25 +652,25 @@ public final class HttpIngressServer {
             String targetUserId = remainder.substring(0, slashIndex);
 
             try {
-                UserDAO.PublicKeyRecord record = userDAO.getPublicKey(targetUserId);
-                if (record == null) {
+                UserDAO.PublicKeyRecord keyRecord = userDAO.getPublicKey(targetUserId);
+                if (keyRecord == null) {
                     sendPlain(exchange, 404, JsonCodec.toJson(PublicKeyResponse.error("user not found")));
                     return;
                 }
 
                 sendPlain(exchange, 200, JsonCodec.toJson(
-                        PublicKeyResponse.success(targetUserId, record.publicKeyPem(), record.fingerprint())));
+                        PublicKeyResponse.success(targetUserId, keyRecord.publicKeyPem(), keyRecord.fingerprint())));
             } catch (Exception ex) {
                 auditLogger.logError("user_key_lookup_error", requestId, null, ex);
-                sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error("internal server error")));
+                sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error(INTERNAL_SERVER_ERROR)));
             }
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
@@ -674,20 +699,20 @@ public final class HttpIngressServer {
             applySecurityHeaders(exchange.getResponseHeaders());
 
             if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error("method not allowed")));
+                sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error(METHOD_NOT_ALLOWED)));
                 return;
             }
 
             // Authenticate via session
             String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error("missing or invalid auth")));
+                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(MISSING_OR_INVALID_AUTH)));
                 return;
             }
             String sessionId = authHeader.substring("Bearer ".length());
             String callerId = sessionDAO.getUserIdForSession(sessionId);
             if (callerId == null) {
-                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error("invalid session")));
+                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(INVALID_SESSION)));
                 return;
             }
 
@@ -715,15 +740,15 @@ public final class HttpIngressServer {
                 sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results)));
             } catch (Exception ex) {
                 auditLogger.logError("search_error", requestId, callerId, ex);
-                sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error("internal server error")));
+                sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error(INTERNAL_SERVER_ERROR)));
             }
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
@@ -751,16 +776,133 @@ public final class HttpIngressServer {
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, -1);
             } else {
-                sendPlain(exchange, 405, "{\"error\":\"method not allowed\"}");
+                sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
             }
             exchange.close();
         }
 
         private void applySecurityHeaders(Headers headers) {
-            headers.add("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-            headers.add("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none';");
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.add("X-Frame-Options", "DENY");
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Handles contacts requests: {@code GET /api/v1/contacts},
+     * {@code POST /api/v1/contacts}, and
+     * {@code DELETE /api/v1/contacts?contactId=xyz}.
+     */
+    private final class ContactsHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add("X-Request-Id", requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            // Authenticate via session
+            String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(MISSING_OR_INVALID_AUTH)));
+                return;
+            }
+            String sessionId = authHeader.substring("Bearer ".length());
+            String callerId = sessionDAO.getUserIdForSession(sessionId);
+            if (callerId == null) {
+                sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(INVALID_SESSION)));
+                return;
+            }
+
+            String method = exchange.getRequestMethod();
+
+            try {
+                if ("GET".equalsIgnoreCase(method)) {
+                    handleGet(exchange, callerId);
+                } else if ("POST".equalsIgnoreCase(method)) {
+                    handlePost(exchange, callerId);
+                } else if ("DELETE".equalsIgnoreCase(method)) {
+                    handleDelete(exchange, callerId);
+                } else {
+                    sendPlain(exchange, 405, JsonCodec.toJson(ContactsResponse.error(METHOD_NOT_ALLOWED)));
+                }
+            } catch (Exception ex) {
+                auditLogger.logError("contacts_error", requestId, callerId, ex);
+                sendPlain(exchange, 500, JsonCodec.toJson(ContactsResponse.error(INTERNAL_SERVER_ERROR)));
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private void handleGet(HttpExchange exchange, String callerId) throws IOException {
+            List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
+            List<UserSearchResult> results = records.stream()
+                    .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(),
+                            r.rank()))
+                    .toList();
+            sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
+        }
+
+        private void handlePost(HttpExchange exchange, String callerId) throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            AddContactRequest request = JsonCodec.fromJson(body, AddContactRequest.class);
+            if (request == null || request.getContactId() == null || request.getContactId().isBlank()) {
+                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error(INVALID_CONTACT_ID)));
+                return;
+            }
+            contactDAO.addContact(callerId, request.getContactId());
+            sendPlain(exchange, 200, "{}");
+        }
+
+        private void handleDelete(HttpExchange exchange, String callerId) throws IOException {
+            String rawQuery = exchange.getRequestURI().getQuery();
+            String contactId = "";
+            if (rawQuery != null) {
+                for (String param : rawQuery.split("&")) {
+                    if (param.startsWith("contactId=")) {
+                        contactId = java.net.URLDecoder.decode(param.substring(10), StandardCharsets.UTF_8);
+                        break;
+                    }
+                }
+            }
+            if (contactId.isBlank()) {
+                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error(INVALID_CONTACT_ID)));
+                return;
+            }
+            contactDAO.removeContact(callerId, contactId);
+            sendPlain(exchange, 200, "{}");
+        }
+
+        private String readBody(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException("Request body exceeds limit");
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {

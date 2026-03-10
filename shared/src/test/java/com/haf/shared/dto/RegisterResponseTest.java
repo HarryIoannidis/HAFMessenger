@@ -10,10 +10,10 @@ class RegisterResponseTest {
         String userId = "test-uid-123";
         RegisterResponse response = RegisterResponse.success(userId);
 
-        assertEquals(userId, response.userId);
-        assertEquals("PENDING", response.status);
-        assertNotNull(response.message);
-        assertNull(response.error);
+        assertEquals(userId, response.getUserId());
+        assertEquals("PENDING", response.getStatus());
+        assertNotNull(response.getMessage());
+        assertNull(response.getError());
     }
 
     @Test
@@ -21,9 +21,9 @@ class RegisterResponseTest {
         String errMsg = "Email already exists";
         RegisterResponse response = RegisterResponse.error(errMsg);
 
-        assertEquals(errMsg, response.error);
-        assertNull(response.userId);
-        assertNull(response.status);
-        assertNull(response.message);
+        assertEquals(errMsg, response.getError());
+        assertNull(response.getUserId());
+        assertNull(response.getStatus());
+        assertNull(response.getMessage());
     }
 }

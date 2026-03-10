@@ -8,25 +8,25 @@ import java.util.Arrays;
 import java.util.Base64;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AadCodecTest {
+class AadCodecTest {
 
     private EncryptedMessage base() {
         EncryptedMessage m = new EncryptedMessage();
-        m.version = MessageHeader.VERSION;
-        m.algorithm = MessageHeader.ALGO_AEAD;
-        m.senderId = "userA";
-        m.recipientId = "userB";
-        m.timestampEpochMs = 1730544000000L; // fixed
-        m.ttlSeconds = 3600;
-        m.contentType = "text/plain";
-        m.contentLength = 11L;
-        m.ivB64 = Base64.getEncoder().encodeToString("0123456789AB".getBytes(StandardCharsets.UTF_8)); // 12B dummy
-        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString("k".getBytes(StandardCharsets.UTF_8));
+        m.setVersion(MessageHeader.VERSION);
+        m.setAlgorithm(MessageHeader.ALGO_AEAD);
+        m.setSenderId("userA");
+        m.setRecipientId("userB");
+        m.setTimestampEpochMs(1730544000000L); // fixed
+        m.setTtlSeconds(3600);
+        m.setContentType("text/plain");
+        m.setContentLength(11L);
+        m.setIvB64(Base64.getEncoder().encodeToString("0123456789AB".getBytes(StandardCharsets.UTF_8))); // 12B dummy
+        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString("k".getBytes(StandardCharsets.UTF_8)));
         return m;
     }
 
     @Test
-    public void test_deterministic_aad() {
+    void test_deterministic_aad() {
         EncryptedMessage m1 = base();
         EncryptedMessage m2 = base();
 
@@ -37,10 +37,10 @@ public class AadCodecTest {
     }
 
     @Test
-    public void test_different_contentType_changes_aad() {
+    void test_different_contentType_changes_aad() {
         EncryptedMessage m1 = base();
         EncryptedMessage m2 = base();
-        m2.contentType = "application/octet-stream";
+        m2.setContentType("application/octet-stream");
 
         byte[] a1 = AadCodec.buildAAD(m1);
         byte[] a2 = AadCodec.buildAAD(m2);
@@ -49,10 +49,10 @@ public class AadCodecTest {
     }
 
     @Test
-    public void test_different_contentLength_changes_aad() {
+    void test_different_contentLength_changes_aad() {
         EncryptedMessage m1 = base();
         EncryptedMessage m2 = base();
-        m2.contentLength = 12L;
+        m2.setContentLength(12L);
 
         byte[] a1 = AadCodec.buildAAD(m1);
         byte[] a2 = AadCodec.buildAAD(m2);
@@ -61,10 +61,10 @@ public class AadCodecTest {
     }
 
     @Test
-    public void test_different_recipient_id_changes_aad() {
+    void test_different_recipient_id_changes_aad() {
         EncryptedMessage m1 = base();
         EncryptedMessage m2 = base();
-        m2.recipientId = "userC";
+        m2.setRecipientId("userC");
 
         byte[] a1 = AadCodec.buildAAD(m1);
         byte[] a2 = AadCodec.buildAAD(m2);
