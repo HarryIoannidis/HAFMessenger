@@ -21,7 +21,7 @@ public final class JsonCodec {
      * Serializes object in JSON with strict settings (NO NULL, FAIL_ON_UNKNOWN).
      *
      * @param value any DTO (KeyMetadata, EncryptedMessage, etc.)
-     * @return jSON string
+     * @return JSON string
      * @throws JsonCodecException if serialization fails
      */
     public static String toJson(Object value) {
