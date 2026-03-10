@@ -5,6 +5,10 @@
     -fx-border-insets: 0;
 }
 
+.card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(32, 32, 32, 0.6), 10, 0, 0, 0);
+}
+
 .plain-text-bold {
     -fx-fill: #202020;
     -fx-text-alignment: center;

@@ -93,22 +93,36 @@ public class MainController {
     private boolean hasSearchResults;
 
     // Cached views for performance
-    private Parent cachedSearchView;
-    private Parent cachedPlaceholderView;
     private Parent currentChatView;
     private String currentChatRecipientId;
+
+    private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
+    private final java.util.concurrent.CompletableFuture<Parent> searchFuture = new java.util.concurrent.CompletableFuture<>();
+    private final java.util.concurrent.atomic.AtomicBoolean placeholderLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
+            false);
+    private final java.util.concurrent.atomic.AtomicBoolean searchLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
+            false);
 
     @FXML
     public void initialize() {
         setupWindowControls();
         setupNavBar();
         setupContactList();
-        loadPlaceholder();
         setupContactSelection();
         setupSearchField();
 
+        // Trigger pre-loading immediately
+        triggerPreloading();
+
         // Messages tab is active by default
         activateMessagesTab();
+    }
+
+    private void triggerPreloading() {
+        Thread.ofVirtual().name("view-preloader").start(() -> {
+            ensurePlaceholderLoaded();
+            ensureSearchLoaded();
+        });
     }
 
     private void setupNavBar() {
@@ -179,7 +193,7 @@ public class MainController {
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null) {
             showProfilePanel(selected);
-            loadChat(selected.name());
+            loadChat(selected.id());
         } else {
             loadPlaceholder();
         }
@@ -222,22 +236,38 @@ public class MainController {
     }
 
     /**
-     * Loads search.fxml into the content pane and stores the SearchController ref.
+     * Loads search.fxml into the content pane.
      */
     private void loadSearchView() {
-        if (cachedSearchView == null) {
-            try {
-                FXMLLoader loader = new FXMLLoader(
-                        getClass().getResource(UiConstants.FXML_SEARCH));
-                cachedSearchView = loader.load();
-                searchController = loader.getController();
-                searchController.setMainController(this);
-            } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
-                return;
-            }
+        searchFuture.thenAccept(view -> javafx.application.Platform.runLater(() -> {
+            contentPane.getChildren().setAll(view);
+        }));
+
+        // If not already loading, trigger it (non-blocking)
+        if (!searchLoadingStarted.get()) {
+            ensureSearchLoaded();
         }
-        contentPane.getChildren().setAll(cachedSearchView);
+    }
+
+    private void ensureSearchLoaded() {
+        if (searchLoadingStarted.getAndSet(true)) {
+            return;
+        }
+
+        try {
+            var resource = getClass().getResource(UiConstants.FXML_SEARCH);
+            LOGGER.log(Level.INFO, "Loading search FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
+            Parent view = loader.load();
+            SearchController controller = loader.getController();
+            controller.setMainController(this);
+
+            searchController = controller;
+            searchFuture.complete(view);
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
+            searchFuture.completeExceptionally(e);
+        }
     }
 
     private void showProfilePanel(ContactInfo contact) {
@@ -281,13 +311,11 @@ public class MainController {
      * Adds a searched user to the contacts list and switches to their chat.
      */
     public void startChatWith(String userId, String fullName) {
-        // Switch to messages tab
-        activateMessagesTab();
 
         // Find if contact already exists
         ContactInfo target = null;
         for (ContactInfo info : contactsList.getItems()) {
-            if (info.name().equals(fullName)) { // Using name as identifier for now
+            if (info.id().equals(userId)) {
                 target = info;
                 break;
             }
@@ -295,36 +323,35 @@ public class MainController {
 
         // Add if not exists
         if (target == null) {
-            target = ContactInfo.online(fullName);
+            target = ContactInfo.online(userId, fullName);
             contactsList.getItems().add(target);
         }
 
-        // Select and load chat
+        // Select and load chat. Note: activateMessagesTab is triggered by the selection
+        // listener.
         contactsList.getSelectionModel().select(target);
         contactsList.setUserData(target);
-        showProfilePanel(target);
-        loadChat(userId);
     }
 
-    public boolean hasContact(String fullName) {
+    public boolean hasContact(String userId) {
         for (ContactInfo info : contactsList.getItems()) {
-            if (info.name().equals(fullName)) {
+            if (info.id().equals(userId)) {
                 return true;
             }
         }
         return false;
     }
 
-    public void addContact(String fullName) {
-        if (!hasContact(fullName)) {
-            contactsList.getItems().add(ContactInfo.online(fullName));
+    public void addContact(String userId, String fullName) {
+        if (!hasContact(userId)) {
+            contactsList.getItems().add(ContactInfo.online(userId, fullName));
         }
     }
 
-    public void removeContact(String fullName) {
-        contactsList.getItems().removeIf(info -> info.name().equals(fullName));
+    public void removeContact(String userId) {
+        contactsList.getItems().removeIf(info -> info.id().equals(userId));
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
-        if (selected != null && selected.name().equals(fullName)) {
+        if (selected != null && selected.id().equals(userId)) {
             contactsList.getSelectionModel().clearSelection();
             contactsList.setUserData(null);
             hideProfilePanel();
@@ -341,9 +368,8 @@ public class MainController {
                 return;
             }
 
-            // If we are currently in Search Mode, clicking any contact (even the current
-            // one)
-            // should transport us back to the Messages tab.
+            // If we are currently in Search Mode, clicking any contact should transport us
+            // back to the Messages tab.
             if (indicatorSearch.isVisible()) {
                 activateMessagesTab();
                 contactsList.setUserData(clicked);
@@ -372,17 +398,29 @@ public class MainController {
     }
 
     private void loadPlaceholder() {
-        if (cachedPlaceholderView == null) {
-            try {
-                FXMLLoader loader = new FXMLLoader(
-                        getClass().getResource(UiConstants.FXML_PLACEHOLDER));
-                cachedPlaceholderView = loader.load();
-            } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
-                return;
-            }
+        placeholderFuture
+                .thenAccept(view -> javafx.application.Platform.runLater(() -> contentPane.getChildren().setAll(view)));
+
+        if (!placeholderLoadingStarted.get()) {
+            ensurePlaceholderLoaded();
         }
-        contentPane.getChildren().setAll(cachedPlaceholderView);
+    }
+
+    private void ensurePlaceholderLoaded() {
+        if (placeholderLoadingStarted.getAndSet(true)) {
+            return;
+        }
+
+        try {
+            var resource = getClass().getResource(UiConstants.FXML_PLACEHOLDER);
+            LOGGER.log(Level.INFO, "Loading placeholder FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
+            Parent view = loader.load();
+            placeholderFuture.complete(view);
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
+            placeholderFuture.completeExceptionally(e);
+        }
     }
 
     private void loadChat(String recipientId) {
@@ -392,19 +430,27 @@ public class MainController {
             return;
         }
 
-        try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource(UiConstants.FXML_CHAT));
-            currentChatView = loader.load();
+        // Load new chat view in a background thread to prevent UI freeze
+        Thread.ofVirtual().name("chat-loader").start(() -> {
+            try {
+                var resource = getClass().getResource(UiConstants.FXML_CHAT);
+                LOGGER.log(Level.INFO, "Loading chat FXML: {0}", resource);
+                FXMLLoader loader = new FXMLLoader(resource);
+                javafx.scene.Parent view = loader.load();
 
-            ChatController chatController = loader.getController();
-            chatController.setRecipient(recipientId);
+                ChatController chatController = loader.getController();
+                chatController.setRecipient(recipientId);
 
-            currentChatRecipientId = recipientId;
-            contentPane.getChildren().setAll(currentChatView);
-        } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
-        }
+                // Update UI once the view is fully prepared in memory
+                javafx.application.Platform.runLater(() -> {
+                    currentChatView = view;
+                    currentChatRecipientId = recipientId;
+                    contentPane.getChildren().setAll(view);
+                });
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
+            }
+        });
     }
 
     private void setupWindowControls() {

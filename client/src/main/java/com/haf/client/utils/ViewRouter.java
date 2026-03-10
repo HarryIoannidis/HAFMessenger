@@ -55,7 +55,9 @@ public class ViewRouter {
                 recreateStage(StageStyle.DECORATED);
             }
 
-            FXMLLoader loader = new FXMLLoader(ViewRouter.class.getResource(fxmlPath));
+            var resource = ViewRouter.class.getResource(fxmlPath);
+            logger.log(Level.INFO, "Switching to FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
 
             if (mainStage.getScene() != null) {
@@ -83,7 +85,9 @@ public class ViewRouter {
                 recreateStage(StageStyle.TRANSPARENT);
             }
 
-            FXMLLoader loader = new FXMLLoader(ViewRouter.class.getResource(fxmlPath));
+            var resource = ViewRouter.class.getResource(fxmlPath);
+            logger.log(Level.INFO, "Switching to transparent FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
             Scene scene = new Scene(root);
             scene.setFill(Color.TRANSPARENT);

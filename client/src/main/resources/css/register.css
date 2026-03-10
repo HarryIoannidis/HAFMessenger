@@ -39,6 +39,7 @@
     -fx-border-color: #989898;
     -fx-border-width: 2;
     -fx-border-radius: 8;
+    -fx-padding: 4;
     -fx-background-radius: 8;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0.3, 0, 2);
 }
@@ -51,7 +52,8 @@
     -fx-font-weight: normal;
     -fx-cursor: hand;
     -fx-alignment: center-left;
-    -fx-graphic-text-gap: 10;
+    -fx-graphic-text-gap: 15;
+    -fx-padding: 8;
 }
 
 .combo-box-popup .list-cell:hover {
@@ -70,8 +72,8 @@
 }
 
 .combo-box-popup .list-cell .image-view {
-    -fx-fit-width: 24;
-    -fx-fit-height: 24;
+    -fx-fit-width: 36;
+    -fx-fit-height: 36;
     -fx-preserve-ratio: true;
 }
 
@@ -83,6 +85,44 @@
 .combo-box-popup .list-cell:disabled {
     -fx-opacity: 0.4;
     -fx-cursor: default;
+}
+
+/* Modern Scrollbar for ComboBox */
+.combo-box-popup .list-view .scroll-bar:vertical {
+    -fx-pref-width: 8px;
+    -fx-min-width: 8px;
+    -fx-max-width: 8px;
+    -fx-background-color: transparent;
+}
+
+.combo-box-popup .list-view .scroll-bar:vertical .thumb {
+    -fx-background-color: #A3A3A3;
+    -fx-background-radius: 4px;
+    -fx-opacity: 0.6;
+}
+
+.combo-box-popup .list-view .scroll-bar:vertical .thumb:hover {
+    -fx-opacity: 1.0;
+}
+
+.combo-box-popup .list-view .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.combo-box-popup .list-view .scroll-bar:vertical .increment-button,
+.combo-box-popup .list-view .scroll-bar:vertical .decrement-button {
+    -fx-background-color: transparent;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+}
+
+.combo-box-popup .list-view .scroll-bar:horizontal {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-opacity: 0;
 }
 
 /* Drag&Drop Zone */

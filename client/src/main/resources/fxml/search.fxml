@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
@@ -8,16 +9,16 @@
 <?import javafx.scene.text.Text?>
 
 <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="400.0" minWidth="420.0" prefHeight="700.0" prefWidth="900.0" stylesheets="@../css/global.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SearchController">
-
+   <ScrollPane fitToHeight="true" fitToWidth="true">
+      <content>
          <!-- Layer 1: the result cards -->
-   <FlowPane fx:id="resultsPane" columnHalignment="CENTER" hgap="30.0" vgap="30.0" visible="false">
-      <opaqueInsets>
-         <Insets />
-      </opaqueInsets>
-      <padding>
-         <Insets bottom="30.0" left="30.0" right="30.0" top="30.0" />
-      </padding>
-   </FlowPane>
+         <FlowPane fx:id="resultsPane" columnHalignment="CENTER" hgap="30.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" vgap="30.0" visible="false">
+            <padding>
+               <Insets bottom="30.0" left="30.0" right="30.0" top="30.0" />
+            </padding>
+         </FlowPane>
+      </content>
+   </ScrollPane>
 
    <!-- Layer 2: status overlay (visible when no results) -->
    <VBox fx:id="statusBox" alignment="CENTER" mouseTransparent="true">

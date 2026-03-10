@@ -127,7 +127,12 @@ public final class WebSocketIngressServer extends WebSocketServer {
     @Override
     public void onMessage(WebSocket conn, String message) {
         String requestId = UUID.randomUUID().toString();
-        String userId = connectionUsers.getOrDefault(conn, TEST_USER_ID);
+        String userId = connectionUsers.get(conn);
+
+        if (userId == null) {
+            conn.close(1008, "Unauthorized");
+            return;
+        }
 
         try {
             RateLimitDecision decision = rateLimiterService.checkAndConsume(requestId, userId);
