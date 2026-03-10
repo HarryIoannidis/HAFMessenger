@@ -572,7 +572,7 @@ public class RegisterController {
         return request;
     }
 
-    private String fetchAdminPublicKeyPem(HttpClient client) {
+    private String fetchAdminPublicKeyPem(HttpClient client) throws InterruptedException {
         try {
             HttpRequest adminKeyRequest = HttpRequest.newBuilder()
                     .uri(URI.create("https://localhost:8443/api/v1/config/admin-key"))
@@ -588,6 +588,8 @@ public class RegisterController {
                     return body.substring(start, end).replace("\\n", "\n");
                 }
             }
+        } catch (InterruptedException e) {
+            throw e; // Preserve interruption for the caller
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to fetch admin public key", e);
         }
@@ -1034,9 +1036,17 @@ public class RegisterController {
     private static class RankListCell extends ListCell<String> {
         private final ImageView imageView = new ImageView();
 
+        // Constructor
         public RankListCell() {
+            // Initialization handled by field declarations and updateItem
         }
 
+        /**
+         * Updates the cell with the given rank.
+         * 
+         * @param rank  the rank to display
+         * @param empty whether the cell is empty
+         */
         @Override
         protected void updateItem(String rank, boolean empty) {
             super.updateItem(rank, empty);
