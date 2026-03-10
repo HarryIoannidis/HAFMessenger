@@ -22,10 +22,62 @@ import java.io.Serializable;
  * </ul>
  */
 public class EncryptedFileDTO implements Serializable {
-    public String ciphertextB64;
-    public String ivB64;
-    public String tagB64;
-    public String ephemeralPublicB64;
-    public String contentType;
-    public long originalSize;
+    private String ciphertextB64;
+    private String ivB64;
+    private String tagB64;
+    private String ephemeralPublicB64;
+    private String contentType;
+    private long originalSize;
+
+    public EncryptedFileDTO() {
+        // Required for JSON deserialization
+    }
+
+    public String getCiphertextB64() {
+        return ciphertextB64;
+    }
+
+    public void setCiphertextB64(String ciphertextB64) {
+        this.ciphertextB64 = ciphertextB64;
+    }
+
+    public String getIvB64() {
+        return ivB64;
+    }
+
+    public void setIvB64(String ivB64) {
+        this.ivB64 = ivB64;
+    }
+
+    public String getTagB64() {
+        return tagB64;
+    }
+
+    public void setTagB64(String tagB64) {
+        this.tagB64 = tagB64;
+    }
+
+    public String getEphemeralPublicB64() {
+        return ephemeralPublicB64;
+    }
+
+    public void setEphemeralPublicB64(String ephemeralPublicB64) {
+        this.ephemeralPublicB64 = ephemeralPublicB64;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public long getOriginalSize() {
+        return originalSize;
+    }
+
+    public void setOriginalSize(long originalSize) {
+        this.originalSize = originalSize;
+    }
 }

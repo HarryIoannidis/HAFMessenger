@@ -27,15 +27,15 @@ public final class MailboxRouter implements AutoCloseable {
     /**
      * Constructs a MailboxRouter instance.
      *
-     * @param envelopeDAO The DAO for managing envelopes in the database.
-     * @param scheduler The scheduler for running periodic tasks.
-     * @param auditLogger The logger for auditing cleanup operations.
+     * @param envelopeDAO     The DAO for managing envelopes in the database.
+     * @param scheduler       The scheduler for running periodic tasks.
+     * @param auditLogger     The logger for auditing cleanup operations.
      * @param metricsRegistry The registry for tracking metrics.
      */
     public MailboxRouter(EnvelopeDAO envelopeDAO,
-                         ScheduledExecutorService scheduler,
-                         AuditLogger auditLogger,
-                         MetricsRegistry metricsRegistry) {
+            ScheduledExecutorService scheduler,
+            AuditLogger auditLogger,
+            MetricsRegistry metricsRegistry) {
         this.envelopeDAO = Objects.requireNonNull(envelopeDAO, "envelopeDAO");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.auditLogger = Objects.requireNonNull(auditLogger, "auditLogger");
@@ -47,11 +47,10 @@ public final class MailboxRouter implements AutoCloseable {
      */
     public void start() {
         cleanupFuture = scheduler.scheduleAtFixedRate(
-            this::runTtlCleanup,
-            TTL_CLEANUP_INTERVAL.toSeconds(),
-            TTL_CLEANUP_INTERVAL.toSeconds(),
-            TimeUnit.SECONDS
-        );
+                this::runTtlCleanup,
+                TTL_CLEANUP_INTERVAL.toSeconds(),
+                TTL_CLEANUP_INTERVAL.toSeconds(),
+                TimeUnit.SECONDS);
     }
 
     /**
@@ -63,7 +62,7 @@ public final class MailboxRouter implements AutoCloseable {
     public QueuedEnvelope ingress(EncryptedMessage message) {
         QueuedEnvelope envelope = envelopeDAO.insert(message);
         metricsRegistry.increaseQueueDepth();
-        dispatch(message.recipientId, envelope);
+        dispatch(message.getRecipientId(), envelope);
         return envelope;
     }
 
@@ -71,8 +70,8 @@ public final class MailboxRouter implements AutoCloseable {
      * Fetches undelivered messages for a specific recipient.
      *
      * @param recipientId The ID of the recipient.
-     * @param limit The maximum number of messages to fetch.
-     * @return  list of undelivered messages for the recipient.
+     * @param limit       The maximum number of messages to fetch.
+     * @return list of undelivered messages for the recipient.
      */
     public List<QueuedEnvelope> fetchUndelivered(String recipientId, int limit) {
         return envelopeDAO.fetchForRecipient(recipientId, limit);
@@ -105,7 +104,7 @@ public final class MailboxRouter implements AutoCloseable {
      * Filters out any envelope IDs that do not belong to the provided user to
      * prevent cross-user acknowledgements.
      *
-     * @param userId the user who owns the mailbox
+     * @param userId      the user who owns the mailbox
      * @param envelopeIds the candidate envelope IDs to acknowledge
      * @return true if at least one envelope was acknowledged, false otherwise
      */
@@ -118,7 +117,7 @@ public final class MailboxRouter implements AutoCloseable {
 
         // Filter to envelopes that belong to the user
         List<String> owned = envelopes.values().stream()
-                .filter(env -> userId.equals(env.payload().recipientId))
+                .filter(env -> userId.equals(env.payload().getRecipientId()))
                 .map(QueuedEnvelope::envelopeId)
                 .toList();
 
@@ -144,7 +143,7 @@ public final class MailboxRouter implements AutoCloseable {
      * Subscribes a recipient to receive notifications for new messages.
      *
      * @param recipientId the ID of the recipient.
-     * @param subscriber the subscriber to be notified.
+     * @param subscriber  the subscriber to be notified.
      * @return a MailboxSubscription object representing the subscription.
      */
     public MailboxSubscription subscribe(String recipientId, MailboxSubscriber subscriber) {
@@ -174,7 +173,7 @@ public final class MailboxRouter implements AutoCloseable {
      * Dispatches a message to all subscribers of a recipient.
      *
      * @param recipientId the ID of the recipient.
-     * @param envelope the envelope containing the message.
+     * @param envelope    the envelope containing the message.
      */
     private void dispatch(String recipientId, QueuedEnvelope envelope) {
         Set<MailboxSubscriber> subs = subscribers.get(recipientId);
@@ -186,7 +185,6 @@ public final class MailboxRouter implements AutoCloseable {
             subs.forEach(sub -> sub.onEnvelope(envelope));
         }
     }
-
 
     /**
      * Performs cleanup of expired messages and logs the operation.
@@ -228,8 +226,8 @@ public final class MailboxRouter implements AutoCloseable {
      * Represents a subscription to a recipient's mailbox.
      *
      * @param recipientId the ID of the recipient.
-     * @param subscriber the subscriber associated with the subscription.
+     * @param subscriber  the subscriber associated with the subscription.
      */
-    public record MailboxSubscription(String recipientId, MailboxSubscriber subscriber) {}
+    public record MailboxSubscription(String recipientId, MailboxSubscriber subscriber) {
+    }
 }
-

@@ -13,20 +13,20 @@ public final class MessageValidator {
     }
 
     public enum ErrorCode {
-        NULL_DTO, // DTO null
-        BAD_VERSION, // λάθος έκδοση πρωτοκόλλου
-        BAD_ALGO, // λάθος δήλωση αλγορίθμων
-        BAD_SENDER, // senderId λείπει/πολύ μικρό
-        BAD_RECIPIENT, // recipientId λείπει/πολύ μικρό
-        BAD_TTL, // ttlSeconds εκτός ορίων
-        BAD_IV, // ivB64 άκυρο/λάθος μήκος (12B)
-        BAD_CIPHERTEXT, // ciphertextB64 άκυρο/κενό/υπερβολικά μεγάλο
-        BAD_TAG, // tagB64 άκυρο/λάθος μήκος (16B)
-        BAD_WRAPPED_KEY, // ephemeralPublicB64 άκυρο/μικρό για RSA-2048 OAEP
+        NULL_DTO, // DTO is null
+        BAD_VERSION, // Wrong protocol version
+        BAD_ALGO, // Wrong algorithm declaration
+        BAD_SENDER, // senderId missing or too short
+        BAD_RECIPIENT, // recipientId missing or too short
+        BAD_TTL, // ttlSeconds out of bounds
+        BAD_IV, // ivB64 invalid or wrong length (12B)
+        BAD_CIPHERTEXT, // ciphertextB64 invalid, empty, or too large
+        BAD_TAG, // tagB64 invalid or wrong length (16B)
+        BAD_WRAPPED_KEY, // ephemeralPublicB64 invalid or too short for RSA-2048 OAEP
         BAD_TIMESTAMP, // timestampEpochMs <= 0
         BAD_CONTENT_LENGTH, // contentLength < 0
         BAD_CONTENT_TYPE, // contentType null/empty/not allowed
-        BAD_AAD // aadB64 null/empty
+        BAD_AAD // aadB64 is null or empty
     }
 
     /**
@@ -53,10 +53,10 @@ public final class MessageValidator {
         if (localRecipientId == null || localRecipientId.length() < MessageHeader.MIN_RECIPIENT_LEN) {
             throw new IllegalArgumentException("Local recipient identity invalid");
         }
-        if (m.recipientId == null || m.recipientId.length() < MessageHeader.MIN_RECIPIENT_LEN) {
+        if (m.getRecipientId() == null || m.getRecipientId().length() < MessageHeader.MIN_RECIPIENT_LEN) {
             throw new IllegalArgumentException("Message recipientId invalid");
         }
-        if (!m.recipientId.equals(localRecipientId)) {
+        if (!m.getRecipientId().equals(localRecipientId)) {
             throw new IllegalArgumentException("Recipient mismatch");
         }
     }
@@ -70,100 +70,125 @@ public final class MessageValidator {
     public static List<ErrorCode> validateOrCollectErrors(EncryptedMessage m) {
         List<ErrorCode> errors = new ArrayList<>();
 
-        // Βασικός έλεγχος: DTO δεν πρέπει να είναι null
+        // Basic check: DTO must not be null
         if (m == null) {
             errors.add(ErrorCode.NULL_DTO);
             return errors;
         }
 
-        // Έκδοση πρωτοκόλλου
-        if (!MessageHeader.VERSION.equals(m.version)) {
+        validateHeader(m, errors);
+        validateIdentities(m, errors);
+        validateMetadata(m, errors);
+        validatePayload(m, errors);
+
+        return errors;
+    }
+
+    private static void validateHeader(EncryptedMessage m, List<ErrorCode> errors) {
+        // Protocol version
+        if (!MessageHeader.VERSION.equals(m.getVersion())) {
             errors.add(ErrorCode.BAD_VERSION);
         }
 
-        // Δήλωση αλγορίθμων (προφίλ AEAD)
-        if (!MessageHeader.ALGO_AEAD.equals(m.algorithm)) {
+        // Algorithm declaration (AEAD profile)
+        if (!MessageHeader.ALGO_AEAD.equals(m.getAlgorithm())) {
             errors.add(ErrorCode.BAD_ALGO);
         }
+    }
 
-        // Ταυτότητα αποστολέα (ελάχιστο μήκος)
-        if (m.senderId == null || m.senderId.length() < MessageHeader.MIN_SENDER_LEN) {
+    private static void validateIdentities(EncryptedMessage m, List<ErrorCode> errors) {
+        // Sender identity (minimum length)
+        if (m.getSenderId() == null || m.getSenderId().length() < MessageHeader.MIN_SENDER_LEN) {
             errors.add(ErrorCode.BAD_SENDER);
         }
 
-        // Ταυτότητα παραλήπτη (ελάχιστο μήκος)
-        if (m.recipientId == null || m.recipientId.length() < MessageHeader.MIN_RECIPIENT_LEN) {
+        // Recipient identity (minimum length)
+        if (m.getRecipientId() == null || m.getRecipientId().length() < MessageHeader.MIN_RECIPIENT_LEN) {
             errors.add(ErrorCode.BAD_RECIPIENT);
         }
+    }
 
-        // Πολιτική χρόνου ζωής (TTL)
-        if (m.ttlSeconds < MessageHeader.MIN_TTL_SECONDS || m.ttlSeconds > MessageHeader.MAX_TTL_SECONDS) {
+    private static void validateMetadata(EncryptedMessage m, List<ErrorCode> errors) {
+        // Time-to-live policy (TTL)
+        if (m.getTtlSeconds() < MessageHeader.MIN_TTL_SECONDS || m.getTtlSeconds() > MessageHeader.MAX_TTL_SECONDS) {
             errors.add(ErrorCode.BAD_TTL);
         }
 
-        // IV (GCM nonce) – ύπαρξη και μήκος 12 bytes
-        if (m.ivB64 == null) {
+        // Timestamp – positive value
+        if (m.getTimestampEpochMs() <= 0) {
+            errors.add(ErrorCode.BAD_TIMESTAMP);
+        }
+
+        // Content length – non-negative
+        if (m.getContentLength() < 0) {
+            errors.add(ErrorCode.BAD_CONTENT_LENGTH);
+        }
+
+        // Additional Authenticated Data (AAD) – if present, must have positive length
+        if (m.getAadB64() != null && m.getAadB64().isEmpty()) {
+            errors.add(ErrorCode.BAD_AAD);
+        }
+
+        // Content type – accepted
+        String baseCt = normalizeContentType(m.getContentType());
+        if (baseCt == null || !MessageHeader.ALLOWED_CONTENT_TYPES.contains(baseCt)) {
+            errors.add(ErrorCode.BAD_CONTENT_TYPE);
+        }
+    }
+
+    private static void validatePayload(EncryptedMessage m, List<ErrorCode> errors) {
+        validateIv(m, errors);
+        validateCiphertext(m, errors);
+        validateTag(m, errors);
+        validateEphemeralKey(m, errors);
+    }
+
+    private static void validateIv(EncryptedMessage m, List<ErrorCode> errors) {
+        // IV (GCM nonce) – existence and length 12 bytes
+        if (m.getIvB64() == null) {
             errors.add(ErrorCode.BAD_IV);
         } else {
-            byte[] iv = safeB64(m.ivB64);
+            byte[] iv = safeB64(m.getIvB64());
             if (iv == null || iv.length != MessageHeader.IV_BYTES) {
                 errors.add(ErrorCode.BAD_IV);
             }
         }
+    }
 
-        // Ciphertext – ύπαρξη, αποκωδικοποίηση, όχι κενό, κάτω από μέγιστο όριο
-        if (m.ciphertextB64 == null) {
+    private static void validateCiphertext(EncryptedMessage m, List<ErrorCode> errors) {
+        // Ciphertext – existence, decoding, non-empty, below maximum threshold
+        if (m.getCiphertextB64() == null) {
             errors.add(ErrorCode.BAD_CIPHERTEXT);
         } else {
-            byte[] ct = safeB64(m.ciphertextB64);
-            if (ct == null || ct.length == 0 || m.ciphertextB64.length() > MessageHeader.MAX_CIPHERTEXT_BASE64) {
+            byte[] ct = safeB64(m.getCiphertextB64());
+            if (ct == null || ct.length == 0 || m.getCiphertextB64().length() > MessageHeader.MAX_CIPHERTEXT_BASE64) {
                 errors.add(ErrorCode.BAD_CIPHERTEXT);
             }
         }
+    }
 
-        // GCM tag – ύπαρξη και μήκος 16 bytes
-        if (m.tagB64 == null) {
+    private static void validateTag(EncryptedMessage m, List<ErrorCode> errors) {
+        // GCM tag – existence and length 16 bytes
+        if (m.getTagB64() == null) {
             errors.add(ErrorCode.BAD_TAG);
         } else {
-            byte[] tag = safeB64(m.tagB64);
+            byte[] tag = safeB64(m.getTagB64());
             if (tag == null || tag.length != MessageHeader.GCM_TAG_BYTES) {
                 errors.add(ErrorCode.BAD_TAG);
             }
         }
+    }
 
-        // Εφήμερο κλειδί (X25519) – ύπαρξη και ελάχιστο μήκος
-        if (m.ephemeralPublicB64 == null) {
+    private static void validateEphemeralKey(EncryptedMessage m, List<ErrorCode> errors) {
+        // Ephemeral key (X25519) – existence and minimum length
+        if (m.getEphemeralPublicB64() == null) {
             errors.add(ErrorCode.BAD_WRAPPED_KEY);
         } else {
-            byte[] wk = safeB64(m.ephemeralPublicB64);
+            byte[] wk = safeB64(m.getEphemeralPublicB64());
             if (wk == null || wk.length < 32) { // X25519 min
                 errors.add(ErrorCode.BAD_WRAPPED_KEY);
             }
         }
-
-        // Χρονοσήμανση – θετική τιμή
-        if (m.timestampEpochMs <= 0) {
-            errors.add(ErrorCode.BAD_TIMESTAMP);
-        }
-
-        // Μήκος αρχικού περιεχομένου – μη αρνητικό
-        if (m.contentLength < 0) {
-            errors.add(ErrorCode.BAD_CONTENT_LENGTH);
-        }
-
-        // Αυθεντικοποιητικά πρόσθετα δεδομένα (AAD) – αν υπάρχουν, πρέπει να είναι
-        // θετικά μήκη
-        if (m.aadB64 != null && m.aadB64.isEmpty()) {
-            errors.add(ErrorCode.BAD_AAD);
-        }
-
-        // Τύπος περιεχομένου – αποδεκτός
-        String baseCt = normalizeContentType(m.contentType);
-        if (baseCt == null || !MessageHeader.ALLOWED_CONTENT_TYPES.contains(baseCt)) {
-            errors.add(ErrorCode.BAD_CONTENT_TYPE);
-        }
-
-        return errors;
     }
 
     /**
@@ -188,13 +213,13 @@ public final class MessageValidator {
      * Safely decodes a Base64 string into a byte array.
      *
      * @param s the Base64 encoded string.
-     * @return the decoded byte array, or null if decoding fails.
+     * @return the decoded byte array, or an empty array if decoding fails.
      */
     private static byte[] safeB64(String s) {
         try {
             return Base64.getDecoder().decode(s);
         } catch (IllegalArgumentException ex) {
-            return null;
+            return new byte[0];
         }
     }
 

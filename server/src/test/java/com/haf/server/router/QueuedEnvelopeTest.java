@@ -40,7 +40,7 @@ class QueuedEnvelopeTest {
     void queued_envelope_equals_and_hashcode() {
         EncryptedMessage message1 = createValidMessage();
         EncryptedMessage message2 = createValidMessage();
-        message2.senderId = message1.senderId; // Make them equal
+        message2.setSenderId(message1.getSenderId()); // Make them equal
 
         QueuedEnvelope envelope1 = new QueuedEnvelope("id-1", message1, 1000L, 2000L);
         QueuedEnvelope envelope2 = new QueuedEnvelope("id-1", message1, 1000L, 2000L);
@@ -64,21 +64,20 @@ class QueuedEnvelopeTest {
 
     private EncryptedMessage createValidMessage() {
         EncryptedMessage message = new EncryptedMessage();
-        message.version = MessageHeader.VERSION;
-        message.algorithm = MessageHeader.ALGO_AEAD;
-        message.senderId = "sender-123";
-        message.recipientId = "recipient-456";
-        message.timestampEpochMs = System.currentTimeMillis();
-        message.ttlSeconds = (int) Duration.ofDays(1).toSeconds();
-        message.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        message.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-        message.ciphertextB64 = Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8));
-        message.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-        message.contentType = "text/plain";
-        message.contentLength = 4;
-        message.aadB64 = Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8));
-        message.e2e = true;
+        message.setVersion(MessageHeader.VERSION);
+        message.setAlgorithm(MessageHeader.ALGO_AEAD);
+        message.setSenderId("sender-123");
+        message.setRecipientId("recipient-456");
+        message.setTimestampEpochMs(System.currentTimeMillis());
+        message.setTtlSeconds((int) Duration.ofDays(1).toSeconds());
+        message.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+        message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+        message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
+        message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        message.setContentType("text/plain");
+        message.setContentLength(4);
+        message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));
+        message.setE2e(true);
         return message;
     }
 }
-

@@ -24,8 +24,9 @@ public class DefaultMessageReceiver implements MessageReceiver {
     /**
      * Creates a DefaultMessageReceiver with the specified dependencies.
      *
-     * @param keyProvider the key provider (must be UserKeystoreKeyProvider to access keystore)
-     * @param clockProvider the clock provider for deterministic expiry checks
+     * @param keyProvider      the key provider (must be UserKeystoreKeyProvider to
+     *                         access keystore)
+     * @param clockProvider    the clock provider for deterministic expiry checks
      * @param webSocketAdapter the WebSocket adapter for network communication
      * @param localRecipientId the local recipient's ID (must match message
      *                         recipientId)
@@ -97,7 +98,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
             // 4. Check expiry using ClockProvider (before decrypt)
             long now = clockProvider.currentTimeMillis();
-            if (now > encryptedMessage.timestampEpochMs + encryptedMessage.ttlSeconds * 1000L) {
+            if (now > encryptedMessage.getTimestampEpochMs() + encryptedMessage.getTtlSeconds() * 1000L) {
                 if (messageListener != null) {
                     messageListener.onError(new MessageExpiredException("Message expired at " + now));
                 }
@@ -114,8 +115,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
             byte[] plaintext = decryptor.decryptMessage(encryptedMessage);
 
             // 8. Extract senderId, contentType from EncryptedMessage
-            String senderId = encryptedMessage.senderId;
-            String contentType = encryptedMessage.contentType;
+            String senderId = encryptedMessage.getSenderId();
+            String contentType = encryptedMessage.getContentType();
 
             // 9. Deliver to MessageListener
             if (messageListener != null) {

@@ -10,15 +10,15 @@ import java.security.KeyPair;
 import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class MessageEncryptorTest {
+class MessageEncryptorTest {
 
     @Test
-    public void test_encrypt_message() throws Exception {
+    void test_encrypt_message() throws Exception {
         KeyPair keyPair = EccKeyIO.generate();
 
         String senderId = "userA";
         String recipientId = "userB";
-        byte[] payload = "Το μυστικό μήνυμα".getBytes(StandardCharsets.UTF_8);
+        byte[] payload = "The secret message".getBytes(StandardCharsets.UTF_8);
         String contentType = "text/plain";
         long ttlSeconds = 3600;
 
@@ -27,24 +27,24 @@ public class MessageEncryptorTest {
 
         EncryptedMessage encryptedMessage = encryptor.encrypt(payload, contentType, ttlSeconds);
 
-        assertNotNull(encryptedMessage, "EncryptedMessage δεν πρέπει να είναι null");
-        assertEquals(MessageHeader.VERSION, encryptedMessage.version, "Η έκδοση πρέπει να ταιριάζει");
-        assertEquals(senderId, encryptedMessage.senderId, "Το senderId πρέπει να ταιριάζει");
-        assertEquals(recipientId, encryptedMessage.recipientId, "Το recipientId πρέπει να ταιριάζει");
-        assertEquals(1000000L, encryptedMessage.timestampEpochMs, "Το timestamp πρέπει να ταιριάζει με το clock");
-        assertEquals(ttlSeconds, encryptedMessage.ttlSeconds, "Το TTL πρέπει να ταιριάζει");
-        assertEquals(contentType, encryptedMessage.contentType, "Το contentType πρέπει να ταιριάζει");
-        assertEquals(MessageHeader.ALGO_AEAD, encryptedMessage.algorithm, "Το αλγόριθμο πρέπει να ταιριάζει");
-        assertNotNull(encryptedMessage.ivB64, "Το ivB64 δεν πρέπει να είναι null");
-        assertNotNull(encryptedMessage.ephemeralPublicB64, "Το ephemeralPublicB64 δεν πρέπει να είναι null");
-        assertNotNull(encryptedMessage.ciphertextB64, "Το ciphertextB64 δεν πρέπει να είναι null");
-        assertEquals(payload.length, encryptedMessage.contentLength,
-                "Το contentLength πρέπει να ταιριάζει με το μήκος του αρχικού μηνύματος");
-        assertTrue(encryptedMessage.e2e, "Το e2e flag πρέπει να είναι true");
+        assertNotNull(encryptedMessage, "EncryptedMessage should not be null");
+        assertEquals(MessageHeader.VERSION, encryptedMessage.getVersion(), "Version should match");
+        assertEquals(senderId, encryptedMessage.getSenderId(), "senderId should match");
+        assertEquals(recipientId, encryptedMessage.getRecipientId(), "recipientId should match");
+        assertEquals(1000000L, encryptedMessage.getTimestampEpochMs(), "timestamp should match clock");
+        assertEquals(ttlSeconds, encryptedMessage.getTtlSeconds(), "TTL should match");
+        assertEquals(contentType, encryptedMessage.getContentType(), "contentType should match");
+        assertEquals(MessageHeader.ALGO_AEAD, encryptedMessage.getAlgorithm(), "Algorithm should match");
+        assertNotNull(encryptedMessage.getIvB64(), "ivB64 should not be null");
+        assertNotNull(encryptedMessage.getEphemeralPublicB64(), "ephemeralPublicB64 should not be null");
+        assertNotNull(encryptedMessage.getCiphertextB64(), "ciphertextB64 should not be null");
+        assertEquals(payload.length, encryptedMessage.getContentLength(),
+                "contentLength should match the original message length");
+        assertTrue(encryptedMessage.isE2e(), "e2e flag should be true");
     }
 
     @Test
-    public void test_encrypt_rejects_null_payload() {
+    void test_encrypt_rejects_null_payload() {
         KeyPair keyPair = EccKeyIO.generate();
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor encryptor = new MessageEncryptor(keyPair.getPublic(), "sender", "recipient", clock);
@@ -55,7 +55,7 @@ public class MessageEncryptorTest {
     }
 
     @Test
-    public void test_encrypt_rejects_invalid_ttl() {
+    void test_encrypt_rejects_invalid_ttl() {
         KeyPair keyPair = EccKeyIO.generate();
         ClockProvider clock = new FixedClockProvider(1000000L);
         MessageEncryptor encryptor = new MessageEncryptor(keyPair.getPublic(), "sender", "recipient", clock);

@@ -12,10 +12,27 @@ import java.util.List;
  * </p>
  */
 public class UserSearchResponse implements Serializable {
-    public List<UserSearchResult> results;
-    public String error;
+    private List<UserSearchResult> results;
+    private String error;
 
     public UserSearchResponse() {
+        // Required for JSON deserialization
+    }
+
+    public List<UserSearchResult> getResults() {
+        return results;
+    }
+
+    public void setResults(List<UserSearchResult> results) {
+        this.results = results;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
     /**
@@ -23,7 +40,7 @@ public class UserSearchResponse implements Serializable {
      */
     public static UserSearchResponse success(List<UserSearchResult> results) {
         UserSearchResponse r = new UserSearchResponse();
-        r.results = results;
+        r.setResults(results);
         return r;
     }
 
@@ -32,7 +49,7 @@ public class UserSearchResponse implements Serializable {
      */
     public static UserSearchResponse error(String error) {
         UserSearchResponse r = new UserSearchResponse();
-        r.error = error;
+        r.setError(error);
         return r;
     }
 }

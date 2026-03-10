@@ -557,18 +557,20 @@ public class RegisterController {
         }
     }
 
-    private RegisterRequest buildRegistrationRequest(KeyPair registrationKp) throws Exception {
+    private RegisterRequest buildRegistrationRequest(KeyPair registrationKp) {
+        // 1. Prepare Request DTO
         RegisterRequest request = new RegisterRequest();
-        request.fullName = viewModel.getName();
-        request.regNumber = viewModel.getRegNum();
-        request.idNumber = viewModel.getIdNum();
-        request.rank = viewModel.getRank();
-        request.telephone = viewModel.getPhoneNum();
-        request.email = viewModel.getEmail();
-        request.password = viewModel.getPassword();
+        request.setFullName(viewModel.getName());
+        request.setRegNumber(viewModel.getRegNum());
+        request.setIdNumber(viewModel.getIdNum());
+        request.setRank(viewModel.getRank());
+        request.setTelephone(viewModel.getPhoneNum());
+        request.setEmail(viewModel.getEmail());
+        request.setPassword(viewModel.getPassword());
 
-        request.publicKeyPem = EccKeyIO.publicPem(registrationKp.getPublic());
-        request.publicKeyFingerprint = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(registrationKp.getPublic()));
+        request.setPublicKeyPem(EccKeyIO.publicPem(registrationKp.getPublic()));
+        request.setPublicKeyFingerprint(FingerprintUtil.sha256Hex(EccKeyIO.publicDer(registrationKp.getPublic())));
+
         return request;
     }
 
@@ -602,10 +604,10 @@ public class RegisterController {
             File idPhotoFile = viewModel.idPhotoFileProperty().get();
             File selfiePhotoFile = viewModel.selfiePhotoFileProperty().get();
             if (idPhotoFile != null) {
-                request.idPhoto = encryptPhoto(idPhotoFile, adminPublicKey);
+                request.setIdPhoto(encryptPhoto(idPhotoFile, adminPublicKey));
             }
             if (selfiePhotoFile != null) {
-                request.selfiePhoto = encryptPhoto(selfiePhotoFile, adminPublicKey);
+                request.setSelfiePhoto(encryptPhoto(selfiePhotoFile, adminPublicKey));
             }
         }
     }
@@ -625,12 +627,12 @@ public class RegisterController {
         viewModel.loadingProperty().set(false);
         registerButton.setText(originalText);
 
-        if (httpResponse.statusCode() == 201 && response.error == null) {
+        if (httpResponse.statusCode() == 201 && response.getError() == null) {
             saveKeysToKeystore(registrationKp);
             LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
             navigateToLogin();
         } else {
-            String errorMsg = response.error != null ? response.error : "Registration failed.";
+            String errorMsg = response.getError() != null ? response.getError() : "Registration failed.";
             viewModel.setRegistrationError(errorMsg);
         }
     }
@@ -705,12 +707,12 @@ public class RegisterController {
 
         // 5. Build DTO
         EncryptedFileDTO dto = new EncryptedFileDTO();
-        dto.ciphertextB64 = Base64.getEncoder().encodeToString(ct);
-        dto.ivB64 = Base64.getEncoder().encodeToString(iv);
-        dto.tagB64 = Base64.getEncoder().encodeToString(tag);
-        dto.ephemeralPublicB64 = Base64.getEncoder().encodeToString(EccKeyIO.publicDer(ephemeral.getPublic()));
-        dto.contentType = "image/jpeg";
-        dto.originalSize = plaintext.length;
+        dto.setCiphertextB64(Base64.getEncoder().encodeToString(ct));
+        dto.setIvB64(Base64.getEncoder().encodeToString(iv));
+        dto.setTagB64(Base64.getEncoder().encodeToString(tag));
+        dto.setEphemeralPublicB64(Base64.getEncoder().encodeToString(EccKeyIO.publicDer(ephemeral.getPublic())));
+        dto.setContentType("image/jpeg");
+        dto.setOriginalSize(plaintext.length);
         return dto;
     }
 

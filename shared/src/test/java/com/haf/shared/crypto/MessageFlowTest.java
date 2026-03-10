@@ -11,10 +11,10 @@ import java.security.KeyPair;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class MessageFlowTest {
+class MessageFlowTest {
 
     @Test
-    public void test_happy_flow_encrypt_validate_bind_decrypt_ok() throws Exception {
+    void test_happy_flow_encrypt_validate_bind_decrypt_ok() throws Exception {
         KeyPair kp = EccKeyIO.generate();
 
         String localRecipientId = "userB";
@@ -35,7 +35,7 @@ public class MessageFlowTest {
     }
 
     @Test
-    public void test_negative_wrong_aad_decrypt_fails() throws Exception {
+    void test_negative_wrong_aad_decrypt_fails() throws Exception {
         KeyPair kp = EccKeyIO.generate();
 
         String localRecipientId = "userB";
@@ -50,7 +50,7 @@ public class MessageFlowTest {
         MessageValidator.validateRecipientOrThrow(localRecipientId, m);
 
         // Tamper AAD field used in canonical AAD
-        m.ttlSeconds += 1; // This changes the AAD, so decrypt should fail
+        m.setTtlSeconds(m.getTtlSeconds() + 1); // This changes the AAD, so decrypt should fail
 
         MessageDecryptor dec = new MessageDecryptor(kp.getPrivate(), clock);
         assertThrows(Exception.class, () -> dec.decryptMessage(m), "Decrypt must fail with tampered AAD field");

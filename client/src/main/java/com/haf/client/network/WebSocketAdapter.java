@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.haf.client.utils.SslContextUtils;
+import com.haf.shared.exceptions.HttpCommunicationException;
 import com.haf.shared.exceptions.SslConfigurationException;
 
 /**
@@ -163,7 +164,7 @@ public class WebSocketAdapter {
             requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
-            throw new RuntimeException("Failed to construct HTTPS URI", e);
+            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
         }
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -177,8 +178,80 @@ public class WebSocketAdapter {
                     if (response.statusCode() >= 200 && response.statusCode() < 300) {
                         return response.body();
                     } else {
-                        throw new RuntimeException(
-                                "HTTP GET failed with status " + response.statusCode() + ": " + response.body());
+                        throw new HttpCommunicationException(
+                                "HTTP GET failed with status " + response.statusCode() + ": " + response.body(),
+                                response.statusCode(), response.body());
+                    }
+                });
+    }
+
+    /**
+     * Executes an authenticated POST request against the server using the trusting
+     * HttpClient.
+     *
+     * @param path The API path to request
+     * @param body The JSON body to send
+     * @return CompletableFuture containing the response body string
+     */
+    public CompletableFuture<String> postAuthenticated(String path, String body) {
+        URI requestUri = serverUri.resolve(path);
+        try {
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+                    requestUri.getQuery(), requestUri.getFragment());
+        } catch (java.net.URISyntaxException e) {
+            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(requestUri)
+                .header("Authorization", "Bearer " + sessionId)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        return response.body();
+                    } else {
+                        throw new HttpCommunicationException(
+                                "HTTP POST failed with status " + response.statusCode() + ": " + response.body(),
+                                response.statusCode(), response.body());
+                    }
+                });
+    }
+
+    /**
+     * Executes an authenticated DELETE request against the server using the
+     * trusting
+     * HttpClient.
+     *
+     * @param path The API path to request
+     * @return CompletableFuture containing the response body string
+     */
+    public CompletableFuture<String> deleteAuthenticated(String path) {
+        URI requestUri = serverUri.resolve(path);
+        try {
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+                    requestUri.getQuery(), requestUri.getFragment());
+        } catch (java.net.URISyntaxException e) {
+            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(requestUri)
+                .header("Authorization", "Bearer " + sessionId)
+                .DELETE()
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        return response.body();
+                    } else {
+                        throw new HttpCommunicationException(
+                                "HTTP DELETE failed with status " + response.statusCode() + ": " + response.body(),
+                                response.statusCode(), response.body());
                     }
                 });
     }

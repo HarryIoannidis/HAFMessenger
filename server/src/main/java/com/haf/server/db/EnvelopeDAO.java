@@ -114,30 +114,30 @@ public final class EnvelopeDAO {
     public QueuedEnvelope insert(EncryptedMessage message) {
         String envelopeId = UUID.randomUUID().toString();
         long createdAt = System.currentTimeMillis();
-        long expiresAtMillis = message.timestampEpochMs + (message.ttlSeconds * 1000L);
+        long expiresAtMillis = message.getTimestampEpochMs() + (message.getTtlSeconds() * 1000L);
 
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
 
             ps.setString(1, envelopeId);
-            ps.setString(2, message.senderId);
-            ps.setString(3, message.recipientId);
-            ps.setBytes(4, decodeB64("ciphertext", message.ciphertextB64));
-            ps.setBytes(5, decodeB64("wrappedKey", message.ephemeralPublicB64));
-            ps.setBytes(6, decodeB64("iv", message.ivB64));
-            ps.setBytes(7, decodeB64("tag", message.tagB64));
+            ps.setString(2, message.getSenderId());
+            ps.setString(3, message.getRecipientId());
+            ps.setBytes(4, decodeB64("ciphertext", message.getCiphertextB64()));
+            ps.setBytes(5, decodeB64("wrappedKey", message.getEphemeralPublicB64()));
+            ps.setBytes(6, decodeB64("iv", message.getIvB64()));
+            ps.setBytes(7, decodeB64("tag", message.getTagB64()));
             ps.setString(8, computeAadHash(message));
-            ps.setString(9, message.contentType);
-            ps.setLong(10, message.contentLength);
-            ps.setLong(11, message.timestampEpochMs);
-            ps.setLong(12, message.ttlSeconds);
+            ps.setString(9, message.getContentType());
+            ps.setLong(10, message.getContentLength());
+            ps.setLong(11, message.getTimestampEpochMs());
+            ps.setLong(12, message.getTtlSeconds());
             ps.setTimestamp(13, new Timestamp(expiresAtMillis));
 
             ps.executeUpdate();
 
             return new QueuedEnvelope(envelopeId, message, createdAt, expiresAtMillis);
         } catch (SQLException ex) {
-            auditLogger.logError("db_insert_envelope", null, message.senderId, ex);
+            auditLogger.logError("db_insert_envelope", null, message.getSenderId(), ex);
 
             throw new DatabaseOperationException("Failed to store envelope", ex);
         }
@@ -277,14 +277,14 @@ public final class EnvelopeDAO {
      */
     private String computeAadHash(EncryptedMessage message) {
         String aad = String.join("|",
-                message.version,
-                message.algorithm,
-                message.senderId,
-                message.recipientId,
-                String.valueOf(message.timestampEpochMs),
-                String.valueOf(message.ttlSeconds),
-                message.contentType,
-                String.valueOf(message.contentLength));
+                message.getVersion(),
+                message.getAlgorithm(),
+                message.getSenderId(),
+                message.getRecipientId(),
+                String.valueOf(message.getTimestampEpochMs()),
+                String.valueOf(message.getTtlSeconds()),
+                message.getContentType(),
+                String.valueOf(message.getContentLength()));
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
@@ -318,18 +318,18 @@ public final class EnvelopeDAO {
      */
     private EncryptedMessage hydrateMessage(ResultSet rs) throws SQLException {
         EncryptedMessage message = new EncryptedMessage();
-        message.version = MessageHeader.VERSION;
-        message.algorithm = MessageHeader.ALGO_AEAD;
-        message.senderId = rs.getString("sender_id");
-        message.recipientId = rs.getString("recipient_id");
-        message.ciphertextB64 = encoder.encodeToString(rs.getBytes("encrypted_payload"));
-        message.ephemeralPublicB64 = encoder.encodeToString(rs.getBytes("wrapped_key"));
-        message.ivB64 = encoder.encodeToString(rs.getBytes("iv"));
-        message.tagB64 = encoder.encodeToString(rs.getBytes("auth_tag"));
-        message.contentType = rs.getString("content_type");
-        message.contentLength = rs.getLong("content_length");
-        message.timestampEpochMs = rs.getLong("timestamp");
-        message.ttlSeconds = rs.getLong("ttl");
+        message.setVersion(MessageHeader.VERSION);
+        message.setAlgorithm(MessageHeader.ALGO_AEAD);
+        message.setSenderId(rs.getString("sender_id"));
+        message.setRecipientId(rs.getString("recipient_id"));
+        message.setCiphertextB64(encoder.encodeToString(rs.getBytes("encrypted_payload")));
+        message.setEphemeralPublicB64(encoder.encodeToString(rs.getBytes("wrapped_key")));
+        message.setIvB64(encoder.encodeToString(rs.getBytes("iv")));
+        message.setTagB64(encoder.encodeToString(rs.getBytes("auth_tag")));
+        message.setContentType(rs.getString("content_type"));
+        message.setContentLength(rs.getLong("content_length"));
+        message.setTimestampEpochMs(rs.getLong("timestamp"));
+        message.setTtlSeconds(rs.getLong("ttl"));
         return message;
     }
 }

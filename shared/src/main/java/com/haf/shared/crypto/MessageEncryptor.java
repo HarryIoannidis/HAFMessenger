@@ -73,17 +73,17 @@ public class MessageEncryptor {
         byte[] ephemeralPublicDer = com.haf.shared.utils.EccKeyIO.publicDer(ephemeralPair.getPublic());
 
         EncryptedMessage m = new EncryptedMessage();
-        m.version = MessageHeader.VERSION;
-        m.algorithm = MessageHeader.ALGO_AEAD;
-        m.senderId = senderId;
-        m.recipientId = recipientId;
-        m.timestampEpochMs = clockProvider.currentTimeMillis();
-        m.ttlSeconds = ttlSeconds;
-        m.contentType = contentType;
-        m.contentLength = payload.length;
+        m.setVersion(MessageHeader.VERSION);
+        m.setAlgorithm(MessageHeader.ALGO_AEAD);
+        m.setSenderId(senderId);
+        m.setRecipientId(recipientId);
+        m.setTimestampEpochMs(clockProvider.currentTimeMillis());
+        m.setTtlSeconds(ttlSeconds);
+        m.setContentType(contentType);
+        m.setContentLength(payload.length);
 
-        m.ivB64 = Base64.getEncoder().encodeToString(iv);
-        m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(ephemeralPublicDer);
+        m.setIvB64(Base64.getEncoder().encodeToString(iv));
+        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(ephemeralPublicDer));
 
         // Build AAD before encryption (AAD is built from DTO fields)
         byte[] aad = AadCodec.buildAAD(m);
@@ -102,9 +102,9 @@ public class MessageEncryptor {
         byte[] ct = java.util.Arrays.copyOfRange(combined, 0, ctLen);
         byte[] tag = java.util.Arrays.copyOfRange(combined, ctLen, combined.length);
 
-        m.ciphertextB64 = Base64.getEncoder().encodeToString(ct);
-        m.tagB64 = Base64.getEncoder().encodeToString(tag);
-        m.e2e = true;
+        m.setCiphertextB64(Base64.getEncoder().encodeToString(ct));
+        m.setTagB64(Base64.getEncoder().encodeToString(tag));
+        m.setE2e(true);
 
         return m;
     }

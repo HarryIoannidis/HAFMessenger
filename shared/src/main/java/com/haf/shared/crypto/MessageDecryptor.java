@@ -44,15 +44,15 @@ public class MessageDecryptor {
 
         // Check expiry using ClockProvider
         long now = clockProvider.currentTimeMillis();
-        if (now > m.timestampEpochMs + m.ttlSeconds * 1000L) {
+        if (now > m.getTimestampEpochMs() + m.getTtlSeconds() * 1000L) {
             throw new MessageExpiredException("Message expired at " + now +
-                    ", message timestamp: " + m.timestampEpochMs + ", TTL: " + m.ttlSeconds + " seconds");
+                    ", message timestamp: " + m.getTimestampEpochMs() + ", TTL: " + m.getTtlSeconds() + " seconds");
         }
 
-        byte[] ephemeralPublicDer = Base64.getDecoder().decode(m.ephemeralPublicB64);
-        byte[] iv = Base64.getDecoder().decode(m.ivB64);
-        byte[] ct = Base64.getDecoder().decode(m.ciphertextB64);
-        byte[] tag = Base64.getDecoder().decode(m.tagB64);
+        byte[] ephemeralPublicDer = Base64.getDecoder().decode(m.getEphemeralPublicB64());
+        byte[] iv = Base64.getDecoder().decode(m.getIvB64());
+        byte[] ct = Base64.getDecoder().decode(m.getCiphertextB64());
+        byte[] tag = Base64.getDecoder().decode(m.getTagB64());
 
         byte[] combined = new byte[ct.length + tag.length];
         System.arraycopy(ct, 0, combined, 0, ct.length);

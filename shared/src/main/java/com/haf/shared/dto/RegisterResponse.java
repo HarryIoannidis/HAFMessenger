@@ -9,12 +9,45 @@ import java.io.Serializable;
  * On failure: {@code error} contains the reason and {@code userId} is null.
  */
 public class RegisterResponse implements Serializable {
-    public String userId;
-    public String status;
-    public String message;
-    public String error;
+    private String userId;
+    private String status;
+    private String message;
+    private String error;
 
     public RegisterResponse() {
+        // Required for JSON deserialization
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
     /**
@@ -22,9 +55,9 @@ public class RegisterResponse implements Serializable {
      */
     public static RegisterResponse success(String userId) {
         RegisterResponse r = new RegisterResponse();
-        r.userId = userId;
-        r.status = "PENDING";
-        r.message = "Registration submitted successfully. Awaiting approval.";
+        r.setUserId(userId);
+        r.setStatus("PENDING");
+        r.setMessage("Registration submitted successfully. Awaiting approval.");
         return r;
     }
 
@@ -33,7 +66,7 @@ public class RegisterResponse implements Serializable {
      */
     public static RegisterResponse error(String error) {
         RegisterResponse r = new RegisterResponse();
-        r.error = error;
+        r.setError(error);
         return r;
     }
 }

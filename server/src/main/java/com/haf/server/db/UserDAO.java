@@ -89,22 +89,22 @@ public final class UserDAO {
                 PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
 
             ps.setString(1, userId);
-            ps.setString(2, request.email); // username = email
-            ps.setString(3, request.email);
+            ps.setString(2, request.getEmail()); // username = email
+            ps.setString(3, request.getEmail());
             ps.setString(4, hashedPassword);
-            ps.setString(5, request.rank);
-            ps.setString(6, request.regNumber);
-            ps.setString(7, request.idNumber);
-            ps.setString(8, request.fullName);
-            ps.setString(9, request.telephone);
-            ps.setString(10, request.publicKeyFingerprint);
-            ps.setString(11, request.publicKeyPem);
+            ps.setString(5, request.getRank());
+            ps.setString(6, request.getRegNumber());
+            ps.setString(7, request.getIdNumber());
+            ps.setString(8, request.getFullName());
+            ps.setString(9, request.getTelephone());
+            ps.setString(10, request.getPublicKeyFingerprint());
+            ps.setString(11, request.getPublicKeyPem());
 
             ps.executeUpdate();
 
             return userId;
         } catch (SQLException ex) {
-            auditLogger.logError("db_insert_user", null, request.email, ex);
+            auditLogger.logError("db_insert_user", null, request.getEmail(), ex);
 
             throw new DatabaseOperationException("Failed to register user", ex);
         }

@@ -58,9 +58,9 @@ class UserDAOTest {
         assertNotNull(userId);
         assertFalse(userId.isBlank());
         verify(insertStatement, times(1)).executeUpdate();
-        verify(insertStatement).setString(3, request.email); // email
+        verify(insertStatement).setString(3, request.getEmail()); // email
         verify(insertStatement).setString(4, "$2a$12$hashedPasswordValue"); // password_hash
-        verify(insertStatement).setString(8, request.fullName); // full_name
+        verify(insertStatement).setString(8, request.getFullName()); // full_name
     }
 
     @Test
@@ -71,7 +71,7 @@ class UserDAOTest {
         when(insertStatement.executeUpdate()).thenThrow(new SQLException("Duplicate entry"));
 
         assertThrows(DatabaseOperationException.class, () -> dao.insert(request, "hashedPass"));
-        verify(auditLogger, times(1)).logError(eq("db_insert_user"), isNull(), eq(request.email), any());
+        verify(auditLogger, times(1)).logError(eq("db_insert_user"), isNull(), eq(request.getEmail()), any());
     }
 
     @Test
@@ -127,14 +127,14 @@ class UserDAOTest {
         when(resultSet.getString("rank")).thenReturn("Σμηναγός");
         when(resultSet.getString("status")).thenReturn("APPROVED");
 
-        UserDAO.UserRecord record = dao.findByEmail("john@haf.gr");
+        UserDAO.UserRecord userRecord = dao.findByEmail("john@haf.gr");
 
-        assertNotNull(record);
-        assertEquals("uid-123", record.userId());
-        assertEquals("$2a$12$hash", record.passwordHash());
-        assertEquals("John Doe", record.fullName());
-        assertEquals("Σμηναγός", record.rank());
-        assertEquals("APPROVED", record.status());
+        assertNotNull(userRecord);
+        assertEquals("uid-123", userRecord.userId());
+        assertEquals("$2a$12$hash", userRecord.passwordHash());
+        assertEquals("John Doe", userRecord.fullName());
+        assertEquals("Σμηναγός", userRecord.rank());
+        assertEquals("APPROVED", userRecord.status());
     }
 
     @Test
@@ -208,15 +208,15 @@ class UserDAOTest {
 
     private RegisterRequest createValidRequest() {
         RegisterRequest request = new RegisterRequest();
-        request.fullName = "John Doe";
-        request.regNumber = "REG-001";
-        request.idNumber = "ID-12345";
-        request.rank = "Σμηναγός";
-        request.telephone = "6912345678";
-        request.email = "john.doe@haf.gr";
-        request.password = "SecurePass123!";
-        request.publicKeyPem = "-----BEGIN PUBLIC KEY-----\nMIIBIjAN...test\n-----END PUBLIC KEY-----";
-        request.publicKeyFingerprint = "abc123fingerprint";
+        request.setFullName("John Doe");
+        request.setRegNumber("REG-001");
+        request.setIdNumber("ID-12345");
+        request.setRank("Σμηναγός");
+        request.setTelephone("6912345678");
+        request.setEmail("john.doe@haf.gr");
+        request.setPassword("SecurePass123!");
+        request.setPublicKeyPem("-----BEGIN PUBLIC KEY-----\nMIIBIjAN...test\n-----END PUBLIC KEY-----");
+        request.setPublicKeyFingerprint("abc123fingerprint");
         return request;
     }
 }

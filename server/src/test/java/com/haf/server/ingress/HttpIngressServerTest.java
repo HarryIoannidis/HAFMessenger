@@ -1,6 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.ContactDAO;
 import com.haf.server.db.FileUploadDAO;
 import com.haf.server.db.SessionDAO;
 import com.haf.server.db.UserDAO;
@@ -50,6 +51,9 @@ class HttpIngressServerTest {
     @Mock
     private FileUploadDAO fileUploadDAO;
 
+    @Mock
+    private ContactDAO contactDAO;
+
     @BeforeEach
     void setUp() throws Exception {
         metricsRegistry = new MetricsRegistry();
@@ -61,7 +65,7 @@ class HttpIngressServerTest {
 
         server = new HttpIngressServer(
                 config, sslContext, mailboxRouter, rateLimiterService,
-                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO);
+                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO, contactDAO);
     }
 
     @Test

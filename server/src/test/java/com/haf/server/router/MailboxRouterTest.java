@@ -65,7 +65,7 @@ class MailboxRouterTest {
         when(envelopeDAO.insert(message)).thenReturn(envelope);
 
         MailboxRouter.MailboxSubscriber subscriber = mock(MailboxRouter.MailboxSubscriber.class);
-        router.subscribe(message.recipientId, subscriber);
+        router.subscribe(message.getRecipientId(), subscriber);
 
         router.ingress(message);
 
@@ -187,7 +187,7 @@ class MailboxRouterTest {
 
         // Verify subscriber is not called after unsubscription
         EncryptedMessage message = createValidMessage();
-        message.recipientId = recipientId;
+        message.setRecipientId(recipientId);
         QueuedEnvelope envelope = new QueuedEnvelope(
                 "envelope-1", message, System.currentTimeMillis(), System.currentTimeMillis() + 3600000);
         when(envelopeDAO.insert(message)).thenReturn(envelope);
@@ -238,20 +238,20 @@ class MailboxRouterTest {
 
     private EncryptedMessage createValidMessage() {
         EncryptedMessage message = new EncryptedMessage();
-        message.version = MessageHeader.VERSION;
-        message.algorithm = MessageHeader.ALGO_AEAD;
-        message.senderId = "sender-123";
-        message.recipientId = "recipient-456";
-        message.timestampEpochMs = System.currentTimeMillis();
-        message.ttlSeconds = (int) Duration.ofDays(1).toSeconds();
-        message.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-        message.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-        message.ciphertextB64 = Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8));
-        message.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-        message.contentType = "text/plain";
-        message.contentLength = 4;
-        message.aadB64 = Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8));
-        message.e2e = true;
+        message.setVersion(MessageHeader.VERSION);
+        message.setAlgorithm(MessageHeader.ALGO_AEAD);
+        message.setSenderId("sender-123");
+        message.setRecipientId("recipient-456");
+        message.setTimestampEpochMs(System.currentTimeMillis());
+        message.setTtlSeconds((int) Duration.ofDays(1).toSeconds());
+        message.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+        message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+        message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
+        message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        message.setContentType("text/plain");
+        message.setContentLength(4);
+        message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));
+        message.setE2e(true);
         return message;
     }
 }

@@ -15,61 +15,63 @@ class JsonCodecTest {
   @Test
   void dto_roundtrip_ok() {
     EncryptedMessage m = new EncryptedMessage();
-    m.version = "1";
-    m.senderId = "A10";
-    m.recipientId = "B10";
-    m.timestampEpochMs = System.currentTimeMillis();
-    m.ttlSeconds = 86400;
-    m.algorithm = "AES-256-GCM+RSA-OAEP";
-    m.ivB64 = Base64.getEncoder().encodeToString(new byte[12]);
-    m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-    m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
-    m.tagB64 = Base64.getEncoder().encodeToString(new byte[16]);
-    m.contentType = "text/plain";
-    m.contentLength = 1;
-    m.aadB64 = Base64.getEncoder().encodeToString("header-metadata".getBytes(StandardCharsets.UTF_8)); // AAD should not
-                                                                                                       // be serialized
-    m.e2e = true;
+    m.setVersion("1");
+    m.setSenderId("A10");
+    m.setRecipientId("B10");
+    m.setTimestampEpochMs(System.currentTimeMillis());
+    m.setTtlSeconds(86400);
+    m.setAlgorithm("AES-256-GCM+RSA-OAEP");
+    m.setIvB64(Base64.getEncoder().encodeToString(new byte[12]));
+    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+    m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
+    m.setTagB64(Base64.getEncoder().encodeToString(new byte[16]));
+    m.setContentType("text/plain");
+    m.setContentLength(1);
+    m.setAadB64(Base64.getEncoder().encodeToString("header-metadata".getBytes(StandardCharsets.UTF_8))); // AAD should
+                                                                                                         // not
+    // be serialized
+    m.setE2e(true);
 
     String json = JsonCodec.toJson(m);
     assertFalse(json.contains("\"aadB64\""), "AAD must NOT be serialized");
 
     EncryptedMessage back = JsonCodec.fromJson(json, EncryptedMessage.class);
 
-    assertEquals(m.version, back.version);
-    assertEquals(m.senderId, back.senderId);
-    assertEquals(m.recipientId, back.recipientId);
-    assertEquals(m.algorithm, back.algorithm);
-    assertEquals(m.ivB64, back.ivB64);
-    assertEquals(m.ephemeralPublicB64, back.ephemeralPublicB64);
-    assertEquals(m.ciphertextB64, back.ciphertextB64);
-    assertEquals(m.tagB64, back.tagB64);
-    assertEquals(m.contentType, back.contentType);
-    assertEquals(m.contentLength, back.contentLength);
-    assertEquals(m.e2e, back.e2e);
+    assertEquals(m.getVersion(), back.getVersion());
+    assertEquals(m.getSenderId(), back.getSenderId());
+    assertEquals(m.getRecipientId(), back.getRecipientId());
+    assertEquals(m.getAlgorithm(), back.getAlgorithm());
+    assertEquals(m.getIvB64(), back.getIvB64());
+    assertEquals(m.getEphemeralPublicB64(), back.getEphemeralPublicB64());
+    assertEquals(m.getCiphertextB64(), back.getCiphertextB64());
+    assertEquals(m.getTagB64(), back.getTagB64());
+    assertEquals(m.getContentType(), back.getContentType());
+    assertEquals(m.getContentLength(), back.getContentLength());
+    assertEquals(m.isE2e(), back.isE2e());
 
-    assertEquals(12, Base64.getDecoder().decode(back.ivB64).length);
-    assertEquals(16, Base64.getDecoder().decode(back.tagB64).length);
+    assertEquals(12, Base64.getDecoder().decode(back.getIvB64()).length);
+    assertEquals(16, Base64.getDecoder().decode(back.getTagB64()).length);
   }
 
   @Test
   void dto_roundtrip_then_validate_ok() {
     EncryptedMessage m = new EncryptedMessage();
-    m.version = MessageHeader.VERSION;
-    m.senderId = "A12";
-    m.recipientId = "B34";
-    m.timestampEpochMs = System.currentTimeMillis();
-    m.ttlSeconds = 600;
-    m.algorithm = MessageHeader.ALGO_AEAD;
-    m.ivB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]);
-    m.ephemeralPublicB64 = Base64.getEncoder().encodeToString(new byte[256]);
-    m.ciphertextB64 = Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8));
-    m.tagB64 = Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]);
-    m.contentType = "application/pdf";
-    m.contentLength = 1;
-    m.aadB64 = Base64.getEncoder().encodeToString("header-metadata".getBytes(StandardCharsets.UTF_8)); // AAD should not
-                                                                                                       // be serialized
-    m.e2e = true;
+    m.setVersion(MessageHeader.VERSION);
+    m.setSenderId("A12");
+    m.setRecipientId("B34");
+    m.setTimestampEpochMs(System.currentTimeMillis());
+    m.setTtlSeconds(600);
+    m.setAlgorithm(MessageHeader.ALGO_AEAD);
+    m.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
+    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+    m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
+    m.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+    m.setContentType("application/pdf");
+    m.setContentLength(1);
+    m.setAadB64(Base64.getEncoder().encodeToString("header-metadata".getBytes(StandardCharsets.UTF_8))); // AAD should
+                                                                                                         // not
+    // be serialized
+    m.setE2e(true);
 
     String json = JsonCodec.toJson(m);
     EncryptedMessage back = JsonCodec.fromJson(json, EncryptedMessage.class);
@@ -114,7 +116,7 @@ class JsonCodecTest {
     var meta = new com.haf.shared.dto.KeyMetadata(
         "key-2025Q4",
         "RSA-3072",
-        "ABCD1234EF...FA", // 64-hex στην πράξη
+        "ABCD1234EF...FA", // 64-hex in practice
         "Primary-key-2025Q4",
         1_730_000_000L,
         "CURRENT");
