@@ -8,7 +8,7 @@ class MessageHeaderTest {
     @Test
     void version_and_algo_are_expected() {
         assertEquals("1", MessageHeader.VERSION, "VERSION mismatch");
-        assertEquals("AES-256-GCM+RSA-OAEP", MessageHeader.ALGO_AEAD, "ALGO_AEAD mismatch");
+        assertEquals("AES-256-GCM+X25519", MessageHeader.ALGO_AEAD, "ALGO_AEAD mismatch");
     }
 
     @Test

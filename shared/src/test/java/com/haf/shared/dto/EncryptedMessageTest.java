@@ -22,9 +22,9 @@ class EncryptedMessageTest {
         m.setVersion("1");
         m.setSenderId("A10");
         m.setRecipientId("B10");
-        m.setAlgorithm("AES-256-GCM+RSA-OAEP");
+        m.setAlgorithm("AES-256-GCM+X25519");
         m.setIvB64(Base64.getEncoder().encodeToString(new byte[12])); // 12B IV
-        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256])); // simulate RSA-2048 wrapped key
+        m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[32])); // X25519 public key (32 bytes)
         m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
         m.setTagB64(Base64.getEncoder().encodeToString(new byte[16])); // 16B tag
         m.setTimestampEpochMs(1);

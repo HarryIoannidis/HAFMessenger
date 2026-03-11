@@ -11,7 +11,7 @@
 - `String recipientId`: recipient ID.
 - `long timestampEpochMs`: Unix timestamp in ms.
 - `long ttlSeconds`: TTL (60-86400).
-- `String algorithm`: `"AES-256-GCM+RSA-OAEP"` (legacy wire string).
+- `String algorithm`: `"AES-256-GCM+X25519"`.
 - `String ivB64`: IV (12 bytes) in Base64.
 - `String ephemeralPublicB64`: sender's ephemeral X25519 public key (DER) in Base64.
 - `String ciphertextB64`: encrypted payload in Base64.

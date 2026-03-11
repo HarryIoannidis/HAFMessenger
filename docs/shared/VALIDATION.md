@@ -5,7 +5,7 @@
 
 ### Field rules
 - version: equal to MessageHeader.VERSION, otherwise reject.
-- algorithm: must equal `MessageHeader.ALGO_AEAD` (legacy string `"AES-256-GCM+RSA-OAEP"`), otherwise reject.
+- algorithm: must equal `MessageHeader.ALGO_AEAD` (`"AES-256-GCM+X25519"`), otherwise reject.
 - senderId/recipientId: non-space, within character policy.
 - timestampEpochMs: > 0.
 - ttlSeconds: within [MIN_TTL_SECONDS, MAX_TTL_SECONDS].

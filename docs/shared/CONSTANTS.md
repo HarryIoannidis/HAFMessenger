@@ -31,7 +31,7 @@
 
 ### Protocol
 - `VERSION = "1"`.
-- `ALGO_AEAD = "AES-256-GCM+RSA-OAEP"` (legacy string kept for wire compatibility).
+- `ALGO_AEAD = "AES-256-GCM+X25519"`.
 
 ### AEAD sizes
 - `IV_BYTES = 12` (from `CryptoConstants.GCM_IV_BYTES`).

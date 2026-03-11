@@ -9,7 +9,7 @@ import java.util.Base64;
 import javax.crypto.SecretKey;
 
 /**
- * Encrypts messages for transmission using AES-256-GCM and RSA-OAEP key
+ * Encrypts messages for transmission using AES-256-GCM and X25519 (ECDH) key
  * wrapping.
  */
 public class MessageEncryptor {
@@ -19,9 +19,9 @@ public class MessageEncryptor {
     private final ClockProvider clockProvider;
 
     /**
-     * Creates a MessageEncryptor with RSA public key of recipient and metadata.
+     * Creates a MessageEncryptor with ECC public key of recipient and metadata.
      *
-     * @param recipientPublicKey the recipient's public RSA key
+     * @param recipientPublicKey the recipient's public X25519 key
      * @param senderId           the sender's ID
      * @param recipientId        the recipient's ID
      * @param clockProvider      the clock provider for deterministic timestamps

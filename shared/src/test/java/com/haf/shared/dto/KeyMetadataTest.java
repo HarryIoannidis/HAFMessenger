@@ -16,7 +16,7 @@ class KeyMetadataTest {
     void jsonRoundTrip_strict_ok() throws Exception {
         KeyMetadata meta = new KeyMetadata(
                 "c9b1d7a2-5d7d-4f61-8a4e-0a2b1f9e1c33",
-                "RSA-3072",
+                "X25519",
                 "4F8C1E3A2B...AB79",
                 "Primary-2025Q4",
                 1762108800L,
@@ -39,7 +39,7 @@ class KeyMetadataTest {
         String jsonWithUnknown = """
         {
           "keyId": "id-1",
-          "algorithm": "RSA-2048",
+          "algorithm": "X25519",
           "fingerprint": "ABCDEF",
           "label": "L1",
           "createdAtEpochSec": 1700000000,
@@ -54,7 +54,7 @@ class KeyMetadataTest {
     @Test
     void validatesStatusValues() {
         for (String s : new String[]{"CURRENT","PREVIOUS","REVOKED"}) {
-            KeyMetadata m = new KeyMetadata("id","RSA-2048","FF","L",1700L,s);
+            KeyMetadata m = new KeyMetadata("id","X25519","FF","L",1700L,s);
             assertNotNull(m);
         }
     }
