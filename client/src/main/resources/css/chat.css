@@ -106,7 +106,7 @@
 .plain-text-chat {
     -fx-fill: #2b2b2b;
     -fx-text-alignment: center;
-    -fx-font-size: 17px;
+    -fx-font-size: 15px;
     -fx-font-family: 'Manrope', sans-serif;
     -fx-font-smoothing-type: gray;
 }
@@ -114,7 +114,7 @@
 .plain-text-subtitle-chat {
     -fx-fill: #2b2b2b;
     -fx-text-alignment: center;
-    -fx-font-size: 15px;
+    -fx-font-size: 14px;
     -fx-font-family: 'Manrope', sans-serif;
     -fx-font-smoothing-type: gray;
 }

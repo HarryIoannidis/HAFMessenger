@@ -54,6 +54,19 @@ class MessageSenderTest {
         }
 
         @Override
+        public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
+            if ("/api/v1/messages".equals(path)) {
+                try {
+                    sendText(jsonBody);
+                    return java.util.concurrent.CompletableFuture.completedFuture("{\"success\":true}");
+                } catch (IOException e) {
+                    return java.util.concurrent.CompletableFuture.failedFuture(e);
+                }
+            }
+            return super.postAuthenticated(path, jsonBody);
+        }
+
+        @Override
         public void sendText(String message) throws IOException {
             if (!connected) {
                 throw new IOException("Not connected");

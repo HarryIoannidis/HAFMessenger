@@ -5,10 +5,10 @@ import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.keystore.KeystoreBootstrap;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.exceptions.KeyNotFoundException;
-import com.haf.shared.exceptions.KeystoreOperationException;
 import java.nio.file.Path;
 import java.security.PublicKey;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * KeyProvider implementation that uses UserKeystore for key management.
@@ -23,7 +23,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     private final UserKeystore keyStore;
     private final String senderId;
     private final char[] passphrase;
-    private java.util.function.Function<String, String> directoryServiceFetcher;
+    private UnaryOperator<String> directoryServiceFetcher;
 
     /**
      * Creates a UserKeystoreKeyProvider with the specified keystore root and
@@ -33,12 +33,10 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * @param passphrase   the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
      */
-    public UserKeystoreKeyProvider(Path keystoreRoot, char[] passphrase) throws Exception {
+    public UserKeystoreKeyProvider(Path keystoreRoot, String senderId, char[] passphrase) throws Exception {
         this.keyStore = new UserKeystore(keystoreRoot);
+        this.senderId = senderId;
         this.passphrase = passphrase != null ? passphrase.clone() : null;
-
-        // Derive sender ID from the oldest CURRENT key directory name
-        this.senderId = deriveSenderId();
     }
 
     /**
@@ -47,8 +45,8 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * @param passphrase the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
      */
-    public UserKeystoreKeyProvider(char[] passphrase) throws Exception {
-        this(KeystoreBootstrap.run(), passphrase);
+    public UserKeystoreKeyProvider(String senderId, char[] passphrase) throws Exception {
+        this(KeystoreBootstrap.run(senderId), senderId, passphrase);
     }
 
     /**
@@ -57,17 +55,6 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * @return the sender ID (currently the keyId)
      * @throws Exception if keystore is invalid or empty
      */
-    private String deriveSenderId() throws Exception {
-        // Prefer the oldest CURRENT key directory as the local identity.
-        // This avoids accidentally selecting a newly imported contact key that may also
-        // be marked CURRENT.
-        try {
-            java.nio.file.Path dir = keyStore.selectOldestKeyDirPreferCurrent();
-            return dir.getFileName().toString();
-        } catch (Exception e) {
-            throw new KeystoreOperationException("Failed to derive sender ID from keystore", e);
-        }
-    }
 
     /**
      * Sets a callback to fetch public keys from a directory service (e.g., the
@@ -77,7 +64,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      *
      * @param fetcher the function to fetch the public key
      */
-    public void setDirectoryServiceFetcher(java.util.function.Function<String, String> fetcher) {
+    public void setDirectoryServiceFetcher(UnaryOperator<String> fetcher) {
         this.directoryServiceFetcher = fetcher;
     }
 
@@ -99,14 +86,9 @@ public class UserKeystoreKeyProvider implements KeyProvider {
 
             // Key not found in local keystore
             if (directoryServiceFetcher != null) {
-                try {
-                    String pem = directoryServiceFetcher.apply(recipientId);
-                    if (pem != null) {
-                        return com.haf.shared.utils.EccKeyIO.publicFromPem(pem);
-                    }
-                } catch (Exception fetchEx) {
-                    throw new KeyNotFoundException(
-                            "Failed to fetch public key from directory service for recipient: " + recipientId, fetchEx);
+                PublicKey key = fetchPublicKeyFromDirectoryService(recipientId);
+                if (key != null) {
+                    return key;
                 }
             }
 
@@ -124,6 +106,19 @@ public class UserKeystoreKeyProvider implements KeyProvider {
             return keyStore.loadPublicKeyByKeyId(recipientId);
         } catch (Exception e) {
             throw new KeyNotFoundException("Failed to load public key for recipient: " + recipientId, e);
+        }
+    }
+
+    private PublicKey fetchPublicKeyFromDirectoryService(String recipientId) throws KeyNotFoundException {
+        try {
+            String pem = directoryServiceFetcher.apply(recipientId);
+            if (pem != null) {
+                return com.haf.shared.utils.EccKeyIO.publicFromPem(pem);
+            }
+            return null; // Or throw if pem is expected to be non-null when fetcher is present
+        } catch (Exception fetchEx) {
+            throw new KeyNotFoundException(
+                    "Failed to fetch public key from directory service for recipient: " + recipientId, fetchEx);
         }
     }
 

@@ -628,7 +628,7 @@ public class RegisterController {
         registerButton.setText(originalText);
 
         if ((httpResponse.statusCode() == 200 || httpResponse.statusCode() == 201) && response.getError() == null) {
-            saveKeysToKeystore(registrationKp);
+            saveKeysToKeystore(registrationKp, response.getUserId());
             LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
             navigateToLogin();
         } else {
@@ -637,9 +637,9 @@ public class RegisterController {
         }
     }
 
-    private void saveKeysToKeystore(KeyPair registrationKp) {
+    private void saveKeysToKeystore(KeyPair registrationKp, String userId) {
         try {
-            Path root = getOrCreateKeystoreRoot();
+            Path root = getOrCreateKeystoreRoot(userId);
 
             UserKeystore keystore = new UserKeystore(root);
             String keyId = UserKeystore.todayKeyId();
@@ -649,13 +649,13 @@ public class RegisterController {
         }
     }
 
-    private Path getOrCreateKeystoreRoot() throws Exception {
+    private Path getOrCreateKeystoreRoot(String userId) throws Exception {
         try {
-            Path root = KeystoreRoot.preferred();
+            Path root = KeystoreRoot.preferred(userId);
             FilePerms.ensureDir700(root);
             return root;
         } catch (Exception e) {
-            Path root = KeystoreRoot.userFallback();
+            Path root = KeystoreRoot.userFallback(userId);
             FilePerms.ensureDir700(root);
             return root;
         }

@@ -32,8 +32,9 @@ public interface MessageReceiver {
          * @param plaintext the decrypted message bytes
          * @param senderId the sender's identifier
          * @param contentType the MIME content type of the message
+         * @param timestampEpochMs the original sent timestamp in milliseconds
          */
-        void onMessage(byte[] plaintext, String senderId, String contentType);
+        void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs);
 
         /**
          * Called when an error occurs during message processing.

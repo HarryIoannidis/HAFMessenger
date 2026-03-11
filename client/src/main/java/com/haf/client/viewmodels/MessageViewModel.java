@@ -10,12 +10,15 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * ViewModel for the chat screen.
@@ -30,7 +33,9 @@ public class MessageViewModel {
     private final MessageReceiver messageReceiver;
 
     private final StringProperty status = new SimpleStringProperty("Ready");
-    private final ObservableList<MessageVM> messages = FXCollections.observableArrayList();
+
+    // Store messages by contact ID (sender or recipient)
+    private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
 
     /**
      * Creates a MessageViewModel.
@@ -44,10 +49,10 @@ public class MessageViewModel {
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType) {
-                MessageVM vm = decodeIncoming(plaintext, senderId, contentType);
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+                MessageVM vm = decodeIncoming(plaintext, senderId, contentType, timestampEpochMs);
                 Platform.runLater(() -> {
-                    messages.add(vm);
+                    getMessages(senderId).add(vm);
                     status.set("Message received from " + senderId);
                 });
             }
@@ -60,10 +65,6 @@ public class MessageViewModel {
             }
         });
     }
-
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
 
     /**
      * Sends a plain-text message and immediately adds it to the local list
@@ -79,10 +80,11 @@ public class MessageViewModel {
 
             MessageVM vm = MessageVM.outgoingText(text, LocalDateTime.now());
             Platform.runLater(() -> {
-                messages.add(vm);
+                getMessages(recipientId).add(vm);
                 status.set("Message sent to " + recipientId);
             });
         } catch (Exception e) {
+            e.printStackTrace();
             Platform.runLater(() -> status.set("Failed to send: " + e.getMessage()));
         }
     }
@@ -108,13 +110,15 @@ public class MessageViewModel {
     }
 
     /**
-     * Observable list of chat messages, ordered oldest-first.
+     * Observable list of chat messages for a specific contact, ordered
+     * oldest-first.
      * Bind the chat scroll-pane directly to this list.
      *
+     * @param contactId the contact's identifier
      * @return the observable message list
      */
-    public ObservableList<MessageVM> getMessages() {
-        return messages;
+    public ObservableList<MessageVM> getMessages(String contactId) {
+        return messagesByContact.computeIfAbsent(contactId, k -> FXCollections.observableArrayList());
     }
 
     /**
@@ -126,16 +130,15 @@ public class MessageViewModel {
         return status;
     }
 
-    // -------------------------------------------------------------------------
-    // Internal helpers
-    // -------------------------------------------------------------------------
-
     /**
      * Converts raw network bytes into the correct {@link MessageVM} variant
      * based on the MIME content-type.
      */
-    private static MessageVM decodeIncoming(byte[] plaintext, String senderId, String contentType) {
-        LocalDateTime now = LocalDateTime.now();
+    private static MessageVM decodeIncoming(byte[] plaintext, String senderId, String contentType,
+            long timestampEpochMs) {
+        LocalDateTime timestamp = Instant.ofEpochMilli(timestampEpochMs)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime();
 
         if (contentType == null) {
             contentType = "text/plain";
@@ -143,14 +146,14 @@ public class MessageViewModel {
 
         if (contentType.startsWith("text/")) {
             String text = new String(plaintext, StandardCharsets.UTF_8);
-            return new MessageVM(false, MessageType.TEXT, text, null, null, null, now);
+            return new MessageVM(false, MessageType.TEXT, text, null, null, null, timestamp);
         }
 
         if (contentType.startsWith("image/")) {
             // Write image bytes to a temp file and expose a file:// path so
             // ImageView can load without holding the raw bytes in memory.
             String localPath = writeTempFile(plaintext, "haf-img-", extensionFor(contentType));
-            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, now);
+            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, timestamp);
         }
 
         // Everything else is treated as a generic file attachment.
@@ -158,7 +161,7 @@ public class MessageViewModel {
         String fileName = senderId + "-attachment" + ext;
         String fileSize = formatSize(plaintext.length);
         String localPath = writeTempFile(plaintext, "haf-file-", ext);
-        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, now);
+        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp);
     }
 
     /**

@@ -81,10 +81,21 @@ public class DefaultMessageReceiver implements MessageReceiver {
      */
     private void handleIncomingMessage(String json) {
         try {
-            // 1. Deserialize with JsonCodec
-            EncryptedMessage encryptedMessage = JsonCodec.fromJson(json, EncryptedMessage.class);
+            // 1. Unwrap envelope if necessary (Server wraps in {type, envelopeId, payload, expiresAt})
+            java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
+            if (!"message".equals(envelope.get("type"))) {
+                return; // Ignore ACKs or other types
+            }
 
-            // 2. Validate with MessageValidator
+            Object payloadObj = envelope.get("payload");
+            if (payloadObj == null) {
+                return;
+            }
+
+            // 2. Deserialize payload with JsonCodec
+            EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj), EncryptedMessage.class);
+
+            // 3. Validate with MessageValidator
             List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
             if (!errors.isEmpty()) {
                 if (messageListener != null) {
@@ -93,10 +104,10 @@ public class DefaultMessageReceiver implements MessageReceiver {
                 return;
             }
 
-            // 3. Check recipient ID matches local recipient
+            // 4. Check recipient ID matches local recipient
             validateRecipient(encryptedMessage);
 
-            // 4. Check expiry using ClockProvider (before decrypt)
+            // 5. Check expiry using ClockProvider (before decrypt)
             long now = clockProvider.currentTimeMillis();
             if (now > encryptedMessage.getTimestampEpochMs() + encryptedMessage.getTtlSeconds() * 1000L) {
                 if (messageListener != null) {
@@ -120,14 +131,16 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
             // 9. Deliver to MessageListener
             if (messageListener != null) {
-                messageListener.onMessage(plaintext, senderId, contentType);
+                messageListener.onMessage(plaintext, senderId, contentType, encryptedMessage.getTimestampEpochMs());
             }
 
         } catch (MessageValidationException | MessageExpiredException | MessageTamperedException e) {
+            e.printStackTrace();
             if (messageListener != null) {
                 messageListener.onError(e);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             if (messageListener != null) {
                 messageListener.onError(new IOException("Failed to process message", e));
             }
@@ -156,6 +169,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param error the error that occurred
      */
     private void handleError(Throwable error) {
+        error.printStackTrace();
         if (messageListener != null) {
             messageListener.onError(error);
         }

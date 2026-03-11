@@ -17,22 +17,22 @@
           <children>
             <StackPane>
                <HBox.margin>
-                  <Insets left="10.0" right="15.0" />
+                  <Insets left="10.0" right="10.0" />
                </HBox.margin>
                <children>
-                    <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
+                    <ImageView fitHeight="50.0" fitWidth="50.0" pickOnBounds="true" preserveRatio="true">
                         <image>
                             <Image url="@../images/misc/avatar.png" />
                         </image>
                     </ImageView>
-                        <Circle fill="#00b706" radius="8.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" StackPane.alignment="BOTTOM_RIGHT">
+                        <Circle fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" StackPane.alignment="BOTTOM_RIGHT">
                      <StackPane.margin>
                         <Insets bottom="5.0" />
                      </StackPane.margin>
                         </Circle>
                </children>
             </StackPane>
-              <VBox HBox.hgrow="ALWAYS">
+              <VBox alignment="CENTER_LEFT" HBox.hgrow="ALWAYS">
                   <HBox.margin>
                       <Insets bottom="5.0" right="5.0" top="5.0" />
                   </HBox.margin>
@@ -45,6 +45,11 @@
                               <Font size="18.0" />
                           </font>
                       </Text>
+                  <Text opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle-chat" text="Full Name">
+                     <font>
+                        <Font size="18.0" />
+                     </font>
+                  </Text>
                   </children>
               </VBox>
           </children>

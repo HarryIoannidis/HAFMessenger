@@ -15,6 +15,21 @@ public final class KeystoreRoot {
      * @return path
      */
     public static Path preferred() {
+        return preferred(null);
+    }
+
+    /**
+     * Preferred keystore root, optionally isolated for a specific user.
+     *
+     * @param userId the user ID to isolate for (if null, returns the shared root)
+     * @return path
+     */
+    public static Path preferred(String userId) {
+        Path root = getBasePreferred();
+        return userId == null ? root : root.resolve("u-" + userId);
+    }
+
+    private static Path getBasePreferred() {
         String prop = System.getProperty("haf.keystore.root");
         if (prop != null && !prop.isBlank()) {
             return Paths.get(prop);
@@ -25,7 +40,7 @@ public final class KeystoreRoot {
             return Paths.get(env);
         }
 
-        String os = System.getProperty("os.name","").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase();
         if (os.contains("win")) {
             String pd = System.getenv("ProgramData");
 
@@ -46,7 +61,22 @@ public final class KeystoreRoot {
      * @return path
      */
     public static Path userFallback() {
-        String os = System.getProperty("os.name","").toLowerCase();
+        return userFallback(null);
+    }
+
+    /**
+     * User-level fallback keystore root, optionally isolated for a specific user.
+     *
+     * @param userId the user ID to isolate for (if null, returns the shared root)
+     * @return path
+     */
+    public static Path userFallback(String userId) {
+        Path root = getBaseUserFallback();
+        return userId == null ? root : root.resolve("u-" + userId);
+    }
+
+    private static Path getBaseUserFallback() {
+        String os = System.getProperty("os.name", "").toLowerCase();
         if (os.contains("win")) {
             String local = System.getenv("LOCALAPPDATA");
             if (local != null && !local.isBlank()) {

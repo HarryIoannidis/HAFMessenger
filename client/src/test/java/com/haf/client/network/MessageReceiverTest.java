@@ -50,8 +50,9 @@ class MessageReceiverTest {
         }
 
         void simulateIncomingMessage(String json) {
+            String wrappedJson = "{\"type\":\"message\",\"payload\":" + json + "}";
             if (messageConsumer != null) {
-                messageConsumer.accept(json);
+                messageConsumer.accept(wrappedJson);
             }
         }
     }
@@ -90,14 +91,14 @@ class MessageReceiverTest {
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
         keyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
 
-        keyProvider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+        keyProvider = new UserKeystoreKeyProvider(tmpRoot, recipientKeyId, passphrase);
         clockProvider = new FixedClockProvider(1000000L);
         webSocketAdapter = new MockWebSocketAdapter();
         messageReceiver = new DefaultMessageReceiver(keyProvider, clockProvider, webSocketAdapter, recipientKeyId);
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
                 receivedMessages.add(plaintext);
             }
 
@@ -116,6 +117,7 @@ class MessageReceiverTest {
                     try {
                         Files.deleteIfExists(p);
                     } catch (Exception ignored) {
+                        // ignore
                     }
                 });
             }
@@ -135,9 +137,6 @@ class MessageReceiverTest {
         // Send via WebSocket
         String json = JsonCodec.toJson(encrypted);
         webSocketAdapter.simulateIncomingMessage(json);
-
-        // Wait a bit for processing
-        Thread.sleep(100);
 
         // Verify message was received and decrypted
         assertEquals(1, receivedMessages.size());
@@ -162,8 +161,6 @@ class MessageReceiverTest {
         String json = JsonCodec.toJson(encrypted);
         webSocketAdapter.simulateIncomingMessage(json);
 
-        Thread.sleep(100);
-
         // Verify error was received
         assertEquals(0, receivedMessages.size());
         assertEquals(1, receivedErrors.size());
@@ -183,8 +180,6 @@ class MessageReceiverTest {
 
         String json = JsonCodec.toJson(encrypted);
         webSocketAdapter.simulateIncomingMessage(json);
-
-        Thread.sleep(100);
 
         // Verify error was received (recipient mismatch)
         assertEquals(0, receivedMessages.size());

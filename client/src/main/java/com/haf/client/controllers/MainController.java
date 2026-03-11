@@ -141,7 +141,7 @@ public class MainController {
                             for (UserSearchResult contact : response.getContacts()) {
                                 if (!hasContact(contact.getUserId())) {
                                     contactsList.getItems()
-                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName()));
+                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName(), contact.getRegNumber()));
                                 }
                             }
                         });
@@ -344,7 +344,7 @@ public class MainController {
     /**
      * Adds a searched user to the contacts list and switches to their chat.
      */
-    public void startChatWith(String userId, String fullName) {
+    public void startChatWith(String userId, String fullName, String regNumber) {
 
         // Find if contact already exists
         ContactInfo target = null;
@@ -357,7 +357,7 @@ public class MainController {
 
         // Add if not exists
         if (target == null) {
-            target = ContactInfo.online(userId, fullName);
+            target = ContactInfo.online(userId, fullName, regNumber);
             contactsList.getItems().add(target);
         }
 
@@ -376,9 +376,9 @@ public class MainController {
         return false;
     }
 
-    public void addContact(String userId, String fullName) {
+    public void addContact(String userId, String fullName, String regNumber) {
         if (!hasContact(userId)) {
-            contactsList.getItems().add(ContactInfo.online(userId, fullName));
+            contactsList.getItems().add(ContactInfo.online(userId, fullName, regNumber));
 
             // Persist to server
             if (NetworkSession.get() != null) {

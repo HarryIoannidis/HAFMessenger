@@ -223,7 +223,7 @@ public class SearchController {
                 mainController.removeContact(result.getUserId());
                 LOGGER.info("Remove contact requested for user: " + result.getUserId());
             } else {
-                mainController.addContact(result.getUserId(), result.getFullName());
+                mainController.addContact(result.getUserId(), result.getFullName(), result.getRegNumber());
                 LOGGER.info("Add contact requested for user: " + result.getUserId());
             }
             updateRemoveButtonText(removeButton, result.getUserId());
@@ -246,7 +246,7 @@ public class SearchController {
         startChatButton.setOnAction(e -> {
             LOGGER.info("Start chat requested for user: " + result.getUserId());
             if (mainController != null) {
-                mainController.startChatWith(result.getUserId(), result.getFullName());
+                mainController.startChatWith(result.getUserId(), result.getFullName(), result.getRegNumber());
                 // Since starting a chat adds them to contacts, update the other button too.
                 if (removeButton != null) {
                     updateRemoveButtonText(removeButton, result.getUserId());

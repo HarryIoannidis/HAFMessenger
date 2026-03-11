@@ -212,7 +212,7 @@
    <center>
       <SplitPane dividerPositions="0.233" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
         <items>
-            <VBox maxWidth="278.0" minWidth="84.0" prefWidth="278.0">
+            <VBox maxWidth="278.0" minWidth="70.0" prefWidth="278.0">
                <children>
                   <ListView fx:id="contactsList" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefWidth="280.0" VBox.vgrow="ALWAYS" />
                </children>

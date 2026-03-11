@@ -44,7 +44,7 @@ class UserKeystoreKeyProviderTest {
         keyStore.saveKeypair(keyId, kp, passphrase);
 
         // Create KeyProvider
-        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, keyId, passphrase);
 
         // Verify sender ID matches keyId
         assertEquals(keyId, provider.getSenderId());
@@ -64,7 +64,7 @@ class UserKeystoreKeyProviderTest {
         keyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
 
         // Create KeyProvider (will use sender key as current)
-        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, senderKeyId, passphrase);
 
         // Load recipient public key
         PublicKey loadedKey = provider.getRecipientPublicKey(recipientKeyId);
@@ -80,8 +80,8 @@ class UserKeystoreKeyProviderTest {
         String senderKeyId = "key-sender-001";
         KeyPair senderKp = EccKeyIO.generate();
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
-
-        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+ 
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, senderKeyId, passphrase);
 
         // Try to load unknown recipient key
         assertThrows(KeyNotFoundException.class, () -> {
@@ -95,8 +95,8 @@ class UserKeystoreKeyProviderTest {
         String keyId = UserKeystore.todayKeyId();
         KeyPair kp = EccKeyIO.generate();
         keyStore.saveKeypair(keyId, kp, passphrase);
-
-        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+ 
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, keyId, passphrase);
 
         assertNotNull(provider.getKeyStore());
     }
@@ -113,8 +113,8 @@ class UserKeystoreKeyProviderTest {
         String externalRecipientId = "key-external-002";
         KeyPair externalKp = EccKeyIO.generate();
         String externalPem = EccKeyIO.publicPem(externalKp.getPublic());
-
-        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, passphrase);
+ 
+        UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, senderKeyId, passphrase);
 
         // Ensure exception is thrown without fetcher
         assertThrows(KeyNotFoundException.class, () -> {

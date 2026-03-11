@@ -475,7 +475,7 @@ public final class HttpIngressServer {
      * @param envelopeId the envelope ID
      * @param expiresAt  the expiration time of the envelope
      */
-    private record IngressResponse(String envelopeId, long expiresAt) {
+    public record IngressResponse(String envelopeId, long expiresAt) {
     }
 
     /**

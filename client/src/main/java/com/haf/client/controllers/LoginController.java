@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.prefs.Preferences;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import com.jfoenix.controls.JFXButton;
@@ -39,6 +40,8 @@ public class LoginController {
     private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
 
     private static final String SIGN_IN_TEXT = "Sign In";
+    private static final String PREF_EMAIL = "remembered_email";
+    private static final String PREF_REMEMBER = "remember_me";
 
     @FXML
     private BorderPane rootContainer;
@@ -105,6 +108,7 @@ public class LoginController {
         setupListeners();
         setupPasswordToggle();
         setupWindowControls();
+        loadPreferences();
     }
 
     /**
@@ -307,8 +311,9 @@ public class LoginController {
         signInButton.setText(SIGN_IN_TEXT);
 
         if (statusCode == 200 && response.getError() == null) {
+            savePreferences();
             try {
-                initializeSecureSession(response.getSessionId(), viewModel.getPassword());
+                initializeSecureSession(response.getUserId(), response.getSessionId(), viewModel.getPassword());
                 ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
                 LOGGER.info("Login successful for: " + viewModel.getEmail() + ", Socket connected.");
             } catch (Exception ex) {
@@ -323,11 +328,33 @@ public class LoginController {
         }
     }
 
-    private void initializeSecureSession(String sessionId, String passphraseStr) throws Exception {
+    private void loadPreferences() {
+        Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
+        boolean remember = prefs.getBoolean(PREF_REMEMBER, false);
+        if (remember) {
+            String savedEmail = prefs.get(PREF_EMAIL, "");
+            viewModel.setEmail(savedEmail);
+            viewModel.rememberCredentialsProperty().set(true);
+            javafx.application.Platform.runLater(passwordField::requestFocus);
+        }
+    }
+
+    private void savePreferences() {
+        Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
+        if (viewModel.isRememberCredentials()) {
+            prefs.put(PREF_EMAIL, viewModel.getEmail());
+            prefs.putBoolean(PREF_REMEMBER, true);
+        } else {
+            prefs.remove(PREF_EMAIL);
+            prefs.putBoolean(PREF_REMEMBER, false);
+        }
+    }
+
+    private void initializeSecureSession(String userId, String sessionId, String passphraseStr) throws Exception {
         com.haf.shared.utils.ClockProvider clockProvider = com.haf.shared.utils.SystemClockProvider.getInstance();
         char[] passphrase = passphraseStr.toCharArray();
         com.haf.client.crypto.UserKeystoreKeyProvider keyProvider = new com.haf.client.crypto.UserKeystoreKeyProvider(
-                passphrase);
+                userId, passphrase);
 
         com.haf.client.network.WebSocketAdapter wsAdapter = new com.haf.client.network.WebSocketAdapter(
                 URI.create("wss://localhost:8444/"), sessionId);
