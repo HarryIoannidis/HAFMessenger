@@ -11,24 +11,33 @@
 <?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
 
-<StackPane minWidth="80.0" prefHeight="65.0" prefWidth="280.0" stylesheets="@../css/chat.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
+<StackPane minWidth="80.0" prefHeight="65.0" prefWidth="280.0" stylesheets="@../css/chat.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
    <children>
       <HBox alignment="CENTER_LEFT" minWidth="140.0" prefWidth="280.0">
           <children>
-              <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
-                  <image>
-                      <Image url="@../images/misc/avatar.png" />
-                  </image>
-                  <HBox.margin>
-                      <Insets left="10.0" right="15.0" />
-                  </HBox.margin>
-              </ImageView>
+            <StackPane>
+               <HBox.margin>
+                  <Insets left="10.0" right="15.0" />
+               </HBox.margin>
+               <children>
+                    <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
+                        <image>
+                            <Image url="@../images/misc/avatar.png" />
+                        </image>
+                    </ImageView>
+                        <Circle fill="#00b706" radius="8.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" StackPane.alignment="BOTTOM_RIGHT">
+                     <StackPane.margin>
+                        <Insets bottom="5.0" />
+                     </StackPane.margin>
+                        </Circle>
+               </children>
+            </StackPane>
               <VBox HBox.hgrow="ALWAYS">
                   <HBox.margin>
                       <Insets bottom="5.0" right="5.0" top="5.0" />
                   </HBox.margin>
                   <padding>
-                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                      <Insets bottom="5.0" right="5.0" top="5.0" />
                   </padding>
                   <children>
                       <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-chat" text="Full Name" VBox.vgrow="ALWAYS">
@@ -36,20 +45,6 @@
                               <Font size="18.0" />
                           </font>
                       </Text>
-                      <HBox alignment="CENTER_LEFT" VBox.vgrow="ALWAYS">
-                          <children>
-                              <Text opacity="0.9" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle-chat" text="Activeness">
-                                  <font>
-                                      <Font size="16.0" />
-                                  </font>
-                              </Text>
-                              <Circle fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" HBox.hgrow="NEVER">
-                                  <HBox.margin>
-                                      <Insets left="10.0" />
-                                  </HBox.margin>
-                              </Circle>
-                          </children>
-                      </HBox>
                   </children>
               </VBox>
           </children>

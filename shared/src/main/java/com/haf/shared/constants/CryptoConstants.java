@@ -18,6 +18,12 @@ public final class CryptoConstants {
     public static final String KDF_ALGORITHM = "HKDF";
     public static final String KDF_HASH_ALGO = "SHA-256";
 
+    // Password Hashing (Argon2id)
+    public static final int ARGON2_MEMORY_KB = 65536; // 64 MB
+    public static final int ARGON2_ITERATIONS = 3;
+    public static final int ARGON2_PARALLELISM = 4;
+    public static final int ARGON2_OUTPUT_LENGTH = 32;
+
     private CryptoConstants() {
     }
 }

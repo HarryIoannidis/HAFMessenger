@@ -30,7 +30,9 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
-import org.mindrot.jbcrypt.BCrypt;
+import com.haf.shared.constants.CryptoConstants;
+import com.password4j.Password;
+import com.password4j.Argon2Function;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.ByteArrayOutputStream;
@@ -82,7 +84,12 @@ public final class HttpIngressServer {
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
-    private static final int BCRYPT_LOG_ROUNDS = 12;
+    private static final Argon2Function ARGON2 = Argon2Function.getInstance(
+            CryptoConstants.ARGON2_MEMORY_KB,
+            CryptoConstants.ARGON2_ITERATIONS,
+            CryptoConstants.ARGON2_PARALLELISM,
+            CryptoConstants.ARGON2_OUTPUT_LENGTH,
+            com.password4j.types.Argon2.ID);
 
     private final ServerConfig config;
     private final MailboxRouter mailboxRouter;
@@ -362,8 +369,10 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                // Hash password
-                String hashedPassword = BCrypt.hashpw(request.getPassword(), BCrypt.gensalt(BCRYPT_LOG_ROUNDS));
+                String hashedPassword = Password.hash(request.getPassword())
+                        .addRandomSalt(CryptoConstants.SALT_LEN)
+                        .with(ARGON2)
+                        .getResult();
 
                 // Store user (starts in PENDING)
                 String userId = userDAO.insert(request, hashedPassword);
@@ -504,8 +513,7 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                // Verify password
-                if (!BCrypt.checkpw(request.getPassword(), user.passwordHash())) {
+                if (!Password.check(request.getPassword(), user.passwordHash()).with(ARGON2)) {
                     respond(exchange, requestId, 401,
                             JsonCodec.toJson(LoginResponse.error(INVALID_EMAIL_PASSWORD)));
                     return;
