@@ -39,6 +39,10 @@ public class ChatController {
 
     private MessageViewModel viewModel;
 
+    // We hold a strong reference to the listener to avoid early garbage collection
+    // while the WeakListChangeListener wrapper is active.
+    private ListChangeListener<MessageVM> messageListener;
+
     @FXML
     public void initialize() {
         viewModel = ChatSession.get();
@@ -48,12 +52,31 @@ public class ChatController {
             return;
         }
 
-        // Populate existing messages and listen for new ones.
-        for (MessageVM vm : viewModel.getMessages()) {
+        // Wire send button.
+        sendButton.setOnAction(e -> sendMessage());
+
+        // Wire Enter key on message field.
+        messageField.setOnAction(e -> sendMessage());
+    }
+
+    /**
+     * Loads the messages for the specified recipient and attaches a listener.
+     */
+    private void loadMessages() {
+        if (viewModel == null) {
+            return;
+        }
+
+        // Clear existing messages
+        chatBox.getChildren().clear();
+
+        // Populate existing messages for this contact
+        for (MessageVM vm : viewModel.getMessages(recipientId)) {
             chatBox.getChildren().add(MessageBubbleFactory.create(vm));
         }
 
-        viewModel.getMessages().addListener((ListChangeListener<MessageVM>) change -> {
+        // Create a new listener
+        messageListener = change -> {
             while (change.next()) {
                 if (change.wasAdded()) {
                     for (MessageVM vm : change.getAddedSubList()) {
@@ -65,13 +88,10 @@ public class ChatController {
                     chatScrollPane.setVvalue(1.0);
                 }
             }
-        });
+        };
 
-        // Wire send button.
-        sendButton.setOnAction(e -> sendMessage());
-
-        // Wire Enter key on message field.
-        messageField.setOnAction(e -> sendMessage());
+        // Attach via WeakListChangeListener to prevent leaking this controller
+        viewModel.getMessages(recipientId).addListener(messageListener);
     }
 
     /**
@@ -82,6 +102,7 @@ public class ChatController {
      */
     public void setRecipient(String recipientId) {
         this.recipientId = recipientId != null ? recipientId : "";
+        loadMessages();
     }
 
     private void sendMessage() {

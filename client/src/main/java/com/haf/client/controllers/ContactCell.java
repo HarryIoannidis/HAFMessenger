@@ -24,14 +24,24 @@ public class ContactCell extends ListCell<ContactInfo> {
     private static final Logger LOGGER = Logger.getLogger(ContactCell.class.getName());
 
     private static byte[] cachedFXMLBytes;
-    private Runnable clickCallback;
-
     private StackPane cellRoot;
     private Text nameText;
+    private Text regNumberText;
     private Circle activenessCircle;
 
     public void setOnClick(Runnable clickCallback) {
-        this.clickCallback = clickCallback;
+        ensureLoaded();
+        if (cellRoot != null && cellRoot.getChildren().size() > 1) {
+            var button = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
+            button.setOnAction(e -> {
+                if (getListView() != null) {
+                    getListView().getSelectionModel().select(getItem());
+                }
+                if (clickCallback != null) {
+                    clickCallback.run();
+                }
+            });
+        }
     }
 
     public ContactCell() {
@@ -87,17 +97,6 @@ public class ContactCell extends ListCell<ContactInfo> {
         if (hbox.getChildren().size() > 1) {
             bindHBoxChildren(hbox);
         }
-
-        // The transparent JFXButton overlay (index 1) triggers selection and tab switch
-        if (cellRoot.getChildren().size() > 1) {
-            var button = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
-            button.setOnAction(e -> {
-                getListView().getSelectionModel().select(getItem());
-                if (clickCallback != null) {
-                    clickCallback.run();
-                }
-            });
-        }
     }
 
     private void bindHBoxChildren(HBox hbox) {
@@ -107,8 +106,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
 
         var vbox = (VBox) hbox.getChildren().get(1);
-        if (!vbox.getChildren().isEmpty()) {
+        if (vbox.getChildren().size() > 0) {
             nameText = (Text) vbox.getChildren().get(0);
+        }
+        if (vbox.getChildren().size() > 1) {
+            regNumberText = (Text) vbox.getChildren().get(1);
         }
     }
 
@@ -130,6 +132,9 @@ public class ContactCell extends ListCell<ContactInfo> {
 
         if (nameText != null) {
             nameText.setText(contact.name());
+        }
+        if (regNumberText != null) {
+            regNumberText.setText(contact.regNumber());
         }
         if (activenessCircle != null) {
             try {

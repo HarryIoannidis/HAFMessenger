@@ -8,15 +8,15 @@ package com.haf.client.model;
  * @param activenessColor JavaFX CSS colour string for the status dot, e.g.
  *                        "#00b706".
  */
-public record ContactInfo(String id, String name, String activenessLabel, String activenessColor) {
+public record ContactInfo(String id, String name, String regNumber, String activenessLabel, String activenessColor) {
 
     /** Convenience factory for an online contact. */
-    public static ContactInfo online(String id, String name) {
-        return new ContactInfo(id, name, "Online", "#00b706");
+    public static ContactInfo online(String id, String name, String regNumber) {
+        return new ContactInfo(id, name, regNumber, "Online", "#00b706");
     }
 
     /** Convenience factory for an offline contact. */
-    public static ContactInfo offline(String id, String name) {
-        return new ContactInfo(id, name, "Offline", "#ff0000");
+    public static ContactInfo offline(String id, String name, String regNumber) {
+        return new ContactInfo(id, name, regNumber, "Offline", "#ff0000");
     }
 }

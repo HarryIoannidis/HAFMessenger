@@ -15,19 +15,24 @@ public final class KeystoreBootstrap {
     private KeystoreBootstrap() {
     }
 
+    public static Path run() throws Exception {
+        return run(null);
+    }
+
     /**
-     * Bootstraps the keystore if needed.
+     * Bootstraps the keystore if needed for a specific user.
      *
+     * @param userId the user ID (can be null for shared)
      * @return the root directory of the keystore
      * @throws Exception
      */
-    public static Path run() throws Exception {
-        Path root = KeystoreRoot.preferred();
+    public static Path run(String userId) throws Exception {
+        Path root = KeystoreRoot.preferred(userId);
 
         try {
             FilePerms.ensureDir700(root);
         } catch (Exception e) {
-            root = KeystoreRoot.userFallback();
+            root = KeystoreRoot.userFallback(userId);
             FilePerms.ensureDir700(root);
         }
 

@@ -46,16 +46,29 @@ class MessageSendReceiveIT {
         }
 
         @Override
+        public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
+            if ("/api/v1/messages".equals(path)) {
+                try {
+                    sendText(jsonBody);
+                    return java.util.concurrent.CompletableFuture.completedFuture("{\"success\":true}");
+                } catch (java.io.IOException e) {
+                    return java.util.concurrent.CompletableFuture.failedFuture(e);
+                }
+            }
+            return super.postAuthenticated(path, jsonBody);
+        }
+
+        @Override
         public void sendText(String message) throws java.io.IOException {
             if (!connected) {
                 throw new java.io.IOException("Not connected");
             }
             if (peer != null && peer.messageConsumer != null) {
+                String wrappedJson = "{\"type\":\"message\",\"payload\":" + message + "}";
                 // Simulate network delay
                 new Thread(() -> {
                     try {
-                        Thread.sleep(10);
-                        peer.messageConsumer.accept(message);
+                        peer.messageConsumer.accept(wrappedJson);
                     } catch (Exception e) {
                         if (peer.errorConsumer != null) {
                             peer.errorConsumer.accept(e);
@@ -93,6 +106,7 @@ class MessageSendReceiveIT {
     byte[] receivedPayload;
     String receivedSenderId;
     String receivedContentType;
+    long receivedTimestamp;
     CountDownLatch messageReceivedLatch;
 
     @BeforeEach
@@ -118,8 +132,8 @@ class MessageSendReceiveIT {
         // Also save recipient key in sender's keystore for lookup (Phase 4 placeholder)
         senderKeyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
 
-        senderKeyProvider = new UserKeystoreKeyProvider(tmpRoot1, passphrase);
-        recipientKeyProvider = new UserKeystoreKeyProvider(tmpRoot2, passphrase);
+        senderKeyProvider = new UserKeystoreKeyProvider(tmpRoot1, senderKeyId, passphrase);
+        recipientKeyProvider = new UserKeystoreKeyProvider(tmpRoot2, recipientKeyId, passphrase);
 
         clock = new FixedClockProvider(1000000L);
 
@@ -135,10 +149,11 @@ class MessageSendReceiveIT {
         messageReceivedLatch = new CountDownLatch(1);
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
                 receivedPayload = plaintext;
                 receivedSenderId = senderId;
                 receivedContentType = contentType;
+                receivedTimestamp = timestampEpochMs;
                 messageReceivedLatch.countDown();
             }
 
@@ -201,6 +216,7 @@ class MessageSendReceiveIT {
         assertArrayEquals(payload, receivedPayload);
         assertEquals(senderKeyId, receivedSenderId);
         assertEquals(contentType, receivedContentType);
+        assertEquals(1000000L, receivedTimestamp);
     }
 
     @Test
@@ -216,7 +232,8 @@ class MessageSendReceiveIT {
         CountDownLatch latch = new CountDownLatch(1);
         testReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+                assertEquals(2000000L, timestampEpochMs);
                 latch.countDown();
             }
 
@@ -259,8 +276,10 @@ class MessageSendReceiveIT {
             // CRITICAL: DO NOT save the recipient key in the sender's keystore!
             // The sender should not know the recipient's key yet.
 
-            UserKeystoreKeyProvider newSenderKeyProvider = new UserKeystoreKeyProvider(tmpSenderDir, passphrase);
-            UserKeystoreKeyProvider newRecipientKeyProvider = new UserKeystoreKeyProvider(tmpRecipientDir, passphrase);
+            UserKeystoreKeyProvider newSenderKeyProvider = new UserKeystoreKeyProvider(tmpSenderDir, newSenderKeyId,
+                    passphrase);
+            UserKeystoreKeyProvider newRecipientKeyProvider = new UserKeystoreKeyProvider(tmpRecipientDir,
+                    newRecipientKeyId, passphrase);
 
             // Configure directory service callback on the sender
             final String recipientPem = EccKeyIO.publicPem(newRecipientKp.getPublic());
@@ -283,10 +302,11 @@ class MessageSendReceiveIT {
             CountDownLatch latch = new CountDownLatch(1);
             dsReceiver.setMessageListener(new MessageReceiver.MessageListener() {
                 @Override
-                public void onMessage(byte[] plaintext, String senderId, String contentType) {
+                public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
                     receivedPayload = plaintext;
                     receivedSenderId = senderId;
                     receivedContentType = contentType;
+                    receivedTimestamp = timestampEpochMs;
                     latch.countDown();
                 }
 

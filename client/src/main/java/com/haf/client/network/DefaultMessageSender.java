@@ -77,11 +77,8 @@ public class DefaultMessageSender implements MessageSender {
             // 6. Serialize to JSON with JsonCodec
             String json = JsonCodec.toJson(encryptedMessage);
 
-            // 7. Send via WebSocketAdapter
-            if (!webSocketAdapter.isConnected()) {
-                throw new IOException("WebSocket is not connected");
-            }
-            webSocketAdapter.sendText(json);
+            // 7. Send via Http (WebSocket port is for push/ack only)
+            webSocketAdapter.postAuthenticated("/api/v1/messages", json).join();
 
         } catch (KeyNotFoundException | MessageValidationException | IOException e) {
             // Re-throw these exceptions as-is

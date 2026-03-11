@@ -36,6 +36,8 @@ public class WebSocketAdapter {
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
     private static final int MAX_INBOUND_MESSAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
     // Heartbeat (ping/pong)
     private ScheduledExecutorService scheduler;
@@ -71,7 +73,7 @@ public class WebSocketAdapter {
         this.httpClient = HttpClient.newBuilder()
                 .sslContext(sslContext)
                 .sslParameters(sslParameters)
-                .connectTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofSeconds(20))
                 .build();
     }
 
@@ -122,11 +124,11 @@ public class WebSocketAdapter {
 
         try {
             CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
-                    .header("Authorization", "Bearer " + sessionId)
+                    .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
                     .buildAsync(serverUri, listener);
 
-            // Wait for connection to complete (with 10 second timeout)
-            this.webSocket = future.get(10, TimeUnit.SECONDS);
+            // Wait for connection to complete (with 30 second timeout)
+            this.webSocket = future.get(30, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException e) {
             isConnected = false;
             Throwable cause = e.getCause();
@@ -169,7 +171,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
                 .GET()
                 .build();
 
@@ -204,7 +206,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -240,7 +242,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
                 .DELETE()
                 .build();
 
@@ -303,35 +305,47 @@ public class WebSocketAdapter {
 
     private void handleIncomingText(WebSocket webSocket, CharSequence data, boolean last) {
         try {
-            // Accumulate fragments until last == true
             if (data != null) {
-                // Guard against oversize messages (approx by char count)
-                if (inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES) {
-                    inboundBuffer.setLength(0);
-                    if (errorConsumer != null) {
-                        errorConsumer.accept(new IOException("Inbound message too large"));
-                    }
-                    // Drop this message and request next
+                if (isMessageOversize(data)) {
+                    handleOversizeError();
                     return;
                 }
                 inboundBuffer.append(data);
             }
             if (last) {
-                String message = inboundBuffer.toString();
-                inboundBuffer.setLength(0);
-                if (messageConsumer != null) {
-                    try {
-                        messageConsumer.accept(message);
-                    } catch (Exception e) {
-                        if (errorConsumer != null) {
-                            errorConsumer.accept(e);
-                        }
-                    }
-                }
+                processCompleteMessage();
             }
         } finally {
-            // Request next message
             webSocket.request(1);
+        }
+    }
+
+    private boolean isMessageOversize(CharSequence data) {
+        return inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES;
+    }
+
+    private void handleOversizeError() {
+        inboundBuffer.setLength(0);
+        if (errorConsumer != null) {
+            errorConsumer.accept(new IOException("Inbound message too large"));
+        }
+    }
+
+    private void processCompleteMessage() {
+        String message = inboundBuffer.toString();
+        inboundBuffer.setLength(0);
+        if (messageConsumer != null) {
+            notifyMessageConsumer(message);
+        }
+    }
+
+    private void notifyMessageConsumer(String message) {
+        try {
+            messageConsumer.accept(message);
+        } catch (Exception e) {
+            if (errorConsumer != null) {
+                errorConsumer.accept(e);
+            }
         }
     }
 

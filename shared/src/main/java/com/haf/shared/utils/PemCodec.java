@@ -3,13 +3,14 @@ package com.haf.shared.utils;
 import java.util.Base64;
 
 public final class PemCodec {
-    private PemCodec() {}
+    private PemCodec() {
+    }
 
     /**
      * Converts a DER-encoded byte array to a PEM-encoded string.
      *
      * @param type the type of the PEM block, e.g. "PUBLIC KEY"
-     * @param der the DER-encoded byte array
+     * @param der  the DER-encoded byte array
      * @return the PEM-encoded string
      */
     public static String toPem(String type, byte[] der) {

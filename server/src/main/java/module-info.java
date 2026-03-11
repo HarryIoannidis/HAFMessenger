@@ -9,4 +9,6 @@ module server {
     requires io.github.cdimascio.dotenv.java;
     requires password4j;
     requires transitive shared;
+
+    opens com.haf.server.ingress to com.fasterxml.jackson.databind;
 }

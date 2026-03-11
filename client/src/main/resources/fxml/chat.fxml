@@ -71,7 +71,7 @@
       <URL value="@../css/chat.css" />
    </stylesheets>
    <center>
-      <ScrollPane fx:id="chatScrollPane" fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" styleClass="chat-area" BorderPane.alignment="CENTER">
+      <ScrollPane fx:id="chatScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="chat-area" BorderPane.alignment="CENTER">
          <content>
             <VBox fx:id="chatBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" spacing="8">
                <padding>
