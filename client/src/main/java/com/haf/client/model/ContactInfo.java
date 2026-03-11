@@ -17,6 +17,6 @@ public record ContactInfo(String id, String name, String activenessLabel, String
 
     /** Convenience factory for an offline contact. */
     public static ContactInfo offline(String id, String name) {
-        return new ContactInfo(id, name, "Offline", "#696969ff");
+        return new ContactInfo(id, name, "Offline", "#ff0000");
     }
 }

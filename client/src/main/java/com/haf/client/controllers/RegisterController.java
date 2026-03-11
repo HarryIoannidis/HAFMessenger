@@ -627,7 +627,7 @@ public class RegisterController {
         viewModel.loadingProperty().set(false);
         registerButton.setText(originalText);
 
-        if (httpResponse.statusCode() == 201 && response.getError() == null) {
+        if ((httpResponse.statusCode() == 200 || httpResponse.statusCode() == 201) && response.getError() == null) {
             saveKeysToKeystore(registrationKp);
             LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
             navigateToLogin();

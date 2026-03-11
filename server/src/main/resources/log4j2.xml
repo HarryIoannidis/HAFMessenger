@@ -3,6 +3,7 @@
     <Properties>
         <!-- Change this to 'dev' for local development or 'prod' for production -->
         <Property name="log.environment">dev</Property>
+        <Property name="log.path">logs</Property>
     </Properties>
 
     <Appenders>
@@ -18,8 +19,8 @@
 
         <!-- Rolling File Appender - JSON (for production logs) -->
         <RollingFile name="JsonFileAppender"
-                     fileName="logs/haf-server.json"
-                     filePattern="logs/haf-server-%d{yyyy-MM-dd}-%i.json.gz">
+                     fileName="${log.path}/haf-server.json"
+                     filePattern="${log.path}/haf-server-%d{yyyy-MM-dd}-%i.json.gz">
             <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
@@ -30,8 +31,8 @@
 
         <!-- Audit File Appender - JSON (for audit compliance) -->
         <RollingFile name="AuditFileAppender"
-                     fileName="logs/audit.json"
-                     filePattern="logs/audit-%d{yyyy-MM-dd}-%i.json.gz">
+                     fileName="${log.path}/audit.json"
+                     filePattern="${log.path}/audit-%d{yyyy-MM-dd}-%i.json.gz">
             <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
