@@ -3,12 +3,12 @@ package com.haf.shared.utils;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageValidationException;
-
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
 public final class MessageValidator {
+
     private MessageValidator() {
     }
 
@@ -22,7 +22,7 @@ public final class MessageValidator {
         BAD_IV, // ivB64 invalid or wrong length (12B)
         BAD_CIPHERTEXT, // ciphertextB64 invalid, empty, or too large
         BAD_TAG, // tagB64 invalid or wrong length (16B)
-        BAD_WRAPPED_KEY, // ephemeralPublicB64 invalid or too short for RSA-2048 OAEP
+        BAD_WRAPPED_KEY, // ephemeralPublicB64 invalid or too short for X25519 ECDHKeyAgreement
         BAD_TIMESTAMP, // timestampEpochMs <= 0
         BAD_CONTENT_LENGTH, // contentLength < 0
         BAD_CONTENT_TYPE, // contentType null/empty/not allowed
@@ -180,7 +180,7 @@ public final class MessageValidator {
     }
 
     private static void validateEphemeralKey(EncryptedMessage m, List<ErrorCode> errors) {
-        // Ephemeral key (X25519) – existence and minimum length
+        // Ephemeral key (X25519) – existence and minimum length (32 bytes)
         if (m.getEphemeralPublicB64() == null) {
             errors.add(ErrorCode.BAD_WRAPPED_KEY);
         } else {

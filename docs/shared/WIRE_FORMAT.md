@@ -6,7 +6,7 @@
 ### Version and Profile
 - Version: 1
 - Algorithm profile: AES-256-GCM with X25519 ECDH key agreement + SHA-256 KDF
-- Wire string: `"AES-256-GCM+RSA-OAEP"` (legacy, kept for backward compatibility)
+- Wire string: `"AES-256-GCM+X25519"`
 
 ### GCM Parameters
 - IV (nonce): 12 bytes, ivB64 field (Base64)

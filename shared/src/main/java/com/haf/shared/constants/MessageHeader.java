@@ -5,7 +5,7 @@ import java.util.Set;
 public final class MessageHeader {
     // Wire protocol
     public static final String VERSION = "1";
-    public static final String ALGO_AEAD = "AES-256-GCM+RSA-OAEP";
+    public static final String ALGO_AEAD = "AES-256-GCM+X25519";
 
     // AEAD sizes (derived from crypto constants to avoid drift)
     public static final int IV_BYTES = CryptoConstants.GCM_IV_BYTES;
@@ -16,7 +16,7 @@ public final class MessageHeader {
     public static final int MIN_RECIPIENT_LEN = 3;
 
     // TTL policy (seconds)
-    public static final long MAX_TTL_SECONDS = 24 * 3600;
+    public static final long MAX_TTL_SECONDS = 24L * 3600;
     public static final long MIN_TTL_SECONDS = 60;
 
     // Size limits

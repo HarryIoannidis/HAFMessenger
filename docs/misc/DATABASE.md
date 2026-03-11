@@ -285,9 +285,9 @@ CREATE TABLE message_envelopes (
     recipient_id VARCHAR(255) NOT NULL,
     ciphertext_b64 TEXT NOT NULL,
     iv_b64 VARCHAR(255) NOT NULL,
-    wrapped_key_b64 TEXT NOT NULL,
+    ephemeral_public_b64 TEXT NOT NULL,
     tag_b64 VARCHAR(255) NOT NULL,
-    algorithm VARCHAR(50) NOT NULL DEFAULT 'AES-256-GCM+RSA-OAEP', -- legacy wire string
+    algorithm VARCHAR(50) NOT NULL DEFAULT 'AES-256-GCM+X25519',
     content_type VARCHAR(100),
     client_timestamp_ms BIGINT NOT NULL,
     ttl_seconds INT NOT NULL,
@@ -463,7 +463,7 @@ public class DatabaseManager {
             ps.setString(2, envelope.senderId);
             ps.setString(3, envelope.recipientId);
             ps.setBytes(4, Base64.getDecoder().decode(envelope.ciphertext));
-            ps.setBytes(5, Base64.getDecoder().decode(envelope.wrappedKey));
+            ps.setBytes(5, Base64.getDecoder().decode(envelope.ephemeralPublicB64));
             ps.setBytes(6, Base64.getDecoder().decode(envelope.iv));
             ps.setBytes(7, Base64.getDecoder().decode(envelope.authTag));
             ps.setString(8, computeAadHash(envelope));
@@ -620,7 +620,7 @@ public class DatabaseManager {
         dto.senderId = rs.getString("sender_id");
         dto.recipientId = rs.getString("recipient_id");
         dto.ciphertext = Base64.getEncoder().encodeToString(rs.getBytes("encrypted_payload"));
-        dto.wrappedKey = Base64.getEncoder().encodeToString(rs.getBytes("wrapped_key"));
+        dto.ephemeralPublicB64 = Base64.getEncoder().encodeToString(rs.getBytes("ephemeral_public"));
         dto.iv = Base64.getEncoder().encodeToString(rs.getBytes("iv"));
         dto.authTag = Base64.getEncoder().encodeToString(rs.getBytes("auth_tag"));
         dto.contentType = rs.getString("content_type");

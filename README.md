@@ -9,7 +9,7 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
 
 ## **Key Features**
 
-* End-to-end encryption: AES-256 for message content + RSA for key exchange
+* End-to-end encryption: AES-256 for message content + X25519 (ECDH) for key agreement
 * Authentication: username/password + TOTP (Google Authenticator) + WebAuthn/FIDO2 support
 * Real-time user presence and push notifications
 * Encrypted file transfer (images, PDFs) with temporary encrypted server storage and automatic deletion
@@ -30,7 +30,7 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
   - Flyway for database migrations
   - Log4j2 for structured logging
 * Database: MySQL
-* Cryptography: Java Cryptography (AES-256, RSA 2048, SHA-256)
+* Cryptography: Java Cryptography (AES-256, X25519, SHA-256)
 * 2FA: otp-java (TOTP)
 * WebAuthn: WebAuthn4J (when required)
 * Build / Packaging: Maven, jlink / jpackage for self-contained installers
@@ -70,7 +70,7 @@ The application follows a **client–server 3-tier** design and the **MVVM** pat
     * DTOs in `shared/src/main/java/com/haf/shared/dto/` (EncryptedMessage, KeyMetadata) for client-server communication
     * Constants in `shared/src/main/java/com/haf/shared/constants/` (CryptoConstants, MessageHeader) for protocol and crypto constants
     * Crypto implementations in `shared/src/main/java/com/haf/shared/crypto/` (CryptoService, MessageEncryptor, MessageDecryptor, UserKeyStore, KeystoreBootstrap, KeystoreSealing, etc.) for E2E encryption, key management, and keystore operations
-    * Utilities in `shared/src/main/java/com/haf/shared/utils/` (JsonCodec, MessageValidator, RsaKeyIO, FilePerms, FingerprintUtil, PemCodec) for serialization, validation, and helper functions
+    * Utilities in `shared/src/main/java/com/haf/shared/utils/` (JsonCodec, MessageValidator, EccKeyIO, FilePerms, FingerprintUtil, PemCodec) for serialization, validation, and helper functions
 
 * **Documentation Layer (Docs / References)**
 
@@ -124,7 +124,7 @@ haf-messenger/
 │   │   ├── crypto/              # Crypto implementations (CryptoService, MessageEncryptor, MessageDecryptor)
 │   │   ├── keystore/            # Key store formats, root selection, bootstrap, key loading logic
 │   │   ├── exceptions/          # Typed exceptions (MessageValidationException, KeyNotFoundException, etc.)
-│   │   └── utils/               # Common utilities (JsonCodec, MessageValidator, RsaKeyIO, FilePerms, FingerprintUtil, PemCodec)
+│   │   └── utils/               # Common utilities (JsonCodec, MessageValidator, EccKeyIO, FilePerms, FingerprintUtil, PemCodec)
 │   └── src/test/                # Unit and integration tests (KeystoreE2EIT, etc.)
 │
 ├── scripts/                     # Build and deployment scripts
@@ -146,8 +146,8 @@ haf-messenger/
 
 * Encryption flow:
 
-  1. Client generates a session AES-256 key.
-  2. AES key is wrapped (encrypted) with the recipient’s public RSA key using RSA-OAEP (SHA-256/MGF1).
+  1. Client generates an ephemeral X25519 keypair for each message.
+  2. A 256-bit AES session key is derived via ECDH (ephemeral_private, recipient_public) + SHA-256 KDF.
   3. Payload is encrypted using AES-256-GCM with a 12-byte IV and 128-bit authentication tag.
   4. AAD (Additional Authenticated Data) is constructed from DTO metadata fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength) — not transmitted, reconstructed during decryption.
   5. Packet structure: `{version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, ephemeralPublicB64, ciphertextB64, tagB64, contentType, contentLength, e2e}`

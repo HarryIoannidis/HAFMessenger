@@ -20,9 +20,9 @@ class JsonCodecTest {
     m.setRecipientId("B10");
     m.setTimestampEpochMs(System.currentTimeMillis());
     m.setTtlSeconds(86400);
-    m.setAlgorithm("AES-256-GCM+RSA-OAEP");
+    m.setAlgorithm("AES-256-GCM+X25519");
     m.setIvB64(Base64.getEncoder().encodeToString(new byte[12]));
-    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[32]));
     m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
     m.setTagB64(Base64.getEncoder().encodeToString(new byte[16]));
     m.setContentType("text/plain");
@@ -63,7 +63,7 @@ class JsonCodecTest {
     m.setTtlSeconds(600);
     m.setAlgorithm(MessageHeader.ALGO_AEAD);
     m.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
-    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
+    m.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[32]));
     m.setCiphertextB64(Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
     m.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
     m.setContentType("application/pdf");
@@ -89,7 +89,7 @@ class JsonCodecTest {
             "recipientId":"B1",
             "timestampEpochMs":1710000000000,
             "ttlSeconds":86400,
-            "algo":"AES-256-GCM+RSA-OAEP",
+            "algo":"AES-256-GCM+X25519",
             "ivB64":"AAAAAAAAAAAAAA==",
             "ephemeralPublicB64":"%s",
             "ciphertextB64":"%s",
@@ -101,7 +101,7 @@ class JsonCodecTest {
             "unknownField":123
           }
         """.formatted(
-        Base64.getEncoder().encodeToString(new byte[256]),
+        Base64.getEncoder().encodeToString(new byte[32]),
         Base64.getEncoder().encodeToString("x".getBytes(StandardCharsets.UTF_8)));
 
     JsonCodecException ex = assertThrows(JsonCodecException.class,
@@ -115,7 +115,7 @@ class JsonCodecTest {
   void key_metadata_roundtrip_ok() {
     var meta = new com.haf.shared.dto.KeyMetadata(
         "key-2025Q4",
-        "RSA-3072",
+        "X25519",
         "ABCD1234EF...FA", // 64-hex in practice
         "Primary-key-2025Q4",
         1_730_000_000L,
@@ -137,7 +137,7 @@ class JsonCodecTest {
     String json = """
           {
             "keyId":"key-2025Q4",
-            "algorithm":"RSA-2048",
+            "algorithm":"X25519",
             "fingerprint":"%s",
             "label":"Primary",
             "createdAtEpochSec":1730000000,
