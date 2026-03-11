@@ -33,11 +33,14 @@ public class WebSocketAdapter {
     private Consumer<Throwable> errorConsumer;
     private volatile boolean isConnected = false;
 
+    // HTTP constants
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String HTTPS_PROTOCOL = "https";
+
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
     private static final int MAX_INBOUND_MESSAGE_BYTES = 2 * 1024 * 1024; // 2 MB
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String BEARER_PREFIX = "Bearer ";
 
     // Heartbeat (ping/pong)
     private ScheduledExecutorService scheduler;
@@ -163,7 +166,8 @@ public class WebSocketAdapter {
         // Must rewrite scheme from wss to https for standard HTTP calls
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+                    requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
@@ -198,7 +202,8 @@ public class WebSocketAdapter {
     public CompletableFuture<String> postAuthenticated(String path, String body) {
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+                    requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
@@ -234,7 +239,8 @@ public class WebSocketAdapter {
     public CompletableFuture<String> deleteAuthenticated(String path) {
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443, requestUri.getPath(),
+            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+                    requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct HTTPS URI", e);

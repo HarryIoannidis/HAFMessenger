@@ -29,6 +29,7 @@ class UserKeystoreKeyProviderTest {
                     try {
                         Files.deleteIfExists(p);
                     } catch (Exception ignored) {
+                        // ignore
                     }
                 });
             }
@@ -80,7 +81,7 @@ class UserKeystoreKeyProviderTest {
         String senderKeyId = "key-sender-001";
         KeyPair senderKp = EccKeyIO.generate();
         keyStore.saveKeypair(senderKeyId, senderKp, passphrase);
- 
+
         UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, senderKeyId, passphrase);
 
         // Try to load unknown recipient key
@@ -95,7 +96,7 @@ class UserKeystoreKeyProviderTest {
         String keyId = UserKeystore.todayKeyId();
         KeyPair kp = EccKeyIO.generate();
         keyStore.saveKeypair(keyId, kp, passphrase);
- 
+
         UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, keyId, passphrase);
 
         assertNotNull(provider.getKeyStore());
@@ -113,7 +114,7 @@ class UserKeystoreKeyProviderTest {
         String externalRecipientId = "key-external-002";
         KeyPair externalKp = EccKeyIO.generate();
         String externalPem = EccKeyIO.publicPem(externalKp.getPublic());
- 
+
         UserKeystoreKeyProvider provider = new UserKeystoreKeyProvider(tmpRoot, senderKeyId, passphrase);
 
         // Ensure exception is thrown without fetcher
