@@ -102,6 +102,7 @@ public class MainController {
 
     // Cached views for performance
     private Parent currentChatView;
+    private ChatController currentChatController;
     private String currentChatRecipientId;
 
     private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
@@ -480,13 +481,17 @@ public class MainController {
     }
 
     private void loadChat(String recipientId) {
-        // Reuse chat view if we are already chatting with the same contact
-        if (currentChatView != null && recipientId.equals(currentChatRecipientId)) {
+        // Reuse chat view if already loaded — just switch recipient
+        if (currentChatView != null && currentChatController != null) {
+            if (!recipientId.equals(currentChatRecipientId)) {
+                currentChatController.setRecipient(recipientId);
+                currentChatRecipientId = recipientId;
+            }
             contentPane.getChildren().setAll(currentChatView);
             return;
         }
 
-        // Load new chat view in a background thread to prevent UI freeze
+        // First load: create the chat view in a background thread
         Thread.ofVirtual().name("chat-loader").start(() -> {
             try {
                 var resource = getClass().getResource(UiConstants.FXML_CHAT);
@@ -497,9 +502,9 @@ public class MainController {
                 ChatController chatController = loader.getController();
                 chatController.setRecipient(recipientId);
 
-                // Update UI once the view is fully prepared in memory
                 javafx.application.Platform.runLater(() -> {
                     currentChatView = view;
+                    currentChatController = chatController;
                     currentChatRecipientId = recipientId;
                     contentPane.getChildren().setAll(view);
                 });

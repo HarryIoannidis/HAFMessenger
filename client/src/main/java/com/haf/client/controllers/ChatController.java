@@ -6,11 +6,14 @@ import com.haf.client.utils.MessageBubbleFactory;
 import com.haf.client.viewmodels.MessageViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.collections.ListChangeListener;
+import javafx.collections.WeakListChangeListener;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Controller for {@code chat.fxml}.
@@ -42,6 +45,11 @@ public class ChatController {
     // We hold a strong reference to the listener to avoid early garbage collection
     // while the WeakListChangeListener wrapper is active.
     private ListChangeListener<MessageVM> messageListener;
+    private WeakListChangeListener<MessageVM> weakMessageListener;
+    private javafx.collections.ObservableList<MessageVM> currentObservedList;
+
+    // Per-contact draft text cache so unsent messages survive contact switches.
+    private final Map<String, String> drafts = new HashMap<>();
 
     @FXML
     public void initialize() {
@@ -67,6 +75,11 @@ public class ChatController {
             return;
         }
 
+        // Remove old listener from the previous contact's list
+        if (currentObservedList != null && weakMessageListener != null) {
+            currentObservedList.removeListener(weakMessageListener);
+        }
+
         // Clear existing messages
         chatBox.getChildren().clear();
 
@@ -90,8 +103,10 @@ public class ChatController {
             }
         };
 
-        // Attach via WeakListChangeListener to prevent leaking this controller
-        viewModel.getMessages(recipientId).addListener(messageListener);
+        // Track and attach via WeakListChangeListener
+        currentObservedList = viewModel.getMessages(recipientId);
+        weakMessageListener = new WeakListChangeListener<>(messageListener);
+        currentObservedList.addListener(weakMessageListener);
     }
 
     /**
@@ -101,8 +116,25 @@ public class ChatController {
      * @param recipientId the contact's unique identifier
      */
     public void setRecipient(String recipientId) {
+        // Save current draft before switching
+        if (!this.recipientId.isEmpty() && messageField != null) {
+            String currentText = messageField.getText();
+            if (currentText != null && !currentText.isEmpty()) {
+                drafts.put(this.recipientId, currentText);
+            } else {
+                drafts.remove(this.recipientId);
+            }
+        }
+
         this.recipientId = recipientId != null ? recipientId : "";
         loadMessages();
+
+        // Restore draft for the new contact
+        if (messageField != null) {
+            String draft = drafts.getOrDefault(this.recipientId, "");
+            messageField.setText(draft);
+            messageField.positionCaret(draft.length());
+        }
     }
 
     private void sendMessage() {

@@ -8,6 +8,7 @@ module server {
     requires org.java_websocket;
     requires io.github.cdimascio.dotenv.java;
     requires password4j;
+    requires org.slf4j;
     requires transitive shared;
 
     opens com.haf.server.ingress to com.fasterxml.jackson.databind;

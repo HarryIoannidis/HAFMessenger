@@ -3,6 +3,8 @@ package com.haf.client.network;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,6 +27,8 @@ import com.haf.shared.exceptions.SslConfigurationException;
  * Features implement exponential backoff and certificate pinning.
  */
 public class WebSocketAdapter {
+    private static final Logger LOGGER = Logger.getLogger(WebSocketAdapter.class.getName());
+
     private final URI serverUri;
     private final String sessionId;
     private final HttpClient httpClient;
@@ -179,16 +183,7 @@ public class WebSocketAdapter {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                        return response.body();
-                    } else {
-                        throw new HttpCommunicationException(
-                                "HTTP GET failed with status " + response.statusCode() + ": " + response.body(),
-                                response.statusCode(), response.body());
-                    }
-                });
+        return sendWithRetry(request, "GET");
     }
 
     /**
@@ -216,16 +211,7 @@ public class WebSocketAdapter {
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                        return response.body();
-                    } else {
-                        throw new HttpCommunicationException(
-                                "HTTP POST failed with status " + response.statusCode() + ": " + response.body(),
-                                response.statusCode(), response.body());
-                    }
-                });
+        return sendWithRetry(request, "POST");
     }
 
     /**
@@ -252,16 +238,47 @@ public class WebSocketAdapter {
                 .DELETE()
                 .build();
 
+        return sendWithRetry(request, "DELETE");
+    }
+
+    /**
+     * Sends an HTTP request with a single retry on connection errors.
+     * Java's HttpClient may reuse a stale pooled TCP connection that the server
+     * has already closed, resulting in a ClosedChannelException. A retry forces
+     * the client to open a fresh connection.
+     */
+    private CompletableFuture<String> sendWithRetry(HttpRequest request, String method) {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                        return response.body();
-                    } else {
-                        throw new HttpCommunicationException(
-                                "HTTP DELETE failed with status " + response.statusCode() + ": " + response.body(),
-                                response.statusCode(), response.body());
+                .thenApply(response -> validateResponse(response, method))
+                .exceptionallyCompose(error -> {
+                    if (isConnectionError(error)) {
+                        LOGGER.log(Level.WARNING, "HTTP {0} failed with connection error, retrying once", method);
+                        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                                .thenApply(response -> validateResponse(response, method));
                     }
+                    return CompletableFuture.failedFuture(error);
                 });
+    }
+
+    private String validateResponse(HttpResponse<String> response, String method) {
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            return response.body();
+        }
+        throw new HttpCommunicationException(
+                "HTTP " + method + " failed with status " + response.statusCode() + ": " + response.body(),
+                response.statusCode(), response.body());
+    }
+
+    private static boolean isConnectionError(Throwable error) {
+        Throwable cause = error;
+        while (cause != null) {
+            if (cause instanceof java.net.ConnectException
+                    || cause instanceof java.nio.channels.ClosedChannelException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private WebSocket.Listener createWebSocketListener() {

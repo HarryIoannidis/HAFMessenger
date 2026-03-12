@@ -16,7 +16,11 @@ public final class KeystoreBootstrap {
     }
 
     public static Path run() throws Exception {
-        return run(null);
+        return run(null, null);
+    }
+
+    public static Path run(String userId) throws Exception {
+        return run(userId, null);
     }
 
     /**
@@ -26,7 +30,7 @@ public final class KeystoreBootstrap {
      * @return the root directory of the keystore
      * @throws Exception
      */
-    public static Path run(String userId) throws Exception {
+    public static Path run(String userId, char[] passphrase) throws Exception {
         Path root = KeystoreRoot.preferred(userId);
 
         try {
@@ -36,7 +40,7 @@ public final class KeystoreBootstrap {
             FilePerms.ensureDir700(root);
         }
 
-        firstRunIfMissing(root);
+        firstRunIfMissing(root, passphrase);
 
         System.out.println("DEBUG: Bootstrap resolving root to: " + root.toAbsolutePath());
         return root;
@@ -48,7 +52,7 @@ public final class KeystoreBootstrap {
      * @param root the root directory of the keystore
      * @throws Exception
      */
-    private static void firstRunIfMissing(Path root) throws Exception {
+    private static void firstRunIfMissing(Path root, char[] passphrase) throws Exception {
         try (var s = Files.list(root)) {
             if (s.findAny().isPresent())
                 return;
@@ -62,7 +66,7 @@ public final class KeystoreBootstrap {
         FilePerms.writeFile600(dir.resolve("public.pem"),
                 EccKeyIO.publicPem(kp.getPublic()).getBytes(StandardCharsets.US_ASCII));
 
-        char[] pass = getPass();
+        char[] pass = (passphrase != null && passphrase.length > 0) ? passphrase : getPass();
         byte[] prvPem = EccKeyIO.privatePem(kp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
         byte[] sealed = KeystoreSealing.sealWithPass(pass, prvPem);
         FilePerms.writeFile600(dir.resolve("private.enc"), sealed);

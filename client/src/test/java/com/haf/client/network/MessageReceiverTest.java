@@ -28,6 +28,8 @@ class MessageReceiverTest {
         private java.util.function.Consumer<String> messageConsumer;
         private boolean connected = false;
 
+        private final java.util.List<String> sentMessages = new java.util.ArrayList<>();
+
         MockWebSocketAdapter() {
             super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
         }
@@ -40,6 +42,11 @@ class MessageReceiverTest {
         }
 
         @Override
+        public void sendText(String text) throws java.io.IOException {
+            sentMessages.add(text);
+        }
+
+        @Override
         public boolean isConnected() {
             return connected;
         }
@@ -49,11 +56,15 @@ class MessageReceiverTest {
             connected = false;
         }
 
-        void simulateIncomingMessage(String json) {
-            String wrappedJson = "{\"type\":\"message\",\"payload\":" + json + "}";
+        void simulateIncomingMessage(String json, String envelopeId) {
+            String wrappedJson = "{\"type\":\"message\",\"envelopeId\":\"" + envelopeId + "\",\"payload\":" + json + "}";
             if (messageConsumer != null) {
                 messageConsumer.accept(wrappedJson);
             }
+        }
+
+        java.util.List<String> getSentMessages() {
+            return sentMessages;
         }
     }
 
@@ -134,14 +145,20 @@ class MessageReceiverTest {
                 recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
         EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
 
-        // Send via WebSocket
+        // Send via WebSocket with envelopeId
+        String envelopeId = "env-001";
         String json = JsonCodec.toJson(encrypted);
-        webSocketAdapter.simulateIncomingMessage(json);
+        webSocketAdapter.simulateIncomingMessage(json, envelopeId);
 
         // Verify message was received and decrypted
         assertEquals(1, receivedMessages.size());
         assertArrayEquals(payload, receivedMessages.get(0));
         assertEquals(0, receivedErrors.size());
+
+        // Verify ACK was sent
+        List<String> sent = webSocketAdapter.getSentMessages();
+        assertEquals(1, sent.size());
+        assertEquals("{\"envelopeIds\":[\"env-001\"]}", sent.get(0));
     }
 
     @Test
@@ -159,7 +176,7 @@ class MessageReceiverTest {
         // So message is expired
 
         String json = JsonCodec.toJson(encrypted);
-        webSocketAdapter.simulateIncomingMessage(json);
+        webSocketAdapter.simulateIncomingMessage(json, "env-expired");
 
         // Verify error was received
         assertEquals(0, receivedMessages.size());
@@ -179,7 +196,7 @@ class MessageReceiverTest {
         EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
 
         String json = JsonCodec.toJson(encrypted);
-        webSocketAdapter.simulateIncomingMessage(json);
+        webSocketAdapter.simulateIncomingMessage(json, "env-wrong-recipient");
 
         // Verify error was received (recipient mismatch)
         assertEquals(0, receivedMessages.size());
