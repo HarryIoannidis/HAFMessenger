@@ -46,7 +46,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * @throws Exception if keystore initialization fails
      */
     public UserKeystoreKeyProvider(String senderId, char[] passphrase) throws Exception {
-        this(KeystoreBootstrap.run(senderId), senderId, passphrase);
+        this(KeystoreBootstrap.run(senderId, passphrase), senderId, passphrase);
     }
 
     /**

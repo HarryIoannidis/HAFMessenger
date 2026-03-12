@@ -5,7 +5,6 @@ import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageExpiredException;
-import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.JsonCodec;
@@ -81,10 +80,9 @@ public class DefaultMessageReceiver implements MessageReceiver {
      */
     private void handleIncomingMessage(String json) {
         try {
-            // 1. Unwrap envelope if necessary (Server wraps in {type, envelopeId, payload, expiresAt})
             java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
             if (!"message".equals(envelope.get("type"))) {
-                return; // Ignore ACKs or other types
+                return;
             }
 
             Object payloadObj = envelope.get("payload");
@@ -92,49 +90,18 @@ public class DefaultMessageReceiver implements MessageReceiver {
                 return;
             }
 
-            // 2. Deserialize payload with JsonCodec
-            EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj), EncryptedMessage.class);
+            EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj),
+                    EncryptedMessage.class);
 
-            // 3. Validate with MessageValidator
-            List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
-            if (!errors.isEmpty()) {
-                if (messageListener != null) {
-                    messageListener.onError(new MessageValidationException(errors));
-                }
-                return;
-            }
+            processEncryptedMessage(encryptedMessage);
 
-            // 4. Check recipient ID matches local recipient
-            validateRecipient(encryptedMessage);
-
-            // 5. Check expiry using ClockProvider (before decrypt)
-            long now = clockProvider.currentTimeMillis();
-            if (now > encryptedMessage.getTimestampEpochMs() + encryptedMessage.getTtlSeconds() * 1000L) {
-                if (messageListener != null) {
-                    messageListener.onError(new MessageExpiredException("Message expired at " + now));
-                }
-                return;
-            }
-
-            // 5. Load local private key from UserKeystore
-            PrivateKey privateKey = loadLocalPrivateKey();
-
-            // 6. Create MessageDecryptor with private key and ClockProvider
-            MessageDecryptor decryptor = new MessageDecryptor(privateKey, clockProvider);
-
-            // 7. Decrypt to get plaintext bytes
-            byte[] plaintext = decryptor.decryptMessage(encryptedMessage);
-
-            // 8. Extract senderId, contentType from EncryptedMessage
-            String senderId = encryptedMessage.getSenderId();
-            String contentType = encryptedMessage.getContentType();
-
-            // 9. Deliver to MessageListener
+            sendAckIfPossible(envelope);
+        } catch (com.haf.shared.exceptions.KeystoreOperationException e) {
+            e.printStackTrace();
             if (messageListener != null) {
-                messageListener.onMessage(plaintext, senderId, contentType, encryptedMessage.getTimestampEpochMs());
+                messageListener.onError(new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
             }
-
-        } catch (MessageValidationException | MessageExpiredException | MessageTamperedException e) {
+        } catch (com.haf.shared.exceptions.MessageValidationException | MessageExpiredException e) {
             e.printStackTrace();
             if (messageListener != null) {
                 messageListener.onError(e);
@@ -142,8 +109,53 @@ public class DefaultMessageReceiver implements MessageReceiver {
         } catch (Exception e) {
             e.printStackTrace();
             if (messageListener != null) {
-                messageListener.onError(new IOException("Failed to process message", e));
+                messageListener.onError(new IOException("Failed to process message: " + e.getMessage(), e));
             }
+        }
+    }
+
+    private void processEncryptedMessage(EncryptedMessage encryptedMessage) throws Exception {
+        // 3. Validate with MessageValidator
+        List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
+        if (!errors.isEmpty()) {
+            throw new com.haf.shared.exceptions.MessageValidationException(errors);
+        }
+
+        // 4. Check recipient ID matches local recipient
+        validateRecipient(encryptedMessage);
+
+        // 5. Check expiry using ClockProvider (before decrypt)
+        validateExpiry(encryptedMessage);
+
+        // 6. Load local private key from UserKeystore
+        PrivateKey privateKey = loadLocalPrivateKey();
+
+        // 7. Decrypt message
+        MessageDecryptor decryptor = new MessageDecryptor(privateKey, clockProvider);
+        byte[] plaintext = decryptor.decryptMessage(encryptedMessage);
+
+        // 8. Deliver to MessageListener
+        if (messageListener != null) {
+            messageListener.onMessage(plaintext,
+                    encryptedMessage.getSenderId(),
+                    encryptedMessage.getContentType(),
+                    encryptedMessage.getTimestampEpochMs());
+        }
+    }
+
+    private void validateExpiry(EncryptedMessage msg) throws MessageExpiredException {
+        long now = clockProvider.currentTimeMillis();
+        long expiryTime = msg.getTimestampEpochMs() + msg.getTtlSeconds() * 1000L;
+        if (now > expiryTime) {
+            throw new MessageExpiredException("Message expired at " + now);
+        }
+    }
+
+    private void sendAckIfPossible(java.util.Map<?, ?> envelope) throws IOException {
+        Object envId = envelope.get("envelopeId");
+        if (envId != null) {
+            String ack = "{\"envelopeIds\":[\"" + envId + "\"]}";
+            webSocketAdapter.sendText(ack);
         }
     }
 

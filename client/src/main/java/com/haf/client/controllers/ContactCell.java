@@ -10,14 +10,13 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
-
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * A {@link ListCell} that renders each contact using {@code contact_cell.fxml}.
- * The cell now works with {@link ContactInfo} objects instead of raw Strings.
+ * The cell now works with {@link ContactInfo} objects.
  */
 public class ContactCell extends ListCell<ContactInfo> {
 

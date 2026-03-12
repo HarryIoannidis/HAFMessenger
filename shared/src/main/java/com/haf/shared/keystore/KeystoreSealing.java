@@ -2,6 +2,7 @@ package com.haf.shared.keystore;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
+import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import com.haf.shared.constants.CryptoConstants;
@@ -21,7 +22,7 @@ public final class KeystoreSealing {
      * @return the sealed ciphertext
      * @throws Exception if sealing fails
      */
-    public static byte[] sealWithPass(char[] pass, byte[] plaintext) throws Exception {
+    public static byte[] sealWithPass(char[] pass, byte[] plaintext) throws GeneralSecurityException {
         byte[] salt = new byte[CryptoConstants.SALT_LEN];
         RNG.nextBytes(salt);
 
@@ -47,7 +48,7 @@ public final class KeystoreSealing {
      * @return the plaintext
      * @throws Exception
      */
-    public static byte[] openWithPass(char[] pass, byte[] envelope) throws Exception {
+    public static byte[] openWithPass(char[] pass, byte[] envelope) throws GeneralSecurityException, KeystoreOperationException {
         String env = new String(envelope, java.nio.charset.StandardCharsets.US_ASCII);
         String[] parts = env.split("\\.");
 
@@ -67,7 +68,13 @@ public final class KeystoreSealing {
         Cipher cipher = Cipher.getInstance(CryptoConstants.AES_GCM_TRANSFORMATION);
         cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(CryptoConstants.GCM_TAG_BITS, iv));
 
-        return cipher.doFinal(ct);
+        try {
+            return cipher.doFinal(ct);
+        } catch (AEADBadTagException e) {
+            throw new KeystoreOperationException("Tag mismatch: incorrect passphrase or corrupted data", e);
+        } catch (GeneralSecurityException e) {
+            throw new KeystoreOperationException("Decryption failed: " + e.getMessage(), e);
+        }
     }
 
     /**
