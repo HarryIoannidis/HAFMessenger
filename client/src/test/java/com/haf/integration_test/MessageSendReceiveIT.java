@@ -149,7 +149,7 @@ class MessageSendReceiveIT {
         messageReceivedLatch = new CountDownLatch(1);
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                 receivedPayload = plaintext;
                 receivedSenderId = senderId;
                 receivedContentType = contentType;
@@ -232,7 +232,7 @@ class MessageSendReceiveIT {
         CountDownLatch latch = new CountDownLatch(1);
         testReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                 assertEquals(2000000L, timestampEpochMs);
                 latch.countDown();
             }
@@ -302,7 +302,7 @@ class MessageSendReceiveIT {
             CountDownLatch latch = new CountDownLatch(1);
             dsReceiver.setMessageListener(new MessageReceiver.MessageListener() {
                 @Override
-                public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+                public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                     receivedPayload = plaintext;
                     receivedSenderId = senderId;
                     receivedContentType = contentType;

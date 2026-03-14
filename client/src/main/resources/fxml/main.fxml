@@ -89,7 +89,7 @@
                         </StackPane>
                         <StackPane>
                            <children>
-                              <JFXButton fx:id="navSearch" contentDisplay="CENTER" focusTraversable="false" prefHeight="90.0" prefWidth="140.0" styleClass="nav-item" text=" ">
+                              <JFXButton fx:id="navSearch" contentDisplay="GRAPHIC_ONLY" focusTraversable="false" prefHeight="90.0" prefWidth="140.0" styleClass="nav-item" text=" ">
                                  <graphic>
                                     <FontIcon fx:id="iconSearch" iconLiteral="mdi2m-magnify" iconSize="27" styleClass="nav-item-icon" />
                                  </graphic>
@@ -189,7 +189,7 @@
                           <!-- Permanent spacer: fills when neither panel is active, yields to ALWAYS panels -->
                           <Pane HBox.hgrow="SOMETIMES" />
                           <!-- Dots menu button: always visible at far right -->
-                         <JFXButton focusTraversable="false" contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
+                         <JFXButton fx:id="dotsMenuButton" focusTraversable="false" contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                             <graphic>
                                <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="25" />
                             </graphic>
@@ -208,6 +208,7 @@
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/main.css" />
+      <URL value="@../css/options.css" />
    </stylesheets>
    <center>
       <SplitPane dividerPositions="0.233" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
