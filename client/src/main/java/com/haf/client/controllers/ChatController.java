@@ -92,13 +92,23 @@ public class ChatController {
         messageListener = change -> {
             while (change.next()) {
                 if (change.wasAdded()) {
+                    boolean hasIncomingMessages = false;
                     for (MessageVM vm : change.getAddedSubList()) {
                         Node bubble = MessageBubbleFactory.create(vm);
                         chatBox.getChildren().add(bubble);
+                        if (!vm.isOutgoing()) {
+                            hasIncomingMessages = true;
+                        }
                     }
                     // Auto-scroll to the newest bubble.
                     chatScrollPane.layout();
                     chatScrollPane.setVvalue(1.0);
+
+                    // User is currently viewing this chat, so newly arrived incoming
+                    // envelopes can be acknowledged immediately.
+                    if (hasIncomingMessages) {
+                        viewModel.acknowledgeMessagesFrom(recipientId);
+                    }
                 }
             }
         };
@@ -107,6 +117,9 @@ public class ChatController {
         currentObservedList = viewModel.getMessages(recipientId);
         weakMessageListener = new WeakListChangeListener<>(messageListener);
         currentObservedList.addListener(weakMessageListener);
+
+        // ACK all pending envelopes from this sender now that the user is viewing the chat.
+        viewModel.acknowledgeMessagesFrom(recipientId);
     }
 
     /**

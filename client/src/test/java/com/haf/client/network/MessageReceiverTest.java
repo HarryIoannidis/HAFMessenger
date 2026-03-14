@@ -109,7 +109,7 @@ class MessageReceiverTest {
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                 receivedMessages.add(plaintext);
             }
 
@@ -155,8 +155,15 @@ class MessageReceiverTest {
         assertArrayEquals(payload, receivedMessages.get(0));
         assertEquals(0, receivedErrors.size());
 
-        // Verify ACK was sent
+        // Verify ACK was NOT sent automatically (deferred until user views the chat)
         List<String> sent = webSocketAdapter.getSentMessages();
+        assertEquals(0, sent.size(), "ACK should not be sent automatically on receipt");
+
+        // Now explicitly acknowledge envelopes for the sender
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+
+        // Verify ACK was sent after explicit acknowledge
+        sent = webSocketAdapter.getSentMessages();
         assertEquals(1, sent.size());
         assertEquals("{\"envelopeIds\":[\"env-001\"]}", sent.get(0));
     }
@@ -202,5 +209,48 @@ class MessageReceiverTest {
         assertEquals(0, receivedMessages.size());
         assertEquals(1, receivedErrors.size());
         assertTrue(receivedErrors.get(0) instanceof MessageValidationException);
+    }
+
+    @Test
+    void decrypts_with_fallback_key_when_current_key_does_not_match() throws Exception {
+        UserKeystore keyStore = new UserKeystore(tmpRoot);
+        String rotatedCurrentKeyId = "key-rotated-current";
+        KeyPair rotatedCurrentKey = EccKeyIO.generate();
+        keyStore.saveKeypair(rotatedCurrentKeyId, rotatedCurrentKey, passphrase);
+
+        messageReceiver.start();
+
+        byte[] payload = "legacy key message".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+
+        String envelopeId = "env-fallback";
+        webSocketAdapter.simulateIncomingMessage(JsonCodec.toJson(encrypted), envelopeId);
+
+        assertEquals(1, receivedMessages.size());
+        assertArrayEquals(payload, receivedMessages.get(0));
+        assertEquals(0, receivedErrors.size());
+    }
+
+    @Test
+    void acknowledges_undecryptable_envelope_to_prevent_retries() throws Exception {
+        messageReceiver.start();
+
+        KeyPair unknownRecipientKey = EccKeyIO.generate();
+        MessageEncryptor encryptor = new MessageEncryptor(
+                unknownRecipientKey.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt("xx".getBytes(StandardCharsets.UTF_8), "text/plain", 3600);
+
+        String envelopeId = "env-bad-tag";
+        webSocketAdapter.simulateIncomingMessage(JsonCodec.toJson(encrypted), envelopeId);
+
+        assertEquals(0, receivedMessages.size());
+        assertEquals(1, receivedErrors.size());
+        assertTrue(receivedErrors.get(0) instanceof com.haf.shared.exceptions.MessageTamperedException);
+
+        List<String> sent = webSocketAdapter.getSentMessages();
+        assertEquals(1, sent.size());
+        assertEquals("{\"envelopeIds\":[\"env-bad-tag\"]}", sent.get(0));
     }
 }

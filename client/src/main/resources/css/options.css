@@ -1,0 +1,6 @@
+.dropdown-menu {
+    -fx-background-color: #f2f2f2;
+    -fx-background-radius: 14;
+    -fx-padding: 6;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 18, 0.25, 0, 4);
+}

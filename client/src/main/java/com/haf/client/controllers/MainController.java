@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.core.ChatSession;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.model.ContactInfo;
 import com.haf.client.utils.UiConstants;
@@ -12,8 +13,13 @@ import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.scene.Parent;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -85,6 +91,10 @@ public class MainController {
     @FXML
     private Circle profileActivenessCircle;
 
+    // Dots menu button
+    @FXML
+    private JFXButton dotsMenuButton;
+
     // Content area
     @FXML
     private StackPane contentPane;
@@ -116,6 +126,7 @@ public class MainController {
     public void initialize() {
         setupWindowControls();
         setupNavBar();
+        setupDotsMenu();
         setupContactList();
         setupContactSelection();
         setupSearchField();
@@ -142,7 +153,8 @@ public class MainController {
                             for (UserSearchResult contact : response.getContacts()) {
                                 if (!hasContact(contact.getUserId())) {
                                     contactsList.getItems()
-                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName(), contact.getRegNumber()));
+                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName(),
+                                                    contact.getRegNumber()));
                                 }
                             }
                         });
@@ -543,5 +555,73 @@ public class MainController {
                 stage.setY(event.getScreenY() - yOffset);
             });
         }
+    }
+
+    private void setupDotsMenu() {
+        if (dotsMenuButton == null) {
+            return;
+        }
+
+        ContextMenu menu = new ContextMenu();
+        menu.getStyleClass().add("dropdown-menu");
+
+        MenuItem profileItem = createIconMenuItem("mdi2a-account-circle-outline", "Profile");
+        MenuItem settingsItem = createIconMenuItem("mdi2c-cog-outline", "Settings");
+        MenuItem helpItem = createIconMenuItem("mdi2h-help-circle-outline", "Help");
+        MenuItem logoutItem = createIconMenuItem("mdi2l-logout", "Log out");
+
+        profileItem.setOnAction(e -> LOGGER.info("TODO: Profile clicked"));
+        settingsItem.setOnAction(e -> LOGGER.info("TODO: Settings clicked"));
+        helpItem.setOnAction(e -> LOGGER.info("TODO: Help clicked"));
+        logoutItem.setOnAction(e -> handleLogout());
+
+        menu.getItems().addAll(
+                profileItem,
+                new SeparatorMenuItem(),
+                settingsItem,
+                new SeparatorMenuItem(),
+                helpItem,
+                new SeparatorMenuItem(),
+                logoutItem);
+
+        dotsMenuButton.setOnAction(e -> {
+            if (menu.isShowing()) {
+                menu.hide();
+            } else {
+                Bounds bounds = dotsMenuButton.localToScreen(dotsMenuButton.getBoundsInLocal());
+                menu.show(dotsMenuButton, bounds.getMinX() - menu.prefWidth(-1) + bounds.getWidth(),
+                        bounds.getMaxY());
+            }
+        });
+    }
+
+    private MenuItem createIconMenuItem(String iconLiteral, String text) {
+        FontIcon icon = new FontIcon(iconLiteral);
+        icon.setIconSize(22);
+        Label label = new Label(text, icon);
+        label.setGraphicTextGap(12);
+        MenuItem item = new MenuItem();
+        item.setGraphic(label);
+        return item;
+    }
+
+    private void handleLogout() {
+        LOGGER.info("Logging out...");
+
+        // 1. Close WebSocket connection
+        if (NetworkSession.get() != null) {
+            try {
+                NetworkSession.get().close();
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error closing WebSocket on logout", ex);
+            }
+        }
+
+        // 2. Clear session singletons
+        NetworkSession.clear();
+        ChatSession.clear();
+
+        // 3. Navigate back to login screen
+        Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
     }
 }

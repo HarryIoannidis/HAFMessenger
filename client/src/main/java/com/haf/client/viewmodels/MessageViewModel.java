@@ -49,7 +49,7 @@ public class MessageViewModel {
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                 MessageVM vm = decodeIncoming(plaintext, senderId, contentType, timestampEpochMs);
                 Platform.runLater(() -> {
                     getMessages(senderId).add(vm);
@@ -107,6 +107,17 @@ public class MessageViewModel {
     public void stopReceiving() {
         messageReceiver.stop();
         Platform.runLater(() -> status.set("Stopped receiving messages"));
+    }
+
+    /**
+     * Acknowledges all pending messages received from a specific sender.
+     * Call this when the user opens the chat with that sender so the
+     * server marks those envelopes as delivered.
+     *
+     * @param senderId the sender whose messages should be acknowledged
+     */
+    public void acknowledgeMessagesFrom(String senderId) {
+        messageReceiver.acknowledgeEnvelopes(senderId);
     }
 
     /**
