@@ -73,7 +73,13 @@ public final class SessionDAO {
 
     private static final String SELECT_USER_SQL = """
             SELECT user_id FROM sessions
-            WHERE session_id = ? AND expires_at > ?
+            WHERE session_id = ? AND expires_at > ? AND revoked = FALSE
+            """;
+
+    private static final String REVOKE_SESSION_SQL = """
+            UPDATE sessions
+            SET revoked = TRUE
+            WHERE session_id = ?
             """;
 
     /**
@@ -101,5 +107,26 @@ public final class SessionDAO {
             auditLogger.logError("db_verify_session", null, "unknown", ex);
         }
         return null;
+    }
+
+    /**
+     * Revokes the given session.
+     * If the session does not exist or is already revoked, this is still treated as
+     * a successful no-op.
+     *
+     * @param sessionId the session ID to revoke
+     */
+    public void revokeSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(REVOKE_SESSION_SQL)) {
+            ps.setString(1, sessionId);
+            ps.executeUpdate();
+        } catch (SQLException ex) {
+            auditLogger.logError("db_revoke_session", null, sessionId, ex);
+            throw new DatabaseOperationException("Failed to revoke session", ex);
+        }
     }
 }

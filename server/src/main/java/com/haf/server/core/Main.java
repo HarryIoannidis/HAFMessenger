@@ -8,6 +8,7 @@ import com.haf.server.db.SessionDAO;
 import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.ingress.HttpIngressServer;
+import com.haf.server.ingress.PresenceRegistry;
 import com.haf.server.ingress.WebSocketIngressServer;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
@@ -73,12 +74,14 @@ public final class Main {
             ContactDAO contactDAO = new ContactDAO(dataSource);
             MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
+            PresenceRegistry presenceRegistry = new PresenceRegistry();
 
             HttpIngressServer httpServer = new HttpIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
-                    sessionDAO, fileUploadDAO, contactDAO);
+                    sessionDAO, fileUploadDAO, contactDAO, presenceRegistry);
             WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
-                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO);
+                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO,
+                    contactDAO, presenceRegistry);
 
             metricsFutureRef[0] = scheduler.scheduleAtFixedRate(
                     () -> auditLogger.logMetricsSnapshot(metricsRegistry.snapshot()),

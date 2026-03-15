@@ -54,18 +54,22 @@ class HttpIngressServerTest {
     @Mock
     private ContactDAO contactDAO;
 
+    private PresenceRegistry presenceRegistry;
+
     @BeforeEach
     void setUp() throws Exception {
         metricsRegistry = new MetricsRegistry();
         validator = new EncryptedMessageValidator();
         sslContext = createTestSSLContext();
+        presenceRegistry = new PresenceRegistry();
 
         // Use port 0 to get a random available port for tests
         when(config.getHttpPort()).thenReturn(0);
 
         server = new HttpIngressServer(
                 config, sslContext, mailboxRouter, rateLimiterService,
-                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO, contactDAO);
+                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO, contactDAO,
+                presenceRegistry);
     }
 
     @Test

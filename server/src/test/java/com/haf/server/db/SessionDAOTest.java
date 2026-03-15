@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,6 +31,9 @@ class SessionDAOTest {
 
     @Mock
     private AuditLogger auditLogger;
+
+    @Mock
+    private ResultSet resultSet;
 
     private SessionDAO dao;
 
@@ -61,6 +65,45 @@ class SessionDAOTest {
 
         assertThrows(DatabaseOperationException.class, () -> dao.createSession("user-123"));
         verify(auditLogger, times(1)).logError(eq("db_create_session"), isNull(), eq("user-123"), any());
+    }
+
+    @Test
+    void getUserIdForSession_returns_user_for_active_non_revoked_session() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("revoked = FALSE"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getString("user_id")).thenReturn("user-123");
+
+        String userId = dao.getUserIdForSession("session-123");
+
+        assertEquals("user-123", userId);
+    }
+
+    @Test
+    void getUserIdForSession_returns_null_for_blank_session() {
+        assertNull(dao.getUserIdForSession(" "));
+    }
+
+    @Test
+    void revokeSession_executes_update() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("UPDATE sessions"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenReturn(1);
+
+        assertDoesNotThrow(() -> dao.revokeSession("session-123"));
+        verify(preparedStatement).setString(1, "session-123");
+        verify(preparedStatement, times(1)).executeUpdate();
+    }
+
+    @Test
+    void revokeSession_throws_on_sql_exception() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("UPDATE sessions"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.revokeSession("session-123"));
+        verify(auditLogger, times(1)).logError(eq("db_revoke_session"), isNull(), eq("session-123"), any());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.ContactDAO;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
@@ -54,8 +55,12 @@ class WebSocketIngressServerTest {
     @Mock
     private SessionDAO sessionDAO;
 
+    @Mock
+    private ContactDAO contactDAO;
+
     private SSLContext sslContext;
     private WebSocketIngressServer server;
+    private PresenceRegistry presenceRegistry;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -63,10 +68,11 @@ class WebSocketIngressServerTest {
 
         // Use port 0 to get a random available port for tests
         when(config.getWsPort()).thenReturn(0);
+        presenceRegistry = new PresenceRegistry();
 
         server = new WebSocketIngressServer(
                 config, sslContext, mailboxRouter, rateLimiterService,
-                auditLogger, metricsRegistry, sessionDAO);
+                auditLogger, metricsRegistry, sessionDAO, contactDAO, presenceRegistry);
     }
 
     @Test
@@ -89,6 +95,62 @@ class WebSocketIngressServerTest {
     }
 
     @Test
+    void on_open_broadcasts_active_only_on_first_connection() {
+        String userId = "user-a";
+        String watcherId = "watcher-1";
+        WebSocket watcherConnection = mock(WebSocket.class);
+        WebSocket secondConnection = mock(WebSocket.class);
+        ClientHandshake secondHandshake = mock(ClientHandshake.class);
+
+        presenceRegistry.registerConnection(watcherId, watcherConnection);
+
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer session-1");
+        when(secondHandshake.getFieldValue("Authorization")).thenReturn("Bearer session-2");
+        when(sessionDAO.getUserIdForSession("session-1")).thenReturn(userId);
+        when(sessionDAO.getUserIdForSession("session-2")).thenReturn(userId);
+        when(contactDAO.getWatcherUserIds(userId)).thenReturn(List.of(watcherId));
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
+
+        server.onOpen(webSocket, handshake);
+        server.onOpen(secondConnection, secondHandshake);
+
+        verify(watcherConnection, times(1)).send(contains("\"type\":\"presence\""));
+        verify(watcherConnection, times(1)).send(contains("\"active\":true"));
+    }
+
+    @Test
+    void on_close_broadcasts_inactive_only_on_last_connection() {
+        String userId = "user-a";
+        String watcherId = "watcher-1";
+        WebSocket watcherConnection = mock(WebSocket.class);
+        WebSocket secondConnection = mock(WebSocket.class);
+        ClientHandshake secondHandshake = mock(ClientHandshake.class);
+
+        presenceRegistry.registerConnection(watcherId, watcherConnection);
+
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer session-1");
+        when(secondHandshake.getFieldValue("Authorization")).thenReturn("Bearer session-2");
+        when(sessionDAO.getUserIdForSession("session-1")).thenReturn(userId);
+        when(sessionDAO.getUserIdForSession("session-2")).thenReturn(userId);
+        when(contactDAO.getWatcherUserIds(userId)).thenReturn(List.of(watcherId));
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
+
+        server.onOpen(webSocket, handshake);
+        server.onOpen(secondConnection, secondHandshake);
+        clearInvocations(watcherConnection);
+
+        server.onClose(webSocket, 1000, "normal", true);
+        verify(watcherConnection, never()).send(contains("\"active\":false"));
+
+        server.onClose(secondConnection, 1000, "normal", true);
+        verify(watcherConnection, times(1)).send(contains("\"active\":false"));
+    }
+
+    @Test
     void on_open_rejects_unauthorized() {
         when(handshake.getFieldValue("Authorization")).thenReturn(null);
 
@@ -96,6 +158,7 @@ class WebSocketIngressServerTest {
 
         verify(webSocket, times(1)).closeConnection(CloseFrame.POLICY_VALIDATION, "Unauthorized");
         verify(mailboxRouter, never()).subscribe(anyString(), any());
+        verify(contactDAO, never()).getWatcherUserIds(anyString());
     }
 
     @Test

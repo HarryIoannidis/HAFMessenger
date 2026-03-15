@@ -5,6 +5,7 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
+import com.haf.client.viewmodels.MessageViewModel;
 import com.haf.shared.dto.AddContactRequest;
 import com.haf.shared.dto.ContactsResponse;
 import com.haf.shared.dto.UserSearchResult;
@@ -31,6 +32,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -114,6 +116,8 @@ public class MainController {
     private Parent currentChatView;
     private ChatController currentChatController;
     private String currentChatRecipientId;
+    private MessageViewModel activeMessageViewModel;
+    private MessageViewModel.PresenceListener presenceListener;
 
     private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
     private final java.util.concurrent.CompletableFuture<Parent> searchFuture = new java.util.concurrent.CompletableFuture<>();
@@ -130,6 +134,7 @@ public class MainController {
         setupContactList();
         setupContactSelection();
         setupSearchField();
+        registerPresenceListener();
 
         // Trigger pre-loading immediately
         triggerPreloading();
@@ -151,11 +156,11 @@ public class MainController {
                     if (response != null && response.getContacts() != null) {
                         Platform.runLater(() -> {
                             for (UserSearchResult contact : response.getContacts()) {
-                                if (!hasContact(contact.getUserId())) {
-                                    contactsList.getItems()
-                                            .add(ContactInfo.online(contact.getUserId(), contact.getFullName(),
-                                                    contact.getRegNumber()));
-                                }
+                                upsertContact(
+                                        contact.getUserId(),
+                                        contact.getFullName(),
+                                        contact.getRegNumber(),
+                                        contact.isActive());
                             }
                         });
                     }
@@ -358,19 +363,11 @@ public class MainController {
      * Adds a searched user to the contacts list and switches to their chat.
      */
     public void startChatWith(String userId, String fullName, String regNumber) {
-
-        // Find if contact already exists
-        ContactInfo target = null;
-        for (ContactInfo info : contactsList.getItems()) {
-            if (info.id().equals(userId)) {
-                target = info;
-                break;
-            }
-        }
+        ContactInfo target = getContactById(userId);
 
         // Add if not exists
         if (target == null) {
-            target = ContactInfo.online(userId, fullName, regNumber);
+            target = ContactInfo.inactive(userId, fullName, regNumber);
             contactsList.getItems().add(target);
         }
 
@@ -391,7 +388,7 @@ public class MainController {
 
     public void addContact(String userId, String fullName, String regNumber) {
         if (!hasContact(userId)) {
-            contactsList.getItems().add(ContactInfo.online(userId, fullName, regNumber));
+            contactsList.getItems().add(ContactInfo.inactive(userId, fullName, regNumber));
 
             // Persist to server
             if (NetworkSession.get() != null) {
@@ -617,21 +614,99 @@ public class MainController {
 
     private void handleLogout() {
         LOGGER.info("Logging out...");
-
-        // 1. Close WebSocket connection
-        if (NetworkSession.get() != null) {
-            try {
-                NetworkSession.get().close();
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error closing WebSocket on logout", ex);
+        Thread.ofVirtual().name("logout-thread").start(() -> {
+            // 1. Revoke server session (best effort), then close socket.
+            if (NetworkSession.get() != null) {
+                try {
+                    NetworkSession.get().postAuthenticated("/api/v1/logout", "{}").get(3, TimeUnit.SECONDS);
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "Logout API call failed; continuing with local logout", ex);
+                }
+                try {
+                    NetworkSession.get().close();
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "Error closing WebSocket on logout", ex);
+                }
             }
+
+            // 2. Clear session singletons
+            unregisterPresenceListener();
+            NetworkSession.clear();
+            ChatSession.clear();
+
+            // 3. Navigate back to login screen
+            Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
+        });
+    }
+
+    private void registerPresenceListener() {
+        activeMessageViewModel = ChatSession.get();
+        if (activeMessageViewModel == null) {
+            return;
+        }
+        presenceListener = this::applyPresenceUpdate;
+        activeMessageViewModel.addPresenceListener(presenceListener);
+    }
+
+    private void unregisterPresenceListener() {
+        if (activeMessageViewModel != null && presenceListener != null) {
+            activeMessageViewModel.removePresenceListener(presenceListener);
+        }
+        activeMessageViewModel = null;
+        presenceListener = null;
+    }
+
+    private void applyPresenceUpdate(String userId, boolean active) {
+        Platform.runLater(() -> updateContactPresence(userId, active));
+    }
+
+    private void updateContactPresence(String userId, boolean active) {
+        int index = findContactIndex(userId);
+        if (index < 0) {
+            return;
         }
 
-        // 2. Clear session singletons
-        NetworkSession.clear();
-        ChatSession.clear();
+        ContactInfo existing = contactsList.getItems().get(index);
+        ContactInfo updated = ContactInfo.fromPresence(existing.id(), existing.name(), existing.regNumber(), active);
+        contactsList.getItems().set(index, updated);
 
-        // 3. Navigate back to login screen
-        Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
+        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+        if (selected != null && selected.id().equals(userId)) {
+            contactsList.getSelectionModel().select(updated);
+            showProfilePanel(updated);
+        }
+    }
+
+    private void upsertContact(String userId, String fullName, String regNumber, boolean active) {
+        ContactInfo contact = ContactInfo.fromPresence(userId, fullName, regNumber, active);
+        int index = findContactIndex(userId);
+        if (index >= 0) {
+            contactsList.getItems().set(index, contact);
+            ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.id().equals(userId)) {
+                contactsList.getSelectionModel().select(contact);
+                showProfilePanel(contact);
+            }
+        } else {
+            contactsList.getItems().add(contact);
+        }
+    }
+
+    private ContactInfo getContactById(String userId) {
+        int index = findContactIndex(userId);
+        if (index < 0) {
+            return null;
+        }
+        return contactsList.getItems().get(index);
+    }
+
+    private int findContactIndex(String userId) {
+        for (int i = 0; i < contactsList.getItems().size(); i++) {
+            ContactInfo info = contactsList.getItems().get(i);
+            if (info.id().equals(userId)) {
+                return i;
+            }
+        }
+        return -1;
     }
 }

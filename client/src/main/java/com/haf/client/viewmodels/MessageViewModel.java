@@ -17,8 +17,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * ViewModel for the chat screen.
@@ -29,10 +31,16 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class MessageViewModel {
 
+    @FunctionalInterface
+    public interface PresenceListener {
+        void onPresenceUpdate(String userId, boolean active);
+    }
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
 
     private final StringProperty status = new SimpleStringProperty("Ready");
+    private final List<PresenceListener> presenceListeners = new CopyOnWriteArrayList<>();
 
     // Store messages by contact ID (sender or recipient)
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
@@ -51,7 +59,7 @@ public class MessageViewModel {
             @Override
             public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
                 MessageVM vm = decodeIncoming(plaintext, senderId, contentType, timestampEpochMs);
-                Platform.runLater(() -> {
+                runOnUiThread(() -> {
                     getMessages(senderId).add(vm);
                     status.set("Message received from " + senderId);
                 });
@@ -61,7 +69,12 @@ public class MessageViewModel {
             public void onError(Throwable error) {
                 // Errors are surfaced through the status property only —
                 // they do not appear as chat bubbles.
-                Platform.runLater(() -> status.set("Error: " + error.getMessage()));
+                runOnUiThread(() -> status.set("Error: " + error.getMessage()));
+            }
+
+            @Override
+            public void onPresenceUpdate(String userId, boolean active) {
+                runOnUiThread(() -> notifyPresenceListeners(userId, active));
             }
         });
     }
@@ -79,13 +92,13 @@ public class MessageViewModel {
             messageSender.sendMessage(payload, recipientId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
 
             MessageVM vm = MessageVM.outgoingText(text, LocalDateTime.now());
-            Platform.runLater(() -> {
+            runOnUiThread(() -> {
                 getMessages(recipientId).add(vm);
                 status.set("Message sent to " + recipientId);
             });
         } catch (Exception e) {
             e.printStackTrace();
-            Platform.runLater(() -> status.set("Failed to send: " + e.getMessage()));
+            runOnUiThread(() -> status.set("Failed to send: " + e.getMessage()));
         }
     }
 
@@ -95,9 +108,9 @@ public class MessageViewModel {
     public void startReceiving() {
         try {
             messageReceiver.start();
-            Platform.runLater(() -> status.set("Receiving messages…"));
+            runOnUiThread(() -> status.set("Receiving messages…"));
         } catch (Exception e) {
-            Platform.runLater(() -> status.set("Failed to start receiving: " + e.getMessage()));
+            runOnUiThread(() -> status.set("Failed to start receiving: " + e.getMessage()));
         }
     }
 
@@ -106,7 +119,7 @@ public class MessageViewModel {
      */
     public void stopReceiving() {
         messageReceiver.stop();
-        Platform.runLater(() -> status.set("Stopped receiving messages"));
+        runOnUiThread(() -> status.set("Stopped receiving messages"));
     }
 
     /**
@@ -139,6 +152,36 @@ public class MessageViewModel {
      */
     public StringProperty statusProperty() {
         return status;
+    }
+
+    public void addPresenceListener(PresenceListener listener) {
+        if (listener != null) {
+            presenceListeners.add(listener);
+        }
+    }
+
+    public void removePresenceListener(PresenceListener listener) {
+        if (listener != null) {
+            presenceListeners.remove(listener);
+        }
+    }
+
+    private void notifyPresenceListeners(String userId, boolean active) {
+        for (PresenceListener listener : presenceListeners) {
+            try {
+                listener.onPresenceUpdate(userId, active);
+            } catch (Exception ignored) {
+                // A bad listener must not break dispatching for others.
+            }
+        }
+    }
+
+    private static void runOnUiThread(Runnable action) {
+        try {
+            Platform.runLater(action);
+        } catch (IllegalStateException ex) {
+            action.run();
+        }
     }
 
     /**

@@ -75,4 +75,26 @@ public class ContactDAO {
             throw new DatabaseOperationException("Error removing contact " + contactId + " from user " + userId, e);
         }
     }
+
+    public List<String> getWatcherUserIds(String contactId) {
+        String sql = """
+                    SELECT user_id
+                    FROM contacts
+                    WHERE contact_id = ?
+                      AND status = 'ACCEPTED'
+                """;
+        List<String> watcherUserIds = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, contactId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    watcherUserIds.add(rs.getString("user_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new DatabaseOperationException("Error fetching watchers for contact " + contactId, e);
+        }
+        return watcherUserIds;
+    }
 }

@@ -1,6 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.ContactDAO;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.db.SessionDAO;
@@ -20,6 +21,7 @@ import javax.net.ssl.SSLContext;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,6 +35,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
     private final Map<WebSocket, MailboxSubscription> subscriptions = new ConcurrentHashMap<>();
     private final Map<WebSocket, String> connectionUsers = new ConcurrentHashMap<>();
     private final SessionDAO sessionDAO;
+    private final ContactDAO contactDAO;
+    private final PresenceRegistry presenceRegistry;
 
     /**
      * Creates a WebSocketIngressServer with the given configuration and
@@ -45,6 +49,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
      * @param auditLogger        the audit logger.
      * @param metricsRegistry    the metrics registry.
      * @param sessionDAO         the session DAO.
+     * @param contactDAO         the contact DAO.
+     * @param presenceRegistry   the presence registry.
      */
     public WebSocketIngressServer(ServerConfig config,
             SSLContext sslContext,
@@ -52,7 +58,9 @@ public final class WebSocketIngressServer extends WebSocketServer {
             RateLimiterService rateLimiterService,
             AuditLogger auditLogger,
             MetricsRegistry metricsRegistry,
-            SessionDAO sessionDAO) {
+            SessionDAO sessionDAO,
+            ContactDAO contactDAO,
+            PresenceRegistry presenceRegistry) {
         super(new InetSocketAddress(config.getWsPort()));
         setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
 
@@ -68,6 +76,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
         this.auditLogger = auditLogger;
         this.metricsRegistry = metricsRegistry;
         this.sessionDAO = sessionDAO;
+        this.contactDAO = contactDAO;
+        this.presenceRegistry = presenceRegistry;
     }
 
     /**
@@ -90,15 +100,26 @@ public final class WebSocketIngressServer extends WebSocketServer {
             return;
         }
 
-        connectionUsers.put(conn, userId);
+        try {
+            connectionUsers.put(conn, userId);
+            boolean becameActive = presenceRegistry.registerConnection(userId, conn);
 
-        MailboxSubscriber subscriber = envelope -> sendEnvelope(conn, envelope);
-        MailboxSubscription subscription = mailboxRouter.subscribe(userId, subscriber);
-        subscriptions.put(conn, subscription);
+            MailboxSubscriber subscriber = envelope -> sendEnvelope(conn, envelope);
+            MailboxSubscription subscription = mailboxRouter.subscribe(userId, subscriber);
+            subscriptions.put(conn, subscription);
 
-        List<QueuedEnvelope> pending = mailboxRouter.fetchUndelivered(userId, 100);
-        // Push any backlog to the newly connected client.
-        pending.forEach(envelope -> sendEnvelope(conn, envelope));
+            List<QueuedEnvelope> pending = mailboxRouter.fetchUndelivered(userId, 100);
+            // Push any backlog to the newly connected client.
+            pending.forEach(envelope -> sendEnvelope(conn, envelope));
+
+            if (becameActive) {
+                broadcastPresenceToWatchers(userId, true);
+            }
+        } catch (Exception ex) {
+            auditLogger.logError("ws_open_error", null, userId, ex);
+            cleanupConnection(conn);
+            conn.close(1011, "internal");
+        }
     }
 
     /**
@@ -112,8 +133,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        mailboxRouter.unsubscribe(subscriptions.remove(conn));
-        connectionUsers.remove(conn);
+        cleanupConnection(conn);
     }
 
     /**
@@ -174,7 +194,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     @Override
     public void onStart() {
-        // no-op
+        // No operation
     }
 
     /**
@@ -192,6 +212,41 @@ public final class WebSocketIngressServer extends WebSocketServer {
         conn.send(json);
     }
 
+    private void cleanupConnection(WebSocket conn) {
+        mailboxRouter.unsubscribe(subscriptions.remove(conn));
+        String userId = connectionUsers.remove(conn);
+        if (userId == null) {
+            return;
+        }
+        boolean becameInactive = presenceRegistry.unregisterConnection(userId, conn);
+        if (becameInactive) {
+            broadcastPresenceToWatchers(userId, false);
+        }
+    }
+
+    private void broadcastPresenceToWatchers(String userId, boolean active) {
+        try {
+            List<String> watcherUserIds = contactDAO.getWatcherUserIds(userId);
+            if (watcherUserIds == null || watcherUserIds.isEmpty()) {
+                return;
+            }
+
+            String payload = presenceJson(userId, active);
+            for (String watcherUserId : watcherUserIds) {
+                Set<WebSocket> watcherConnections = presenceRegistry.getActiveConnections(watcherUserId);
+                for (WebSocket watcherConnection : watcherConnections) {
+                    try {
+                        watcherConnection.send(payload);
+                    } catch (Exception ex) {
+                        auditLogger.logError("ws_presence_broadcast_error", null, watcherUserId, ex);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            auditLogger.logError("ws_presence_watchers_lookup_error", null, userId, ex);
+        }
+    }
+
     // Avoid using inner records for JSON I/O to keep Jackson from requiring deep
     // reflection on the module.
     // Minimal helper methods for small response payloads follow.
@@ -204,6 +259,10 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     private String rateLimitJson(long retryAfterSeconds) {
         return "{\"type\":\"rate_limit\",\"retryAfterSeconds\":" + Math.max(1, retryAfterSeconds) + "}";
+    }
+
+    private String presenceJson(String userId, boolean active) {
+        return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active + "}";
     }
 
     /**

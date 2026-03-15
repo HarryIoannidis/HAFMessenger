@@ -5,9 +5,15 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KeystoreBootstrapTest {
+    private String originalUserHome;
+    private Path tempHome;
 
     @BeforeEach
     void setup() throws Exception {
+        originalUserHome = System.getProperty("user.home");
+        tempHome = Files.createTempDirectory("haf-keystore-home");
+        System.setProperty("user.home", tempHome.toString());
+
         // Check OS
         String os = System.getProperty("os.name", "").toLowerCase();
 
@@ -20,29 +26,27 @@ class KeystoreBootstrapTest {
             System.setProperty("haf.keystore.root", "/root/___deny___");
         }
 
-        Path uf = KeystoreRoot.userFallback();
-        if (Files.exists(uf)) {
-            try (var s = Files.list(uf)) {
-                s.forEach(p -> {
-                    try {
-                        if (Files.isDirectory(p)) {
-                            Files.walk(p)
-                                    .sorted((a, b) -> b.getNameCount() - a.getNameCount())
-                                    .forEach(pp -> {
-                                        try { Files.deleteIfExists(pp); } catch (Exception ignored) {}
-                                    });
-                        } else {
-                            Files.deleteIfExists(p);
-                        }
-                    } catch (Exception ignored) {}
-                });
-            }
-        }
+        // Fallback path resolves under tempHome, so no global cleanup is needed.
     }
 
     @AfterEach
-    void clear() {
+    void clear() throws Exception {
         System.clearProperty("haf.keystore.root");
+        if (originalUserHome != null) {
+            System.setProperty("user.home", originalUserHome);
+        }
+        if (tempHome != null && Files.exists(tempHome)) {
+            try (var walk = Files.walk(tempHome)) {
+                walk.sorted((a, b) -> b.getNameCount() - a.getNameCount())
+                        .forEach(p -> {
+                            try {
+                                Files.deleteIfExists(p);
+                            } catch (Exception ignored) {
+                                // ignore
+                            }
+                        });
+            }
+        }
     }
 
     @Test
