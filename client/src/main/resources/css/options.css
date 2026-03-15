@@ -1,6 +1,53 @@
 .dropdown-menu {
-    -fx-background-color: #f2f2f2;
-    -fx-background-radius: 14;
-    -fx-padding: 6;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 18, 0.25, 0, 4);
+    -fx-background-color: #d9d9d9;
+    -fx-background-radius: 16;
+    -fx-padding: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 16, 0.18, 0, 4);
+}
+
+.dropdown-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 12;
+    -fx-padding: 16 20 16 20;
+    -fx-cursor: hand;
+}
+
+.dropdown-menu .menu-item:focused {
+    -fx-background-color: transparent;
+}
+
+.dropdown-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.06);
+}
+
+.dropdown-menu .menu-item:armed {
+    -fx-background-color: #007abd;
+}
+
+.dropdown-menu .menu-item .label {
+    -fx-text-fill: #2b2b2b;
+    -fx-font-family: "Manrope", sans-serif;
+    -fx-font-size: 17px;
+    -fx-font-weight: 600;
+}
+
+.dropdown-menu .menu-item .ikonli-font-icon {
+    -fx-icon-color: #2b2b2b;
+}
+
+.dropdown-menu .menu-item:armed .label {
+    -fx-text-fill: #ffffff;
+}
+
+.dropdown-menu .menu-item:armed .ikonli-font-icon {
+    -fx-icon-color: #ffffff;
+}
+
+.dropdown-menu .separator {
+    -fx-padding: 6 12 6 12;
+}
+
+.dropdown-menu .separator .line {
+    -fx-border-color: #a3a3a3;
+    -fx-border-width: 1 0 0 0;
 }
