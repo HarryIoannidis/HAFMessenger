@@ -3,6 +3,7 @@ package com.haf.client.controllers;
 import com.haf.client.core.ChatSession;
 import com.haf.client.models.MessageVM;
 import com.haf.client.utils.MessageBubbleFactory;
+import com.haf.client.viewmodels.ChatViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.collections.ListChangeListener;
@@ -12,8 +13,6 @@ import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Controller for {@code chat.fxml}.
@@ -37,10 +36,7 @@ public class ChatController {
     @FXML
     private JFXButton sendButton;
 
-    /** The ID of the contact currently being chatted with. */
-    private String recipientId = "";
-
-    private MessageViewModel viewModel;
+    private ChatViewModel viewModel;
 
     // We hold a strong reference to the listener to avoid early garbage collection
     // while the WeakListChangeListener wrapper is active.
@@ -48,14 +44,13 @@ public class ChatController {
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
 
-    // Per-contact draft text cache so unsent messages survive contact switches.
-    private final Map<String, String> drafts = new HashMap<>();
-
     @FXML
     public void initialize() {
-        viewModel = ChatSession.get();
+        MessageViewModel messageViewModel = ChatSession.get();
+        viewModel = new ChatViewModel(messageViewModel);
+        bindViewModel();
 
-        if (viewModel == null) {
+        if (!viewModel.isReady()) {
             // No session yet — UI stays enabled; sendMessage() guards the null.
             return;
         }
@@ -67,11 +62,20 @@ public class ChatController {
         messageField.setOnAction(e -> sendMessage());
     }
 
+    private void bindViewModel() {
+        if (messageField != null) {
+            messageField.textProperty().bindBidirectional(viewModel.draftTextProperty());
+        }
+        if (sendButton != null) {
+            sendButton.disableProperty().bind(viewModel.canSendProperty().not());
+        }
+    }
+
     /**
      * Loads the messages for the specified recipient and attaches a listener.
      */
     private void loadMessages() {
-        if (viewModel == null) {
+        if (viewModel == null || !viewModel.isReady()) {
             return;
         }
 
@@ -83,8 +87,10 @@ public class ChatController {
         // Clear existing messages
         chatBox.getChildren().clear();
 
+        String activeRecipient = viewModel.getRecipientId();
+
         // Populate existing messages for this contact
-        for (MessageVM vm : viewModel.getMessages(recipientId)) {
+        for (MessageVM vm : viewModel.getActiveMessages()) {
             chatBox.getChildren().add(MessageBubbleFactory.create(vm));
         }
 
@@ -107,19 +113,19 @@ public class ChatController {
                     // User is currently viewing this chat, so newly arrived incoming
                     // envelopes can be acknowledged immediately.
                     if (hasIncomingMessages) {
-                        viewModel.acknowledgeMessagesFrom(recipientId);
+                        viewModel.acknowledgeRecipient(activeRecipient);
                     }
                 }
             }
         };
 
         // Track and attach via WeakListChangeListener
-        currentObservedList = viewModel.getMessages(recipientId);
+        currentObservedList = viewModel.getActiveMessages();
         weakMessageListener = new WeakListChangeListener<>(messageListener);
         currentObservedList.addListener(weakMessageListener);
 
         // ACK all pending envelopes from this sender now that the user is viewing the chat.
-        viewModel.acknowledgeMessagesFrom(recipientId);
+        viewModel.acknowledgeActiveRecipient();
     }
 
     /**
@@ -129,36 +135,16 @@ public class ChatController {
      * @param recipientId the contact's unique identifier
      */
     public void setRecipient(String recipientId) {
-        // Save current draft before switching
-        if (!this.recipientId.isEmpty() && messageField != null) {
-            String currentText = messageField.getText();
-            if (currentText != null && !currentText.isEmpty()) {
-                drafts.put(this.recipientId, currentText);
-            } else {
-                drafts.remove(this.recipientId);
-            }
+        if (viewModel == null) {
+            return;
         }
-
-        this.recipientId = recipientId != null ? recipientId : "";
+        viewModel.setRecipient(recipientId);
         loadMessages();
-
-        // Restore draft for the new contact
-        if (messageField != null) {
-            String draft = drafts.getOrDefault(this.recipientId, "");
-            messageField.setText(draft);
-            messageField.positionCaret(draft.length());
-        }
     }
 
     private void sendMessage() {
         if (viewModel == null)
             return;
-
-        String text = messageField.getText().trim();
-        if (text.isEmpty())
-            return;
-
-        viewModel.sendTextMessage(recipientId, text);
-        messageField.clear();
+        viewModel.sendCurrentDraft();
     }
 }

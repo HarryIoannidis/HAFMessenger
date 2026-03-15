@@ -121,6 +121,32 @@ class WebSocketIngressServerTest {
     }
 
     @Test
+    void on_open_sends_presence_snapshot_for_all_contacts() {
+        String userId = "user-a";
+        String onlineContactId = "contact-online";
+        String offlineContactId = "contact-offline";
+        WebSocket onlineContactConnection = mock(WebSocket.class);
+
+        presenceRegistry.registerConnection(onlineContactId, onlineContactConnection);
+
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer session-1");
+        when(sessionDAO.getUserIdForSession("session-1")).thenReturn(userId);
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
+        when(contactDAO.getContacts(userId)).thenReturn(List.of(
+                new ContactDAO.ContactRecord(onlineContactId, "Online Contact", "001", "online@haf.gr", "SMINIAS"),
+                new ContactDAO.ContactRecord(offlineContactId, "Offline Contact", "002", "offline@haf.gr",
+                        "SMINIAS")));
+
+        server.onOpen(webSocket, handshake);
+
+        verify(webSocket, times(2)).send(contains("\"type\":\"presence\""));
+        verify(webSocket).send(contains("\"userId\":\"" + onlineContactId + "\",\"active\":true"));
+        verify(webSocket).send(contains("\"userId\":\"" + offlineContactId + "\",\"active\":false"));
+    }
+
+    @Test
     void on_close_broadcasts_inactive_only_on_last_connection() {
         String userId = "user-a";
         String watcherId = "watcher-1";

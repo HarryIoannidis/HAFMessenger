@@ -5,11 +5,8 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
+import com.haf.client.viewmodels.MainViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
-import com.haf.shared.dto.AddContactRequest;
-import com.haf.shared.dto.ContactsResponse;
-import com.haf.shared.dto.UserSearchResult;
-import com.haf.shared.utils.JsonCodec;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -110,7 +107,7 @@ public class MainController {
     private SearchController searchController;
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
-    private boolean hasSearchResults;
+    private final MainViewModel viewModel = MainViewModel.createDefault();
 
     // Cached views for performance
     private Parent currentChatView;
@@ -128,6 +125,7 @@ public class MainController {
 
     @FXML
     public void initialize() {
+        bindViewModel();
         setupWindowControls();
         setupNavBar();
         setupDotsMenu();
@@ -140,35 +138,14 @@ public class MainController {
         triggerPreloading();
 
         // Fetch contacts from server
-        fetchContacts();
+        viewModel.fetchContacts();
 
         // Messages tab is active by default
         activateMessagesTab();
     }
 
-    private void fetchContacts() {
-        if (NetworkSession.get() == null)
-            return;
-
-        NetworkSession.get().getAuthenticated("/api/v1/contacts")
-                .thenAccept(responseJson -> {
-                    ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
-                    if (response != null && response.getContacts() != null) {
-                        Platform.runLater(() -> {
-                            for (UserSearchResult contact : response.getContacts()) {
-                                upsertContact(
-                                        contact.getUserId(),
-                                        contact.getFullName(),
-                                        contact.getRegNumber(),
-                                        contact.isActive());
-                            }
-                        });
-                    }
-                })
-                .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to load contacts", ex);
-                    return null;
-                });
+    private void bindViewModel() {
+        contactsList.setItems(viewModel.contactsProperty());
     }
 
     private void triggerPreloading() {
@@ -193,7 +170,7 @@ public class MainController {
         // Action button: search or clear depending on state
         if (searchActionButton != null) {
             searchActionButton.setOnAction(e -> {
-                if (hasSearchResults) {
+                if (viewModel.hasSearchResultsProperty().get()) {
                     clearSearch();
                 } else {
                     performSearch();
@@ -212,7 +189,7 @@ public class MainController {
         String query = toolbarSearchField.getText();
         if (query != null && !query.isBlank()) {
             searchController.search(query);
-            hasSearchResults = true;
+            viewModel.setHasSearchResults(true);
             // Switch icon to clear (X)
             if (searchActionIcon != null) {
                 searchActionIcon.setIconLiteral("mdi2c-close");
@@ -228,7 +205,7 @@ public class MainController {
         if (searchController != null) {
             searchController.clearResults();
         }
-        hasSearchResults = false;
+        viewModel.setHasSearchResults(false);
         // Restore magnify icon
         if (searchActionIcon != null) {
             searchActionIcon.setIconLiteral("mdi2m-magnify");
@@ -236,6 +213,7 @@ public class MainController {
     }
 
     private void activateMessagesTab() {
+        viewModel.setActiveTab(MainViewModel.MainTab.MESSAGES);
         indicatorMessages.setVisible(true);
         indicatorSearch.setVisible(false);
 
@@ -253,6 +231,7 @@ public class MainController {
     }
 
     private void activateSearchTab() {
+        viewModel.setActiveTab(MainViewModel.MainTab.SEARCH);
         indicatorMessages.setVisible(false);
         indicatorSearch.setVisible(true);
 
@@ -363,12 +342,10 @@ public class MainController {
      * Adds a searched user to the contacts list and switches to their chat.
      */
     public void startChatWith(String userId, String fullName, String regNumber) {
-        ContactInfo target = getContactById(userId);
-
-        // Add if not exists
+        viewModel.addContact(userId, fullName, regNumber);
+        ContactInfo target = viewModel.getContactById(userId);
         if (target == null) {
-            target = ContactInfo.inactive(userId, fullName, regNumber);
-            contactsList.getItems().add(target);
+            target = viewModel.ensureChatContact(userId, fullName, regNumber);
         }
 
         // Select and load chat. Note: activateMessagesTab is triggered by the selection
@@ -378,50 +355,21 @@ public class MainController {
     }
 
     public boolean hasContact(String userId) {
-        for (ContactInfo info : contactsList.getItems()) {
-            if (info.id().equals(userId)) {
-                return true;
-            }
-        }
-        return false;
+        return viewModel.hasContact(userId);
     }
 
     public void addContact(String userId, String fullName, String regNumber) {
-        if (!hasContact(userId)) {
-            contactsList.getItems().add(ContactInfo.inactive(userId, fullName, regNumber));
-
-            // Persist to server
-            if (NetworkSession.get() != null) {
-                AddContactRequest request = new AddContactRequest(userId);
-                String body = JsonCodec.toJson(request);
-                NetworkSession.get().postAuthenticated("/api/v1/contacts", body)
-                        .exceptionally(ex -> {
-                            LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
-                            return null;
-                        });
-            }
-        }
+        viewModel.addContact(userId, fullName, regNumber);
     }
 
     public void removeContact(String userId) {
-        contactsList.getItems().removeIf(info -> info.id().equals(userId));
+        viewModel.removeContact(userId);
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null && selected.id().equals(userId)) {
             contactsList.getSelectionModel().clearSelection();
             contactsList.setUserData(null);
             hideProfilePanel();
             loadPlaceholder();
-        }
-
-        // Persist removal to server
-        if (NetworkSession.get() != null) {
-            String path = "/api/v1/contacts?contactId="
-                    + java.net.URLEncoder.encode(userId, java.nio.charset.StandardCharsets.UTF_8);
-            NetworkSession.get().deleteAuthenticated(path)
-                    .exceptionally(ex -> {
-                        LOGGER.log(Level.SEVERE, "Failed to remove contact on server", ex);
-                        return null;
-                    });
         }
     }
 
@@ -661,52 +609,15 @@ public class MainController {
     }
 
     private void updateContactPresence(String userId, boolean active) {
-        int index = findContactIndex(userId);
-        if (index < 0) {
+        ContactInfo updated = viewModel.updateContactPresence(userId, active);
+        if (updated == null) {
             return;
         }
-
-        ContactInfo existing = contactsList.getItems().get(index);
-        ContactInfo updated = ContactInfo.fromPresence(existing.id(), existing.name(), existing.regNumber(), active);
-        contactsList.getItems().set(index, updated);
 
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null && selected.id().equals(userId)) {
             contactsList.getSelectionModel().select(updated);
             showProfilePanel(updated);
         }
-    }
-
-    private void upsertContact(String userId, String fullName, String regNumber, boolean active) {
-        ContactInfo contact = ContactInfo.fromPresence(userId, fullName, regNumber, active);
-        int index = findContactIndex(userId);
-        if (index >= 0) {
-            contactsList.getItems().set(index, contact);
-            ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
-            if (selected != null && selected.id().equals(userId)) {
-                contactsList.getSelectionModel().select(contact);
-                showProfilePanel(contact);
-            }
-        } else {
-            contactsList.getItems().add(contact);
-        }
-    }
-
-    private ContactInfo getContactById(String userId) {
-        int index = findContactIndex(userId);
-        if (index < 0) {
-            return null;
-        }
-        return contactsList.getItems().get(index);
-    }
-
-    private int findContactIndex(String userId) {
-        for (int i = 0; i < contactsList.getItems().size(); i++) {
-            ContactInfo info = contactsList.getItems().get(i);
-            if (info.id().equals(userId)) {
-                return i;
-            }
-        }
-        return -1;
     }
 }

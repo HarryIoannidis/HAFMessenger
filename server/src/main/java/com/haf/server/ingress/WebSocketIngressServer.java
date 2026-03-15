@@ -112,6 +112,10 @@ public final class WebSocketIngressServer extends WebSocketServer {
             // Push any backlog to the newly connected client.
             pending.forEach(envelope -> sendEnvelope(conn, envelope));
 
+            // Send an initial presence snapshot for all contacts so the client has
+            // a correct baseline immediately after connecting.
+            sendPresenceSnapshot(conn, userId);
+
             if (becameActive) {
                 broadcastPresenceToWatchers(userId, true);
             }
@@ -244,6 +248,23 @@ public final class WebSocketIngressServer extends WebSocketServer {
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_presence_watchers_lookup_error", null, userId, ex);
+        }
+    }
+
+    private void sendPresenceSnapshot(WebSocket conn, String userId) {
+        try {
+            List<ContactDAO.ContactRecord> contacts = contactDAO.getContacts(userId);
+            if (contacts == null || contacts.isEmpty()) {
+                return;
+            }
+            for (ContactDAO.ContactRecord contact : contacts) {
+                if (contact == null || contact.userId() == null || contact.userId().isBlank()) {
+                    continue;
+                }
+                conn.send(presenceJson(contact.userId(), presenceRegistry.isActive(contact.userId())));
+            }
+        } catch (Exception ex) {
+            auditLogger.logError("ws_presence_snapshot_error", null, userId, ex);
         }
     }
 
