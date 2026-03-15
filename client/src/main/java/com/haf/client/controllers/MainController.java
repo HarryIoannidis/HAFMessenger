@@ -579,7 +579,6 @@ public class MainController {
                 profileItem,
                 new SeparatorMenuItem(),
                 settingsItem,
-                new SeparatorMenuItem(),
                 helpItem,
                 new SeparatorMenuItem(),
                 logoutItem);
@@ -588,11 +587,20 @@ public class MainController {
             if (menu.isShowing()) {
                 menu.hide();
             } else {
-                Bounds bounds = dotsMenuButton.localToScreen(dotsMenuButton.getBoundsInLocal());
-                menu.show(dotsMenuButton, bounds.getMinX() - menu.prefWidth(-1) + bounds.getWidth(),
-                        bounds.getMaxY());
+                showDotsMenuAnchored(menu);
             }
         });
+    }
+
+    private void showDotsMenuAnchored(ContextMenu menu) {
+        Bounds bounds = dotsMenuButton.localToScreen(dotsMenuButton.getBoundsInLocal());
+        if (bounds == null) {
+            menu.show(dotsMenuButton, 0, 0);
+            return;
+        }
+
+        double menuWidth = Math.max(menu.prefWidth(-1), 220);
+        menu.show(dotsMenuButton, bounds.getMaxX() - menuWidth, bounds.getMaxY() + 4);
     }
 
     private MenuItem createIconMenuItem(String iconLiteral, String text) {
@@ -602,6 +610,8 @@ public class MainController {
         label.setGraphicTextGap(12);
         MenuItem item = new MenuItem();
         item.setGraphic(label);
+        item.getStyleClass().add("dropdown-menu-item");
+        label.getStyleClass().add("dropdown-menu-label");
         return item;
     }
 
