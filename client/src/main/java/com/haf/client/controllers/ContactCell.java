@@ -1,6 +1,6 @@
 package com.haf.client.controllers;
 
-import com.haf.client.model.ContactInfo;
+import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.ListCell;

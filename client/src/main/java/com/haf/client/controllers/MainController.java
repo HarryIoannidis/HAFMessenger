@@ -2,7 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.NetworkSession;
-import com.haf.client.model.ContactInfo;
+import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.shared.dto.AddContactRequest;

@@ -1,4 +1,4 @@
-package com.haf.client.model;
+package com.haf.client.models;
 
 /**
  * Lightweight data holder for a contact list entry.
