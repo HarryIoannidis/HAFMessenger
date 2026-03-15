@@ -52,6 +52,15 @@ public interface MessageReceiver {
          * @param error the error that occurred
          */
         void onError(Throwable error);
+
+        /**
+         * Called when a user presence update is received.
+         *
+         * @param userId the user whose presence changed
+         * @param active true when active, false when inactive
+         */
+        default void onPresenceUpdate(String userId, boolean active) {
+            // Optional callback.
+        }
     }
 }
-

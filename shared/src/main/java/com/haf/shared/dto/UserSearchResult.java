@@ -11,17 +11,23 @@ public class UserSearchResult implements Serializable {
     private String regNumber;
     private String email;
     private String rank;
+    private boolean active;
 
     public UserSearchResult() {
         // Required for JSON deserialization
     }
 
     public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank) {
+        this(userId, fullName, regNumber, email, rank, false);
+    }
+
+    public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
         this.userId = userId;
         this.fullName = fullName;
         this.regNumber = regNumber;
         this.email = email;
         this.rank = rank;
+        this.active = active;
     }
 
     public String getUserId() {
@@ -62,5 +68,13 @@ public class UserSearchResult implements Serializable {
 
     public void setRank(String rank) {
         this.rank = rank;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

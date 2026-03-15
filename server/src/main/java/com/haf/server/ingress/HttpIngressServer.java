@@ -54,6 +54,7 @@ public final class HttpIngressServer {
     private static final String MESSAGES_PATH = "/api/v1/messages";
     private static final String REGISTER_PATH = "/api/v1/register";
     private static final String LOGIN_PATH = "/api/v1/login";
+    private static final String LOGOUT_PATH = "/api/v1/logout";
     private static final String USERS_PATH = "/api/v1/users";
     private static final String SEARCH_PATH = "/api/v1/search";
     private static final String CONTACTS_PATH = "/api/v1/contacts";
@@ -101,6 +102,7 @@ public final class HttpIngressServer {
     private final SessionDAO sessionDAO;
     private final FileUploadDAO fileUploadDAO;
     private final ContactDAO contactDAO;
+    private final PresenceRegistry presenceRegistry;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private HttpsServer server;
@@ -126,7 +128,8 @@ public final class HttpIngressServer {
             UserDAO userDAO,
             SessionDAO sessionDAO,
             FileUploadDAO fileUploadDAO,
-            ContactDAO contactDAO) throws IOException {
+            ContactDAO contactDAO,
+            PresenceRegistry presenceRegistry) throws IOException {
         this.config = config;
         this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
@@ -137,6 +140,7 @@ public final class HttpIngressServer {
         this.sessionDAO = sessionDAO;
         this.fileUploadDAO = fileUploadDAO;
         this.contactDAO = contactDAO;
+        this.presenceRegistry = presenceRegistry;
         this.server = createServer(sslContext);
     }
 
@@ -166,6 +170,7 @@ public final class HttpIngressServer {
         httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
         httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
+        httpsServer.createContext(LOGOUT_PATH, new LogoutHandler());
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext(SEARCH_PATH, new SearchHandler());
         httpsServer.createContext(CONTACTS_PATH, new ContactsHandler());
@@ -588,6 +593,63 @@ public final class HttpIngressServer {
     }
 
     /**
+     * Handles logout requests.
+     */
+    private final class LogoutHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            try {
+                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
+                    return;
+                }
+
+                String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+                if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
+                    return;
+                }
+
+                String sessionId = authHeader.substring(BEARER_PREFIX.length());
+                String callerId = sessionDAO.getUserIdForSession(sessionId);
+                if (callerId == null) {
+                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
+                    return;
+                }
+
+                sessionDAO.revokeSession(sessionId);
+                sendPlain(exchange, 200, "{\"success\":true}");
+            } catch (Exception ex) {
+                auditLogger.logError("logout_error", requestId, null, ex);
+                sendPlain(exchange, 500, JSON_ERROR_PREFIX + INTERNAL_SERVER_ERROR + JSON_ERROR_SUFFIX);
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private void applySecurityHeaders(Headers headers) {
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
+        }
+
+        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
      * Serves the Admin's X25519 public key so clients can E2E-encrypt
      * registration photos before sending them.
      */
@@ -864,7 +926,7 @@ public final class HttpIngressServer {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResult> results = records.stream()
                     .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(),
-                            r.rank()))
+                            r.rank(), presenceRegistry.isActive(r.userId())))
                     .toList();
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
         }

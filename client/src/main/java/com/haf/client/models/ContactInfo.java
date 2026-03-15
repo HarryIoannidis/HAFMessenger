@@ -10,13 +10,25 @@ package com.haf.client.models;
  */
 public record ContactInfo(String id, String name, String regNumber, String activenessLabel, String activenessColor) {
 
-    /** Convenience factory for an online contact. */
+    /** Convenience factory for an active contact. */
     public static ContactInfo online(String id, String name, String regNumber) {
-        return new ContactInfo(id, name, regNumber, "Online", "#00b706");
+        return new ContactInfo(id, name, regNumber, "Active", "#00b706");
     }
 
-    /** Convenience factory for an offline contact. */
+    /** Convenience factory for an inactive contact. */
     public static ContactInfo offline(String id, String name, String regNumber) {
-        return new ContactInfo(id, name, regNumber, "Offline", "#ff0000");
+        return new ContactInfo(id, name, regNumber, "Inactive", "#ff0000");
+    }
+
+    public static ContactInfo active(String id, String name, String regNumber) {
+        return online(id, name, regNumber);
+    }
+
+    public static ContactInfo inactive(String id, String name, String regNumber) {
+        return offline(id, name, regNumber);
+    }
+
+    public static ContactInfo fromPresence(String id, String name, String regNumber, boolean active) {
+        return active ? active(id, name, regNumber) : inactive(id, name, regNumber);
     }
 }

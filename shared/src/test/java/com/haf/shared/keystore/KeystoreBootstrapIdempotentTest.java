@@ -5,15 +5,35 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KeystoreBootstrapIdempotentTest {
+    private String originalUserHome;
+    private Path tempHome;
 
     @BeforeEach
-    void setup() {
+    void setup() throws Exception {
+        originalUserHome = System.getProperty("user.home");
+        tempHome = Files.createTempDirectory("haf-keystore-home-idempotent");
+        System.setProperty("user.home", tempHome.toString());
         System.setProperty("haf.keystore.root", "/root/___deny___");
     }
 
     @AfterEach
-    void clear() {
+    void clear() throws Exception {
         System.clearProperty("haf.keystore.root");
+        if (originalUserHome != null) {
+            System.setProperty("user.home", originalUserHome);
+        }
+        if (tempHome != null && Files.exists(tempHome)) {
+            try (var walk = Files.walk(tempHome)) {
+                walk.sorted((a, b) -> b.getNameCount() - a.getNameCount())
+                        .forEach(p -> {
+                            try {
+                                Files.deleteIfExists(p);
+                            } catch (Exception ignored) {
+                                // ignore
+                            }
+                        });
+            }
+        }
     }
 
     @Test

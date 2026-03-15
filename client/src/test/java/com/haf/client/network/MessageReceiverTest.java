@@ -63,6 +63,12 @@ class MessageReceiverTest {
             }
         }
 
+        void simulateIncomingRaw(String json) {
+            if (messageConsumer != null) {
+                messageConsumer.accept(json);
+            }
+        }
+
         java.util.List<String> getSentMessages() {
             return sentMessages;
         }
@@ -85,6 +91,7 @@ class MessageReceiverTest {
     MessageReceiver messageReceiver;
     List<byte[]> receivedMessages = new ArrayList<>();
     List<Throwable> receivedErrors = new ArrayList<>();
+    List<String> presenceUpdates = new ArrayList<>();
 
     @BeforeEach
     void setup() throws Exception {
@@ -116,6 +123,11 @@ class MessageReceiverTest {
             @Override
             public void onError(Throwable error) {
                 receivedErrors.add(error);
+            }
+
+            @Override
+            public void onPresenceUpdate(String userId, boolean active) {
+                presenceUpdates.add(userId + ":" + active);
             }
         });
     }
@@ -209,6 +221,18 @@ class MessageReceiverTest {
         assertEquals(0, receivedMessages.size());
         assertEquals(1, receivedErrors.size());
         assertTrue(receivedErrors.get(0) instanceof MessageValidationException);
+    }
+
+    @Test
+    void receives_presence_event_without_decryption_or_ack() throws Exception {
+        messageReceiver.start();
+
+        webSocketAdapter.simulateIncomingRaw("{\"type\":\"presence\",\"userId\":\"user-42\",\"active\":true}");
+
+        assertEquals(0, receivedMessages.size());
+        assertEquals(0, receivedErrors.size());
+        assertEquals(List.of("user-42:true"), presenceUpdates);
+        assertTrue(webSocketAdapter.getSentMessages().isEmpty());
     }
 
     @Test

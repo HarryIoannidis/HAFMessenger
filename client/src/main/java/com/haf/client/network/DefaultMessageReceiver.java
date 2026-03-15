@@ -101,7 +101,12 @@ public class DefaultMessageReceiver implements MessageReceiver {
         String envelopeId = null;
         try {
             java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
-            if (!"message".equals(envelope.get("type"))) {
+            Object type = envelope.get("type");
+            if ("presence".equals(type)) {
+                handlePresenceEvent(envelope);
+                return;
+            }
+            if (!"message".equals(type)) {
                 return;
             }
 
@@ -129,22 +134,41 @@ public class DefaultMessageReceiver implements MessageReceiver {
                 messageListener.onError(e);
             }
         } catch (com.haf.shared.exceptions.KeystoreOperationException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "Keystore decryption failed: {0}", e.getMessage());
             if (messageListener != null) {
                 messageListener.onError(
                         new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
             }
         } catch (com.haf.shared.exceptions.MessageValidationException | MessageExpiredException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.FINE, "Rejected incoming envelope {0}: {1}", new Object[] { envelopeId, e.getMessage() });
             if (messageListener != null) {
                 messageListener.onError(e);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, "Failed to process inbound message: {0}", e.getMessage());
             if (messageListener != null) {
                 messageListener.onError(new IOException("Failed to process message: " + e.getMessage(), e));
             }
         }
+    }
+
+    private void handlePresenceEvent(java.util.Map<?, ?> envelope) {
+        Object userIdRaw = envelope.get("userId");
+        Object activeRaw = envelope.get("active");
+        if (userIdRaw == null || activeRaw == null || messageListener == null) {
+            return;
+        }
+
+        String userId = String.valueOf(userIdRaw);
+        boolean active = toBoolean(activeRaw);
+        messageListener.onPresenceUpdate(userId, active);
+    }
+
+    private boolean toBoolean(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.parseBoolean(String.valueOf(value));
     }
 
     private void acknowledgeUndecryptableEnvelope(String envelopeId) {
@@ -310,7 +334,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param error the error that occurred
      */
     private void handleError(Throwable error) {
-        error.printStackTrace();
+        LOGGER.log(Level.WARNING, "WebSocket receiver error: {0}", error.getMessage());
         if (messageListener != null) {
             messageListener.onError(error);
         }
