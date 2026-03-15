@@ -1,11 +1,10 @@
 package com.haf.client.controllers;
 
-import com.haf.client.core.NetworkSession;
 import com.haf.client.utils.UiConstants;
-import com.haf.shared.dto.UserSearchResponse;
+import com.haf.client.viewmodels.SearchViewModel;
 import com.haf.shared.dto.UserSearchResult;
-import com.haf.shared.utils.JsonCodec;
 import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.layout.FlowPane;
@@ -13,20 +12,17 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Controller for the search view ({@code search.fxml}).
  *
- * <p>
- * Called by {@link MainController} when the user types a query and presses
- * Enter. Fetches results from the server, loads an
- * {@code search_result_item.fxml} card for each match and adds it to the
- * {@link #resultsPane}.
- * </p>
+ * Keeps rendering/wiring logic in the view and delegates async state +
+ * business logic to {@link SearchViewModel}.
  */
 public class SearchController {
 
@@ -41,72 +37,63 @@ public class SearchController {
     @FXML
     private Text statusText;
 
+    private final SearchViewModel viewModel = SearchViewModel.createDefault();
+    private final AtomicInteger renderGeneration = new AtomicInteger();
+
+    @FXML
+    public void initialize() {
+        bindViewModel();
+        viewModel.clearResults();
+    }
+
     /**
      * Triggers an asynchronous search against the server.
      *
      * @param query the search term (name or reg number)
      */
     public void search(String query) {
-        if (query == null || query.isBlank()) {
-            clearResults();
-            return;
-        }
-
-        resultsPane.getChildren().clear();
-        showStatus("Searching...");
-
-        Thread.ofVirtual().name("search-query").start(() -> {
-            try {
-                String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
-                String path = "/api/v1/search?q=" + encoded;
-                String json = NetworkSession.get().getAuthenticated(path).get();
-                UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
-
-                Platform.runLater(() -> displayResults(response));
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Search request failed", ex);
-                Platform.runLater(() -> showStatus("Search failed. Please try again."));
-            }
-        });
+        viewModel.search(query);
     }
 
     /**
      * Clears the results pane and resets the status text.
      */
     public void clearResults() {
-        resultsPane.getChildren().clear();
-        showStatus("Search for users by name or registration number.");
+        viewModel.clearResults();
     }
 
-    /**
-     * Populates the results pane with cards.
-     */
-    private void displayResults(UserSearchResponse response) {
-        resultsPane.getChildren().clear();
+    private void bindViewModel() {
+        statusText.textProperty().bind(viewModel.statusTextProperty());
 
-        if (response.getError() != null) {
-            showStatus("Error: " + response.getError());
+        viewModel.hasResultsProperty().addListener((obs, oldValue, newValue) -> updateResultsVisibility(newValue));
+        updateResultsVisibility(viewModel.hasResultsProperty().get());
+
+        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResult>) change -> renderResults(
+                viewModel.resultsProperty()));
+        renderResults(viewModel.resultsProperty());
+    }
+
+    private void updateResultsVisibility(boolean hasResults) {
+        statusBox.setVisible(!hasResults);
+        resultsPane.setVisible(hasResults);
+    }
+
+    private void renderResults(List<UserSearchResult> results) {
+        int generation = renderGeneration.incrementAndGet();
+
+        if (results == null || results.isEmpty()) {
+            resultsPane.getChildren().clear();
             return;
         }
 
-        if (response.getResults() == null || response.getResults().isEmpty()) {
-            showStatus("No results found.");
-            return;
-        }
-
-        hideStatus();
-
-        // Offload FXML loading of results to a background thread to prevent UI jank
+        List<UserSearchResult> snapshot = List.copyOf(results);
         Thread.ofVirtual().name("search-item-loader").start(() -> {
-            java.util.List<javafx.scene.Node> loadedCards = new java.util.ArrayList<>();
-            for (UserSearchResult result : response.getResults()) {
+            List<javafx.scene.Node> loadedCards = new ArrayList<>();
+            for (UserSearchResult result : snapshot) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
-                    LOGGER.log(Level.INFO, "Loading search result item FXML: {0}", resource);
                     FXMLLoader loader = new FXMLLoader(resource);
                     javafx.scene.Node card = loader.load();
-                    // We can populate the card's text and set up listeners in the background.
-                    // Just don't touch live scenes.
                     populateCard(card, result);
                     loadedCards.add(card);
                 } catch (IOException e) {
@@ -114,8 +101,12 @@ public class SearchController {
                 }
             }
 
-            // Once all cards are prepared, add them to the UI thread
-            Platform.runLater(() -> resultsPane.getChildren().setAll(loadedCards));
+            Platform.runLater(() -> {
+                if (generation != renderGeneration.get()) {
+                    return;
+                }
+                resultsPane.getChildren().setAll(loadedCards);
+            });
         });
     }
 
@@ -300,22 +291,4 @@ public class SearchController {
         }
     }
 
-    /**
-     * Shows a status message.
-     * 
-     * @param message The status message.
-     */
-    private void showStatus(String message) {
-        statusText.setText(message);
-        statusBox.setVisible(true);
-        resultsPane.setVisible(false);
-    }
-
-    /**
-     * Hides the status message.
-     */
-    private void hideStatus() {
-        statusBox.setVisible(false);
-        resultsPane.setVisible(true);
-    }
 }

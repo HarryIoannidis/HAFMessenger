@@ -68,6 +68,61 @@
 
 ---
 
+## SearchViewModel
+
+### Purpose
+- Handles search query flow, async API calls, status messaging, and result state.
+- Keeps network/error/empty-state logic out of `SearchController`.
+
+### Properties
+- `statusTextProperty()`: Search status text (`Searching...`, `No results found.`, errors).
+- `loadingProperty()`: True while async search is running.
+- `hasResultsProperty()`: True when there are result cards to render.
+- `resultsProperty()`: Observable list of `UserSearchResult` values for rendering.
+
+### Operations
+- `search(String query)`: Validates query, executes async search, updates properties.
+- `clearResults()`: Resets state to idle prompt.
+
+---
+
+## MainViewModel
+
+### Purpose
+- Owns main page state that is not pure UI chrome.
+- Handles contacts list data, contact persistence calls, active tab state, and search-result toggle state.
+
+### Properties
+- `contactsProperty()`: Observable list of `ContactInfo` shown in main contacts list.
+- `activeTabProperty()`: Current tab (`MESSAGES` or `SEARCH`).
+- `hasSearchResultsProperty()`: Tracks whether toolbar action should clear or search.
+
+### Operations
+- `fetchContacts()`: Loads contacts from backend and upserts local list.
+- `addContact(...)` / `removeContact(...)`: Updates local list and persists changes.
+- `updateContactPresence(...)`: Applies active/inactive updates from presence stream.
+- `ensureChatContact(...)`: Adds a contact locally if missing before opening chat.
+
+---
+
+## ChatViewModel
+
+### Purpose
+- UI-state wrapper for chat screen on top of `MessageViewModel`.
+- Keeps recipient switching, draft caching, send enablement, and ack delegation out of `ChatController`.
+
+### Properties
+- `draftTextProperty()`: Text currently in the compose field.
+- `canSendProperty()`: True only when recipient and non-empty message exist.
+
+### Operations
+- `setRecipient(String)`: Switches active recipient, persists/restores per-contact drafts.
+- `getActiveMessages()`: Returns message list for active recipient.
+- `sendCurrentDraft()`: Sends trimmed text via `MessageViewModel`, clears draft on success path.
+- `acknowledgeActiveRecipient()`: Marks pending envelopes as delivered when chat is viewed.
+
+---
+
 ## MessageViewModel
 
 ### Purpose
@@ -77,7 +132,7 @@
 
 ### Properties
 - `statusProperty()`: Current operation status ("Ready", "Message sent to X", etc.).
-- `getMessages()`: Observable list of `MessageVM` records for display.
+- `getMessages(contactId)`: Observable list of `MessageVM` records per contact.
 
 ### Dependencies
 - `MessageSender`: Sends encrypted messages to recipients.
