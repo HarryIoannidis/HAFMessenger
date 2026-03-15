@@ -47,13 +47,9 @@ class MainViewModelTest {
 
     @Test
     void add_contact_adds_locally_and_calls_gateway_once() {
-        AtomicInteger fetchCalls = new AtomicInteger();
         AtomicInteger addCalls = new AtomicInteger();
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
-                () -> {
-                    fetchCalls.incrementAndGet();
-                    return CompletableFuture.completedFuture("{}");
-                },
+                () -> CompletableFuture.completedFuture("{}"),
                 userId -> {
                     addCalls.incrementAndGet();
                     return CompletableFuture.completedFuture("{}");
@@ -62,12 +58,10 @@ class MainViewModelTest {
 
         viewModel.addContact("u-1", "Jane", "100");
         viewModel.addContact("u-1", "Jane", "100");
-        awaitCondition(() -> fetchCalls.get() >= 1);
 
         assertTrue(viewModel.hasContact("u-1"));
         assertEquals(1, viewModel.contactsProperty().size());
         assertEquals(1, addCalls.get());
-        assertEquals(1, fetchCalls.get());
     }
 
     @Test

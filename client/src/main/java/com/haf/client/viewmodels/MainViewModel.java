@@ -161,7 +161,6 @@ public class MainViewModel {
 
         contacts.add(ContactInfo.inactive(userId, fullName, regNumber));
         contactsGateway.addContact(userId)
-                .thenRun(this::fetchContacts)
                 .exceptionally(ex -> {
                     LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
                     return null;
