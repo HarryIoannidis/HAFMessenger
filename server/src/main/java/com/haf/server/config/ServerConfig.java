@@ -13,6 +13,10 @@ public final class ServerConfig {
     private static final int DEFAULT_DB_POOL_SIZE = 20;
     private static final int DEFAULT_HTTP_PORT = 8443;
     private static final int DEFAULT_WS_PORT = 8444;
+    private static final int DEFAULT_SEARCH_PAGE_SIZE = 20;
+    private static final int DEFAULT_SEARCH_MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_SEARCH_MIN_QUERY_LENGTH = 3;
+    private static final int DEFAULT_SEARCH_MAX_QUERY_LENGTH = 128;
 
     private final String dbUrl;
     private final String dbUser;
@@ -28,6 +32,11 @@ public final class ServerConfig {
     private final int httpPort;
     private final int wsPort;
     private final String adminPublicKeyPem;
+    private final int searchPageSize;
+    private final int searchMaxPageSize;
+    private final int searchMinQueryLength;
+    private final int searchMaxQueryLength;
+    private final String searchCursorSecret;
 
     /**
      * Loads the server configuration from environment variables or a .env file.
@@ -90,6 +99,14 @@ public final class ServerConfig {
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
         this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
         this.adminPublicKeyPem = env.getOrDefault("HAF_ADMIN_PUBLIC_KEY", null);
+
+        this.searchPageSize = parseInt(env.get("HAF_SEARCH_PAGE_SIZE"), DEFAULT_SEARCH_PAGE_SIZE);
+        this.searchMaxPageSize = parseInt(env.get("HAF_SEARCH_MAX_PAGE_SIZE"), DEFAULT_SEARCH_MAX_PAGE_SIZE);
+        this.searchMinQueryLength = parseInt(env.get("HAF_SEARCH_MIN_QUERY_LENGTH"), DEFAULT_SEARCH_MIN_QUERY_LENGTH);
+        this.searchMaxQueryLength = parseInt(env.get("HAF_SEARCH_MAX_QUERY_LENGTH"), DEFAULT_SEARCH_MAX_QUERY_LENGTH);
+        this.searchCursorSecret = require(env, "HAF_SEARCH_CURSOR_SECRET");
+
+        validateSearchConfig();
     }
 
     /**
@@ -182,6 +199,41 @@ public final class ServerConfig {
     }
 
     /**
+     * Returns the default server-side search page size.
+     */
+    public int getSearchPageSize() {
+        return searchPageSize;
+    }
+
+    /**
+     * Returns the maximum allowed search page size.
+     */
+    public int getSearchMaxPageSize() {
+        return searchMaxPageSize;
+    }
+
+    /**
+     * Returns the minimum query length for user search.
+     */
+    public int getSearchMinQueryLength() {
+        return searchMinQueryLength;
+    }
+
+    /**
+     * Returns the maximum query length for user search.
+     */
+    public int getSearchMaxQueryLength() {
+        return searchMaxQueryLength;
+    }
+
+    /**
+     * Returns the shared secret used to sign search pagination cursors.
+     */
+    public String getSearchCursorSecret() {
+        return searchCursorSecret;
+    }
+
+    /**
      * Throws a ConfigurationException if the given key is missing or blank.
      */
     private static String require(Map<String, String> env, String key) {
@@ -211,6 +263,24 @@ public final class ServerConfig {
         }
     }
 
+    private void validateSearchConfig() {
+        if (searchPageSize < 1) {
+            throw new ConfigurationException("HAF_SEARCH_PAGE_SIZE must be >= 1");
+        }
+        if (searchMaxPageSize < 1) {
+            throw new ConfigurationException("HAF_SEARCH_MAX_PAGE_SIZE must be >= 1");
+        }
+        if (searchPageSize > searchMaxPageSize) {
+            throw new ConfigurationException("HAF_SEARCH_PAGE_SIZE must be <= HAF_SEARCH_MAX_PAGE_SIZE");
+        }
+        if (searchMinQueryLength < 1) {
+            throw new ConfigurationException("HAF_SEARCH_MIN_QUERY_LENGTH must be >= 1");
+        }
+        if (searchMaxQueryLength < searchMinQueryLength) {
+            throw new ConfigurationException("HAF_SEARCH_MAX_QUERY_LENGTH must be >= HAF_SEARCH_MIN_QUERY_LENGTH");
+        }
+    }
+
     /**
      * Returns a string representation of this object.
      */
@@ -224,6 +294,10 @@ public final class ServerConfig {
                 ", wsPort=" + wsPort +
                 ", keystoreRoot=" + keystoreRoot +
                 ", tlsKeystorePath=" + tlsKeystorePath +
+                ", searchPageSize=" + searchPageSize +
+                ", searchMaxPageSize=" + searchMaxPageSize +
+                ", searchMinQueryLength=" + searchMinQueryLength +
+                ", searchMaxQueryLength=" + searchMaxQueryLength +
                 '}';
     }
 }

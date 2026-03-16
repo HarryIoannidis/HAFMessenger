@@ -4,12 +4,16 @@ import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.shared.dto.RegisterRequest;
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -217,45 +221,71 @@ public final class UserDAO {
     // ── Search ───────────────────────────────────────────────────────────
 
     /**
-     * Represents a user record returned by {@link #searchUsers(String, int)}.
+     * Represents a user record returned by user search.
      */
     public record SearchRecord(String userId, String fullName,
             String regNumber, String email, String rank) {
     }
 
-    private static final String SEARCH_USERS_SQL = """
+    /**
+     * Represents one page of user-search results.
+     *
+     * @param results      matching rows for the requested page
+     * @param hasMore      true when more rows exist
+     * @param lastFullName full_name from the last row in this page (cursor key)
+     * @param lastUserId   user_id from the last row in this page (cursor key)
+     */
+    public record SearchPage(List<SearchRecord> results, boolean hasMore, String lastFullName, String lastUserId) {
+    }
+
+    private static final String SEARCH_USERS_PAGED_SQL = """
             SELECT user_id, full_name, reg_number, email, `rank`
             FROM users
             WHERE `status` = 'APPROVED'
               AND user_id != ?
-              AND (full_name LIKE ? OR reg_number LIKE ?)
+              AND (full_name LIKE ? ESCAPE '\\\\'
+                   OR reg_number LIKE ? ESCAPE '\\\\'
+                   OR `rank` LIKE ? ESCAPE '\\\\')
+              AND (? = 0 OR full_name > ? OR (full_name = ? AND user_id > ?))
+            ORDER BY full_name ASC, user_id ASC
             LIMIT ?
             """;
 
     /**
-     * Searches for approved users whose name or registration number matches,
-     * excluding the user performing the search.
+     * Searches for approved users whose name, registration number, or rank matches
+     * using prefix matching and keyset pagination.
      *
-     * @param query         the search term (matched with {@code %query%})
-     * @param excludeUserId the user ID to exclude from results
-     * @param limit         maximum number of results
-     * @return list of matching records, never null
-     * @throws DatabaseOperationException if the query fails
+     * @param query          the search term
+     * @param excludeUserId  user ID to exclude from results
+     * @param limit          page size
+     * @param cursorFullName cursor full_name from the previous page (nullable)
+     * @param cursorUserId   cursor user_id from the previous page (nullable)
+     * @return paged results, never null
      */
-    public List<SearchRecord> searchUsers(String query, String excludeUserId, int limit) {
-        String pattern = "%" + query + "%";
+    public SearchPage searchUsersPage(String query, String excludeUserId, int limit, String cursorFullName,
+            String cursorUserId) {
+        String normalizedQuery = query == null ? "" : query;
+        String pattern = toPrefixPattern(normalizedQuery);
+        boolean hasCursor = cursorFullName != null && !cursorFullName.isBlank()
+                && cursorUserId != null && !cursorUserId.isBlank();
+
         try (Connection connection = dataSource.getConnection();
-                PreparedStatement ps = connection.prepareStatement(SEARCH_USERS_SQL)) {
+                PreparedStatement ps = connection.prepareStatement(SEARCH_USERS_PAGED_SQL)) {
 
             ps.setString(1, excludeUserId);
             ps.setString(2, pattern);
             ps.setString(3, pattern);
-            ps.setInt(4, limit);
+            ps.setString(4, pattern);
+            ps.setInt(5, hasCursor ? 1 : 0);
+            ps.setString(6, hasCursor ? cursorFullName : null);
+            ps.setString(7, hasCursor ? cursorFullName : null);
+            ps.setString(8, hasCursor ? cursorUserId : null);
+            ps.setInt(9, limit + 1);
 
-            List<SearchRecord> results = new ArrayList<>();
+            List<SearchRecord> rows = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    results.add(new SearchRecord(
+                    rows.add(new SearchRecord(
                             rs.getString("user_id"),
                             rs.getString("full_name"),
                             rs.getString("reg_number"),
@@ -263,10 +293,72 @@ public final class UserDAO {
                             rs.getString("rank")));
                 }
             }
-            return results;
+
+            boolean hasMore = rows.size() > limit;
+            if (hasMore) {
+                rows.removeLast();
+            }
+
+            String lastFullName = null;
+            String lastUserId = null;
+            if (hasMore && !rows.isEmpty()) {
+                SearchRecord last = rows.getLast();
+                lastFullName = last.fullName();
+                lastUserId = last.userId();
+            }
+
+            return new SearchPage(rows, hasMore, lastFullName, lastUserId);
         } catch (SQLException ex) {
-            auditLogger.logError("db_search_users", null, query, ex);
+            auditLogger.logError("db_search_users", null, excludeUserId, ex, Map.of(
+                    "queryLength", normalizedQuery.length(),
+                    "queryHash", sha256Hex(normalizedQuery)));
             throw new DatabaseOperationException("Failed to search users", ex);
+        }
+    }
+
+    /**
+     * Legacy non-paginated search helper retained for backwards compatibility in
+     * tests and callers that only need the first page.
+     * Searches for approved users whose name or registration number matches,
+     * excluding the user performing the search.
+     *
+     * @param query         the search term
+     * @param excludeUserId the user ID to exclude from results
+     * @param limit         maximum number of results
+     * @return list of matching records, never null
+     * @throws DatabaseOperationException if the query fails
+     */
+    public List<SearchRecord> searchUsers(String query, String excludeUserId, int limit) {
+        return searchUsersPage(query, excludeUserId, limit, null, null).results();
+    }
+
+    private static String toPrefixPattern(String input) {
+        return escapeLikeLiteral(input) + "%";
+    }
+
+    private static String escapeLikeLiteral(String input) {
+        StringBuilder escaped = new StringBuilder(input.length() + 8);
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+            if (ch == '\\' || ch == '%' || ch == '_') {
+                escaped.append('\\');
+            }
+            escaped.append(ch);
+        }
+        return escaped.toString();
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hashed.length * 2);
+            for (byte b : hashed) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
         }
     }
 }

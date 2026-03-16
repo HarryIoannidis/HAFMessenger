@@ -7,6 +7,7 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
@@ -32,6 +33,9 @@ public class SearchController {
     private FlowPane resultsPane;
 
     @FXML
+    private ScrollPane resultsScrollPane;
+
+    @FXML
     private VBox statusBox;
 
     @FXML
@@ -43,6 +47,7 @@ public class SearchController {
     @FXML
     public void initialize() {
         bindViewModel();
+        bindInfiniteScroll();
         viewModel.clearResults();
     }
 
@@ -68,9 +73,43 @@ public class SearchController {
         viewModel.hasResultsProperty().addListener((obs, oldValue, newValue) -> updateResultsVisibility(newValue));
         updateResultsVisibility(viewModel.hasResultsProperty().get());
 
-        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResult>) change -> renderResults(
-                viewModel.resultsProperty()));
-        renderResults(viewModel.resultsProperty());
+        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResult>) this::onResultsChanged);
+        renderAllResults(viewModel.resultsProperty());
+    }
+
+    private void bindInfiniteScroll() {
+        if (resultsScrollPane == null) {
+            return;
+        }
+
+        resultsScrollPane.vvalueProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null && newValue.doubleValue() >= UiConstants.SEARCH_SCROLL_LOAD_THRESHOLD) {
+                viewModel.loadMore();
+            }
+        });
+    }
+
+    private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResult> change) {
+        boolean needsFullRender = false;
+        List<UserSearchResult> addedRows = new ArrayList<>();
+
+        while (change.next()) {
+            if (change.wasPermutated() || change.wasReplaced() || change.wasRemoved() || change.wasUpdated()) {
+                needsFullRender = true;
+            }
+            if (change.wasAdded()) {
+                addedRows.addAll(change.getAddedSubList());
+            }
+        }
+
+        if (needsFullRender) {
+            renderAllResults(viewModel.resultsProperty());
+            return;
+        }
+
+        if (!addedRows.isEmpty()) {
+            appendResults(addedRows);
+        }
     }
 
     private void updateResultsVisibility(boolean hasResults) {
@@ -78,7 +117,7 @@ public class SearchController {
         resultsPane.setVisible(hasResults);
     }
 
-    private void renderResults(List<UserSearchResult> results) {
+    private void renderAllResults(List<UserSearchResult> results) {
         int generation = renderGeneration.incrementAndGet();
 
         if (results == null || results.isEmpty()) {
@@ -106,6 +145,36 @@ public class SearchController {
                     return;
                 }
                 resultsPane.getChildren().setAll(loadedCards);
+            });
+        });
+    }
+
+    private void appendResults(List<UserSearchResult> results) {
+        int generation = renderGeneration.get();
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+
+        List<UserSearchResult> snapshot = List.copyOf(results);
+        Thread.ofVirtual().name("search-item-loader-append").start(() -> {
+            List<javafx.scene.Node> loadedCards = new ArrayList<>();
+            for (UserSearchResult result : snapshot) {
+                try {
+                    var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
+                    FXMLLoader loader = new FXMLLoader(resource);
+                    javafx.scene.Node card = loader.load();
+                    populateCard(card, result);
+                    loadedCards.add(card);
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Could not load search_result_item.fxml", e);
+                }
+            }
+
+            Platform.runLater(() -> {
+                if (generation != renderGeneration.get()) {
+                    return;
+                }
+                resultsPane.getChildren().addAll(loadedCards);
             });
         });
     }

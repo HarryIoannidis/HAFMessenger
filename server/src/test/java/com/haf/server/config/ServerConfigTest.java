@@ -23,6 +23,7 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
+        env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
 
         ServerConfig config = ServerConfig.fromEnv(env);
 
@@ -32,6 +33,9 @@ class ServerConfigTest {
         assertEquals(20, config.getDbPoolSize()); // default
         assertEquals(tempDir, config.getKeystoreRoot());
         assertEquals(tempDir.resolve("keystore.p12"), config.getTlsKeystorePath());
+        assertEquals(20, config.getSearchPageSize());
+        assertEquals(50, config.getSearchMaxPageSize());
+        assertEquals(3, config.getSearchMinQueryLength());
     }
 
     @Test
@@ -80,6 +84,23 @@ class ServerConfigTest {
     }
 
     @Test
+    void load_fails_when_search_cursor_secret_missing() {
+        Map<String, String> env = createMinimalEnv();
+        env.remove("HAF_SEARCH_CURSOR_SECRET");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_fails_when_search_page_size_exceeds_max() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_SEARCH_PAGE_SIZE", "60");
+        env.put("HAF_SEARCH_MAX_PAGE_SIZE", "50");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
     void get_key_password_returns_clone() {
         Map<String, String> env = createMinimalEnv();
         ServerConfig config = ServerConfig.fromEnv(env);
@@ -112,6 +133,7 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
+        env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
         return env;
     }
 }

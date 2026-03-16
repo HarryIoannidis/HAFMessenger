@@ -40,12 +40,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 @SuppressWarnings("java:S1075")
 public final class HttpIngressServer {
@@ -768,7 +776,10 @@ public final class HttpIngressServer {
      */
     private final class SearchHandler implements HttpHandler {
 
-        private static final int MAX_RESULTS = 20;
+        private static final String CURSOR_HMAC_ALGO = "HmacSHA256";
+        private static final String INVALID_LIMIT = "invalid limit";
+        private static final String INVALID_CURSOR = "invalid cursor";
+        private static final String INVALID_QUERY_PARAMS = "invalid query parameters";
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -794,31 +805,203 @@ public final class HttpIngressServer {
                 return;
             }
 
-            // Extract query
-            String rawQuery = exchange.getRequestURI().getQuery(); // e.g. "q=john"
-            String searchTerm = "";
-            if (rawQuery != null) {
-                for (String param : rawQuery.split("&")) {
-                    if (param.startsWith("q=")) {
-                        searchTerm = java.net.URLDecoder.decode(param.substring(2), StandardCharsets.UTF_8);
-                        break;
-                    }
-                }
+            Map<String, String> queryParams;
+            try {
+                queryParams = parseQueryParams(exchange.getRequestURI().getRawQuery());
+            } catch (IllegalArgumentException ex) {
+                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_QUERY_PARAMS)));
+                return;
             }
-            if (searchTerm.isBlank()) {
-                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(List.of())));
+            String searchTerm = queryParams.getOrDefault("q", "");
+            String normalizedQuery = searchTerm == null ? "" : searchTerm.trim();
+            if (normalizedQuery.isBlank()) {
+                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(List.of(), false, null)));
                 return;
             }
 
+            if (normalizedQuery.length() < config.getSearchMinQueryLength()) {
+                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse
+                        .error("query must be at least " + config.getSearchMinQueryLength() + " characters")));
+                return;
+            }
+            if (normalizedQuery.length() > config.getSearchMaxQueryLength()) {
+                normalizedQuery = normalizedQuery.substring(0, config.getSearchMaxQueryLength());
+            }
+
+            int effectiveLimit;
             try {
-                List<UserDAO.SearchRecord> records = userDAO.searchUsers(searchTerm, callerId, MAX_RESULTS);
-                List<UserSearchResult> results = records.stream()
+                effectiveLimit = resolveLimit(queryParams.get("limit"));
+            } catch (IllegalArgumentException ex) {
+                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_LIMIT)));
+                return;
+            }
+
+            String cursorToken = queryParams.get("cursor");
+            CursorKey cursor;
+            try {
+                cursor = decodeCursor(cursorToken);
+            } catch (IllegalArgumentException ex) {
+                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_CURSOR)));
+                return;
+            }
+
+            String queryHash = sha256Hex(normalizedQuery);
+            auditLogger.logSearchRequest(
+                    requestId,
+                    callerId,
+                    normalizedQuery.length(),
+                    queryHash,
+                    effectiveLimit,
+                    cursor.isPresent());
+
+            try {
+                UserDAO.SearchPage page = userDAO.searchUsersPage(
+                        normalizedQuery,
+                        callerId,
+                        effectiveLimit,
+                        cursor.fullName(),
+                        cursor.userId());
+
+                List<UserSearchResult> results = page.results().stream()
                         .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
                         .toList();
-                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results)));
+                String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
+                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
             } catch (Exception ex) {
-                auditLogger.logError("search_error", requestId, callerId, ex);
+                auditLogger.logError("search_error", requestId, callerId, ex, Map.of(
+                        "queryLength", normalizedQuery.length(),
+                        "queryHash", queryHash,
+                        "limit", effectiveLimit,
+                        "cursorSupplied", cursor.isPresent()));
                 sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error(INTERNAL_SERVER_ERROR)));
+            }
+        }
+
+        private int resolveLimit(String rawLimit) {
+            if (rawLimit == null || rawLimit.isBlank()) {
+                return config.getSearchPageSize();
+            }
+            try {
+                int requested = Integer.parseInt(rawLimit);
+                if (requested < 1) {
+                    throw new IllegalArgumentException(INVALID_LIMIT);
+                }
+                return clamp(requested, 1, config.getSearchMaxPageSize());
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException(INVALID_LIMIT, ex);
+            }
+        }
+
+        private static int clamp(int value, int min, int max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        private Map<String, String> parseQueryParams(String rawQuery) {
+            Map<String, String> params = new HashMap<>();
+            if (rawQuery == null || rawQuery.isBlank()) {
+                return params;
+            }
+
+            String[] pairs = rawQuery.split("&");
+            for (String pair : pairs) {
+                if (pair == null || pair.isBlank()) {
+                    continue;
+                }
+                int equalsIndex = pair.indexOf('=');
+                String rawKey = equalsIndex >= 0 ? pair.substring(0, equalsIndex) : pair;
+                String rawValue = equalsIndex >= 0 ? pair.substring(equalsIndex + 1) : "";
+                String key = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
+                String value = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+                params.putIfAbsent(key, value);
+            }
+            return params;
+        }
+
+        private CursorKey decodeCursor(String cursorToken) {
+            if (cursorToken == null || cursorToken.isBlank()) {
+                return CursorKey.empty();
+            }
+
+            try {
+                String decoded = new String(Base64.getUrlDecoder().decode(cursorToken), StandardCharsets.UTF_8);
+                String[] parts = decoded.split("\\.", 3);
+                if (parts.length != 3) {
+                    throw new IllegalArgumentException(INVALID_CURSOR);
+                }
+
+                String payload = parts[0] + "." + parts[1];
+                byte[] providedSignature = Base64.getUrlDecoder().decode(parts[2]);
+                byte[] expectedSignature = hmac(payload);
+                if (!MessageDigest.isEqual(expectedSignature, providedSignature)) {
+                    throw new IllegalArgumentException(INVALID_CURSOR);
+                }
+
+                String fullName = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
+                String userId = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+                if (fullName.isBlank() || userId.isBlank()) {
+                    throw new IllegalArgumentException(INVALID_CURSOR);
+                }
+                return new CursorKey(fullName, userId);
+            } catch (IllegalArgumentException ex) {
+                throw ex;
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(INVALID_CURSOR, ex);
+            }
+        }
+
+        private String encodeCursor(String fullName, String userId) {
+            if (fullName == null || userId == null) {
+                return null;
+            }
+
+            String fullNamePart = Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(fullName.getBytes(StandardCharsets.UTF_8));
+            String userIdPart = Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(userId.getBytes(StandardCharsets.UTF_8));
+            String payload = fullNamePart + "." + userIdPart;
+            String signature = Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(hmac(payload));
+            String cursorPayload = payload + "." + signature;
+            return Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(cursorPayload.getBytes(StandardCharsets.UTF_8));
+        }
+
+        private byte[] hmac(String payload) {
+            try {
+                Mac mac = Mac.getInstance(CURSOR_HMAC_ALGO);
+                byte[] secretBytes = config.getSearchCursorSecret().getBytes(StandardCharsets.UTF_8);
+                mac.init(new SecretKeySpec(secretBytes, CURSOR_HMAC_ALGO));
+                return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to sign search cursor", ex);
+            }
+        }
+
+        private static String sha256Hex(String value) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+                StringBuilder hex = new StringBuilder(bytes.length * 2);
+                for (byte b : bytes) {
+                    hex.append(String.format("%02x", b));
+                }
+                return hex.toString();
+            } catch (NoSuchAlgorithmException ex) {
+                throw new IllegalStateException("SHA-256 is not available", ex);
+            }
+        }
+
+        private record CursorKey(String fullName, String userId) {
+            static CursorKey empty() {
+                return new CursorKey(null, null);
+            }
+
+            boolean isPresent() {
+                return fullName != null && userId != null;
             }
         }
 
