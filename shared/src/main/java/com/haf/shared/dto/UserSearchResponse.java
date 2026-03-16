@@ -14,6 +14,8 @@ import java.util.List;
 public class UserSearchResponse implements Serializable {
     private List<UserSearchResult> results;
     private String error;
+    private boolean hasMore;
+    private String nextCursor;
 
     public UserSearchResponse() {
         // Required for JSON deserialization
@@ -35,12 +37,41 @@ public class UserSearchResponse implements Serializable {
         this.error = error;
     }
 
+    public boolean isHasMore() {
+        return hasMore;
+    }
+
+    public void setHasMore(boolean hasMore) {
+        this.hasMore = hasMore;
+    }
+
+    public String getNextCursor() {
+        return nextCursor;
+    }
+
+    public void setNextCursor(String nextCursor) {
+        this.nextCursor = nextCursor;
+    }
+
     /**
      * Convenience factory for a successful search response.
      */
     public static UserSearchResponse success(List<UserSearchResult> results) {
         UserSearchResponse r = new UserSearchResponse();
         r.setResults(results);
+        r.setHasMore(false);
+        r.setNextCursor(null);
+        return r;
+    }
+
+    /**
+     * Convenience factory for a successful paginated search response.
+     */
+    public static UserSearchResponse success(List<UserSearchResult> results, boolean hasMore, String nextCursor) {
+        UserSearchResponse r = new UserSearchResponse();
+        r.setResults(results);
+        r.setHasMore(hasMore);
+        r.setNextCursor(nextCursor);
         return r;
     }
 

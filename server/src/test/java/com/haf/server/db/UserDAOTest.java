@@ -179,9 +179,11 @@ class UserDAOTest {
         assertEquals("Alice", results.get(0).fullName());
         assertEquals("uid-2", results.get(1).userId());
         verify(existsStatement).setString(1, "caller-id");
-        verify(existsStatement).setString(2, "%a%");
-        verify(existsStatement).setString(3, "%a%");
-        verify(existsStatement).setInt(4, 20);
+        verify(existsStatement).setString(2, "a%");
+        verify(existsStatement).setString(3, "a%");
+        verify(existsStatement).setString(4, "a%");
+        verify(existsStatement).setInt(5, 0);
+        verify(existsStatement).setInt(9, 21);
     }
 
     @Test
@@ -203,7 +205,44 @@ class UserDAOTest {
         when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
 
         assertThrows(DatabaseOperationException.class, () -> dao.searchUsers("test", "caller-id", 10));
-        verify(auditLogger, times(1)).logError(eq("db_search_users"), isNull(), eq("test"), any());
+        verify(auditLogger, times(1)).logError(eq("db_search_users"), isNull(), eq("caller-id"), any(),
+                anyMap());
+    }
+
+    @Test
+    void searchUsersPage_escapes_like_metacharacters() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("LIKE"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        dao.searchUsersPage("ab%_\\\\", "caller-id", 20, null, null);
+
+        verify(existsStatement).setString(2, "ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(3, "ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(4, "ab\\%\\_\\\\\\\\%");
+    }
+
+    @Test
+    void searchUsersPage_returns_hasMore_and_cursor_keys_when_limit_exceeded() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("ORDER BY full_name"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, true, true, false);
+
+        when(resultSet.getString("user_id")).thenReturn("uid-1", "uid-2", "uid-3");
+        when(resultSet.getString("full_name")).thenReturn("Alice", "Bob", "Charlie");
+        when(resultSet.getString("reg_number")).thenReturn("REG-001", "REG-002", "REG-003");
+        when(resultSet.getString("email")).thenReturn("alice@haf.gr", "bob@haf.gr", "charlie@haf.gr");
+        when(resultSet.getString("rank")).thenReturn("Σμηναγός", "Σμηνίας", "Αντισμήναρχος");
+
+        UserDAO.SearchPage page = dao.searchUsersPage("a", "caller-id", 2, null, null);
+
+        assertEquals(2, page.results().size());
+        assertTrue(page.hasMore());
+        assertEquals("Bob", page.lastFullName());
+        assertEquals("uid-2", page.lastUserId());
+        verify(existsStatement).setInt(9, 3);
     }
 
     private RegisterRequest createValidRequest() {

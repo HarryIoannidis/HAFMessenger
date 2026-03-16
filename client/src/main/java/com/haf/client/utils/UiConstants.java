@@ -107,6 +107,11 @@ public final class UiConstants {
     // Common Dimensions
     public static final double RANK_ICON_SIZE = 32.0;
 
+    // Search
+    public static final int SEARCH_PAGE_SIZE = 20;
+    public static final int SEARCH_MIN_QUERY_LENGTH = 3;
+    public static final double SEARCH_SCROLL_LOAD_THRESHOLD = 0.90;
+
     // Styles
     public static final String STYLE_TEXT_FIELD_ERROR = "text-field-error";
     public static final String STYLE_PASSWORD_FIELD_ERROR = "password-field-error";

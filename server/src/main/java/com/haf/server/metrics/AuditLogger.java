@@ -116,6 +116,25 @@ public final class AuditLogger {
     }
 
     /**
+     * Logs sanitized metadata about a user-search request.
+     *
+     * @param requestId    the request ID
+     * @param userId       the authenticated user ID
+     * @param queryLength  query length after normalization
+     * @param queryHash    SHA-256 hash of normalized query
+     * @param limit        effective page size for this request
+     * @param cursorSupplied true if request included a cursor
+     */
+    public void logSearchRequest(String requestId, String userId, int queryLength, String queryHash, int limit,
+            boolean cursorSupplied) {
+        log(Level.INFO, "search_users", requestId, userId, Map.of(
+                "queryLength", queryLength,
+                "queryHash", queryHash,
+                "limit", limit,
+                "cursorSupplied", cursorSupplied));
+    }
+
+    /**
      * Logs a cleanup event.
      *
      * @param deleted    the number of messages deleted.
@@ -151,7 +170,27 @@ public final class AuditLogger {
      * @param error     the error.
      */
     public void logError(String action, String requestId, String userId, Throwable error) {
+        logError(action, requestId, userId, error, null);
+    }
+
+    /**
+     * Logs an error event with additional structured fields.
+     *
+     * @param action      the action that caused the error
+     * @param requestId   the request ID
+     * @param userId      the user ID
+     * @param error       the error
+     * @param extraFields extra fields to include in the audit event
+     */
+    public void logError(String action, String requestId, String userId, Throwable error, Map<String, ?> extraFields) {
         StringMapMessage message = baseMessage(action, requestId, userId);
+        if (extraFields != null) {
+            extraFields.forEach((k, v) -> {
+                if (v != null) {
+                    message.put(k, String.valueOf(v));
+                }
+            });
+        }
         LOGGER.error(message, error);
     }
 

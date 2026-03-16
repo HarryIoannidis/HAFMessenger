@@ -94,11 +94,10 @@ class ChatViewModelTest {
 
     private static final class AckRecordingReceiver implements MessageReceiver {
         private final List<String> acknowledgedSenderIds = new ArrayList<>();
-        private MessageListener messageListener;
 
         @Override
         public void setMessageListener(MessageListener listener) {
-            this.messageListener = listener;
+            // no-op for this test double
         }
 
         @Override
