@@ -118,6 +118,7 @@ public class MainController {
 
     private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
     private final java.util.concurrent.CompletableFuture<Parent> searchFuture = new java.util.concurrent.CompletableFuture<>();
+    private final java.util.concurrent.atomic.AtomicInteger chatLoadGeneration = new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.concurrent.atomic.AtomicBoolean placeholderLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
             false);
     private final java.util.concurrent.atomic.AtomicBoolean searchLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
@@ -438,6 +439,8 @@ public class MainController {
     }
 
     private void loadChat(String recipientId) {
+        int loadGeneration = chatLoadGeneration.incrementAndGet();
+
         // Reuse chat view if already loaded — just switch recipient
         if (currentChatView != null && currentChatController != null) {
             if (!recipientId.equals(currentChatRecipientId)) {
@@ -448,8 +451,7 @@ public class MainController {
             return;
         }
 
-        // First load: create the chat view in a background thread
-        Thread.ofVirtual().name("chat-loader").start(() -> {
+        Runnable loadAction = () -> {
             try {
                 var resource = getClass().getResource(UiConstants.FXML_CHAT);
                 LOGGER.log(Level.INFO, "Loading chat FXML: {0}", resource);
@@ -457,18 +459,25 @@ public class MainController {
                 javafx.scene.Parent view = loader.load();
 
                 ChatController chatController = loader.getController();
-                chatController.setRecipient(recipientId);
 
-                javafx.application.Platform.runLater(() -> {
-                    currentChatView = view;
-                    currentChatController = chatController;
-                    currentChatRecipientId = recipientId;
-                    contentPane.getChildren().setAll(view);
-                });
+                if (loadGeneration != chatLoadGeneration.get()) {
+                    return;
+                }
+                chatController.setRecipient(recipientId);
+                currentChatView = view;
+                currentChatController = chatController;
+                currentChatRecipientId = recipientId;
+                contentPane.getChildren().setAll(view);
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
             }
-        });
+        };
+
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            loadAction.run();
+        } else {
+            javafx.application.Platform.runLater(loadAction);
+        }
     }
 
     private void setupWindowControls() {

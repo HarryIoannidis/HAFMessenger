@@ -58,10 +58,11 @@ public class MessageViewModel {
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
             public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
-                MessageVM vm = decodeIncoming(plaintext, senderId, contentType, timestampEpochMs);
+                String contactId = normalizeContactId(senderId);
+                MessageVM vm = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
                 runOnUiThread(() -> {
-                    getMessages(senderId).add(vm);
-                    status.set("Message received from " + senderId);
+                    getMessages(contactId).add(vm);
+                    status.set("Message received from " + contactId);
                 });
             }
 
@@ -87,14 +88,15 @@ public class MessageViewModel {
      * @param text        the text to send
      */
     public void sendTextMessage(String recipientId, String text) {
+        String contactId = normalizeContactId(recipientId);
         try {
             byte[] payload = text.getBytes(StandardCharsets.UTF_8);
-            messageSender.sendMessage(payload, recipientId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
+            messageSender.sendMessage(payload, contactId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
 
             MessageVM vm = MessageVM.outgoingText(text, LocalDateTime.now());
             runOnUiThread(() -> {
-                getMessages(recipientId).add(vm);
-                status.set("Message sent to " + recipientId);
+                getMessages(contactId).add(vm);
+                status.set("Message sent to " + contactId);
             });
         } catch (Exception e) {
             e.printStackTrace();
@@ -130,7 +132,7 @@ public class MessageViewModel {
      * @param senderId the sender whose messages should be acknowledged
      */
     public void acknowledgeMessagesFrom(String senderId) {
-        messageReceiver.acknowledgeEnvelopes(senderId);
+        messageReceiver.acknowledgeEnvelopes(normalizeContactId(senderId));
     }
 
     /**
@@ -142,7 +144,8 @@ public class MessageViewModel {
      * @return the observable message list
      */
     public ObservableList<MessageVM> getMessages(String contactId) {
-        return messagesByContact.computeIfAbsent(contactId, k -> FXCollections.observableArrayList());
+        String normalizedContactId = normalizeContactId(contactId);
+        return messagesByContact.computeIfAbsent(normalizedContactId, ignored -> FXCollections.observableArrayList());
     }
 
     /**
@@ -178,10 +181,25 @@ public class MessageViewModel {
 
     private static void runOnUiThread(Runnable action) {
         try {
+            if (Platform.isFxApplicationThread()) {
+                action.run();
+                return;
+            }
+        } catch (RuntimeException ex) {
+            // JavaFX toolkit may not be initialized in headless/unit-test runs.
+            action.run();
+            return;
+        }
+
+        try {
             Platform.runLater(action);
-        } catch (IllegalStateException ex) {
+        } catch (RuntimeException ex) {
             action.run();
         }
+    }
+
+    private static String normalizeContactId(String contactId) {
+        return contactId == null ? "" : contactId.trim();
     }
 
     /**
