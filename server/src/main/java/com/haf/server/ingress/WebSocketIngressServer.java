@@ -19,11 +19,16 @@ import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 import javax.net.ssl.SSLContext;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class WebSocketIngressServer extends WebSocketServer {
 
@@ -37,6 +42,9 @@ public final class WebSocketIngressServer extends WebSocketServer {
     private final SessionDAO sessionDAO;
     private final ContactDAO contactDAO;
     private final PresenceRegistry presenceRegistry;
+    private final CountDownLatch startupSignal = new CountDownLatch(1);
+    private final AtomicReference<Exception> startupFailure = new AtomicReference<>();
+    private final AtomicBoolean startupComplete = new AtomicBoolean(false);
 
     /**
      * Creates a WebSocketIngressServer with the given configuration and
@@ -193,12 +201,41 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     @Override
     public void onError(WebSocket conn, Exception ex) {
+        if (!startupComplete.get() && conn == null) {
+            startupFailure.compareAndSet(null, ex);
+            startupSignal.countDown();
+        }
         auditLogger.logError("ws_error", null, connectionUsers.get(conn), ex);
     }
 
     @Override
     public void onStart() {
-        // No operation
+        startupComplete.set(true);
+        startupSignal.countDown();
+    }
+
+    /**
+     * Blocks until the WebSocket server has either started or failed.
+     *
+     * @param timeout maximum time to wait
+     * @throws IllegalStateException if startup fails or times out
+     */
+    public void awaitStartup(Duration timeout) {
+        long timeoutMs = Math.max(1L, timeout.toMillis());
+        try {
+            boolean ready = startupSignal.await(timeoutMs, TimeUnit.MILLISECONDS);
+            if (!ready) {
+                throw new IllegalStateException("Timed out waiting for WebSocket server startup on port " + getPort());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for WebSocket server startup", e);
+        }
+
+        Exception startupException = startupFailure.get();
+        if (startupException != null) {
+            throw new IllegalStateException("WebSocket server failed to start on port " + getPort(), startupException);
+        }
     }
 
     /**
@@ -239,15 +276,19 @@ public final class WebSocketIngressServer extends WebSocketServer {
             for (String watcherUserId : watcherUserIds) {
                 Set<WebSocket> watcherConnections = presenceRegistry.getActiveConnections(watcherUserId);
                 for (WebSocket watcherConnection : watcherConnections) {
-                    try {
-                        watcherConnection.send(payload);
-                    } catch (Exception ex) {
-                        auditLogger.logError("ws_presence_broadcast_error", null, watcherUserId, ex);
-                    }
+                    sendPresenceToWatcher(watcherUserId, watcherConnection, payload);
                 }
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_presence_watchers_lookup_error", null, userId, ex);
+        }
+    }
+
+    private void sendPresenceToWatcher(String watcherUserId, WebSocket watcherConnection, String payload) {
+        try {
+            watcherConnection.send(payload);
+        } catch (Exception ex) {
+            auditLogger.logError("ws_presence_broadcast_error", null, watcherUserId, ex);
         }
     }
 
@@ -267,10 +308,6 @@ public final class WebSocketIngressServer extends WebSocketServer {
             auditLogger.logError("ws_presence_snapshot_error", null, userId, ex);
         }
     }
-
-    // Avoid using inner records for JSON I/O to keep Jackson from requiring deep
-    // reflection on the module.
-    // Minimal helper methods for small response payloads follow.
 
     /**
      * Builds a minimal JSON payload describing a rate-limit event.
