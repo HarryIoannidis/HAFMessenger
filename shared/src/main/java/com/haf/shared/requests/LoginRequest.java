@@ -1,4 +1,4 @@
-package com.haf.shared.dto;
+package com.haf.shared.requests;
 
 import java.io.Serializable;
 

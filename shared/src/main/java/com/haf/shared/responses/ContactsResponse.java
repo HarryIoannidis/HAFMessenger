@@ -1,20 +1,22 @@
-package com.haf.shared.dto;
+package com.haf.shared.responses;
+
+import com.haf.shared.dto.UserSearchResultDTO;
 
 import java.util.List;
 
 public class ContactsResponse {
-    private List<UserSearchResult> contacts;
+    private List<UserSearchResultDTO> contacts;
     private String error;
 
     public ContactsResponse() {
         // Required for JSON deserialization
     }
 
-    public List<UserSearchResult> getContacts() {
+    public List<UserSearchResultDTO> getContacts() {
         return contacts;
     }
 
-    public void setContacts(List<UserSearchResult> contacts) {
+    public void setContacts(List<UserSearchResultDTO> contacts) {
         this.contacts = contacts;
     }
 
@@ -26,7 +28,7 @@ public class ContactsResponse {
         this.error = error;
     }
 
-    public static ContactsResponse success(List<UserSearchResult> contacts) {
+    public static ContactsResponse success(List<UserSearchResultDTO> contacts) {
         ContactsResponse response = new ContactsResponse();
         response.setContacts(contacts);
         return response;

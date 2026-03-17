@@ -3,6 +3,7 @@ package com.haf.server.ingress;
 import com.haf.server.config.ServerConfig;
 import com.haf.server.db.ContactDAO;
 import com.haf.server.db.FileUploadDAO;
+import com.haf.server.db.AttachmentDAO;
 import com.haf.server.db.SessionDAO;
 import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
@@ -14,15 +15,26 @@ import com.haf.server.router.RateLimiterService;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
 import com.haf.shared.dto.EncryptedFileDTO;
 import com.haf.shared.dto.EncryptedMessage;
-import com.haf.shared.dto.PublicKeyResponse;
-import com.haf.shared.dto.LoginRequest;
-import com.haf.shared.dto.LoginResponse;
-import com.haf.shared.dto.RegisterRequest;
-import com.haf.shared.dto.RegisterResponse;
-import com.haf.shared.dto.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResult;
-import com.haf.shared.dto.ContactsResponse;
-import com.haf.shared.dto.AddContactRequest;
+import com.haf.shared.requests.AttachmentBindRequest;
+import com.haf.shared.responses.AttachmentBindResponse;
+import com.haf.shared.requests.AttachmentChunkRequest;
+import com.haf.shared.responses.AttachmentChunkResponse;
+import com.haf.shared.requests.AttachmentCompleteRequest;
+import com.haf.shared.responses.AttachmentCompleteResponse;
+import com.haf.shared.responses.AttachmentDownloadResponse;
+import com.haf.shared.requests.AttachmentInitRequest;
+import com.haf.shared.responses.AttachmentInitResponse;
+import com.haf.shared.responses.MessagingPolicyResponse;
+import com.haf.shared.responses.PublicKeyResponse;
+import com.haf.shared.requests.LoginRequest;
+import com.haf.shared.responses.LoginResponse;
+import com.haf.shared.requests.RegisterRequest;
+import com.haf.shared.responses.RegisterResponse;
+import com.haf.shared.responses.UserSearchResponse;
+import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.responses.ContactsResponse;
+import com.haf.shared.requests.AddContactRequest;
+import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -68,6 +80,8 @@ public final class HttpIngressServer {
     private static final String CONTACTS_PATH = "/api/v1/contacts";
     private static final String HEALTH_PATH = "/api/v1/health";
     private static final String ADMIN_KEY_PATH = "/api/v1/config/admin-key";
+    private static final String MESSAGING_CONFIG_PATH = "/api/v1/config/messaging";
+    private static final String ATTACHMENTS_PATH = "/api/v1/attachments";
     private static final String STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
     private static final String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
     private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
@@ -109,6 +123,7 @@ public final class HttpIngressServer {
     private final UserDAO userDAO;
     private final SessionDAO sessionDAO;
     private final FileUploadDAO fileUploadDAO;
+    private final AttachmentDAO attachmentDAO;
     private final ContactDAO contactDAO;
     private final PresenceRegistry presenceRegistry;
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -136,6 +151,7 @@ public final class HttpIngressServer {
             UserDAO userDAO,
             SessionDAO sessionDAO,
             FileUploadDAO fileUploadDAO,
+            AttachmentDAO attachmentDAO,
             ContactDAO contactDAO,
             PresenceRegistry presenceRegistry) throws IOException {
         this.config = config;
@@ -147,6 +163,7 @@ public final class HttpIngressServer {
         this.userDAO = userDAO;
         this.sessionDAO = sessionDAO;
         this.fileUploadDAO = fileUploadDAO;
+        this.attachmentDAO = attachmentDAO;
         this.contactDAO = contactDAO;
         this.presenceRegistry = presenceRegistry;
         this.server = createServer(sslContext);
@@ -184,6 +201,8 @@ public final class HttpIngressServer {
         httpsServer.createContext(CONTACTS_PATH, new ContactsHandler());
         httpsServer.createContext(HEALTH_PATH, new HealthHandler());
         httpsServer.createContext(ADMIN_KEY_PATH, new AdminKeyHandler());
+        httpsServer.createContext(MESSAGING_CONFIG_PATH, new MessagingConfigHandler());
+        httpsServer.createContext(ATTACHMENTS_PATH, new AttachmentsHandler());
         httpsServer.setExecutor(executor);
 
         return httpsServer;
@@ -862,8 +881,8 @@ public final class HttpIngressServer {
                         cursor.fullName(),
                         cursor.userId());
 
-                List<UserSearchResult> results = page.results().stream()
-                        .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
+                List<UserSearchResultDTO> results = page.results().stream()
+                        .map(r -> new UserSearchResultDTO(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
                         .toList();
                 String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
                 sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
@@ -883,18 +902,12 @@ public final class HttpIngressServer {
             }
             try {
                 int requested = Integer.parseInt(rawLimit);
-                if (requested < 1) {
-                    throw new IllegalArgumentException(INVALID_LIMIT);
-                }
-                return clamp(requested, 1, config.getSearchMaxPageSize());
+                return Math.clamp(requested, 1, config.getSearchMaxPageSize());
             } catch (NumberFormatException ex) {
                 throw new IllegalArgumentException(INVALID_LIMIT, ex);
             }
         }
 
-        private static int clamp(int value, int min, int max) {
-            return Math.max(min, Math.min(max, value));
-        }
 
         private Map<String, String> parseQueryParams(String rawQuery) {
             Map<String, String> params = new HashMap<>();
@@ -1107,8 +1120,8 @@ public final class HttpIngressServer {
 
         private void handleGet(HttpExchange exchange, String callerId) throws IOException {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
-            List<UserSearchResult> results = records.stream()
-                    .map(r -> new UserSearchResult(r.userId(), r.fullName(), r.regNumber(), r.email(),
+            List<UserSearchResultDTO> results = records.stream()
+                    .map(r -> new UserSearchResultDTO(r.userId(), r.fullName(), r.regNumber(), r.email(),
                             r.rank(), presenceRegistry.isActive(r.userId())))
                     .toList();
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
@@ -1173,6 +1186,321 @@ public final class HttpIngressServer {
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
             }
+        }
+    }
+
+    /**
+     * Handles authenticated messaging policy fetches.
+     */
+    private final class MessagingConfigHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            try {
+                if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendJson(exchange, 405, JsonCodec.toJson(MessagingPolicyResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+
+                String callerId = authenticateCaller(exchange);
+                if (callerId == null) {
+                    return;
+                }
+
+                MessagingPolicyResponse response = MessagingPolicyResponse.success(
+                        config.getAttachmentMaxBytes(),
+                        config.getAttachmentInlineMaxBytes(),
+                        config.getAttachmentChunkBytes(),
+                        config.getAttachmentAllowedTypes(),
+                        config.getAttachmentUnboundTtlSeconds());
+                sendJson(exchange, 200, JsonCodec.toJson(response));
+            } catch (Exception ex) {
+                auditLogger.logError("messaging_config_error", requestId, null, ex);
+                sendJson(exchange, 500, JsonCodec.toJson(MessagingPolicyResponse.error(INTERNAL_SERVER_ERROR)));
+            } finally {
+                exchange.close();
+            }
+        }
+    }
+
+    /**
+     * Handles attachment upload/download lifecycle endpoints.
+     */
+    private final class AttachmentsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            String callerId = authenticateCaller(exchange);
+            if (callerId == null) {
+                exchange.close();
+                return;
+            }
+
+            String method = exchange.getRequestMethod();
+            String path = exchange.getRequestURI().getPath();
+            String suffix = path.substring(ATTACHMENTS_PATH.length());
+
+            try {
+                dispatchRequest(exchange, callerId, method, suffix);
+            } catch (SecurityException ex) {
+                sendJson(exchange, 403, jsonError("forbidden"));
+            } catch (IllegalArgumentException ex) {
+                sendJson(exchange, 400, jsonError(ex.getMessage()));
+            } catch (IllegalStateException ex) {
+                sendJson(exchange, 409, jsonError(ex.getMessage()));
+            } catch (Exception ex) {
+                auditLogger.logError("attachments_handler_error", requestId, callerId, ex);
+                sendJson(exchange, 500, jsonError(INTERNAL_SERVER_ERROR));
+            } finally {
+                exchange.close();
+            }
+        }
+
+        private void dispatchRequest(HttpExchange exchange, String callerId, String method, String suffix) throws IOException {
+            if ("/init".equals(suffix)) {
+                if (!METHOD_POST.equalsIgnoreCase(method)) {
+                    sendJson(exchange, 405, JsonCodec.toJson(AttachmentInitResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+                handleInit(exchange, callerId);
+                return;
+            }
+
+            String[] parts = splitAttachmentPath(suffix);
+            if (parts == null || parts.length == 0 || parts[0].isBlank()) {
+                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                return;
+            }
+            String attachmentId = parts[0];
+
+            if (parts.length == 1) {
+                if (!METHOD_GET.equalsIgnoreCase(method)) {
+                    sendJson(exchange, 405, JsonCodec.toJson(AttachmentDownloadResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+                handleDownload(exchange, callerId, attachmentId);
+                return;
+            }
+
+            if (parts.length != 2 || !METHOD_POST.equalsIgnoreCase(method)) {
+                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                return;
+            }
+
+            switch (parts[1]) {
+                case "chunk" -> handleChunk(exchange, callerId, attachmentId);
+                case "complete" -> handleComplete(exchange, callerId, attachmentId);
+                case "bind" -> handleBind(exchange, callerId, attachmentId);
+                default -> sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+            }
+        }
+
+        private void handleInit(HttpExchange exchange, String callerId) throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            AttachmentInitRequest request = JsonCodec.fromJson(body, AttachmentInitRequest.class);
+
+            if (request == null) {
+                throw new IllegalArgumentException("attachment init payload is required");
+            }
+
+            String recipientId = request.getRecipientId() == null ? "" : request.getRecipientId().trim();
+            if (recipientId.isBlank()) {
+                throw new IllegalArgumentException("recipientId is required");
+            }
+            if (request.getPlaintextSizeBytes() <= config.getAttachmentInlineMaxBytes()) {
+                throw new IllegalArgumentException("chunked upload requires size above inline limit");
+            }
+            if (request.getPlaintextSizeBytes() > config.getAttachmentMaxBytes()) {
+                throw new IllegalArgumentException("attachment exceeds maximum size");
+            }
+            if (!AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB.equals(request.getContentType())) {
+                throw new IllegalArgumentException("unsupported attachment upload content type");
+            }
+            if (request.getEncryptedSizeBytes() <= 0) {
+                throw new IllegalArgumentException("encryptedSizeBytes must be >= 1");
+            }
+            long maxEncryptedBytes = (config.getAttachmentMaxBytes() * 2L) + (1024L * 1024L);
+            if (request.getEncryptedSizeBytes() > maxEncryptedBytes) {
+                throw new IllegalArgumentException("encrypted attachment payload is too large");
+            }
+
+            int expectedChunks = request.getExpectedChunks();
+            int computedChunks = (int) Math.ceil(request.getEncryptedSizeBytes() / (double) config.getAttachmentChunkBytes());
+            if (expectedChunks <= 0 || expectedChunks != computedChunks) {
+                throw new IllegalArgumentException("expectedChunks does not match attachment size");
+            }
+
+            AttachmentDAO.UploadInitResult result = attachmentDAO.initUpload(
+                    callerId,
+                    recipientId,
+                    request.getContentType(),
+                    request.getEncryptedSizeBytes(),
+                    expectedChunks,
+                    config.getAttachmentUnboundTtlSeconds());
+
+            sendJson(exchange, 200, JsonCodec.toJson(
+                    AttachmentInitResponse.success(result.attachmentId(), config.getAttachmentChunkBytes(),
+                            result.expiresAtEpochMs())));
+        }
+
+        private void handleChunk(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            AttachmentChunkRequest request = JsonCodec.fromJson(body, AttachmentChunkRequest.class);
+            if (request == null) {
+                throw new IllegalArgumentException("attachment chunk payload is required");
+            }
+
+            if (request.getChunkIndex() < 0) {
+                throw new IllegalArgumentException("chunkIndex must be >= 0");
+            }
+            if (request.getChunkDataB64() == null || request.getChunkDataB64().isBlank()) {
+                throw new IllegalArgumentException("chunkDataB64 is required");
+            }
+
+            byte[] decodedChunk;
+            try {
+                decodedChunk = Base64.getDecoder().decode(request.getChunkDataB64());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("chunkDataB64 is not valid base64");
+            }
+            if (decodedChunk.length == 0 || decodedChunk.length > config.getAttachmentChunkBytes()) {
+                throw new IllegalArgumentException("chunk size is out of bounds");
+            }
+
+            AttachmentDAO.ChunkStoreResult result = attachmentDAO.storeChunk(
+                    callerId,
+                    attachmentId,
+                    request.getChunkIndex(),
+                    decodedChunk);
+            sendJson(exchange, 200, JsonCodec.toJson(
+                    AttachmentChunkResponse.success(attachmentId, result.chunkIndex(), result.stored())));
+        }
+
+        private void handleComplete(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            AttachmentCompleteRequest request = JsonCodec.fromJson(body, AttachmentCompleteRequest.class);
+            if (request == null) {
+                throw new IllegalArgumentException("attachment complete payload is required");
+            }
+            if (request.getExpectedChunks() <= 0) {
+                throw new IllegalArgumentException("expectedChunks must be >= 1");
+            }
+            if (request.getEncryptedSizeBytes() <= 0) {
+                throw new IllegalArgumentException("encryptedSizeBytes must be >= 1");
+            }
+
+            AttachmentDAO.CompletionResult result = attachmentDAO.completeUpload(
+                    callerId,
+                    attachmentId,
+                    request.getExpectedChunks(),
+                    request.getEncryptedSizeBytes());
+            sendJson(exchange, 200, JsonCodec.toJson(
+                    AttachmentCompleteResponse.success(
+                            attachmentId,
+                            result.receivedChunks(),
+                            result.receivedBytes(),
+                            result.status())));
+        }
+
+        private void handleBind(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            AttachmentBindRequest request = JsonCodec.fromJson(body, AttachmentBindRequest.class);
+            if (request == null || request.getEnvelopeId() == null || request.getEnvelopeId().isBlank()) {
+                throw new IllegalArgumentException("envelopeId is required");
+            }
+
+            AttachmentDAO.BindResult result = attachmentDAO.bindUploadToEnvelope(
+                    callerId,
+                    attachmentId,
+                    request.getEnvelopeId());
+            sendJson(exchange, 200, JsonCodec.toJson(
+                    AttachmentBindResponse.success(
+                            result.attachmentId(),
+                            result.envelopeId(),
+                            result.expiresAtEpochMs())));
+        }
+
+        private void handleDownload(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
+            AttachmentDAO.DownloadBlob blob = attachmentDAO.loadForRecipient(callerId, attachmentId);
+            AttachmentDownloadResponse response = AttachmentDownloadResponse.success(
+                    blob.attachmentId(),
+                    blob.senderId(),
+                    blob.recipientId(),
+                    blob.contentType(),
+                    blob.encryptedSizeBytes(),
+                    blob.chunkCount(),
+                    Base64.getEncoder().encodeToString(blob.encryptedBlob()));
+            sendJson(exchange, 200, JsonCodec.toJson(response));
+        }
+
+        private String[] splitAttachmentPath(String suffix) {
+            if (suffix == null || suffix.isBlank() || "/".equals(suffix)) {
+                return new String[0];
+            }
+            String trimmed = suffix.startsWith("/") ? suffix.substring(1) : suffix;
+            if (trimmed.isBlank()) {
+                return new String[0];
+            }
+            return trimmed.split("/");
+        }
+
+        private String readBody(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private String authenticateCaller(HttpExchange exchange) throws IOException {
+        String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            sendJson(exchange, 401, jsonError(MISSING_OR_INVALID_AUTH));
+            return null;
+        }
+
+        String sessionId = authHeader.substring(BEARER_PREFIX.length());
+        String callerId = sessionDAO.getUserIdForSession(sessionId);
+        if (callerId == null) {
+            sendJson(exchange, 401, jsonError(INVALID_SESSION));
+            return null;
+        }
+        return callerId;
+    }
+
+    private String jsonError(String message) {
+        String safe = message == null ? INTERNAL_SERVER_ERROR : message.replace("\"", "\\\"");
+        return JSON_ERROR_PREFIX + safe + JSON_ERROR_SUFFIX;
+    }
+
+    private void applySecurityHeaders(Headers headers) {
+        headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+        headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+        headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+        headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
+    }
+
+
+    private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
+        exchange.sendResponseHeaders(status, payload.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(payload);
         }
     }
 }

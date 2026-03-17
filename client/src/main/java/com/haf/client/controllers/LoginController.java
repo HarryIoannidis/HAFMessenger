@@ -6,9 +6,9 @@ import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
-import com.haf.shared.dto.LoginRequest;
+import com.haf.shared.requests.LoginRequest;
 import com.haf.shared.exceptions.CryptoOperationException;
-import com.haf.shared.dto.LoginResponse;
+import com.haf.shared.responses.LoginResponse;
 import com.haf.shared.utils.JsonCodec;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -377,8 +377,8 @@ public class LoginController {
         try {
             String path = "/api/v1/users/" + recipientId + "/key";
             String jsonResponse = wsAdapter.getAuthenticated(path).get();
-            com.haf.shared.dto.PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse,
-                    com.haf.shared.dto.PublicKeyResponse.class);
+            com.haf.shared.responses.PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse,
+                    com.haf.shared.responses.PublicKeyResponse.class);
             if (keyRes.isSuccess() && keyRes.getPublicKeyPem() != null) {
                 return keyRes.getPublicKeyPem();
             }

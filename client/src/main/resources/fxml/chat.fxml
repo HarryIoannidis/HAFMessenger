@@ -44,7 +44,7 @@
                   <Insets left="10.0" />
                </HBox.margin>
             </Separator>
-            <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
+            <JFXButton fx:id="imageButton" contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
                <graphic>
                   <FontIcon iconLiteral="mdi2i-image-outline" iconSize="27" />
                </graphic>
@@ -52,7 +52,7 @@
                   <Insets right="15.0" />
                </HBox.margin>
             </JFXButton>
-            <JFXButton contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
+            <JFXButton fx:id="fileButton" contentDisplay="CENTER" styleClass="field-icon-button" text=" ">
                <graphic>
                   <FontIcon iconLiteral="mdi2p-paperclip" iconSize="25" />
                </graphic>

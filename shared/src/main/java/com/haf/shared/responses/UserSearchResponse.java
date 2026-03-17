@@ -1,4 +1,6 @@
-package com.haf.shared.dto;
+package com.haf.shared.responses;
+
+import com.haf.shared.dto.UserSearchResultDTO;
 
 import java.io.Serializable;
 import java.util.List;
@@ -12,7 +14,7 @@ import java.util.List;
  * </p>
  */
 public class UserSearchResponse implements Serializable {
-    private List<UserSearchResult> results;
+    private List<UserSearchResultDTO> results;
     private String error;
     private boolean hasMore;
     private String nextCursor;
@@ -21,11 +23,11 @@ public class UserSearchResponse implements Serializable {
         // Required for JSON deserialization
     }
 
-    public List<UserSearchResult> getResults() {
+    public List<UserSearchResultDTO> getResults() {
         return results;
     }
 
-    public void setResults(List<UserSearchResult> results) {
+    public void setResults(List<UserSearchResultDTO> results) {
         this.results = results;
     }
 
@@ -56,7 +58,7 @@ public class UserSearchResponse implements Serializable {
     /**
      * Convenience factory for a successful search response.
      */
-    public static UserSearchResponse success(List<UserSearchResult> results) {
+    public static UserSearchResponse success(List<UserSearchResultDTO> results) {
         UserSearchResponse r = new UserSearchResponse();
         r.setResults(results);
         r.setHasMore(false);
@@ -67,7 +69,7 @@ public class UserSearchResponse implements Serializable {
     /**
      * Convenience factory for a successful paginated search response.
      */
-    public static UserSearchResponse success(List<UserSearchResult> results, boolean hasMore, String nextCursor) {
+    public static UserSearchResponse success(List<UserSearchResultDTO> results, boolean hasMore, String nextCursor) {
         UserSearchResponse r = new UserSearchResponse();
         r.setResults(results);
         r.setHasMore(hasMore);

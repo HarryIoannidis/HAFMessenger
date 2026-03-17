@@ -26,6 +26,8 @@ public final class MessageHeader {
     public static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "text/plain",
             "text/markdown",
+            "application/vnd.haf.attachment-inline+json",
+            "application/vnd.haf.attachment-ref+json",
             "image/png",
             "image/jpeg",
             "image/gif",

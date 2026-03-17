@@ -4,6 +4,7 @@ import com.haf.server.config.ServerConfig;
 import com.haf.server.db.ContactDAO;
 import com.haf.server.db.EnvelopeDAO;
 import com.haf.server.db.FileUploadDAO;
+import com.haf.server.db.AttachmentDAO;
 import com.haf.server.db.SessionDAO;
 import com.haf.server.db.UserDAO;
 import com.haf.server.handlers.EncryptedMessageValidator;
@@ -61,6 +62,7 @@ public final class Main {
         CountDownLatch shutdownLatch = new CountDownLatch(1);
 
         ScheduledFuture<?>[] metricsFutureRef = new ScheduledFuture<?>[1];
+        ScheduledFuture<?>[] attachmentCleanupFutureRef = new ScheduledFuture<?>[1];
         try (dataSource; scheduler) {
             SSLContext sslContext = buildSslContext(config);
             MetricsRegistry metricsRegistry = new MetricsRegistry();
@@ -71,6 +73,7 @@ public final class Main {
             UserDAO userDAO = new UserDAO(dataSource, auditLogger);
             SessionDAO sessionDAO = new SessionDAO(dataSource, auditLogger);
             FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
+            AttachmentDAO attachmentDAO = new AttachmentDAO(dataSource);
             ContactDAO contactDAO = new ContactDAO(dataSource);
             MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
@@ -78,7 +81,7 @@ public final class Main {
 
             HttpIngressServer httpServer = new HttpIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
-                    sessionDAO, fileUploadDAO, contactDAO, presenceRegistry);
+                    sessionDAO, fileUploadDAO, attachmentDAO, contactDAO, presenceRegistry);
             WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO,
                     contactDAO, presenceRegistry);
@@ -88,8 +91,19 @@ public final class Main {
                     60,
                     60,
                     TimeUnit.SECONDS);
+            attachmentCleanupFutureRef[0] = scheduler.scheduleAtFixedRate(
+                    () -> {
+                        int deleted = attachmentDAO.deleteExpiredUploads();
+                        if (deleted > 0) {
+                            LOGGER.info("Attachment cleanup removed {} expired uploads", deleted);
+                        }
+                    },
+                    300,
+                    300,
+                    TimeUnit.SECONDS);
 
             final ScheduledFuture<?> metricsFuture = metricsFutureRef[0];
+            final ScheduledFuture<?> attachmentCleanupFuture = attachmentCleanupFutureRef[0];
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     LOGGER.info("Shutdown initiated");
@@ -97,6 +111,7 @@ public final class Main {
                     httpServer.stop();
                     mailboxRouter.close();
                     metricsFuture.cancel(true);
+                    attachmentCleanupFuture.cancel(true);
                     scheduler.shutdownNow();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -123,6 +138,9 @@ public final class Main {
         } finally {
             if (metricsFutureRef[0] != null) {
                 metricsFutureRef[0].cancel(true);
+            }
+            if (attachmentCleanupFutureRef[0] != null) {
+                attachmentCleanupFutureRef[0].cancel(true);
             }
 
             scheduler.shutdownNow();

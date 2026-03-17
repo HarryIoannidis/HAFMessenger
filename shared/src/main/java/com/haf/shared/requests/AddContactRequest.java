@@ -1,4 +1,4 @@
-package com.haf.shared.dto;
+package com.haf.shared.requests;
 
 public class AddContactRequest {
     private String contactId;

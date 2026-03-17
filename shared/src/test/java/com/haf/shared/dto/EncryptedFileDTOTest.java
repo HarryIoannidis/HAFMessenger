@@ -1,5 +1,6 @@
 package com.haf.shared.dto;
 
+import com.haf.shared.requests.RegisterRequest;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 

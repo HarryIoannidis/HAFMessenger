@@ -284,6 +284,16 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
     }
 
+    @Override
+    public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws Exception {
+        if (encryptedMessage == null) {
+            throw new IllegalArgumentException("encryptedMessage is required");
+        }
+        validateRecipient(encryptedMessage);
+        validateExpiry(encryptedMessage);
+        return decryptWithFallbackKeys(encryptedMessage, null);
+    }
+
     /**
      * {@inheritDoc}
      */

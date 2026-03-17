@@ -1,6 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
+import com.haf.server.db.AttachmentDAO;
 import com.haf.server.db.ContactDAO;
 import com.haf.server.db.FileUploadDAO;
 import com.haf.server.db.SessionDAO;
@@ -12,6 +13,7 @@ import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.RateLimiterService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,6 +54,9 @@ class HttpIngressServerTest {
     private FileUploadDAO fileUploadDAO;
 
     @Mock
+    private AttachmentDAO attachmentDAO;
+
+    @Mock
     private ContactDAO contactDAO;
 
     private PresenceRegistry presenceRegistry;
@@ -66,10 +71,15 @@ class HttpIngressServerTest {
         // Use port 0 to get a random available port for tests
         when(config.getHttpPort()).thenReturn(0);
 
-        server = new HttpIngressServer(
-                config, sslContext, mailboxRouter, rateLimiterService,
-                auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO, contactDAO,
-                presenceRegistry);
+        try {
+            server = new HttpIngressServer(
+                    config, sslContext, mailboxRouter, rateLimiterService,
+                    auditLogger, metricsRegistry, validator, userDAO, sessionDAO, fileUploadDAO, attachmentDAO,
+                    contactDAO,
+                    presenceRegistry);
+        } catch (java.net.SocketException socketEx) {
+            Assumptions.assumeTrue(false, "Socket bind is not permitted in this execution environment");
+        }
     }
 
     @Test

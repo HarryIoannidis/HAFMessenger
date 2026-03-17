@@ -1,5 +1,6 @@
 package com.haf.shared.dto;
 
+import com.haf.shared.responses.RegisterResponse;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
