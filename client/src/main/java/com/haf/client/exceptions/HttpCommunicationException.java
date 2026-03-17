@@ -1,4 +1,4 @@
-package com.haf.shared.exceptions;
+package com.haf.client.exceptions;
 
 /**
  * Exception thrown when an HTTP communication error occurs,

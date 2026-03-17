@@ -1,6 +1,6 @@
 package com.haf.client.utils;
 
-import com.haf.shared.exceptions.SslConfigurationException;
+import com.haf.client.exceptions.SslConfigurationException;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;

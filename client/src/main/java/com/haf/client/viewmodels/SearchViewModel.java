@@ -49,6 +49,11 @@ public class SearchViewModel {
         String searchUsers(String query, int limit, String cursor) throws Exception;
     }
 
+    public enum ContactToggleAction {
+        ADD_CONTACT,
+        REMOVE_CONTACT
+    }
+
     private final SearchGateway searchGateway;
     private final AtomicInteger generation = new AtomicInteger();
 
@@ -168,6 +173,20 @@ public class SearchViewModel {
 
     public ReadOnlyBooleanProperty hasResultsProperty() {
         return hasResults.getReadOnlyProperty();
+    }
+
+    /**
+     * Pure policy for contact toggle action.
+     */
+    public ContactToggleAction resolveContactToggleAction(boolean alreadyInContacts) {
+        return alreadyInContacts ? ContactToggleAction.REMOVE_CONTACT : ContactToggleAction.ADD_CONTACT;
+    }
+
+    /**
+     * Pure policy for contact toggle label text.
+     */
+    public String resolveContactToggleLabel(ContactToggleAction action) {
+        return action == ContactToggleAction.REMOVE_CONTACT ? "Remove contact" : "Add contact";
     }
 
     private void runSearch(String query, String cursor, boolean append, int searchGeneration) {
