@@ -123,8 +123,9 @@ public final class Main {
             }));
 
             mailboxRouter.start();
-            httpServer.start();
             webSocketServer.start();
+            webSocketServer.awaitStartup(Duration.ofSeconds(10));
+            httpServer.start();
 
             LOGGER.info("Servers started on HTTP {} / WS {}", config.getHttpPort(), config.getWsPort());
 
