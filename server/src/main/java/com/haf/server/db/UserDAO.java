@@ -2,7 +2,7 @@ package com.haf.server.db;
 
 import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
-import com.haf.shared.dto.RegisterRequest;
+import com.haf.shared.requests.RegisterRequest;
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

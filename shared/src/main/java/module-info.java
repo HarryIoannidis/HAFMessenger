@@ -1,5 +1,7 @@
 module shared {
     exports com.haf.shared.dto;
+    exports com.haf.shared.requests;
+    exports com.haf.shared.responses;
     exports com.haf.shared.constants;
     exports com.haf.shared.utils;
     exports com.haf.shared.crypto;

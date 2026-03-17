@@ -1,8 +1,8 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.models.ContactInfo;
-import com.haf.shared.dto.ContactsResponse;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.responses.ContactsResponse;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 
@@ -24,9 +24,9 @@ class MainViewModelTest {
     @Test
     void fetch_contacts_upserts_without_duplicates() {
         ContactsResponse first = ContactsResponse.success(List.of(
-                new UserSearchResult("u-1", "Jane Doe", "100", "jane@haf.gr", "SMINIAS", false)));
+                new UserSearchResultDTO("u-1", "Jane Doe", "100", "jane@haf.gr", "SMINIAS", false)));
         ContactsResponse second = ContactsResponse.success(List.of(
-                new UserSearchResult("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResultDTO("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
 
         AtomicInteger calls = new AtomicInteger();
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(

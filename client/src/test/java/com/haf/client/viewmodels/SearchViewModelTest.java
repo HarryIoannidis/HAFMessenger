@@ -1,7 +1,7 @@
 package com.haf.client.viewmodels;
 
-import com.haf.shared.dto.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.responses.UserSearchResponse;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +57,7 @@ class SearchViewModelTest {
         AtomicReference<Integer> receivedLimit = new AtomicReference<>();
         AtomicReference<String> receivedCursor = new AtomicReference<>();
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
             receivedQuery.set(query);
@@ -83,10 +83,10 @@ class SearchViewModelTest {
         AtomicInteger calls = new AtomicInteger();
         AtomicReference<String> secondCursor = new AtomicReference<>();
         UserSearchResponse first = UserSearchResponse.success(List.of(
-                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)),
+                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)),
                 true, "cursor-1");
         UserSearchResponse second = UserSearchResponse.success(List.of(
-                new UserSearchResult("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)),
+                new UserSearchResultDTO("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)),
                 false, null);
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {

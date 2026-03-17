@@ -1,6 +1,7 @@
 package com.haf.server.config;
 
 import com.haf.server.exceptions.ConfigurationException;
+import com.haf.shared.constants.AttachmentConstants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
@@ -36,6 +37,11 @@ class ServerConfigTest {
         assertEquals(20, config.getSearchPageSize());
         assertEquals(50, config.getSearchMaxPageSize());
         assertEquals(3, config.getSearchMinQueryLength());
+        assertEquals(AttachmentConstants.DEFAULT_MAX_BYTES, config.getAttachmentMaxBytes());
+        assertEquals(AttachmentConstants.DEFAULT_INLINE_MAX_BYTES, config.getAttachmentInlineMaxBytes());
+        assertEquals(AttachmentConstants.DEFAULT_CHUNK_BYTES, config.getAttachmentChunkBytes());
+        assertEquals(AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS, config.getAttachmentUnboundTtlSeconds());
+        assertTrue(config.getAttachmentAllowedTypes().contains("application/pdf"));
     }
 
     @Test
@@ -96,6 +102,15 @@ class ServerConfigTest {
         Map<String, String> env = createMinimalEnv();
         env.put("HAF_SEARCH_PAGE_SIZE", "60");
         env.put("HAF_SEARCH_MAX_PAGE_SIZE", "50");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_fails_when_inline_attachment_limit_exceeds_max() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_ATTACHMENT_MAX_BYTES", "100");
+        env.put("HAF_ATTACHMENT_INLINE_MAX_BYTES", "101");
 
         assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }

@@ -1,5 +1,6 @@
 package com.haf.client.network;
 
+import com.haf.shared.dto.EncryptedMessage;
 import java.io.IOException;
 
 public interface MessageReceiver {
@@ -30,6 +31,14 @@ public interface MessageReceiver {
      * @param senderId the sender whose pending envelopes should be acknowledged
      */
     void acknowledgeEnvelopes(String senderId);
+
+    /**
+     * Decrypts a detached encrypted message payload (not sourced from WS mailbox).
+     * Used for attachment reference downloads.
+     */
+    default byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws Exception {
+        throw new UnsupportedOperationException("decryptDetachedMessage is not implemented");
+    }
 
     /**
      * Listener interface for receiving decrypted messages and errors.

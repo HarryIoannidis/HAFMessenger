@@ -2,7 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.utils.UiConstants;
 import com.haf.client.viewmodels.SearchViewModel;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.dto.UserSearchResultDTO;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
@@ -73,7 +73,7 @@ public class SearchController {
         viewModel.hasResultsProperty().addListener((obs, oldValue, newValue) -> updateResultsVisibility(newValue));
         updateResultsVisibility(viewModel.hasResultsProperty().get());
 
-        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResult>) this::onResultsChanged);
+        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResultDTO>) this::onResultsChanged);
         renderAllResults(viewModel.resultsProperty());
     }
 
@@ -89,9 +89,9 @@ public class SearchController {
         });
     }
 
-    private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResult> change) {
+    private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResultDTO> change) {
         boolean needsFullRender = false;
-        List<UserSearchResult> addedRows = new ArrayList<>();
+        List<UserSearchResultDTO> addedRows = new ArrayList<>();
 
         while (change.next()) {
             if (change.wasPermutated() || change.wasReplaced() || change.wasRemoved() || change.wasUpdated()) {
@@ -117,7 +117,7 @@ public class SearchController {
         resultsPane.setVisible(hasResults);
     }
 
-    private void renderAllResults(List<UserSearchResult> results) {
+    private void renderAllResults(List<UserSearchResultDTO> results) {
         int generation = renderGeneration.incrementAndGet();
 
         if (results == null || results.isEmpty()) {
@@ -125,10 +125,10 @@ public class SearchController {
             return;
         }
 
-        List<UserSearchResult> snapshot = List.copyOf(results);
+        List<UserSearchResultDTO> snapshot = List.copyOf(results);
         Thread.ofVirtual().name("search-item-loader").start(() -> {
             List<javafx.scene.Node> loadedCards = new ArrayList<>();
-            for (UserSearchResult result : snapshot) {
+            for (UserSearchResultDTO result : snapshot) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
                     FXMLLoader loader = new FXMLLoader(resource);
@@ -149,16 +149,16 @@ public class SearchController {
         });
     }
 
-    private void appendResults(List<UserSearchResult> results) {
+    private void appendResults(List<UserSearchResultDTO> results) {
         int generation = renderGeneration.get();
         if (results == null || results.isEmpty()) {
             return;
         }
 
-        List<UserSearchResult> snapshot = List.copyOf(results);
+        List<UserSearchResultDTO> snapshot = List.copyOf(results);
         Thread.ofVirtual().name("search-item-loader-append").start(() -> {
             List<javafx.scene.Node> loadedCards = new ArrayList<>();
-            for (UserSearchResult result : snapshot) {
+            for (UserSearchResultDTO result : snapshot) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
                     FXMLLoader loader = new FXMLLoader(resource);
@@ -198,7 +198,7 @@ public class SearchController {
      * sub-controller, keeping the design simple.
      * </p>
      */
-    private void populateCard(javafx.scene.Node card, UserSearchResult result) {
+    private void populateCard(javafx.scene.Node card, UserSearchResultDTO result) {
         populateTextElements(card, result);
         populateRankIcon(card, result);
         populateActionButtons(card, result);
@@ -210,7 +210,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateTextElements(javafx.scene.Node card, UserSearchResult result) {
+    private void populateTextElements(javafx.scene.Node card, UserSearchResultDTO result) {
         Text fullNameText = (Text) card.lookup("#fullNameText");
         Text regNumberText = (Text) card.lookup("#regNumberText");
         Text emailText = (Text) card.lookup("#emailText");
@@ -232,7 +232,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateRankIcon(javafx.scene.Node card, UserSearchResult result) {
+    private void populateRankIcon(javafx.scene.Node card, UserSearchResultDTO result) {
         javafx.scene.image.ImageView rankImage = (javafx.scene.image.ImageView) card.lookup("#rankImage");
         if (rankImage != null && result.getRank() != null) {
             String iconPath = RankIconResolver.resolve(result.getRank());
@@ -254,7 +254,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateActionButtons(javafx.scene.Node card, UserSearchResult result) {
+    private void populateActionButtons(javafx.scene.Node card, UserSearchResultDTO result) {
         com.jfoenix.controls.JFXButton removeButton = (com.jfoenix.controls.JFXButton) card.lookup("#removeButton");
         com.jfoenix.controls.JFXButton startChatButton = (com.jfoenix.controls.JFXButton) card
                 .lookup("#startChatButton");
@@ -269,7 +269,7 @@ public class SearchController {
      * @param removeButton The remove button.
      * @param result       The search result.
      */
-    private void setupRemoveButton(com.jfoenix.controls.JFXButton removeButton, UserSearchResult result) {
+    private void setupRemoveButton(com.jfoenix.controls.JFXButton removeButton, UserSearchResultDTO result) {
         if (removeButton == null)
             return;
 
@@ -299,7 +299,7 @@ public class SearchController {
      */
     private void setupStartChatButton(com.jfoenix.controls.JFXButton startChatButton,
             com.jfoenix.controls.JFXButton removeButton,
-            UserSearchResult result) {
+            UserSearchResultDTO result) {
         if (startChatButton == null)
             return;
 

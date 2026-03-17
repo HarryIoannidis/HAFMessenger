@@ -1,4 +1,4 @@
-package com.haf.shared.dto;
+package com.haf.shared.responses;
 
 public class PublicKeyResponse {
     private String userId;

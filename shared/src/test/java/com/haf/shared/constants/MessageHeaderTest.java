@@ -32,6 +32,10 @@ class MessageHeaderTest {
         assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("application/pdf"), "application/pdf missing");
         assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("image/png"), "image/png missing");
         assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("video/mp4"), "video/mp4 missing");
+        assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("application/vnd.haf.attachment-inline+json"),
+                "inline attachment content-type missing");
+        assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("application/vnd.haf.attachment-ref+json"),
+                "reference attachment content-type missing");
         assertTrue(MessageHeader.ALLOWED_CONTENT_TYPES.contains("application/octet-stream"), "octet-stream missing");
     }
 

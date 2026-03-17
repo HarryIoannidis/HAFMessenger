@@ -2,9 +2,9 @@ package com.haf.client.viewmodels;
 
 import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
-import com.haf.shared.dto.AddContactRequest;
-import com.haf.shared.dto.ContactsResponse;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.requests.AddContactRequest;
+import com.haf.shared.responses.ContactsResponse;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -119,7 +119,7 @@ public class MainViewModel {
                     }
 
                     runOnUiThread(() -> {
-                        for (UserSearchResult contact : response.getContacts()) {
+                        for (UserSearchResultDTO contact : response.getContacts()) {
                             upsertContact(contact.getUserId(), contact.getFullName(), contact.getRegNumber(),
                                     contact.isActive());
                         }

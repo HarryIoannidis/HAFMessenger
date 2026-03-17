@@ -2,7 +2,7 @@ package com.haf.server.db;
 
 import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
-import com.haf.shared.dto.RegisterRequest;
+import com.haf.shared.requests.RegisterRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

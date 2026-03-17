@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * DTO representing a single user search result.
  */
-public class UserSearchResult implements Serializable {
+public class UserSearchResultDTO implements Serializable {
     private String userId;
     private String fullName;
     private String regNumber;
@@ -13,15 +13,15 @@ public class UserSearchResult implements Serializable {
     private String rank;
     private boolean active;
 
-    public UserSearchResult() {
+    public UserSearchResultDTO() {
         // Required for JSON deserialization
     }
 
-    public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank) {
+    public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank) {
         this(userId, fullName, regNumber, email, rank, false);
     }
 
-    public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
+    public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
         this.userId = userId;
         this.fullName = fullName;
         this.regNumber = regNumber;

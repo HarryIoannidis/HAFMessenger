@@ -2,8 +2,8 @@ package com.haf.client.viewmodels;
 
 import com.haf.client.core.NetworkSession;
 import com.haf.client.utils.UiConstants;
-import com.haf.shared.dto.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.responses.UserSearchResponse;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -52,8 +52,8 @@ public class SearchViewModel {
     private final SearchGateway searchGateway;
     private final AtomicInteger generation = new AtomicInteger();
 
-    private final ObservableList<UserSearchResult> results = FXCollections.observableArrayList();
-    private final ObservableList<UserSearchResult> readOnlyResults = FXCollections.unmodifiableObservableList(results);
+    private final ObservableList<UserSearchResultDTO> results = FXCollections.observableArrayList();
+    private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections.unmodifiableObservableList(results);
     private final StringProperty statusText = new SimpleStringProperty(STATUS_IDLE);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loadingMore = new SimpleBooleanProperty(false);
@@ -154,7 +154,7 @@ public class SearchViewModel {
         });
     }
 
-    public ObservableList<UserSearchResult> resultsProperty() {
+    public ObservableList<UserSearchResultDTO> resultsProperty() {
         return readOnlyResults;
     }
 
@@ -224,8 +224,8 @@ public class SearchViewModel {
             return;
         }
 
-        List<UserSearchResult> responseResults = response.getResults();
-        List<UserSearchResult> normalizedResults = responseResults == null ? List.of() : responseResults;
+        List<UserSearchResultDTO> responseResults = response.getResults();
+        List<UserSearchResultDTO> normalizedResults = responseResults == null ? List.of() : responseResults;
 
         hasMore = response.isHasMore();
         nextCursor = hasMore ? response.getNextCursor() : null;
@@ -247,16 +247,16 @@ public class SearchViewModel {
         statusText.set("");
     }
 
-    private void appendUnique(List<UserSearchResult> incoming) {
+    private void appendUnique(List<UserSearchResultDTO> incoming) {
         Set<String> knownUserIds = new HashSet<>();
-        for (UserSearchResult existing : results) {
+        for (UserSearchResultDTO existing : results) {
             if (existing != null && existing.getUserId() != null) {
                 knownUserIds.add(existing.getUserId());
             }
         }
 
-        List<UserSearchResult> additions = new ArrayList<>();
-        for (UserSearchResult candidate : incoming) {
+        List<UserSearchResultDTO> additions = new ArrayList<>();
+        for (UserSearchResultDTO candidate : incoming) {
             if (candidate == null) {
                 continue;
             }

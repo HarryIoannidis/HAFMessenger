@@ -1,7 +1,10 @@
 package com.haf.server.config;
 
 import com.haf.server.exceptions.ConfigurationException;
+import com.haf.shared.constants.AttachmentConstants;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -17,6 +20,10 @@ public final class ServerConfig {
     private static final int DEFAULT_SEARCH_MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_SEARCH_MIN_QUERY_LENGTH = 3;
     private static final int DEFAULT_SEARCH_MAX_QUERY_LENGTH = 128;
+    private static final long DEFAULT_ATTACHMENT_MAX_BYTES = AttachmentConstants.DEFAULT_MAX_BYTES;
+    private static final long DEFAULT_ATTACHMENT_INLINE_MAX_BYTES = AttachmentConstants.DEFAULT_INLINE_MAX_BYTES;
+    private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
+    private static final long DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS = AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS;
 
     private final String dbUrl;
     private final String dbUser;
@@ -37,6 +44,11 @@ public final class ServerConfig {
     private final int searchMinQueryLength;
     private final int searchMaxQueryLength;
     private final String searchCursorSecret;
+    private final long attachmentMaxBytes;
+    private final long attachmentInlineMaxBytes;
+    private final int attachmentChunkBytes;
+    private final List<String> attachmentAllowedTypes;
+    private final long attachmentUnboundTtlSeconds;
 
     /**
      * Loads the server configuration from environment variables or a .env file.
@@ -105,8 +117,16 @@ public final class ServerConfig {
         this.searchMinQueryLength = parseInt(env.get("HAF_SEARCH_MIN_QUERY_LENGTH"), DEFAULT_SEARCH_MIN_QUERY_LENGTH);
         this.searchMaxQueryLength = parseInt(env.get("HAF_SEARCH_MAX_QUERY_LENGTH"), DEFAULT_SEARCH_MAX_QUERY_LENGTH);
         this.searchCursorSecret = require(env, "HAF_SEARCH_CURSOR_SECRET");
+        this.attachmentMaxBytes = parseLong(env.get("HAF_ATTACHMENT_MAX_BYTES"), DEFAULT_ATTACHMENT_MAX_BYTES);
+        this.attachmentInlineMaxBytes = parseLong(env.get("HAF_ATTACHMENT_INLINE_MAX_BYTES"),
+                DEFAULT_ATTACHMENT_INLINE_MAX_BYTES);
+        this.attachmentChunkBytes = parseInt(env.get("HAF_ATTACHMENT_CHUNK_BYTES"), DEFAULT_ATTACHMENT_CHUNK_BYTES);
+        this.attachmentAllowedTypes = parseAttachmentAllowedTypes(env.get("HAF_ATTACHMENT_ALLOWED_TYPES"));
+        this.attachmentUnboundTtlSeconds = parseLong(env.get("HAF_ATTACHMENT_UNBOUND_TTL_SECONDS"),
+                DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS);
 
         validateSearchConfig();
+        validateAttachmentConfig();
     }
 
     /**
@@ -234,6 +254,41 @@ public final class ServerConfig {
     }
 
     /**
+     * Returns maximum attachment bytes accepted by the server.
+     */
+    public long getAttachmentMaxBytes() {
+        return attachmentMaxBytes;
+    }
+
+    /**
+     * Returns max bytes for inline attachment messages.
+     */
+    public long getAttachmentInlineMaxBytes() {
+        return attachmentInlineMaxBytes;
+    }
+
+    /**
+     * Returns attachment chunk size used by the chunked upload flow.
+     */
+    public int getAttachmentChunkBytes() {
+        return attachmentChunkBytes;
+    }
+
+    /**
+     * Returns allowed attachment MIME types.
+     */
+    public List<String> getAttachmentAllowedTypes() {
+        return List.copyOf(attachmentAllowedTypes);
+    }
+
+    /**
+     * Returns TTL in seconds for unbound attachment uploads.
+     */
+    public long getAttachmentUnboundTtlSeconds() {
+        return attachmentUnboundTtlSeconds;
+    }
+
+    /**
      * Throws a ConfigurationException if the given key is missing or blank.
      */
     private static String require(Map<String, String> env, String key) {
@@ -263,6 +318,35 @@ public final class ServerConfig {
         }
     }
 
+    private static long parseLong(String candidate, long defaultValue) {
+        if (candidate == null || candidate.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(candidate);
+        } catch (NumberFormatException ex) {
+            throw new ConfigurationException("Invalid long value: " + candidate, ex);
+        }
+    }
+
+    private static List<String> parseAttachmentAllowedTypes(String candidate) {
+        String source = candidate == null || candidate.isBlank()
+                ? String.join(",", AttachmentConstants.DEFAULT_ALLOWED_TYPES)
+                : candidate;
+        String[] parts = source.split(",");
+        List<String> allowed = new ArrayList<>();
+        for (String part : parts) {
+            String normalized = AttachmentConstants.normalizeMimeType(part);
+            if (normalized != null && !allowed.contains(normalized)) {
+                allowed.add(normalized);
+            }
+        }
+        if (allowed.isEmpty()) {
+            throw new ConfigurationException("HAF_ATTACHMENT_ALLOWED_TYPES must define at least one MIME type");
+        }
+        return List.copyOf(allowed);
+    }
+
     private void validateSearchConfig() {
         if (searchPageSize < 1) {
             throw new ConfigurationException("HAF_SEARCH_PAGE_SIZE must be >= 1");
@@ -278,6 +362,27 @@ public final class ServerConfig {
         }
         if (searchMaxQueryLength < searchMinQueryLength) {
             throw new ConfigurationException("HAF_SEARCH_MAX_QUERY_LENGTH must be >= HAF_SEARCH_MIN_QUERY_LENGTH");
+        }
+    }
+
+    private void validateAttachmentConfig() {
+        if (attachmentMaxBytes < 1) {
+            throw new ConfigurationException("HAF_ATTACHMENT_MAX_BYTES must be >= 1");
+        }
+        if (attachmentInlineMaxBytes < 1) {
+            throw new ConfigurationException("HAF_ATTACHMENT_INLINE_MAX_BYTES must be >= 1");
+        }
+        if (attachmentInlineMaxBytes > attachmentMaxBytes) {
+            throw new ConfigurationException("HAF_ATTACHMENT_INLINE_MAX_BYTES must be <= HAF_ATTACHMENT_MAX_BYTES");
+        }
+        if (attachmentChunkBytes < 1) {
+            throw new ConfigurationException("HAF_ATTACHMENT_CHUNK_BYTES must be >= 1");
+        }
+        if (attachmentChunkBytes > attachmentMaxBytes) {
+            throw new ConfigurationException("HAF_ATTACHMENT_CHUNK_BYTES must be <= HAF_ATTACHMENT_MAX_BYTES");
+        }
+        if (attachmentUnboundTtlSeconds < 1) {
+            throw new ConfigurationException("HAF_ATTACHMENT_UNBOUND_TTL_SECONDS must be >= 1");
         }
     }
 
@@ -298,6 +403,11 @@ public final class ServerConfig {
                 ", searchMaxPageSize=" + searchMaxPageSize +
                 ", searchMinQueryLength=" + searchMinQueryLength +
                 ", searchMaxQueryLength=" + searchMaxQueryLength +
+                ", attachmentMaxBytes=" + attachmentMaxBytes +
+                ", attachmentInlineMaxBytes=" + attachmentInlineMaxBytes +
+                ", attachmentChunkBytes=" + attachmentChunkBytes +
+                ", attachmentAllowedTypes=" + attachmentAllowedTypes +
+                ", attachmentUnboundTtlSeconds=" + attachmentUnboundTtlSeconds +
                 '}';
     }
 }
