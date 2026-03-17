@@ -15,7 +15,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyPair;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,8 +47,8 @@ class DefaultRegistrationServiceTest {
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));
 
-        RegistrationService.RegistrationResult.Success success =
-                assertInstanceOf(RegistrationService.RegistrationResult.Success.class, result);
+        RegistrationService.RegistrationResult.Success success = assertInstanceOf(
+                RegistrationService.RegistrationResult.Success.class, result);
         assertEquals("user-1", success.userId());
         assertEquals(1, saveCalls.get());
         assertEquals("user-1", savedUserId.get());
@@ -70,8 +69,8 @@ class DefaultRegistrationServiceTest {
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));
 
-        RegistrationService.RegistrationResult.Rejected rejected =
-                assertInstanceOf(RegistrationService.RegistrationResult.Rejected.class, result);
+        RegistrationService.RegistrationResult.Rejected rejected = assertInstanceOf(
+                RegistrationService.RegistrationResult.Rejected.class, result);
         assertEquals("Email already exists", rejected.message());
         assertEquals(0, saveCalls.get());
     }
@@ -83,8 +82,8 @@ class DefaultRegistrationServiceTest {
 
         Path idPath = Files.createTempFile("haf-id-", ".jpg");
         Path selfiePath = Files.createTempFile("haf-selfie-", ".jpg");
-        Files.write(idPath, new byte[] {1, 2, 3});
-        Files.write(selfiePath, new byte[] {4, 5, 6});
+        Files.write(idPath, new byte[] { 1, 2, 3 });
+        Files.write(selfiePath, new byte[] { 4, 5, 6 });
 
         DefaultRegistrationService service = new DefaultRegistrationService(
                 EccKeyIO::generate,
@@ -103,11 +102,10 @@ class DefaultRegistrationServiceTest {
                 },
                 (registrationKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
 
-        RegistrationService.RegistrationResult result =
-                service.register(command(idPath.toFile(), selfiePath.toFile()));
+        RegistrationService.RegistrationResult result = service.register(command(idPath.toFile(), selfiePath.toFile()));
 
-        RegistrationService.RegistrationResult.Success success =
-                assertInstanceOf(RegistrationService.RegistrationResult.Success.class, result);
+        RegistrationService.RegistrationResult.Success success = assertInstanceOf(
+                RegistrationService.RegistrationResult.Success.class, result);
         assertEquals("user-2", success.userId());
         assertEquals(0, encryptCalls.get());
         assertEquals(1, saveCalls.get());
@@ -128,8 +126,8 @@ class DefaultRegistrationServiceTest {
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));
 
-        RegistrationService.RegistrationResult.Failure failure =
-                assertInstanceOf(RegistrationService.RegistrationResult.Failure.class, result);
+        RegistrationService.RegistrationResult.Failure failure = assertInstanceOf(
+                RegistrationService.RegistrationResult.Failure.class, result);
         assertEquals(DefaultRegistrationService.CONNECTION_FAILED_MESSAGE, failure.message());
     }
 

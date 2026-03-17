@@ -1,5 +1,6 @@
 package com.haf.client.services;
 
+import com.haf.client.exceptions.RegistrationFlowException;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.crypto.CryptoECC;
 import com.haf.shared.crypto.CryptoService;
@@ -40,32 +41,33 @@ public class DefaultRegistrationService implements RegistrationService {
 
     @FunctionalInterface
     interface KeyPairProvider {
-        KeyPair generate() throws Exception;
+        KeyPair generate() throws RegistrationFlowException;
     }
 
     @FunctionalInterface
     interface HttpClientProvider {
-        HttpClient create() throws Exception;
+        HttpClient create() throws RegistrationFlowException;
     }
 
     @FunctionalInterface
     interface AdminKeyProvider {
-        String fetch(HttpClient client) throws Exception;
+        String fetch(HttpClient client) throws InterruptedException, RegistrationFlowException;
     }
 
     @FunctionalInterface
     interface RegistrationGateway {
-        HttpResponse<String> send(HttpClient client, RegisterRequest request) throws Exception;
+        HttpResponse<String> send(HttpClient client, RegisterRequest request)
+                throws InterruptedException, RegistrationFlowException;
     }
 
     @FunctionalInterface
     interface PhotoEncryptor {
-        EncryptedFileDTO encrypt(File file, PublicKey adminPublicKey) throws Exception;
+        EncryptedFileDTO encrypt(File file, PublicKey adminPublicKey) throws RegistrationFlowException;
     }
 
     @FunctionalInterface
     interface KeystoreSaver {
-        void save(KeyPair registrationKeyPair, String userId, char[] passphrase) throws Exception;
+        void save(KeyPair registrationKeyPair, String userId, char[] passphrase) throws RegistrationFlowException;
     }
 
     private final KeyPairProvider keyPairProvider;
@@ -123,7 +125,10 @@ public class DefaultRegistrationService implements RegistrationService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return new RegistrationResult.Failure(REGISTRATION_INTERRUPTED_MESSAGE);
-        } catch (Exception e) {
+        } catch (RegistrationFlowException e) {
+            LOGGER.log(Level.SEVERE, "Registration failed", e);
+            return new RegistrationResult.Failure(CONNECTION_FAILED_MESSAGE);
+        } catch (RuntimeException e) {
             LOGGER.log(Level.SEVERE, "Registration failed", e);
             return new RegistrationResult.Failure(CONNECTION_FAILED_MESSAGE);
         }
@@ -134,14 +139,17 @@ public class DefaultRegistrationService implements RegistrationService {
             return adminKeyProvider.fetch(client);
         } catch (InterruptedException interruptedException) {
             throw interruptedException;
-        } catch (Exception ex) {
+        } catch (RegistrationFlowException ex) {
+            LOGGER.log(Level.WARNING, "Failed to fetch admin public key", ex);
+            return null;
+        } catch (RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Failed to fetch admin public key", ex);
             return null;
         }
     }
 
     private void encryptPhotosIfAdminKeyAvailable(RegistrationCommand command, RegisterRequest request, String adminPem)
-            throws Exception {
+            throws RegistrationFlowException {
         if (adminPem == null || adminPem.isBlank()) {
             return;
         }
@@ -159,7 +167,7 @@ public class DefaultRegistrationService implements RegistrationService {
         try {
             char[] passphrase = password == null ? new char[0] : password.toCharArray();
             keystoreSaver.save(registrationKeyPair, userId, passphrase);
-        } catch (Exception e) {
+        } catch (RegistrationFlowException e) {
             LOGGER.log(Level.SEVERE, "Failed to save Keystore after successful registration", e);
         }
     }
@@ -189,79 +197,112 @@ public class DefaultRegistrationService implements RegistrationService {
         return REGISTRATION_FAILED_MESSAGE;
     }
 
-    private static HttpClient createHttpClient() throws Exception {
-        return HttpClient.newBuilder()
-                .sslContext(SslContextUtils.getTrustingSslContext())
-                .build();
+    private static HttpClient createHttpClient() throws RegistrationFlowException {
+        try {
+            return HttpClient.newBuilder()
+                    .sslContext(SslContextUtils.getTrustingSslContext())
+                    .build();
+        } catch (Exception ex) {
+            throw new RegistrationFlowException("Failed to create HTTP client for registration", ex);
+        }
     }
 
-    private static String fetchAdminPublicKeyPem(HttpClient client) throws Exception {
-        HttpRequest adminKeyRequest = HttpRequest.newBuilder()
-                .uri(ADMIN_KEY_URI)
-                .GET()
-                .build();
-        HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest, HttpResponse.BodyHandlers.ofString());
+    private static String fetchAdminPublicKeyPem(HttpClient client)
+            throws InterruptedException, RegistrationFlowException {
+        try {
+            HttpRequest adminKeyRequest = HttpRequest.newBuilder()
+                    .uri(ADMIN_KEY_URI)
+                    .GET()
+                    .build();
+            HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest, HttpResponse.BodyHandlers.ofString());
 
-        if (adminKeyResponse.statusCode() != 200) {
+            if (adminKeyResponse.statusCode() != 200) {
+                return null;
+            }
+
+            String body = adminKeyResponse.body();
+            int start = body.indexOf('"', body.indexOf(':') + 1) + 1;
+            int end = body.lastIndexOf('"');
+            if (start > 0 && end > start) {
+                return body.substring(start, end).replace("\\n", "\n");
+            }
             return null;
+        } catch (InterruptedException interruptedException) {
+            throw interruptedException;
+        } catch (Exception ex) {
+            throw new RegistrationFlowException("Failed to fetch admin public key", ex);
         }
+    }
 
-        String body = adminKeyResponse.body();
-        int start = body.indexOf('"', body.indexOf(':') + 1) + 1;
-        int end = body.lastIndexOf('"');
-        if (start > 0 && end > start) {
-            return body.substring(start, end).replace("\\n", "\n");
+    private static HttpResponse<String> sendRegistrationRequest(HttpClient client, RegisterRequest request)
+            throws InterruptedException, RegistrationFlowException {
+        try {
+            String json = JsonCodec.toJson(request);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(REGISTER_URI)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            return client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException interruptedException) {
+            throw interruptedException;
+        } catch (Exception ex) {
+            throw new RegistrationFlowException("Failed to submit registration request", ex);
         }
-        return null;
     }
 
-    private static HttpResponse<String> sendRegistrationRequest(HttpClient client, RegisterRequest request) throws Exception {
-        String json = JsonCodec.toJson(request);
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(REGISTER_URI)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .build();
-        return client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    private static EncryptedFileDTO encryptPhoto(File file, PublicKey adminPublicKey) throws RegistrationFlowException {
+        try {
+            byte[] plaintext = Files.readAllBytes(file.toPath());
+            KeyPair ephemeral = EccKeyIO.generate();
+            SecretKey aesKey = CryptoECC.generateAndDeriveAesKey(ephemeral.getPrivate(), adminPublicKey);
+            byte[] iv = CryptoService.generateIv();
+            byte[] cipherTextAndTag = CryptoService.encryptAesGcm(plaintext, aesKey, iv, null);
+            int tagLen = 16;
+            int ctLen = cipherTextAndTag.length - tagLen;
+            byte[] cipherText = java.util.Arrays.copyOfRange(cipherTextAndTag, 0, ctLen);
+            byte[] authTag = java.util.Arrays.copyOfRange(cipherTextAndTag, ctLen, cipherTextAndTag.length);
+
+            EncryptedFileDTO dto = new EncryptedFileDTO();
+            dto.setCiphertextB64(Base64.getEncoder().encodeToString(cipherText));
+            dto.setIvB64(Base64.getEncoder().encodeToString(iv));
+            dto.setTagB64(Base64.getEncoder().encodeToString(authTag));
+            dto.setEphemeralPublicB64(Base64.getEncoder().encodeToString(EccKeyIO.publicDer(ephemeral.getPublic())));
+            dto.setContentType("image/jpeg");
+            dto.setOriginalSize(plaintext.length);
+            return dto;
+        } catch (Exception ex) {
+            throw new RegistrationFlowException("Failed to encrypt registration photo", ex);
+        }
     }
 
-    private static EncryptedFileDTO encryptPhoto(File file, PublicKey adminPublicKey) throws Exception {
-        byte[] plaintext = Files.readAllBytes(file.toPath());
-        KeyPair ephemeral = EccKeyIO.generate();
-        SecretKey aesKey = CryptoECC.generateAndDeriveAesKey(ephemeral.getPrivate(), adminPublicKey);
-        byte[] iv = CryptoService.generateIv();
-        byte[] cipherTextAndTag = CryptoService.encryptAesGcm(plaintext, aesKey, iv, null);
-        int tagLen = 16;
-        int ctLen = cipherTextAndTag.length - tagLen;
-        byte[] cipherText = java.util.Arrays.copyOfRange(cipherTextAndTag, 0, ctLen);
-        byte[] authTag = java.util.Arrays.copyOfRange(cipherTextAndTag, ctLen, cipherTextAndTag.length);
-
-        EncryptedFileDTO dto = new EncryptedFileDTO();
-        dto.setCiphertextB64(Base64.getEncoder().encodeToString(cipherText));
-        dto.setIvB64(Base64.getEncoder().encodeToString(iv));
-        dto.setTagB64(Base64.getEncoder().encodeToString(authTag));
-        dto.setEphemeralPublicB64(Base64.getEncoder().encodeToString(EccKeyIO.publicDer(ephemeral.getPublic())));
-        dto.setContentType("image/jpeg");
-        dto.setOriginalSize(plaintext.length);
-        return dto;
+    private static void saveKeypairToKeystore(KeyPair registrationKeyPair, String userId, char[] passphrase)
+            throws RegistrationFlowException {
+        try {
+            Path root = getOrCreateKeystoreRoot(userId);
+            UserKeystore keystore = new UserKeystore(root);
+            String keyId = UserKeystore.todayKeyId();
+            keystore.saveKeypair(keyId, registrationKeyPair, passphrase);
+        } catch (RegistrationFlowException registrationFlowException) {
+            throw registrationFlowException;
+        } catch (Exception ex) {
+            throw new RegistrationFlowException("Failed to persist registration keypair", ex);
+        }
     }
 
-    private static void saveKeypairToKeystore(KeyPair registrationKeyPair, String userId, char[] passphrase) throws Exception {
-        Path root = getOrCreateKeystoreRoot(userId);
-        UserKeystore keystore = new UserKeystore(root);
-        String keyId = UserKeystore.todayKeyId();
-        keystore.saveKeypair(keyId, registrationKeyPair, passphrase);
-    }
-
-    private static Path getOrCreateKeystoreRoot(String userId) throws Exception {
+    private static Path getOrCreateKeystoreRoot(String userId) throws RegistrationFlowException {
         try {
             Path root = KeystoreRoot.preferred(userId);
             FilePerms.ensureDir700(root);
             return root;
         } catch (Exception e) {
-            Path root = KeystoreRoot.userFallback(userId);
-            FilePerms.ensureDir700(root);
-            return root;
+            try {
+                Path root = KeystoreRoot.userFallback(userId);
+                FilePerms.ensureDir700(root);
+                return root;
+            } catch (Exception ex) {
+                throw new RegistrationFlowException("Failed to initialize keystore root", ex);
+            }
         }
     }
 }

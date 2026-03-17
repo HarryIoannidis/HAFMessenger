@@ -2,6 +2,8 @@ package com.haf.client.controllers;
 
 import com.haf.client.core.ChatSession;
 import com.haf.client.models.MessageVM;
+import com.haf.client.services.ChatAttachmentService;
+import com.haf.client.services.DefaultChatAttachmentService;
 import com.haf.client.utils.MessageBubbleFactory;
 import com.haf.client.viewmodels.ChatViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
@@ -17,7 +19,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
-import java.nio.file.Path;
+import java.util.Objects;
 
 /**
  * Controller for {@code chat.fxml}.
@@ -42,11 +44,20 @@ public class ChatController {
     @FXML
     private JFXButton fileButton;
 
+    private final ChatAttachmentService chatAttachmentService;
     private ChatViewModel viewModel;
 
     private ListChangeListener<MessageVM> messageListener;
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
+
+    public ChatController() {
+        this(new DefaultChatAttachmentService());
+    }
+
+    ChatController(ChatAttachmentService chatAttachmentService) {
+        this.chatAttachmentService = Objects.requireNonNull(chatAttachmentService, "chatAttachmentService");
+    }
 
     @FXML
     public void initialize() {
@@ -163,22 +174,15 @@ public class ChatController {
             return;
         }
 
-        String recipientId = viewModel.getRecipientId();
-        if (recipientId == null || recipientId.isBlank()) {
-            return;
-        }
-
         File selected = chooser.showOpenDialog(resolveOwnerWindow());
-        if (selected == null) {
+        dispatchSelectedAttachment(viewModel.getRecipientId(), selected);
+    }
+
+    void dispatchSelectedAttachment(String recipientId, File selected) {
+        if (selected == null || recipientId == null || recipientId.isBlank()) {
             return;
         }
-
-        Path path = selected.toPath();
-        String mimeType = detectMimeFromExtension(path);
-        MessageViewModel messageViewModel = ChatSession.get();
-        if (messageViewModel != null) {
-            messageViewModel.sendAttachment(recipientId, path, mimeType);
-        }
+        chatAttachmentService.sendAttachment(recipientId, selected.toPath());
     }
 
     private Stage resolveOwnerWindow() {
@@ -187,32 +191,6 @@ public class ChatController {
         }
         if (chatBox != null && chatBox.getScene() != null && chatBox.getScene().getWindow() instanceof Stage stage) {
             return stage;
-        }
-        return null;
-    }
-
-    private String detectMimeFromExtension(Path path) {
-        String name = path.getFileName() == null ? "" : path.getFileName().toString().toLowerCase();
-        if (name.endsWith(".png")) {
-            return "image/png";
-        }
-        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        if (name.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (name.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (name.endsWith(".pdf")) {
-            return "application/pdf";
-        }
-        if (name.endsWith(".docx")) {
-            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        }
-        if (name.endsWith(".xlsx")) {
-            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         }
         return null;
     }

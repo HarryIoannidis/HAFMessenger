@@ -34,6 +34,12 @@ public class MainViewModel {
         SEARCH
     }
 
+    public enum ContactSelectionAction {
+        SWITCH_TO_MESSAGES_TAB,
+        DESELECT_AND_SHOW_PLACEHOLDER,
+        KEEP_SELECTED_CONTACT
+    }
+
     public interface ContactsGateway {
         CompletableFuture<String> fetchContacts();
 
@@ -108,6 +114,19 @@ public class MainViewModel {
 
     public void setHasSearchResults(boolean value) {
         hasSearchResults.set(value);
+    }
+
+    /**
+     * Pure UI-state decision for contact click behavior on the Main screen.
+     */
+    public ContactSelectionAction resolveContactSelectionAction(MainTab currentTab, boolean clickedSameAsLastSelection) {
+        if (currentTab == MainTab.SEARCH) {
+            return ContactSelectionAction.SWITCH_TO_MESSAGES_TAB;
+        }
+        if (clickedSameAsLastSelection) {
+            return ContactSelectionAction.DESELECT_AND_SHOW_PLACEHOLDER;
+        }
+        return ContactSelectionAction.KEEP_SELECTED_CONTACT;
     }
 
     public void fetchContacts() {

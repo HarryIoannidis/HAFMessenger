@@ -15,6 +15,7 @@ import javafx.scene.text.Text;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,6 +44,7 @@ public class SearchController {
 
     private final SearchViewModel viewModel = SearchViewModel.createDefault();
     private final AtomicInteger renderGeneration = new AtomicInteger();
+    private SearchContactActions contactActions = SearchContactActions.NO_OP;
 
     @FXML
     public void initialize() {
@@ -179,15 +181,8 @@ public class SearchController {
         });
     }
 
-    private MainController mainController;
-
-    /**
-     * Sets the main controller.
-     * 
-     * @param mainController The main controller.
-     */
-    public void setMainController(MainController mainController) {
-        this.mainController = mainController;
+    public void setContactActions(SearchContactActions contactActions) {
+        this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
     }
 
     /**
@@ -273,20 +268,11 @@ public class SearchController {
         if (removeButton == null)
             return;
 
-        updateRemoveButtonText(removeButton, result.getUserId());
+        updateToggleButtonText(removeButton, result.getUserId());
 
         removeButton.setOnAction(e -> {
-            if (mainController == null)
-                return;
-
-            if (mainController.hasContact(result.getUserId())) {
-                mainController.removeContact(result.getUserId());
-                LOGGER.info("Remove contact requested for user: " + result.getUserId());
-            } else {
-                mainController.addContact(result.getUserId(), result.getFullName(), result.getRegNumber());
-                LOGGER.info("Add contact requested for user: " + result.getUserId());
-            }
-            updateRemoveButtonText(removeButton, result.getUserId());
+            handleToggleContact(result);
+            updateToggleButtonText(removeButton, result.getUserId());
         });
     }
 
@@ -304,13 +290,10 @@ public class SearchController {
             return;
 
         startChatButton.setOnAction(e -> {
-            LOGGER.info("Start chat requested for user: " + result.getUserId());
-            if (mainController != null) {
-                mainController.startChatWith(result.getUserId(), result.getFullName(), result.getRegNumber());
-                // Since starting a chat adds them to contacts, update the other button too.
-                if (removeButton != null) {
-                    updateRemoveButtonText(removeButton, result.getUserId());
-                }
+            handleStartChat(result);
+            // Since starting a chat adds them to contacts, update the other button too.
+            if (removeButton != null) {
+                updateToggleButtonText(removeButton, result.getUserId());
             }
         });
     }
@@ -322,12 +305,42 @@ public class SearchController {
      * @param removeButton The remove button.
      * @param userId       The user ID.
      */
-    private void updateRemoveButtonText(com.jfoenix.controls.JFXButton removeButton, String userId) {
-        if (mainController != null && mainController.hasContact(userId)) {
-            removeButton.setText("Remove contact");
-        } else {
-            removeButton.setText("Add contact");
+    private void updateToggleButtonText(com.jfoenix.controls.JFXButton removeButton, String userId) {
+        removeButton.setText(resolveToggleLabel(userId));
+    }
+
+    String resolveToggleLabel(String userId) {
+        SearchViewModel.ContactToggleAction action = viewModel
+                .resolveContactToggleAction(contactActions.hasContact(userId));
+        return viewModel.resolveContactToggleLabel(action);
+    }
+
+    void handleToggleContact(UserSearchResultDTO result) {
+        if (result == null) {
+            return;
         }
+
+        SearchViewModel.ContactToggleAction action = viewModel
+                .resolveContactToggleAction(contactActions.hasContact(result.getUserId()));
+
+        switch (action) {
+            case REMOVE_CONTACT -> {
+                contactActions.removeContact(result.getUserId());
+                LOGGER.info("Remove contact requested for user: " + result.getUserId());
+            }
+            case ADD_CONTACT -> {
+                contactActions.addContact(result.getUserId(), result.getFullName(), result.getRegNumber());
+                LOGGER.info("Add contact requested for user: " + result.getUserId());
+            }
+        }
+    }
+
+    void handleStartChat(UserSearchResultDTO result) {
+        if (result == null) {
+            return;
+        }
+        LOGGER.info("Start chat requested for user: " + result.getUserId());
+        contactActions.startChatWith(result.getUserId(), result.getFullName(), result.getRegNumber());
     }
 
     /**

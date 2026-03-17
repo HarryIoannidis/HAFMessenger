@@ -1,12 +1,11 @@
 package com.haf.client.controllers;
 
-import com.haf.client.core.ChatSession;
-import com.haf.client.core.NetworkSession;
+import com.haf.client.services.DefaultMainSessionService;
+import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
-import com.haf.client.viewmodels.MessageViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -28,15 +27,16 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
+
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Controller for the Main application view ({@code main.fxml}).
  */
-public class MainController {
+public class MainController implements SearchContactActions {
 
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
     private static final String NAV_ITEM_ICON = "nav-item-icon";
@@ -108,13 +108,12 @@ public class MainController {
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
     private final MainViewModel viewModel = MainViewModel.createDefault();
+    private final MainSessionService mainSessionService;
 
     // Cached views for performance
     private Parent currentChatView;
     private ChatController currentChatController;
     private String currentChatRecipientId;
-    private MessageViewModel activeMessageViewModel;
-    private MessageViewModel.PresenceListener presenceListener;
 
     private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
     private final java.util.concurrent.CompletableFuture<Parent> searchFuture = new java.util.concurrent.CompletableFuture<>();
@@ -123,6 +122,14 @@ public class MainController {
             false);
     private final java.util.concurrent.atomic.AtomicBoolean searchLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
             false);
+
+    public MainController() {
+        this(new DefaultMainSessionService());
+    }
+
+    MainController(MainSessionService mainSessionService) {
+        this.mainSessionService = Objects.requireNonNull(mainSessionService, "mainSessionService");
+    }
 
     @FXML
     public void initialize() {
@@ -292,7 +299,7 @@ public class MainController {
             FXMLLoader loader = new FXMLLoader(resource);
             Parent view = loader.load();
             SearchController controller = loader.getController();
-            controller.setMainController(this);
+            controller.setContactActions(this);
 
             searchController = controller;
             searchFuture.complete(view);
@@ -342,6 +349,7 @@ public class MainController {
     /**
      * Adds a searched user to the contacts list and switches to their chat.
      */
+    @Override
     public void startChatWith(String userId, String fullName, String regNumber) {
         viewModel.addContact(userId, fullName, regNumber);
         ContactInfo target = viewModel.getContactById(userId);
@@ -355,53 +363,44 @@ public class MainController {
         contactsList.setUserData(target);
     }
 
+    @Override
     public boolean hasContact(String userId) {
         return viewModel.hasContact(userId);
     }
 
+    @Override
     public void addContact(String userId, String fullName, String regNumber) {
         viewModel.addContact(userId, fullName, regNumber);
     }
 
+    @Override
     public void removeContact(String userId) {
         viewModel.removeContact(userId);
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null && selected.id().equals(userId)) {
-            contactsList.getSelectionModel().clearSelection();
-            contactsList.setUserData(null);
-            hideProfilePanel();
-            loadPlaceholder();
+            clearSelectionAndShowPlaceholder();
         }
     }
 
     private void setupContactSelection() {
-        // Click on an already-selected item → deselect and revert to placeholder
         contactsList.setOnMouseClicked(event -> {
             ContactInfo clicked = contactsList.getSelectionModel().getSelectedItem();
-
             if (clicked == null) {
                 return;
             }
 
-            // If we are currently in Search Mode, clicking any contact should transport us
-            // back to the Messages tab.
-            if (indicatorSearch.isVisible()) {
-                activateMessagesTab();
-                contactsList.setUserData(clicked);
-                return;
-            }
-
-            // If we are already in Messages Mode, toggle selection (deselect if clicked
-            // again)
             Object lastSelected = contactsList.getUserData();
-            if (clicked.equals(lastSelected)) {
-                contactsList.getSelectionModel().clearSelection();
-                contactsList.setUserData(null);
-                hideProfilePanel();
-                loadPlaceholder();
-            } else {
-                contactsList.setUserData(clicked);
-            }
+            MainViewModel.ContactSelectionAction action = viewModel.resolveContactSelectionAction(
+                    viewModel.activeTabProperty().get(),
+                    clicked.equals(lastSelected));
+
+            applyContactSelectionAction(action,
+                    () -> {
+                        activateMessagesTab();
+                        contactsList.setUserData(clicked);
+                    },
+                    this::clearSelectionAndShowPlaceholder,
+                    () -> contactsList.setUserData(clicked));
         });
 
         contactsList.getSelectionModel().selectedItemProperty()
@@ -410,6 +409,30 @@ public class MainController {
                         activateMessagesTab();
                     }
                 });
+    }
+
+    private void clearSelectionAndShowPlaceholder() {
+        contactsList.getSelectionModel().clearSelection();
+        contactsList.setUserData(null);
+        hideProfilePanel();
+        loadPlaceholder();
+    }
+
+    static void applyContactSelectionAction(
+            MainViewModel.ContactSelectionAction action,
+            Runnable switchToMessagesAction,
+            Runnable deselectAndPlaceholderAction,
+            Runnable keepSelectionAction) {
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(switchToMessagesAction, "switchToMessagesAction");
+        Objects.requireNonNull(deselectAndPlaceholderAction, "deselectAndPlaceholderAction");
+        Objects.requireNonNull(keepSelectionAction, "keepSelectionAction");
+
+        switch (action) {
+            case SWITCH_TO_MESSAGES_TAB -> switchToMessagesAction.run();
+            case DESELECT_AND_SHOW_PLACEHOLDER -> deselectAndPlaceholderAction.run();
+            case KEEP_SELECTED_CONTACT -> keepSelectionAction.run();
+        }
     }
 
     private void loadPlaceholder() {
@@ -571,46 +594,16 @@ public class MainController {
 
     private void handleLogout() {
         LOGGER.info("Logging out...");
-        Thread.ofVirtual().name("logout-thread").start(() -> {
-            // 1. Revoke server session (best effort), then close socket.
-            if (NetworkSession.get() != null) {
-                try {
-                    NetworkSession.get().postAuthenticated("/api/v1/logout", "{}").get(3, TimeUnit.SECONDS);
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Logout API call failed; continuing with local logout", ex);
-                }
-                try {
-                    NetworkSession.get().close();
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error closing WebSocket on logout", ex);
-                }
+        mainSessionService.logout().whenComplete((unused, throwable) -> {
+            if (throwable != null) {
+                LOGGER.log(Level.WARNING, "Logout completed with errors", throwable);
             }
-
-            // 2. Clear session singletons
-            unregisterPresenceListener();
-            NetworkSession.clear();
-            ChatSession.clear();
-
-            // 3. Navigate back to login screen
             Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
         });
     }
 
     private void registerPresenceListener() {
-        activeMessageViewModel = ChatSession.get();
-        if (activeMessageViewModel == null) {
-            return;
-        }
-        presenceListener = this::applyPresenceUpdate;
-        activeMessageViewModel.addPresenceListener(presenceListener);
-    }
-
-    private void unregisterPresenceListener() {
-        if (activeMessageViewModel != null && presenceListener != null) {
-            activeMessageViewModel.removePresenceListener(presenceListener);
-        }
-        activeMessageViewModel = null;
-        presenceListener = null;
+        mainSessionService.registerPresenceListener(this::applyPresenceUpdate);
     }
 
     private void applyPresenceUpdate(String userId, boolean active) {

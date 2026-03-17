@@ -1,4 +1,4 @@
-package com.haf.shared.exceptions;
+package com.haf.client.exceptions;
 
 /**
  * Thrown when SSL/TLS configuration fails,
@@ -6,21 +6,10 @@ package com.haf.shared.exceptions;
  */
 public class SslConfigurationException extends RuntimeException {
 
-    /**
-     * Creates a new SslConfigurationException with a detail message.
-     *
-     * @param message the detail message
-     */
     public SslConfigurationException(String message) {
         super(message);
     }
 
-    /**
-     * Creates a new SslConfigurationException with a detail message and cause.
-     *
-     * @param message the detail message
-     * @param cause   the underlying cause
-     */
     public SslConfigurationException(String message, Throwable cause) {
         super(message, cause);
     }
