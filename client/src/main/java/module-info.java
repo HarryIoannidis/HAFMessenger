@@ -17,6 +17,7 @@ module client {
     exports com.haf.client.crypto;
     exports com.haf.client.viewmodels;
     exports com.haf.client.network;
+    exports com.haf.client.services;
 
     opens com.haf.client.controllers to javafx.fxml;
     opens com.haf.client.core to javafx.graphics;

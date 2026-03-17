@@ -41,6 +41,7 @@ public class WebSocketAdapter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HTTPS_PROTOCOL = "https";
+    private static final int CONNECTION_TIMEOUT_SECONDS = 10;
 
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
@@ -80,7 +81,7 @@ public class WebSocketAdapter {
         this.httpClient = HttpClient.newBuilder()
                 .sslContext(sslContext)
                 .sslParameters(sslParameters)
-                .connectTimeout(Duration.ofSeconds(20))
+                .connectTimeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
                 .build();
     }
 
@@ -134,8 +135,8 @@ public class WebSocketAdapter {
                     .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
                     .buildAsync(serverUri, listener);
 
-            // Wait for connection to complete (with 30 second timeout)
-            this.webSocket = future.get(30, TimeUnit.SECONDS);
+            // Wait for connection to complete (bounded by configured timeout)
+            this.webSocket = future.get(CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException e) {
             isConnected = false;
             Throwable cause = e.getCause();
