@@ -11,14 +11,13 @@ import com.jfoenix.controls.JFXButton;
 import javafx.collections.ListChangeListener;
 import javafx.collections.WeakListChangeListener;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
 import java.io.File;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -96,44 +95,55 @@ public class ChatController {
             return;
         }
 
+        removeCurrentListener();
+        chatBox.getChildren().clear();
+        loadInitialMessages();
+        setupMessageListener();
+        viewModel.acknowledgeActiveRecipient();
+    }
+
+    private void removeCurrentListener() {
         if (currentObservedList != null && weakMessageListener != null) {
             currentObservedList.removeListener(weakMessageListener);
         }
+    }
 
-        chatBox.getChildren().clear();
-
-        String activeRecipient = viewModel.getRecipientId();
-
+    private void loadInitialMessages() {
         for (MessageVM vm : viewModel.getActiveMessages()) {
             chatBox.getChildren().add(MessageBubbleFactory.create(vm));
         }
+    }
 
-        messageListener = change -> {
-            while (change.next()) {
-                if (change.wasAdded()) {
-                    boolean hasIncomingMessages = false;
-                    for (MessageVM vm : change.getAddedSubList()) {
-                        Node bubble = MessageBubbleFactory.create(vm);
-                        chatBox.getChildren().add(bubble);
-                        if (!vm.isOutgoing()) {
-                            hasIncomingMessages = true;
-                        }
-                    }
-                    chatScrollPane.layout();
-                    chatScrollPane.setVvalue(1.0);
-
-                    if (hasIncomingMessages) {
-                        viewModel.acknowledgeRecipient(activeRecipient);
-                    }
-                }
-            }
-        };
-
+    private void setupMessageListener() {
+        String activeRecipient = viewModel.getRecipientId();
+        messageListener = change -> handleMessageChange(change, activeRecipient);
         currentObservedList = viewModel.getActiveMessages();
         weakMessageListener = new WeakListChangeListener<>(messageListener);
         currentObservedList.addListener(weakMessageListener);
+    }
 
-        viewModel.acknowledgeActiveRecipient();
+    private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
+        while (change.next()) {
+            if (change.wasAdded()) {
+                processAddedMessages(change.getAddedSubList(), activeRecipient);
+            }
+        }
+    }
+
+    private void processAddedMessages(List<? extends MessageVM> addedMessages, String activeRecipient) {
+        boolean hasIncomingMessages = false;
+        for (MessageVM vm : addedMessages) {
+            chatBox.getChildren().add(MessageBubbleFactory.create(vm));
+            if (!vm.isOutgoing()) {
+                hasIncomingMessages = true;
+            }
+        }
+        chatScrollPane.layout();
+        chatScrollPane.setVvalue(1.0);
+
+        if (hasIncomingMessages) {
+            viewModel.acknowledgeRecipient(activeRecipient);
+        }
     }
 
     /**
@@ -186,7 +196,8 @@ public class ChatController {
     }
 
     private Stage resolveOwnerWindow() {
-        if (sendButton != null && sendButton.getScene() != null && sendButton.getScene().getWindow() instanceof Stage stage) {
+        if (sendButton != null && sendButton.getScene() != null
+                && sendButton.getScene().getWindow() instanceof Stage stage) {
             return stage;
         }
         if (chatBox != null && chatBox.getScene() != null && chatBox.getScene().getWindow() instanceof Stage stage) {

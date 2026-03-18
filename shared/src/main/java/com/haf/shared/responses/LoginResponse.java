@@ -15,6 +15,10 @@ public class LoginResponse implements Serializable {
     private String sessionId;
     private String fullName;
     private String rank;
+    private String regNumber;
+    private String email;
+    private String telephone;
+    private String joinedDate;
     private String status;
     private String error;
 
@@ -62,6 +66,38 @@ public class LoginResponse implements Serializable {
         this.status = status;
     }
 
+    public String getRegNumber() {
+        return regNumber;
+    }
+
+    public void setRegNumber(String regNumber) {
+        this.regNumber = regNumber;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTelephone() {
+        return telephone;
+    }
+
+    public void setTelephone(String telephone) {
+        this.telephone = telephone;
+    }
+
+    public String getJoinedDate() {
+        return joinedDate;
+    }
+
+    public void setJoinedDate(String joinedDate) {
+        this.joinedDate = joinedDate;
+    }
+
     public String getError() {
         return error;
     }
@@ -72,11 +108,28 @@ public class LoginResponse implements Serializable {
 
     public static LoginResponse success(String userId, String sessionId,
             String fullName, String rank, String status) {
+        return success(userId, sessionId, fullName, rank, null, null, null, null, status);
+    }
+
+    public static LoginResponse success(
+            String userId,
+            String sessionId,
+            String fullName,
+            String rank,
+            String regNumber,
+            String email,
+            String telephone,
+            String joinedDate,
+            String status) {
         LoginResponse r = new LoginResponse();
         r.setUserId(userId);
         r.setSessionId(sessionId);
         r.setFullName(fullName);
         r.setRank(rank);
+        r.setRegNumber(regNumber);
+        r.setEmail(email);
+        r.setTelephone(telephone);
+        r.setJoinedDate(joinedDate);
         r.setStatus(status);
         return r;
     }

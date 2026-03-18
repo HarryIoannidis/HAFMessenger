@@ -617,7 +617,15 @@ public final class HttpIngressServer {
 
                 respond(exchange, requestId, 200,
                         JsonCodec.toJson(LoginResponse.success(
-                                user.userId(), sessionId, user.fullName(), user.rank(), user.status())));
+                                user.userId(),
+                                sessionId,
+                                user.fullName(),
+                                user.rank(),
+                                user.regNumber(),
+                                user.email(),
+                                user.telephone(),
+                                user.joinedDate(),
+                                user.status())));
             } catch (Exception ex) {
                 auditLogger.logError("login_error", requestId, null, ex);
                 respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error(INTERNAL_SERVER_ERROR)));
@@ -932,7 +940,14 @@ public final class HttpIngressServer {
                         cursor.userId());
 
                 List<UserSearchResultDTO> results = page.results().stream()
-                        .map(r -> new UserSearchResultDTO(r.userId(), r.fullName(), r.regNumber(), r.email(), r.rank()))
+                        .map(r -> new UserSearchResultDTO(
+                                r.userId(),
+                                r.fullName(),
+                                r.regNumber(),
+                                r.email(),
+                                r.rank(),
+                                r.telephone(),
+                                r.joinedDate()))
                         .toList();
                 String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
                 sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
@@ -1171,8 +1186,15 @@ public final class HttpIngressServer {
         private void handleGet(HttpExchange exchange, String callerId) throws IOException {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResultDTO> results = records.stream()
-                    .map(r -> new UserSearchResultDTO(r.userId(), r.fullName(), r.regNumber(), r.email(),
-                            r.rank(), presenceRegistry.isActive(r.userId())))
+                    .map(r -> new UserSearchResultDTO(
+                            r.userId(),
+                            r.fullName(),
+                            r.regNumber(),
+                            r.email(),
+                            r.rank(),
+                            r.telephone(),
+                            r.joinedDate(),
+                            presenceRegistry.isActive(r.userId())))
                     .toList();
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
         }

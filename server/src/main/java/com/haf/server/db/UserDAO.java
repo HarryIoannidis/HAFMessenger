@@ -56,7 +56,7 @@ public final class UserDAO {
             """;
 
     private static final String FIND_BY_EMAIL_SQL = """
-            SELECT user_id, password_hash, full_name, `rank`, `status`
+            SELECT user_id, password_hash, full_name, `rank`, reg_number, email, telephone, joined_date, `status`
             FROM users WHERE email = ? LIMIT 1
             """;
 
@@ -64,7 +64,8 @@ public final class UserDAO {
      * Represents a user record returned by {@link #findByEmail(String)}.
      */
     public record UserRecord(String userId, String passwordHash,
-            String fullName, String rank, String status) {
+            String fullName, String rank, String regNumber, String email, String telephone, String joinedDate,
+            String status) {
     }
 
     /**
@@ -177,6 +178,10 @@ public final class UserDAO {
                     rs.getString("password_hash"),
                     rs.getString("full_name"),
                     rs.getString("rank"),
+                    rs.getString("reg_number"),
+                    rs.getString("email"),
+                    rs.getString("telephone"),
+                    toIsoDate(rs, "joined_date"),
                     rs.getString("status"));
         } catch (SQLException ex) {
             auditLogger.logError("db_find_user", null, email, ex);
@@ -224,7 +229,7 @@ public final class UserDAO {
      * Represents a user record returned by user search.
      */
     public record SearchRecord(String userId, String fullName,
-            String regNumber, String email, String rank) {
+            String regNumber, String email, String rank, String telephone, String joinedDate) {
     }
 
     /**
@@ -239,7 +244,7 @@ public final class UserDAO {
     }
 
     private static final String SEARCH_USERS_PAGED_SQL = """
-            SELECT user_id, full_name, reg_number, email, `rank`
+            SELECT user_id, full_name, reg_number, email, `rank`, telephone, joined_date
             FROM users
             WHERE `status` = 'APPROVED'
               AND user_id != ?
@@ -290,7 +295,9 @@ public final class UserDAO {
                             rs.getString("full_name"),
                             rs.getString("reg_number"),
                             rs.getString("email"),
-                            rs.getString("rank")));
+                            rs.getString("rank"),
+                            rs.getString("telephone"),
+                            toIsoDate(rs, "joined_date")));
                 }
             }
 
@@ -334,6 +341,11 @@ public final class UserDAO {
 
     private static String toPrefixPattern(String input) {
         return escapeLikeLiteral(input) + "%";
+    }
+
+    private static String toIsoDate(ResultSet rs, String columnLabel) throws SQLException {
+        java.sql.Date value = rs.getDate(columnLabel);
+        return value == null ? null : value.toLocalDate().toString();
     }
 
     private static String escapeLikeLiteral(String input) {

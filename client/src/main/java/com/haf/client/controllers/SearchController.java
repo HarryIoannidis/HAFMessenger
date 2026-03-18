@@ -7,7 +7,10 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
@@ -197,6 +200,7 @@ public class SearchController {
         populateTextElements(card, result);
         populateRankIcon(card, result);
         populateActionButtons(card, result);
+        setupCardProfileOpen(card, result);
     }
 
     /**
@@ -256,6 +260,39 @@ public class SearchController {
 
         setupRemoveButton(removeButton, result);
         setupStartChatButton(startChatButton, removeButton, result);
+    }
+
+    private void setupCardProfileOpen(javafx.scene.Node card, UserSearchResultDTO result) {
+        if (card == null) {
+            return;
+        }
+
+        card.setCursor(Cursor.HAND);
+        card.setOnMouseClicked(event -> {
+            if (event.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
+
+            Node target = event.getPickResult() != null ? event.getPickResult().getIntersectedNode() : null;
+            if (isWithinActionButton(target)) {
+                return;
+            }
+            handleOpenProfile(result);
+        });
+    }
+
+    private boolean isWithinActionButton(Node node) {
+        Node cursor = node;
+        while (cursor != null) {
+            if (cursor instanceof com.jfoenix.controls.JFXButton button) {
+                String buttonId = button.getId();
+                if ("removeButton".equals(buttonId) || "startChatButton".equals(buttonId)) {
+                    return true;
+                }
+            }
+            cursor = cursor.getParent();
+        }
+        return false;
     }
 
     /**
@@ -326,11 +363,11 @@ public class SearchController {
         switch (action) {
             case REMOVE_CONTACT -> {
                 contactActions.removeContact(result.getUserId());
-                LOGGER.info("Remove contact requested for user: " + result.getUserId());
+                LOGGER.log(Level.INFO, "Remove contact requested for user: {0}", result.getUserId());
             }
             case ADD_CONTACT -> {
-                contactActions.addContact(result.getUserId(), result.getFullName(), result.getRegNumber());
-                LOGGER.info("Add contact requested for user: " + result.getUserId());
+                contactActions.addContact(result);
+                LOGGER.log(Level.INFO, "Add contact requested for user: {0}", result.getUserId());
             }
         }
     }
@@ -339,8 +376,16 @@ public class SearchController {
         if (result == null) {
             return;
         }
-        LOGGER.info("Start chat requested for user: " + result.getUserId());
-        contactActions.startChatWith(result.getUserId(), result.getFullName(), result.getRegNumber());
+        LOGGER.log(Level.INFO, "Start chat requested for user: {0}", result.getUserId());
+        contactActions.startChatWith(result);
+    }
+
+    void handleOpenProfile(UserSearchResultDTO result) {
+        if (result == null) {
+            return;
+        }
+        LOGGER.log(Level.INFO, "Open profile requested for user: {0}", result.getUserId());
+        contactActions.openProfile(result);
     }
 
     /**

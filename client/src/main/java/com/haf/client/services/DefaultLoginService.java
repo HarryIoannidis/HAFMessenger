@@ -1,8 +1,10 @@
 package com.haf.client.services;
 
 import com.haf.client.core.ChatSession;
+import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.crypto.UserKeystoreKeyProvider;
+import com.haf.client.models.UserProfileInfo;
 import com.haf.client.network.DefaultMessageReceiver;
 import com.haf.client.network.DefaultMessageSender;
 import com.haf.client.network.WebSocketAdapter;
@@ -71,6 +73,7 @@ public class DefaultLoginService implements LoginService {
 
     @Override
     public LoginResult login(LoginCommand command) {
+        CurrentUserSession.clear();
         if (command == null) {
             return new LoginResult.Failure(CONNECTION_FAILED_MESSAGE);
         }
@@ -106,6 +109,15 @@ public class DefaultLoginService implements LoginService {
     private LoginResult initializeSessionOrRetry(LoginResponse response, LoginCommand command, int attempt) {
         try {
             sessionBootstrap.initialize(response.getUserId(), response.getSessionId(), command.password());
+            CurrentUserSession.set(new UserProfileInfo(
+                    response.getUserId(),
+                    response.getFullName(),
+                    response.getRank(),
+                    response.getRegNumber(),
+                    response.getJoinedDate(),
+                    response.getEmail(),
+                    response.getTelephone(),
+                    true));
             return new LoginResult.Success();
         } catch (Exception ex) {
             if (isLastAttempt(attempt)) {

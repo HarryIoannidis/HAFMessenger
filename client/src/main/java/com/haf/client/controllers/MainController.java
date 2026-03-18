@@ -1,11 +1,14 @@
 package com.haf.client.controllers;
 
+import com.haf.client.core.CurrentUserSession;
+import com.haf.client.models.UserProfileInfo;
 import com.haf.client.services.DefaultMainSessionService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -42,6 +45,7 @@ public class MainController implements SearchContactActions {
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
     private static final String NAV_ITEM_ICON = "nav-item-icon";
     private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
+    private static final String PROFILE_POPUP_KEY = "profile-popup";
 
     // Window chrome
     @FXML
@@ -90,6 +94,8 @@ public class MainController implements SearchContactActions {
     private Text profileActivenessText;
     @FXML
     private Circle profileActivenessCircle;
+    @FXML
+    private JFXButton profilePopupButton;
 
     // Dots menu button
     @FXML
@@ -142,6 +148,7 @@ public class MainController implements SearchContactActions {
         setupContactList();
         setupContactSelection();
         setupSearchField();
+        setupProfilePopupTrigger();
         registerPresenceListener();
 
         // Trigger pre-loading immediately
@@ -241,6 +248,14 @@ public class MainController implements SearchContactActions {
                 }
             });
         }
+    }
+
+    private void setupProfilePopupTrigger() {
+        if (profilePopupButton == null) {
+            return;
+        }
+
+        profilePopupButton.setOnAction(e -> openSelectedContactProfilePopup());
     }
 
     /**
@@ -405,6 +420,44 @@ public class MainController implements SearchContactActions {
         searchPanel.setManaged(false);
     }
 
+    private void openSelectedContactProfilePopup() {
+        String trackedContactId = resolveTrackedContactId();
+        if (trackedContactId == null) {
+            return;
+        }
+
+        ContactInfo contact = viewModel.getContactById(trackedContactId);
+        if (contact == null) {
+            contact = contactsList.getSelectionModel().getSelectedItem();
+        }
+        if (contact == null) {
+            return;
+        }
+
+        openProfilePopup(UserProfileInfo.fromContact(contact, false));
+    }
+
+    private void openSelfProfilePopup() {
+        UserProfileInfo profile = CurrentUserSession.get();
+        if (profile == null) {
+            LOGGER.warning("Self profile is not available in session.");
+            return;
+        }
+        openProfilePopup(profile.asSelfProfile(true));
+    }
+
+    private void openProfilePopup(UserProfileInfo profile) {
+        if (profile == null) {
+            return;
+        }
+
+        ViewRouter.showPopup(
+                PROFILE_POPUP_KEY,
+                UiConstants.FXML_PROFILE,
+                ProfileController.class,
+                controller -> controller.showProfile(profile));
+    }
+
     private void setupContactList() {
         contactsList.setCellFactory(lv -> {
             ContactCell cell = new ContactCell();
@@ -417,11 +470,18 @@ public class MainController implements SearchContactActions {
      * Adds a searched user to the contacts list and switches to their chat.
      */
     @Override
-    public void startChatWith(String userId, String fullName, String regNumber) {
-        viewModel.addContact(userId, fullName, regNumber);
-        ContactInfo target = viewModel.getContactById(userId);
+    public void startChatWith(UserSearchResultDTO result) {
+        if (result == null || result.getUserId() == null || result.getUserId().isBlank()) {
+            return;
+        }
+
+        viewModel.addContact(result);
+        ContactInfo target = viewModel.getContactById(result.getUserId());
         if (target == null) {
-            target = viewModel.ensureChatContact(userId, fullName, regNumber);
+            target = viewModel.ensureChatContact(result);
+        }
+        if (target == null) {
+            return;
         }
 
         // Select and load chat. Note: activateMessagesTab is triggered by the selection
@@ -436,8 +496,8 @@ public class MainController implements SearchContactActions {
     }
 
     @Override
-    public void addContact(String userId, String fullName, String regNumber) {
-        viewModel.addContact(userId, fullName, regNumber);
+    public void addContact(UserSearchResultDTO result) {
+        viewModel.addContact(result);
     }
 
     @Override
@@ -447,6 +507,15 @@ public class MainController implements SearchContactActions {
         if (selected != null && selected.id().equals(userId)) {
             clearSelectionAndShowPlaceholder();
         }
+    }
+
+    @Override
+    public void openProfile(UserSearchResultDTO result) {
+        UserProfileInfo profile = UserProfileInfo.fromSearchResult(result, false);
+        if (profile == null) {
+            return;
+        }
+        openProfilePopup(profile);
     }
 
     private void setupContactSelection() {
@@ -616,7 +685,7 @@ public class MainController implements SearchContactActions {
         MenuItem helpItem = createIconMenuItem("mdi2h-help-circle-outline", "Help");
         MenuItem logoutItem = createIconMenuItem("mdi2l-logout", "Log out");
 
-        profileItem.setOnAction(e -> LOGGER.info("TODO: Profile clicked"));
+        profileItem.setOnAction(e -> openSelfProfilePopup());
         settingsItem.setOnAction(e -> LOGGER.info("TODO: Settings clicked"));
         helpItem.setOnAction(e -> LOGGER.info("TODO: Help clicked"));
         logoutItem.setOnAction(e -> handleLogout());
