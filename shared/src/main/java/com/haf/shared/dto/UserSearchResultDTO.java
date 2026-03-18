@@ -11,6 +11,8 @@ public class UserSearchResultDTO implements Serializable {
     private String regNumber;
     private String email;
     private String rank;
+    private String telephone;
+    private String joinedDate;
     private boolean active;
 
     public UserSearchResultDTO() {
@@ -18,15 +20,40 @@ public class UserSearchResultDTO implements Serializable {
     }
 
     public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank) {
-        this(userId, fullName, regNumber, email, rank, false);
+        this(userId, fullName, regNumber, email, rank, null, null, false);
     }
 
     public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
+        this(userId, fullName, regNumber, email, rank, null, null, active);
+    }
+
+    public UserSearchResultDTO(
+            String userId,
+            String fullName,
+            String regNumber,
+            String email,
+            String rank,
+            String telephone,
+            String joinedDate) {
+        this(userId, fullName, regNumber, email, rank, telephone, joinedDate, false);
+    }
+
+    public UserSearchResultDTO(
+            String userId,
+            String fullName,
+            String regNumber,
+            String email,
+            String rank,
+            String telephone,
+            String joinedDate,
+            boolean active) {
         this.userId = userId;
         this.fullName = fullName;
         this.regNumber = regNumber;
         this.email = email;
         this.rank = rank;
+        this.telephone = telephone;
+        this.joinedDate = joinedDate;
         this.active = active;
     }
 
@@ -68,6 +95,22 @@ public class UserSearchResultDTO implements Serializable {
 
     public void setRank(String rank) {
         this.rank = rank;
+    }
+
+    public String getTelephone() {
+        return telephone;
+    }
+
+    public void setTelephone(String telephone) {
+        this.telephone = telephone;
+    }
+
+    public String getJoinedDate() {
+        return joinedDate;
+    }
+
+    public void setJoinedDate(String joinedDate) {
+        this.joinedDate = joinedDate;
     }
 
     public boolean isActive() {

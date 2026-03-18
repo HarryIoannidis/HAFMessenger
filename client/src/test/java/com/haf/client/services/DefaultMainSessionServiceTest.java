@@ -31,6 +31,7 @@ class DefaultMainSessionServiceTest {
         assertEquals(1, presenceChannel.removeCalls.get());
         assertTrue(context.networkCleared);
         assertTrue(context.chatCleared);
+        assertTrue(context.currentUserProfileCleared);
     }
 
     @Test
@@ -47,6 +48,7 @@ class DefaultMainSessionServiceTest {
         assertEquals(1, networkGateway.closeCalls.get());
         assertTrue(context.networkCleared);
         assertTrue(context.chatCleared);
+        assertTrue(context.currentUserProfileCleared);
     }
 
     @Test
@@ -106,6 +108,7 @@ class DefaultMainSessionServiceTest {
         private final DefaultMainSessionService.PresenceChannel presenceChannel;
         private boolean networkCleared;
         private boolean chatCleared;
+        private boolean currentUserProfileCleared;
 
         private StubSessionContext(
                 DefaultMainSessionService.NetworkGateway networkGateway,
@@ -132,6 +135,11 @@ class DefaultMainSessionServiceTest {
         @Override
         public void clearChatSession() {
             chatCleared = true;
+        }
+
+        @Override
+        public void clearCurrentUserProfile() {
+            currentUserProfileCleared = true;
         }
     }
 }

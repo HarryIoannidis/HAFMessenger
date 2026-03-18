@@ -135,9 +135,22 @@ class WebSocketIngressServerTest {
                 .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
         when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
         when(contactDAO.getContacts(userId)).thenReturn(List.of(
-                new ContactDAO.ContactRecord(onlineContactId, "Online Contact", "001", "online@haf.gr", "SMINIAS"),
-                new ContactDAO.ContactRecord(offlineContactId, "Offline Contact", "002", "offline@haf.gr",
-                        "SMINIAS")));
+                new ContactDAO.ContactRecord(
+                        onlineContactId,
+                        "Online Contact",
+                        "001",
+                        "online@haf.gr",
+                        "SMINIAS",
+                        "6900000001",
+                        "2026-01-01"),
+                new ContactDAO.ContactRecord(
+                        offlineContactId,
+                        "Offline Contact",
+                        "002",
+                        "offline@haf.gr",
+                        "SMINIAS",
+                        "6900000002",
+                        "2026-01-02")));
 
         server.onOpen(webSocket, handshake);
 

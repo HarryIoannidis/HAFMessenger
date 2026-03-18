@@ -1,14 +1,21 @@
 package com.haf.client.utils;
 
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,6 +41,7 @@ public class ViewRouter {
     }
 
     private static Stage mainStage;
+    private static final Map<String, PopupEntry> popupEntries = new ConcurrentHashMap<>();
 
     /**
      * Sets the main application stage.
@@ -51,6 +59,7 @@ public class ViewRouter {
      */
     public static void switchTo(String fxmlPath) {
         try {
+            closeAllPopups();
             if (mainStage.getStyle() == StageStyle.TRANSPARENT) {
                 recreateStage(StageStyle.DECORATED);
             }
@@ -81,6 +90,7 @@ public class ViewRouter {
      */
     public static void switchToTransparent(String fxmlPath) {
         try {
+            closeAllPopups();
             if (mainStage.getStyle() != StageStyle.TRANSPARENT) {
                 recreateStage(StageStyle.TRANSPARENT);
             }
@@ -139,6 +149,7 @@ public class ViewRouter {
      * @param style the stage style
      */
     private static void recreateStage(StageStyle style) {
+        closeAllPopups();
         mainStage.close();
         Stage newStage = new Stage();
         newStage.initStyle(style);
@@ -158,10 +169,109 @@ public class ViewRouter {
         return mainStage;
     }
 
+    public static <T> void showPopup(
+            String popupKey,
+            String fxmlPath,
+            Class<T> controllerType,
+            Consumer<T> configureController) {
+        Objects.requireNonNull(popupKey, "popupKey");
+        Objects.requireNonNull(fxmlPath, "fxmlPath");
+        Objects.requireNonNull(controllerType, "controllerType");
+
+        if (mainStage == null) {
+            throw new IllegalStateException("Main stage is not initialized.");
+        }
+
+        PopupEntry entry = popupEntries.get(popupKey);
+        if (entry == null || entry.stage() == null || entry.stage().getOwner() != mainStage) {
+            entry = loadPopupEntry(fxmlPath, controllerType);
+            popupEntries.put(popupKey, entry);
+        }
+
+        T controller = controllerType.cast(entry.controller());
+        if (configureController != null) {
+            configureController.accept(controller);
+        }
+
+        Stage popupStage = entry.stage();
+        popupStage.sizeToScene();
+        centerPopupOverMainStage(popupStage);
+
+        if (!popupStage.isShowing()) {
+            popupStage.show();
+        }
+        popupStage.toFront();
+        popupStage.requestFocus();
+    }
+
     /**
      * Closes the main application stage.
      */
     public static void close() {
+        closeAllPopups();
         mainStage.close();
+    }
+
+    private static <T> PopupEntry loadPopupEntry(String fxmlPath, Class<T> controllerType) {
+        try {
+            var resource = ViewRouter.class.getResource(fxmlPath);
+            logger.log(Level.INFO, "Loading popup FXML: {0}", resource);
+            FXMLLoader loader = new FXMLLoader(resource);
+            Parent root = loader.load();
+            Object controller = loader.getController();
+            if (!controllerType.isInstance(controller)) {
+                throw new IllegalStateException("Popup controller type mismatch for " + fxmlPath);
+            }
+
+            Stage popupStage = new Stage();
+            popupStage.initOwner(mainStage);
+            popupStage.initStyle(StageStyle.TRANSPARENT);
+            popupStage.initModality(Modality.NONE);
+            popupStage.setResizable(false);
+
+            StackPane popupShell = new StackPane(root);
+            popupShell.setPadding(new Insets(14));
+            popupShell.setPickOnBounds(false);
+            popupShell.setStyle("-fx-background-color: transparent;");
+
+            Scene popupScene = new Scene(popupShell);
+            popupScene.setFill(Color.TRANSPARENT);
+            popupScene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
+            popupStage.setScene(popupScene);
+            popupStage.setTitle(mainStage.getTitle());
+
+            return new PopupEntry(popupStage, controller);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load popup FXML: " + fxmlPath, e);
+        }
+    }
+
+    private static void centerPopupOverMainStage(Stage popupStage) {
+        double popupWidth = popupStage.getWidth();
+        double popupHeight = popupStage.getHeight();
+
+        if (popupWidth <= 0 || popupHeight <= 0) {
+            popupStage.sizeToScene();
+            popupWidth = popupStage.getWidth();
+            popupHeight = popupStage.getHeight();
+        }
+
+        double targetX = mainStage.getX() + ((mainStage.getWidth() - popupWidth) / 2.0);
+        double targetY = mainStage.getY() + ((mainStage.getHeight() - popupHeight) / 2.0);
+        popupStage.setX(targetX);
+        popupStage.setY(targetY);
+    }
+
+    private static void closeAllPopups() {
+        for (PopupEntry entry : popupEntries.values()) {
+            Stage stage = entry.stage();
+            if (stage != null) {
+                stage.close();
+            }
+        }
+        popupEntries.clear();
+    }
+
+    private record PopupEntry(Stage stage, Object controller) {
     }
 }

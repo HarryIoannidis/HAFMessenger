@@ -1,7 +1,9 @@
 package com.haf.client.services;
 
+import com.haf.client.core.CurrentUserSession;
 import com.haf.shared.responses.LoginResponse;
 import com.haf.shared.utils.JsonCodec;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.net.ssl.SSLSession;
@@ -16,8 +18,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DefaultLoginServiceTest {
+
+    @BeforeEach
+    void clearCurrentUserSession() {
+        CurrentUserSession.clear();
+    }
 
     @Test
     void login_success_on_first_attempt() {
@@ -155,6 +163,51 @@ class DefaultLoginServiceTest {
         assertEquals("Account is already logged in.", rejected.message());
         assertEquals(1, attempts.get());
         assertEquals(0, bootstrapCalls.get());
+    }
+
+    @Test
+    void login_success_stores_current_user_profile() {
+        DefaultLoginService service = new DefaultLoginService(
+                command -> response(200, JsonCodec.toJson(LoginResponse.success(
+                        "u1",
+                        "s1",
+                        "User Name",
+                        "Rank",
+                        "REG-001",
+                        "user@haf.gr",
+                        "6900000000",
+                        "2026-01-01",
+                        "ONLINE"))),
+                (userId, sessionId, passphrase) -> {
+                },
+                millis -> {
+                });
+
+        LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
+
+        assertInstanceOf(LoginService.LoginResult.Success.class, result);
+        assertEquals("u1", CurrentUserSession.get().userId());
+        assertEquals("User Name", CurrentUserSession.get().fullName());
+        assertEquals("REG-001", CurrentUserSession.get().regNumber());
+        assertEquals("user@haf.gr", CurrentUserSession.get().email());
+        assertEquals("6900000000", CurrentUserSession.get().telephone());
+        assertEquals("2026-01-01", CurrentUserSession.get().joinedDate());
+    }
+
+    @Test
+    void login_failure_clears_previous_current_user_profile() {
+        CurrentUserSession.set(new com.haf.client.models.UserProfileInfo(
+                "old", "Old", "Rank", "REG", "2025-01-01", "old@haf.gr", "6999999999", true));
+        DefaultLoginService service = new DefaultLoginService(
+                command -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),
+                (userId, sessionId, passphrase) -> {
+                },
+                millis -> {
+                });
+
+        service.login(new LoginService.LoginCommand("user@haf.gr", "bad-pass"));
+
+        assertNull(CurrentUserSession.get());
     }
 
     private static HttpResponse<String> response(int statusCode, String body) {

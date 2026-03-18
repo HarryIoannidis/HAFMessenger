@@ -51,6 +51,17 @@ class SearchControllerTest {
     }
 
     @Test
+    void open_profile_delegates_through_port() {
+        SearchController controller = new SearchController();
+        StubSearchContactActions actions = new StubSearchContactActions();
+        controller.setContactActions(actions);
+
+        controller.handleOpenProfile(sampleUser());
+
+        assertEquals(1, actions.openProfileCalls.get());
+    }
+
+    @Test
     void toggle_policy_methods_are_pure_and_deterministic() {
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> "{}");
 
@@ -84,6 +95,7 @@ class SearchControllerTest {
         private final AtomicInteger addCalls = new AtomicInteger();
         private final AtomicInteger removeCalls = new AtomicInteger();
         private final AtomicInteger startChatCalls = new AtomicInteger();
+        private final AtomicInteger openProfileCalls = new AtomicInteger();
 
         @Override
         public boolean hasContact(String userId) {
@@ -91,7 +103,7 @@ class SearchControllerTest {
         }
 
         @Override
-        public void addContact(String userId, String fullName, String regNumber) {
+        public void addContact(UserSearchResultDTO result) {
             addCalls.incrementAndGet();
         }
 
@@ -101,8 +113,13 @@ class SearchControllerTest {
         }
 
         @Override
-        public void startChatWith(String userId, String fullName, String regNumber) {
+        public void startChatWith(UserSearchResultDTO result) {
             startChatCalls.incrementAndGet();
+        }
+
+        @Override
+        public void openProfile(UserSearchResultDTO result) {
+            openProfileCalls.incrementAndGet();
         }
     }
 }

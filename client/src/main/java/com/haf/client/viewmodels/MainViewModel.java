@@ -144,12 +144,38 @@ public class MainViewModel {
     }
 
     public ContactInfo ensureChatContact(String userId, String fullName, String regNumber) {
+        return ensureChatContact(userId, fullName, regNumber, null, null, null, null);
+    }
+
+    public ContactInfo ensureChatContact(UserSearchResultDTO result) {
+        if (result == null) {
+            return null;
+        }
+        return ensureChatContact(
+                result.getUserId(),
+                result.getFullName(),
+                result.getRegNumber(),
+                result.getRank(),
+                result.getEmail(),
+                result.getTelephone(),
+                result.getJoinedDate());
+    }
+
+    public ContactInfo ensureChatContact(
+            String userId,
+            String fullName,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate) {
         ContactInfo target = getContactById(userId);
         if (target != null) {
+            mergeContactProfile(target.id(), fullName, regNumber, rank, email, telephone, joinedDate);
             return target;
         }
 
-        ContactInfo created = ContactInfo.unknown(userId, fullName, regNumber);
+        ContactInfo created = ContactInfo.unknown(userId, fullName, regNumber, rank, email, telephone, joinedDate);
         contacts.add(created);
         return created;
     }
@@ -167,12 +193,42 @@ public class MainViewModel {
     }
 
     public void addContact(String userId, String fullName, String regNumber) {
+        addContact(userId, fullName, regNumber, null, null, null, null);
+    }
+
+    public void addContact(UserSearchResultDTO result) {
+        if (result == null) {
+            return;
+        }
+        addContact(
+                result.getUserId(),
+                result.getFullName(),
+                result.getRegNumber(),
+                result.getRank(),
+                result.getEmail(),
+                result.getTelephone(),
+                result.getJoinedDate());
+    }
+
+    public void addContact(
+            String userId,
+            String fullName,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
         if (hasContact(userId)) {
+            mergeContactProfile(userId, fullName, regNumber, rank, email, telephone, joinedDate);
             return;
         }
 
         long baselinePresenceSignal = presenceSignalByUser.getOrDefault(userId, 0L);
-        contacts.add(ContactInfo.unknown(userId, fullName, regNumber));
+        contacts.add(ContactInfo.unknown(userId, fullName, regNumber, rank, email, telephone, joinedDate));
         contactsGateway.addContact(userId)
                 .thenAccept(ignored -> scheduleAddContactPresenceFallback(userId, baselinePresenceSignal))
                 .exceptionally(ex -> {
@@ -197,14 +253,38 @@ public class MainViewModel {
         }
 
         ContactInfo existing = contacts.get(index);
-        ContactInfo updated = ContactInfo.fromPresence(existing.id(), existing.name(), existing.regNumber(), active);
+        ContactInfo updated = ContactInfo.fromPresence(
+                existing.id(),
+                existing.name(),
+                existing.regNumber(),
+                existing.rank(),
+                existing.email(),
+                existing.telephone(),
+                existing.joinedDate(),
+                active);
         contacts.set(index, updated);
         presenceSignalByUser.put(userId, presenceSignalCounter.incrementAndGet());
         return updated;
     }
 
-    private void upsertContact(String userId, String fullName, String regNumber, boolean active) {
-        ContactInfo contact = ContactInfo.fromPresence(userId, fullName, regNumber, active);
+    private void upsertContact(
+            String userId,
+            String fullName,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            boolean active) {
+        ContactInfo contact = ContactInfo.fromPresence(
+                userId,
+                fullName,
+                regNumber,
+                rank,
+                email,
+                telephone,
+                joinedDate,
+                active);
         int index = findContactIndex(userId);
         if (index >= 0) {
             contacts.set(index, contact);
@@ -231,10 +311,51 @@ public class MainViewModel {
 
         runOnUiThread(() -> {
             for (UserSearchResultDTO contact : response.getContacts()) {
-                upsertContact(contact.getUserId(), contact.getFullName(), contact.getRegNumber(),
+                upsertContact(
+                        contact.getUserId(),
+                        contact.getFullName(),
+                        contact.getRegNumber(),
+                        contact.getRank(),
+                        contact.getEmail(),
+                        contact.getTelephone(),
+                        contact.getJoinedDate(),
                         contact.isActive());
             }
         });
+    }
+
+    private void mergeContactProfile(
+            String userId,
+            String fullName,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate) {
+        int index = findContactIndex(userId);
+        if (index < 0) {
+            return;
+        }
+
+        ContactInfo existing = contacts.get(index);
+        ContactInfo merged = new ContactInfo(
+                existing.id(),
+                preferNonBlank(fullName, existing.name()),
+                preferNonBlank(regNumber, existing.regNumber()),
+                preferNonBlank(rank, existing.rank()),
+                preferNonBlank(email, existing.email()),
+                preferNonBlank(telephone, existing.telephone()),
+                preferNonBlank(joinedDate, existing.joinedDate()),
+                existing.activenessLabel(),
+                existing.activenessColor());
+        contacts.set(index, merged);
+    }
+
+    private static String preferNonBlank(String incoming, String fallback) {
+        if (incoming != null && !incoming.isBlank()) {
+            return incoming;
+        }
+        return fallback;
     }
 
     private void scheduleAddContactPresenceFallback(String userId, long baselinePresenceSignal) {

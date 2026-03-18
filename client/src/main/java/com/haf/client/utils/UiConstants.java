@@ -15,6 +15,7 @@ public final class UiConstants {
     public static final String FXML_CONTACT_CELL = "/fxml/contact_cell.fxml";
     public static final String FXML_SEARCH = "/fxml/search.fxml";
     public static final String FXML_SEARCH_RESULT_ITEM = "/fxml/search_result_item.fxml";
+    public static final String FXML_PROFILE = "/fxml/profile.fxml";
 
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";

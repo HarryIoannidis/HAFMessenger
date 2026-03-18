@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
+import java.sql.Date;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -125,6 +126,10 @@ class UserDAOTest {
         when(resultSet.getString("password_hash")).thenReturn("$2a$12$hash");
         when(resultSet.getString("full_name")).thenReturn("John Doe");
         when(resultSet.getString("rank")).thenReturn("Σμηναγός");
+        when(resultSet.getString("reg_number")).thenReturn("REG-001");
+        when(resultSet.getString("email")).thenReturn("john@haf.gr");
+        when(resultSet.getString("telephone")).thenReturn("6900000000");
+        when(resultSet.getDate("joined_date")).thenReturn(Date.valueOf("2026-01-01"));
         when(resultSet.getString("status")).thenReturn("APPROVED");
 
         UserDAO.UserRecord userRecord = dao.findByEmail("john@haf.gr");
@@ -134,6 +139,10 @@ class UserDAOTest {
         assertEquals("$2a$12$hash", userRecord.passwordHash());
         assertEquals("John Doe", userRecord.fullName());
         assertEquals("Σμηναγός", userRecord.rank());
+        assertEquals("REG-001", userRecord.regNumber());
+        assertEquals("john@haf.gr", userRecord.email());
+        assertEquals("6900000000", userRecord.telephone());
+        assertEquals("2026-01-01", userRecord.joinedDate());
         assertEquals("APPROVED", userRecord.status());
     }
 
@@ -171,13 +180,19 @@ class UserDAOTest {
         when(resultSet.getString("reg_number")).thenReturn("REG-001", "REG-002");
         when(resultSet.getString("email")).thenReturn("alice@haf.gr", "bob@haf.gr");
         when(resultSet.getString("rank")).thenReturn("Σμηναγός", "Σμηνίας");
+        when(resultSet.getString("telephone")).thenReturn("6900000001", "6900000002");
+        when(resultSet.getDate("joined_date")).thenReturn(Date.valueOf("2026-01-01"), Date.valueOf("2026-01-02"));
 
         var results = dao.searchUsers("a", "caller-id", 20);
 
         assertEquals(2, results.size());
         assertEquals("uid-1", results.get(0).userId());
         assertEquals("Alice", results.get(0).fullName());
+        assertEquals("6900000001", results.get(0).telephone());
+        assertEquals("2026-01-01", results.get(0).joinedDate());
         assertEquals("uid-2", results.get(1).userId());
+        assertEquals("6900000002", results.get(1).telephone());
+        assertEquals("2026-01-02", results.get(1).joinedDate());
         verify(existsStatement).setString(1, "caller-id");
         verify(existsStatement).setString(2, "a%");
         verify(existsStatement).setString(3, "a%");

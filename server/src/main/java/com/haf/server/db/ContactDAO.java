@@ -17,12 +17,13 @@ public class ContactDAO {
         this.dataSource = dataSource;
     }
 
-    public record ContactRecord(String userId, String fullName, String regNumber, String email, String rank) {
+    public record ContactRecord(String userId, String fullName, String regNumber, String email, String rank,
+            String telephone, String joinedDate) {
     }
 
     public List<ContactRecord> getContacts(String userId) {
         String sql = """
-                    SELECT u.user_id, u.full_name, u.reg_number, u.email, u.rank
+                    SELECT u.user_id, u.full_name, u.reg_number, u.email, u.rank, u.telephone, u.joined_date
                     FROM contacts c
                     JOIN users u ON c.contact_id = u.user_id
                     WHERE c.user_id = ?
@@ -39,7 +40,9 @@ public class ContactDAO {
                             rs.getString("full_name"),
                             rs.getString("reg_number"),
                             rs.getString("email"),
-                            rs.getString("rank")));
+                            rs.getString("rank"),
+                            rs.getString("telephone"),
+                            toIsoDate(rs, "joined_date")));
                 }
             }
         } catch (SQLException e) {
@@ -96,5 +99,10 @@ public class ContactDAO {
             throw new DatabaseOperationException("Error fetching watchers for contact " + contactId, e);
         }
         return watcherUserIds;
+    }
+
+    private static String toIsoDate(ResultSet rs, String columnLabel) throws SQLException {
+        java.sql.Date value = rs.getDate(columnLabel);
+        return value == null ? null : value.toLocalDate().toString();
     }
 }

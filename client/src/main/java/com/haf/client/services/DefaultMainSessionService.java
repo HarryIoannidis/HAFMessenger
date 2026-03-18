@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.core.ChatSession;
+import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.viewmodels.MessageViewModel;
 
@@ -38,6 +39,8 @@ public class DefaultMainSessionService implements MainSessionService {
         void clearNetworkSession();
 
         void clearChatSession();
+
+        void clearCurrentUserProfile();
     }
 
     @FunctionalInterface
@@ -121,6 +124,7 @@ public class DefaultMainSessionService implements MainSessionService {
         unregisterPresenceListener();
         sessionContext.clearNetworkSession();
         sessionContext.clearChatSession();
+        sessionContext.clearCurrentUserProfile();
     }
 
     private static void runVirtualTask(String taskName, Runnable task) {
@@ -177,6 +181,11 @@ public class DefaultMainSessionService implements MainSessionService {
         @Override
         public void clearChatSession() {
             ChatSession.clear();
+        }
+
+        @Override
+        public void clearCurrentUserProfile() {
+            CurrentUserSession.clear();
         }
     }
 }

@@ -152,6 +152,37 @@ class MainViewModelTest {
         assertEquals("Active", viewModel.contactsProperty().getFirst().activenessLabel());
     }
 
+    @Test
+    void enriched_profile_fields_survive_presence_update() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+        UserSearchResultDTO dto = new UserSearchResultDTO(
+                "u-1",
+                "Jane",
+                "100",
+                "jane@haf.gr",
+                "SMINIAS",
+                "6900000000",
+                "2026-01-01",
+                false);
+
+        viewModel.addContact(dto);
+        ContactInfo contact = viewModel.getContactById("u-1");
+        assertNotNull(contact);
+        assertEquals("SMINIAS", contact.rank());
+        assertEquals("jane@haf.gr", contact.email());
+        assertEquals("6900000000", contact.telephone());
+        assertEquals("2026-01-01", contact.joinedDate());
+
+        ContactInfo updated = viewModel.updateContactPresence("u-1", true);
+        assertNotNull(updated);
+        assertEquals("SMINIAS", updated.rank());
+        assertEquals("jane@haf.gr", updated.email());
+        assertEquals("6900000000", updated.telephone());
+        assertEquals("2026-01-01", updated.joinedDate());
+        assertEquals("Active", updated.activenessLabel());
+    }
+
     private static void awaitCondition(BooleanSupplier condition) {
         long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (System.nanoTime() < deadlineNanos) {

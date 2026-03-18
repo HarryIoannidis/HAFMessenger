@@ -1,5 +1,7 @@
 package com.haf.client.controllers;
 
+import com.haf.shared.dto.UserSearchResultDTO;
+
 /**
  * Port for Search screen actions that affect contacts/chat state.
  */
@@ -12,7 +14,7 @@ public interface SearchContactActions {
         }
 
         @Override
-        public void addContact(String userId, String fullName, String regNumber) {
+        public void addContact(UserSearchResultDTO result) {
             // Intentionally no-op: default port implementation when Search is not wired.
         }
 
@@ -22,16 +24,23 @@ public interface SearchContactActions {
         }
 
         @Override
-        public void startChatWith(String userId, String fullName, String regNumber) {
+        public void startChatWith(UserSearchResultDTO result) {
+            // Intentionally no-op: default port implementation when Search is not wired.
+        }
+
+        @Override
+        public void openProfile(UserSearchResultDTO result) {
             // Intentionally no-op: default port implementation when Search is not wired.
         }
     };
 
     boolean hasContact(String userId);
 
-    void addContact(String userId, String fullName, String regNumber);
+    void addContact(UserSearchResultDTO result);
 
     void removeContact(String userId);
 
-    void startChatWith(String userId, String fullName, String regNumber);
+    void startChatWith(UserSearchResultDTO result);
+
+    void openProfile(UserSearchResultDTO result);
 }

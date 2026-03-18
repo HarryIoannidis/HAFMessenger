@@ -147,6 +147,10 @@ class HttpIngressServerTest {
 
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"session-1\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"regNumber\":\"REG-001\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"email\":\"pilot@haf.gr\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"telephone\":\"6900000000\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"joinedDate\":\"2026-01-01\""));
         verify(sessionDAO, times(1)).createSession(userId);
         verify(auditLogger, times(1)).logLogin(anyString(), eq(userId), eq(email));
     }
@@ -207,7 +211,16 @@ class HttpIngressServerTest {
 
     private static UserDAO.UserRecord approvedUser(String userId, String password) {
         String passwordHash = Password.hash(password).addRandomSalt().with(ARGON2).getResult();
-        return new UserDAO.UserRecord(userId, passwordHash, "Pilot", "SMINIAS", "APPROVED");
+        return new UserDAO.UserRecord(
+                userId,
+                passwordHash,
+                "Pilot",
+                "SMINIAS",
+                "REG-001",
+                "pilot@haf.gr",
+                "6900000000",
+                "2026-01-01",
+                "APPROVED");
     }
 
     private record ExchangeHarness(HttpExchange exchange, ByteArrayOutputStream responseBody, AtomicInteger statusCode) {
