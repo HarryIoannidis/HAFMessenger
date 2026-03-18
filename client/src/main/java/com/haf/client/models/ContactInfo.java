@@ -20,6 +20,14 @@ public record ContactInfo(String id, String name, String regNumber, String activ
         return new ContactInfo(id, name, regNumber, "Inactive", "#ff0000");
     }
 
+    /**
+     * Neutral pre-presence state used for optimistic inserts.
+     * Dot/text stay hidden until a concrete presence update arrives.
+     */
+    public static ContactInfo unknown(String id, String name, String regNumber) {
+        return new ContactInfo(id, name, regNumber, "", "transparent");
+    }
+
     public static ContactInfo active(String id, String name, String regNumber) {
         return online(id, name, regNumber);
     }

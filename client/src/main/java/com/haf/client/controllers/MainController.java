@@ -11,6 +11,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
+import javafx.collections.ListChangeListener;
 import javafx.scene.Parent;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
@@ -134,6 +135,7 @@ public class MainController implements SearchContactActions {
     @FXML
     public void initialize() {
         bindViewModel();
+        bindSelectedContactProfileSync();
         setupWindowControls();
         setupNavBar();
         setupDotsMenu();
@@ -154,6 +156,60 @@ public class MainController implements SearchContactActions {
 
     private void bindViewModel() {
         contactsList.setItems(viewModel.contactsProperty());
+    }
+
+    private void bindSelectedContactProfileSync() {
+        viewModel.contactsProperty().addListener((ListChangeListener<ContactInfo>) change -> {
+            boolean changed = false;
+            while (change.next()) {
+                changed = true;
+            }
+            if (changed) {
+                // Keep profile strip synchronized when contact entries are replaced in
+                // the list (presence refresh/update paths).
+                refreshProfilePanelForSelectedContact();
+            }
+        });
+    }
+
+    private void refreshProfilePanelForSelectedContact() {
+        if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
+            return;
+        }
+
+        String trackedContactId = resolveTrackedContactId();
+        if (trackedContactId == null) {
+            return;
+        }
+
+        ContactInfo latest = viewModel.getContactById(trackedContactId);
+        if (latest != null) {
+            ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+            if (!latest.equals(selected)) {
+                // Selection can keep a stale object reference after list item replacement.
+                // Re-select the current model instance so header/list stay consistent.
+                contactsList.getSelectionModel().select(latest);
+            }
+            contactsList.setUserData(latest);
+            showProfilePanel(latest);
+        }
+    }
+
+    private String resolveTrackedContactId() {
+        if (currentChatRecipientId != null && !currentChatRecipientId.isBlank()) {
+            return currentChatRecipientId;
+        }
+
+        Object tracked = contactsList.getUserData();
+        if (tracked instanceof ContactInfo trackedContact && trackedContact.id() != null && !trackedContact.id().isBlank()) {
+            return trackedContact.id();
+        }
+
+        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.id() == null || selected.id().isBlank()) {
+            return null;
+        }
+        return selected.id();
     }
 
     private void triggerPreloading() {
@@ -231,8 +287,11 @@ public class MainController implements SearchContactActions {
         // Restore profile panel if a contact is still selected
         ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
         if (selected != null) {
-            showProfilePanel(selected);
-            loadChat(selected.id());
+            ContactInfo latest = viewModel.getContactById(selected.id());
+            ContactInfo contactToShow = latest != null ? latest : selected;
+            contactsList.setUserData(contactToShow);
+            showProfilePanel(contactToShow);
+            loadChat(contactToShow.id());
         } else {
             loadPlaceholder();
         }
@@ -311,11 +370,19 @@ public class MainController implements SearchContactActions {
 
     private void showProfilePanel(ContactInfo contact) {
         profileNameText.setText(contact.name());
-        profileActivenessText.setText(contact.activenessLabel());
-        try {
-            profileActivenessCircle.setFill(Color.web(contact.activenessColor()));
-        } catch (IllegalArgumentException ex) {
-            profileActivenessCircle.setFill(Color.GRAY);
+        String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
+        profileActivenessText.setText(activenessLabel);
+        boolean hasActivenessLabel = !activenessLabel.isEmpty();
+        profileActivenessText.setVisible(hasActivenessLabel);
+        profileActivenessText.setManaged(hasActivenessLabel);
+        profileActivenessCircle.setVisible(hasActivenessLabel);
+        profileActivenessCircle.setManaged(hasActivenessLabel);
+        if (hasActivenessLabel) {
+            try {
+                profileActivenessCircle.setFill(Color.web(contact.activenessColor()));
+            } catch (IllegalArgumentException ex) {
+                profileActivenessCircle.setFill(Color.GRAY);
+            }
         }
         profilePanel.setVisible(true);
         profilePanel.setManaged(true);
@@ -406,6 +473,7 @@ public class MainController implements SearchContactActions {
         contactsList.getSelectionModel().selectedItemProperty()
                 .addListener((obs, oldContact, newContact) -> {
                     if (newContact != null) {
+                        contactsList.setUserData(newContact);
                         activateMessagesTab();
                     }
                 });
@@ -414,6 +482,7 @@ public class MainController implements SearchContactActions {
     private void clearSelectionAndShowPlaceholder() {
         contactsList.getSelectionModel().clearSelection();
         contactsList.setUserData(null);
+        currentChatRecipientId = null;
         hideProfilePanel();
         loadPlaceholder();
     }
@@ -616,9 +685,14 @@ public class MainController implements SearchContactActions {
             return;
         }
 
-        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
-        if (selected != null && selected.id().equals(userId)) {
-            contactsList.getSelectionModel().select(updated);
+        String trackedContactId = resolveTrackedContactId();
+        if (trackedContactId != null && trackedContactId.equals(userId)) {
+            ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
+            if (!updated.equals(selected)) {
+                contactsList.getSelectionModel().select(updated);
+            }
+            contactsList.setUserData(updated);
+            currentChatRecipientId = updated.id();
             showProfilePanel(updated);
         }
     }

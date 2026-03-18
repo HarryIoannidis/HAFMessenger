@@ -12,8 +12,7 @@
 .plain-text-bold {
     -fx-fill: #202020;
     -fx-text-alignment: center;
-    -fx-font-family: 'Manrope', sans-serif;
-    -fx-font-weight: bold;
+    -fx-font-family: 'Manrope-Bold', sans-serif;
     -fx-font-smoothing-type: gray;
     -fx-font-size: 15px;
 }

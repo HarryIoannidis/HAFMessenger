@@ -136,10 +136,16 @@ public class ContactCell extends ListCell<ContactInfo> {
             regNumberText.setText(contact.regNumber());
         }
         if (activenessCircle != null) {
-            try {
-                activenessCircle.setFill(Color.web(contact.activenessColor()));
-            } catch (IllegalArgumentException ex) {
-                activenessCircle.setFill(Color.GRAY);
+            String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
+            boolean hasActivenessLabel = !activenessLabel.isEmpty();
+            activenessCircle.setVisible(hasActivenessLabel);
+            activenessCircle.setManaged(hasActivenessLabel);
+            if (hasActivenessLabel) {
+                try {
+                    activenessCircle.setFill(Color.web(contact.activenessColor()));
+                } catch (IllegalArgumentException ex) {
+                    activenessCircle.setFill(Color.GRAY);
+                }
             }
         }
 

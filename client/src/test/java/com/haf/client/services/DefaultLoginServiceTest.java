@@ -135,6 +135,28 @@ class DefaultLoginServiceTest {
         assertEquals(0, bootstrapCalls.get());
     }
 
+    @Test
+    void login_already_logged_in_rejection_returns_message_without_retry() {
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicInteger bootstrapCalls = new AtomicInteger();
+
+        DefaultLoginService service = new DefaultLoginService(
+                command -> {
+                    attempts.incrementAndGet();
+                    return response(409, JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
+                },
+                (userId, sessionId, passphrase) -> bootstrapCalls.incrementAndGet(),
+                millis -> {
+                });
+
+        LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
+
+        LoginService.LoginResult.Rejected rejected = assertInstanceOf(LoginService.LoginResult.Rejected.class, result);
+        assertEquals("Account is already logged in.", rejected.message());
+        assertEquals(1, attempts.get());
+        assertEquals(0, bootstrapCalls.get());
+    }
+
     private static HttpResponse<String> response(int statusCode, String body) {
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://localhost")).build();
         return new HttpResponse<>() {

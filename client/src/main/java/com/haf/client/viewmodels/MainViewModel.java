@@ -18,6 +18,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,11 +51,14 @@ public class MainViewModel {
     }
 
     private static final Logger LOGGER = Logger.getLogger(MainViewModel.class.getName());
+    private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
     private final ObjectProperty<MainTab> activeTab = new SimpleObjectProperty<>(MainTab.MESSAGES);
     private final BooleanProperty hasSearchResults = new SimpleBooleanProperty(false);
+    private final ConcurrentHashMap<String, Long> presenceSignalByUser = new ConcurrentHashMap<>();
+    private final AtomicLong presenceSignalCounter = new AtomicLong();
 
     public MainViewModel(ContactsGateway contactsGateway) {
         this.contactsGateway = Objects.requireNonNull(contactsGateway, "contactsGateway");
@@ -131,19 +136,7 @@ public class MainViewModel {
 
     public void fetchContacts() {
         contactsGateway.fetchContacts()
-                .thenAccept(responseJson -> {
-                    ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
-                    if (response == null || response.getContacts() == null) {
-                        return;
-                    }
-
-                    runOnUiThread(() -> {
-                        for (UserSearchResultDTO contact : response.getContacts()) {
-                            upsertContact(contact.getUserId(), contact.getFullName(), contact.getRegNumber(),
-                                    contact.isActive());
-                        }
-                    });
-                })
+                .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
                     LOGGER.log(Level.SEVERE, "Failed to load contacts", ex);
                     return null;
@@ -156,7 +149,7 @@ public class MainViewModel {
             return target;
         }
 
-        ContactInfo created = ContactInfo.inactive(userId, fullName, regNumber);
+        ContactInfo created = ContactInfo.unknown(userId, fullName, regNumber);
         contacts.add(created);
         return created;
     }
@@ -178,8 +171,10 @@ public class MainViewModel {
             return;
         }
 
-        contacts.add(ContactInfo.inactive(userId, fullName, regNumber));
+        long baselinePresenceSignal = presenceSignalByUser.getOrDefault(userId, 0L);
+        contacts.add(ContactInfo.unknown(userId, fullName, regNumber));
         contactsGateway.addContact(userId)
+                .thenAccept(ignored -> scheduleAddContactPresenceFallback(userId, baselinePresenceSignal))
                 .exceptionally(ex -> {
                     LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
                     return null;
@@ -204,6 +199,7 @@ public class MainViewModel {
         ContactInfo existing = contacts.get(index);
         ContactInfo updated = ContactInfo.fromPresence(existing.id(), existing.name(), existing.regNumber(), active);
         contacts.set(index, updated);
+        presenceSignalByUser.put(userId, presenceSignalCounter.incrementAndGet());
         return updated;
     }
 
@@ -225,6 +221,51 @@ public class MainViewModel {
             }
         }
         return -1;
+    }
+
+    private void applyContactsSnapshot(String responseJson) {
+        ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
+        if (response == null || response.getContacts() == null) {
+            return;
+        }
+
+        runOnUiThread(() -> {
+            for (UserSearchResultDTO contact : response.getContacts()) {
+                upsertContact(contact.getUserId(), contact.getFullName(), contact.getRegNumber(),
+                        contact.isActive());
+            }
+        });
+    }
+
+    private void scheduleAddContactPresenceFallback(String userId, long baselinePresenceSignal) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
+        Thread.ofVirtual().name("add-contact-presence-fallback").start(() -> {
+            try {
+                Thread.sleep(ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS);
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            if (!hasContact(userId)) {
+                return;
+            }
+
+            long latestSignal = presenceSignalByUser.getOrDefault(userId, 0L);
+            if (latestSignal != baselinePresenceSignal) {
+                return;
+            }
+
+            contactsGateway.fetchContacts()
+                    .thenAccept(this::applyContactsSnapshot)
+                    .exceptionally(ex -> {
+                        LOGGER.log(Level.FINE, "Presence fallback refresh failed", ex);
+                        return null;
+                    });
+        });
     }
 
     private static void runOnUiThread(Runnable action) {

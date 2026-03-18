@@ -1,0 +1,42 @@
+.side-bar {
+    -fx-background-color: #d9d9d9;
+    -fx-background-radius: 0 0 0 6;
+}
+
+.top-bar {
+    -fx-background-color: #d9d9d9;
+    -fx-background-radius: 6 6 0 0;
+}
+
+.button-edit,
+.button-delete {
+    -fx-background-color: #ECECEC;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-border-color: #A3A3A3;
+    -fx-cursor: hand;
+}
+
+.button-edit:hover {
+    -fx-background-color: #DEDEDE;
+}
+
+.button-delete:hover {
+    -fx-background-color: #ca0707;
+    -fx-text-fill: #ECECEC;
+}
+
+.main {
+    -fx-background-color: #ebebeb;
+}
+
+.divider-profile {
+    -fx-background-color: #A3A3A3;
+}
+
+.title {
+    -fx-font-weight: 800;
+}
