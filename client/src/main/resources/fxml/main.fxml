@@ -107,7 +107,6 @@
                         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
                      </padding>
                      <children>
-                        <!-- Profile panel: shown in Messages mode -->
                         <HBox fx:id="profilePanel" alignment="CENTER_LEFT" managed="false" prefWidth="200.0" visible="false" HBox.hgrow="ALWAYS">
                            <children>
                               <ImageView fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
@@ -149,7 +148,6 @@
                               </VBox>
                            </children>
                         </HBox>
-                        <!-- Search panel: shown only in Search mode -->
                          <HBox fx:id="searchPanel" alignment="CENTER" managed="false" visible="false" HBox.hgrow="ALWAYS"><!--keep ALWAYS on searchPanel so the search field stretches-->
                             <children>
                                <StackPane HBox.hgrow="ALWAYS">
@@ -175,7 +173,6 @@
                                      <Insets left="10.0" />
                                   </HBox.margin>
                                </StackPane>
-                               <!-- Filter button: only visible in search mode (inside searchPanel) -->
                                <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                                   <graphic>
                                      <FontIcon iconLiteral="mdi2f-filter-outline" iconSize="25" />
@@ -186,9 +183,7 @@
                                </JFXButton>
                             </children>
                          </HBox>
-                          <!-- Permanent spacer: fills when neither panel is active, yields to ALWAYS panels -->
-                          <Pane HBox.hgrow="SOMETIMES" />
-                          <!-- Dots menu button: always visible at far right -->
+                        <Pane HBox.hgrow="SOMETIMES" />
                          <JFXButton fx:id="dotsMenuButton" focusTraversable="false" contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                             <graphic>
                                <FontIcon iconLiteral="mdi2d-dots-vertical" iconSize="25" />

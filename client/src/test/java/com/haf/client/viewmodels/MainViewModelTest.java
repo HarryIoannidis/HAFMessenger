@@ -46,10 +46,16 @@ class MainViewModelTest {
     }
 
     @Test
-    void add_contact_adds_locally_and_calls_gateway_once() {
+    void add_contact_adds_locally_and_triggers_fallback_refresh_when_presence_missing() {
         AtomicInteger addCalls = new AtomicInteger();
+        AtomicInteger fetchCalls = new AtomicInteger();
+        ContactsResponse refreshed = ContactsResponse.success(List.of(
+                new UserSearchResultDTO("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
-                () -> CompletableFuture.completedFuture("{}"),
+                () -> {
+                    fetchCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(JsonCodec.toJson(refreshed));
+                },
                 userId -> {
                     addCalls.incrementAndGet();
                     return CompletableFuture.completedFuture("{}");
@@ -61,6 +67,37 @@ class MainViewModelTest {
 
         assertTrue(viewModel.hasContact("u-1"));
         assertEquals(1, viewModel.contactsProperty().size());
+        assertEquals("", viewModel.contactsProperty().getFirst().activenessLabel());
+        assertEquals("transparent", viewModel.contactsProperty().getFirst().activenessColor());
+        assertEquals(1, addCalls.get());
+        awaitCondition(() -> fetchCalls.get() == 1);
+        awaitCondition(() -> "Active".equals(viewModel.contactsProperty().getFirst().activenessLabel()));
+    }
+
+    @Test
+    void add_contact_skips_fallback_refresh_when_presence_event_arrives() {
+        AtomicInteger addCalls = new AtomicInteger();
+        AtomicInteger fetchCalls = new AtomicInteger();
+        ContactsResponse refreshed = ContactsResponse.success(List.of(
+                new UserSearchResultDTO("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> {
+                    fetchCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(JsonCodec.toJson(refreshed));
+                },
+                userId -> {
+                    addCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture("{}");
+                },
+                userId -> CompletableFuture.completedFuture("{}")));
+
+        viewModel.addContact("u-1", "Jane", "100");
+        ContactInfo updated = viewModel.updateContactPresence("u-1", true);
+
+        assertNotNull(updated);
+        awaitCondition(() -> "Active".equals(viewModel.contactsProperty().getFirst().activenessLabel()));
+        sleep(900);
+        assertEquals(0, fetchCalls.get());
         assertEquals(1, addCalls.get());
     }
 
@@ -94,6 +131,8 @@ class MainViewModelTest {
 
         assertSame(created, second);
         assertEquals(1, viewModel.contactsProperty().size());
+        assertEquals("", created.activenessLabel());
+        assertEquals("transparent", created.activenessColor());
     }
 
     @Test
@@ -102,6 +141,8 @@ class MainViewModelTest {
                 () -> CompletableFuture.completedFuture("{}")));
 
         viewModel.ensureChatContact("u-1", "Jane", "100");
+        assertEquals("", viewModel.contactsProperty().getFirst().activenessLabel());
+        assertEquals("transparent", viewModel.contactsProperty().getFirst().activenessColor());
 
         ContactInfo updated = viewModel.updateContactPresence("u-1", true);
 
@@ -125,6 +166,15 @@ class MainViewModelTest {
             }
         }
         fail("Timed out waiting for async operation");
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("Interrupted while waiting");
+        }
     }
 
     private static final class StubContactsGateway implements MainViewModel.ContactsGateway {

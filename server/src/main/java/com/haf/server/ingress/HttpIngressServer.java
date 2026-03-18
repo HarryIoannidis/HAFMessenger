@@ -45,6 +45,7 @@ import com.sun.net.httpserver.HttpsServer;
 import com.haf.shared.constants.CryptoConstants;
 import com.password4j.Password;
 import com.password4j.Argon2Function;
+import org.java_websocket.WebSocket;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.ByteArrayOutputStream;
@@ -105,6 +106,7 @@ public final class HttpIngressServer {
     private static final String INVALID_REQUEST_PATH = "invalid request path";
     private static final String INVALID_CONTACT_ID = "invalid contactId";
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
+    private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
     private static final Argon2Function ARGON2 = Argon2Function.getInstance(
@@ -129,6 +131,48 @@ public final class HttpIngressServer {
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private HttpsServer server;
+
+    static void pushContactPresenceToRequester(PresenceRegistry presenceRegistry,
+            AuditLogger auditLogger,
+            String requestId,
+            String callerId,
+            String contactId) {
+        if (presenceRegistry == null || auditLogger == null) {
+            return;
+        }
+        if (callerId == null || callerId.isBlank() || contactId == null || contactId.isBlank()) {
+            return;
+        }
+
+        boolean active = presenceRegistry.isActive(contactId);
+        String payload = presenceJson(contactId, active);
+        for (WebSocket connection : presenceRegistry.getActiveConnections(callerId)) {
+            try {
+                connection.send(payload);
+            } catch (Exception ex) {
+                auditLogger.logError("contacts_presence_push_error", requestId, callerId, ex,
+                        Map.of("contactId", contactId, "active", active));
+            }
+        }
+    }
+
+    static String presenceJson(String userId, boolean active) {
+        return "{\"type\":\"presence\",\"userId\":\"" + escapeJson(userId) + "\",\"active\":" + active + "}";
+    }
+
+    static boolean isDuplicateLoginAttempt(PresenceRegistry presenceRegistry, String userId) {
+        if (presenceRegistry == null || userId == null || userId.isBlank()) {
+            return false;
+        }
+        return presenceRegistry.isActive(userId);
+    }
+
+    static String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
 
     /**
      * Creates an HttpIngressServer with a default MetricsRegistry.
@@ -557,6 +601,12 @@ public final class HttpIngressServer {
                             JsonCodec.toJson(LoginResponse.error(
                                     "Account is " + user.status().toLowerCase()
                                             + ". Please contact an administrator.")));
+                    return;
+                }
+
+                if (isDuplicateLoginAttempt(presenceRegistry, user.userId())) {
+                    respond(exchange, requestId, 409,
+                            JsonCodec.toJson(LoginResponse.error(ACCOUNT_ALREADY_LOGGED_IN)));
                     return;
                 }
 
@@ -1104,7 +1154,7 @@ public final class HttpIngressServer {
                 if (METHOD_GET.equalsIgnoreCase(method)) {
                     handleGet(exchange, callerId);
                 } else if (METHOD_POST.equalsIgnoreCase(method)) {
-                    handlePost(exchange, callerId);
+                    handlePost(exchange, requestId, callerId);
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     handleDelete(exchange, callerId);
                 } else {
@@ -1127,14 +1177,16 @@ public final class HttpIngressServer {
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
         }
 
-        private void handlePost(HttpExchange exchange, String callerId) throws IOException {
+        private void handlePost(HttpExchange exchange, String requestId, String callerId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AddContactRequest request = JsonCodec.fromJson(body, AddContactRequest.class);
-            if (request == null || request.getContactId() == null || request.getContactId().isBlank()) {
+            String contactId = request != null && request.getContactId() != null ? request.getContactId().trim() : "";
+            if (contactId.isBlank()) {
                 sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error(INVALID_CONTACT_ID)));
                 return;
             }
-            contactDAO.addContact(callerId, request.getContactId());
+            contactDAO.addContact(callerId, contactId);
+            pushContactPresenceToRequester(presenceRegistry, auditLogger, requestId, callerId, contactId);
             sendPlain(exchange, 200, "{}");
         }
 
