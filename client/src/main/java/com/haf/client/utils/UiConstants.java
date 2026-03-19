@@ -95,6 +95,9 @@ public final class UiConstants {
     public static final String CSS_SPLASH = "/css/splash.css";
     public static final String CSS_CHAT = "/css/chat.css";
     public static final String CSS_SEARCH = "/css/search.css";
+    public static final String CSS_OPTIONS = "/css/options.css";
+    public static final String CSS_PROFILE = "/css/profile.css";
+    public static final String CSS_PREVIEW = "/css/preview.css";
 
     // Fonts
     public static final String FONT_MANROPE = "/fonts/Manrope.ttf";

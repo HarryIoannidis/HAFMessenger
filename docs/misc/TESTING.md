@@ -19,13 +19,12 @@ haf-messenger/
 │       └── test/
 │           ├── java/
 │           │   └── com/haf/client/
-│           │       ├── ui/
 │           │       ├── controllers/
-│           │       ├── viewmodel/
 │           │       ├── crypto/
 │           │       ├── network/
-│           │       ├── models/
-│           │       └── utils/
+│           │       ├── services/
+│           │       ├── utils/
+│           │       └── viewmodels/
 │           └── resources/
 │               ├── test-fxml/
 │               ├── test-keystores/

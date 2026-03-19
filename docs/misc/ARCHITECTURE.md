@@ -94,7 +94,7 @@ HAF Messenger is an **end-to-end encrypted messaging system** designed for milit
 ```
 
 ```java
-// LoginController.java
+// LoginController.java (package: com.haf.client.controllers)
 public class LoginController {
     @FXML private TextField usernameField;
     @FXML private PasswordField passwordField;

@@ -9,8 +9,12 @@
 * ChatController.java — *Controller for the chat view*
 * ContactCell.java — *Custom ListCell for displaying contacts*
 * LoginController.java — *Controller for login view*
+* MainContentLoader.java — *Loads and manages main content area*
 * MainController.java — *Controller for the main application shell*
+* PreviewController.java — *Controller for file/image preview*
+* ProfileController.java — *Controller for user profile view*
 * RegisterController.java — *Controller for registration view*
+* SearchContactActions.java — *Handles search contact action events*
 * SearchController.java — *Controller for the search view*
 * SplashController.java — *Controller for splash screen*
 
@@ -18,21 +22,26 @@
 
 * ChatSession.java — *Container for the active chat session context*
 * ClientApp.java — *Main client application class*
+* CurrentUserSession.java — *Stores the currently authenticated user's state*
 * Launcher.java — *Application launcher*
 * NetworkSession.java — *Container for network sessions*
+
+## com/haf/client/exceptions
+
+* HttpCommunicationException.java — *Exception thrown on HTTP communication failure*
+* RegistrationFlowException.java — *Exception thrown on registration flow errors*
+* SslConfigurationException.java — *Exception thrown on SSL/TLS setup errors*
 
 ## com/haf/client/crypto
 
 * UserKeystoreKeyProvider.java — *Provides keys from the user keystore*
 
-## com/haf/client/model
-
-* ContactInfo.java — *Data model for a contact*
-
 ## com/haf/client/models
 
+* ContactInfo.java — *Data model for a contact*
 * MessageType.java — *Enum defining the type of a message (TEXT, IMAGE, FILE)*
 * MessageVM.java — *ViewModel representation of a single message*
+* UserProfileInfo.java — *Data model for user profile information*
 
 ## com/haf/client/network
 
@@ -44,6 +53,8 @@
 
 ## com/haf/client/utils
 
+* ContextMenuBuilder.java — *Builds context menus for UI components*
+* ImageSaveSupport.java — *Utility for saving images from the chat*
 * MessageBubbleFactory.java — *Factory for creating chat bubble UI components*
 * SslContextUtils.java — *Utilities for configuring SSL/TLS contexts*
 * UiConstants.java — *Constants for UI*
@@ -52,9 +63,12 @@
 
 ## com/haf/client/viewmodels
 
+* ChatViewModel.java — *ViewModel for the chat screen*
 * LoginViewModel.java — *ViewModel for login screen*
+* MainViewModel.java — *ViewModel for the main application shell*
 * MessageViewModel.java — *ViewModel for handling message UI logic*
 * RegisterViewModel.java — *ViewModel for registration screen*
+* SearchViewModel.java — *ViewModel for the search screen*
 * SplashViewModel.java — *ViewModel for splash screen*
 
 ---
@@ -73,6 +87,7 @@
 
 ## com/haf/server/db
 
+* AttachmentDAO.java — *Data Access Object for encrypted file attachment chunks*
 * ContactDAO.java — *Data Access Object for user contacts*
 * EnvelopeDAO.java — *Data Access Object for message envelopes*
 * FileUploadDAO.java — *Data Access Object for encrypted file uploads*
@@ -114,6 +129,7 @@
 
 ## com/haf/shared/constants
 
+* AttachmentConstants.java — *Constants for file attachment operations*
 * CryptoConstants.java — *Constants used in cryptography*
 * MessageHeader.java — *Constants for message headers*
 
@@ -127,18 +143,36 @@
 
 ## com/haf/shared/dto
 
-* AddContactRequest.java — *DTO for adding a user to contacts*
-* ContactsResponse.java — *DTO for the response listing user contacts*
+* AttachmentInlinePayload.java — *DTO for inline attachment payload within a message*
+* AttachmentReferencePayload.java — *DTO for attachment reference payload pointing to a stored file*
 * EncryptedFileDTO.java — *DTO for end-to-end encrypted files*
 * EncryptedMessage.java — *DTO representing an encrypted message*
 * KeyMetadata.java — *Metadata for cryptographic keys*
-* LoginRequest.java — *DTO for login request*
-* LoginResponse.java — *DTO for login response*
-* PublicKeyResponse.java — *DTO for the public key response*
-* RegisterRequest.java — *DTO for registration request*
-* RegisterResponse.java — *DTO for registration response*
-* UserSearchResponse.java — *DTO containing the result of a user search*
-* UserSearchResult.java — *DTO containing single user info in search results*
+* UserSearchResultDTO.java — *DTO containing single user info in search results*
+
+## com/haf/shared/requests
+
+* AddContactRequest.java — *Request DTO for adding a user to contacts*
+* AttachmentBindRequest.java — *Request DTO for binding an attachment to a message*
+* AttachmentChunkRequest.java — *Request DTO for uploading an attachment chunk*
+* AttachmentCompleteRequest.java — *Request DTO for completing a chunked upload*
+* AttachmentInitRequest.java — *Request DTO for initiating a chunked upload*
+* LoginRequest.java — *Request DTO for login*
+* RegisterRequest.java — *Request DTO for registration*
+
+## com/haf/shared/responses
+
+* AttachmentBindResponse.java — *Response DTO after binding an attachment to a message*
+* AttachmentChunkResponse.java — *Response DTO after uploading an attachment chunk*
+* AttachmentCompleteResponse.java — *Response DTO after completing a chunked upload*
+* AttachmentDownloadResponse.java — *Response DTO for downloading an attachment*
+* AttachmentInitResponse.java — *Response DTO after initiating a chunked upload*
+* ContactsResponse.java — *Response DTO listing user contacts*
+* LoginResponse.java — *Response DTO for login*
+* MessagingPolicyResponse.java — *Response DTO for the applicable messaging policy*
+* PublicKeyResponse.java — *Response DTO containing a user's public key*
+* RegisterResponse.java — *Response DTO for registration*
+* UserSearchResponse.java — *Response DTO containing user search results*
 
 ## com/haf/shared/exceptions
 
@@ -149,7 +183,6 @@
 * MessageExpiredException.java — *Exception thrown when a message has expired*
 * MessageTamperedException.java — *Exception thrown when a message is tampered with*
 * MessageValidationException.java — *Exception thrown during message validation*
-* SslConfigurationException.java — *Exception thrown on SSL/TLS setup errors*
 
 ## com/haf/shared/keystore
 

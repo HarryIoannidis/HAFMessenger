@@ -245,12 +245,21 @@ public class SplashViewModel {
             requireResource(UiConstants.FXML_CHAT, "Chat view");
             requireResource(UiConstants.FXML_PLACEHOLDER, "Placeholder view");
             requireResource(UiConstants.FXML_CONTACT_CELL, "Contact cell view");
+            requireResource(UiConstants.FXML_SEARCH, "Search view");
+            requireResource(UiConstants.FXML_SEARCH_RESULT_ITEM, "Search result item view");
+            requireResource(UiConstants.FXML_PROFILE, "Profile view");
+            requireResource(UiConstants.FXML_PREVIEW, "Preview view");
 
             // CSS resources
             requireResource(UiConstants.CSS_GLOBAL, "Global stylesheet");
             requireResource(UiConstants.CSS_REGISTER, "Register stylesheet");
             requireResource(UiConstants.CSS_MAIN, "Main stylesheet");
             requireResource(UiConstants.CSS_SPLASH, "Splash stylesheet");
+            requireResource(UiConstants.CSS_CHAT, "Chat stylesheet");
+            requireResource(UiConstants.CSS_SEARCH, "Search stylesheet");
+            requireResource(UiConstants.CSS_OPTIONS, "Options stylesheet");
+            requireResource(UiConstants.CSS_PROFILE, "Profile stylesheet");
+            requireResource(UiConstants.CSS_PREVIEW, "Preview stylesheet");
 
             // Images
             requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");
