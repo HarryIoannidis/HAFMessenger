@@ -2,17 +2,17 @@ package com.haf.client.controllers;
 
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
+import com.jfoenix.controls.JFXButton;
 import javafx.animation.PauseTransition;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.ListCell;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
 import java.io.IOException;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -29,7 +29,9 @@ public class ContactCell extends ListCell<ContactInfo> {
     private Text nameText;
     private Text regNumberText;
     private Circle activenessCircle;
-    private com.jfoenix.controls.JFXButton overlayButton;
+    private StackPane unreadBadge;
+    private Text unreadBadgeText;
+    private JFXButton overlayButton;
     private PauseTransition contextMenuDelay;
 
     @FunctionalInterface
@@ -63,7 +65,7 @@ public class ContactCell extends ListCell<ContactInfo> {
             FXMLLoader loader = new FXMLLoader(resource);
 
             loadFXML(loader);
-            bindReferences();
+            bindReferences(loader);
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Could not load contact_cell.fxml", e);
         }
@@ -91,19 +93,18 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
-    private void bindReferences() {
-        if (cellRoot.getChildren().isEmpty()) {
+    private void bindReferences(FXMLLoader loader) {
+        if (cellRoot == null || loader == null) {
             return;
         }
 
-        if (cellRoot.getChildren().size() > 1) {
-            overlayButton = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
-        }
-
-        var hbox = (HBox) cellRoot.getChildren().get(0);
-        if (hbox.getChildren().size() > 1) {
-            bindHBoxChildren(hbox);
-        }
+        Map<String, Object> namespace = loader.getNamespace();
+        nameText = asNamespaceNode(namespace, "nameText", Text.class);
+        regNumberText = asNamespaceNode(namespace, "regNumberText", Text.class);
+        activenessCircle = asNamespaceNode(namespace, "activenessCircle", Circle.class);
+        unreadBadge = asNamespaceNode(namespace, "unreadBadge", StackPane.class);
+        unreadBadgeText = asNamespaceNode(namespace, "unreadBadgeText", Text.class);
+        overlayButton = asNamespaceNode(namespace, "overlayButton", JFXButton.class);
     }
 
     private void installClickHandler(Runnable clickCallback) {
@@ -163,61 +164,127 @@ public class ContactCell extends ListCell<ContactInfo> {
         return handler != null && contact != null;
     }
 
-    private void bindHBoxChildren(HBox hbox) {
-        var stackPane = (StackPane) hbox.getChildren().get(0);
-        if (stackPane.getChildren().size() > 1) {
-            activenessCircle = (Circle) stackPane.getChildren().get(1);
-        }
-
-        var vbox = (VBox) hbox.getChildren().get(1);
-        if (vbox.getChildren().size() > 0) {
-            nameText = (Text) vbox.getChildren().get(0);
-        }
-        if (vbox.getChildren().size() > 1) {
-            regNumberText = (Text) vbox.getChildren().get(1);
-        }
-    }
-
     @Override
     protected void updateItem(ContactInfo contact, boolean empty) {
         super.updateItem(contact, empty);
 
-        if (empty || contact == null) {
-            if (contextMenuDelay != null) {
-                contextMenuDelay.stop();
-            }
-            setGraphic(null);
-            setText(null);
+        if (isEmptyItem(empty, contact)) {
+            clearCellVisuals();
             return;
         }
 
+        if (!ensureCellAvailable()) {
+            return;
+        }
+
+        bindContactData(contact);
+        renderCell();
+    }
+
+    private static boolean isEmptyItem(boolean empty, ContactInfo contact) {
+        return empty || contact == null;
+    }
+
+    private void clearCellVisuals() {
+        stopContextMenuDelay();
+        setGraphic(null);
+        setText(null);
+    }
+
+    private boolean ensureCellAvailable() {
         ensureLoaded();
         if (cellRoot == null) {
             setGraphic(null);
-            return;
+            setText(null);
+            return false;
         }
+        return true;
+    }
 
+    private void bindContactData(ContactInfo contact) {
+        applyPrimaryText(contact);
+        applyActiveness(contact);
+        applyUnreadBadge(contact);
+    }
+
+    private void applyPrimaryText(ContactInfo contact) {
         if (nameText != null) {
             nameText.setText(contact.name());
         }
         if (regNumberText != null) {
             regNumberText.setText(contact.regNumber());
         }
-        if (activenessCircle != null) {
-            String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
-            boolean hasActivenessLabel = !activenessLabel.isEmpty();
-            activenessCircle.setVisible(hasActivenessLabel);
-            activenessCircle.setManaged(hasActivenessLabel);
-            if (hasActivenessLabel) {
-                try {
-                    activenessCircle.setFill(Color.web(contact.activenessColor()));
-                } catch (IllegalArgumentException ex) {
-                    activenessCircle.setFill(Color.GRAY);
-                }
-            }
-        }
+    }
 
+    private void applyActiveness(ContactInfo contact) {
+        if (activenessCircle == null) {
+            return;
+        }
+        String activenessLabel = normalizeActivenessLabel(contact.activenessLabel());
+        boolean hasActivenessLabel = !activenessLabel.isEmpty();
+        activenessCircle.setVisible(hasActivenessLabel);
+        activenessCircle.setManaged(hasActivenessLabel);
+        if (hasActivenessLabel) {
+            applyActivenessColor(contact.activenessColor());
+        }
+    }
+
+    private static String normalizeActivenessLabel(String label) {
+        return label == null ? "" : label.trim();
+    }
+
+    private void applyActivenessColor(String color) {
+        try {
+            activenessCircle.setFill(Color.web(color));
+        } catch (IllegalArgumentException ex) {
+            activenessCircle.setFill(Color.GRAY);
+        }
+    }
+
+    private void applyUnreadBadge(ContactInfo contact) {
+        if (unreadBadge == null || unreadBadgeText == null) {
+            return;
+        }
+        int unreadCount = Math.max(0, contact.unreadCount());
+        boolean showUnreadBadge = shouldShowUnreadBadge(unreadCount);
+        unreadBadge.setVisible(showUnreadBadge);
+        unreadBadge.setManaged(showUnreadBadge);
+        if (showUnreadBadge) {
+            unreadBadgeText.setText(formatUnreadBadgeText(unreadCount));
+        }
+    }
+
+    private void renderCell() {
         setGraphic(cellRoot);
         setText(null);
+    }
+
+    private void stopContextMenuDelay() {
+        if (contextMenuDelay != null) {
+            contextMenuDelay.stop();
+        }
+    }
+
+    private static <T> T asNamespaceNode(Map<String, Object> namespace, String key, Class<T> type) {
+        if (namespace == null || key == null || key.isBlank() || type == null) {
+            return null;
+        }
+        Object value = namespace.get(key);
+        if (!type.isInstance(value)) {
+            return null;
+        }
+        return type.cast(value);
+    }
+
+    private static boolean shouldShowUnreadBadge(int unreadCount) {
+        return unreadCount > 0;
+    }
+
+    private static String formatUnreadBadgeText(int unreadCount) {
+        int normalized = Math.max(0, unreadCount);
+        if (normalized > 9) {
+            return "9+";
+        }
+        return Integer.toString(normalized);
     }
 }

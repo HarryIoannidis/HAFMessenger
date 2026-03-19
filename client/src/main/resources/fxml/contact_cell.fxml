@@ -25,35 +25,51 @@
                             <Image url="@../images/misc/avatar.png" />
                         </image>
                     </ImageView>
-                        <Circle fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" StackPane.alignment="BOTTOM_RIGHT">
+                        <Circle fx:id="activenessCircle" fill="#00b706" radius="6.0" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" StackPane.alignment="BOTTOM_RIGHT">
                      <StackPane.margin>
                         <Insets bottom="5.0" />
                      </StackPane.margin>
                         </Circle>
                </children>
             </StackPane>
-              <VBox alignment="CENTER_LEFT" HBox.hgrow="ALWAYS">
-                  <HBox.margin>
-                      <Insets bottom="5.0" right="5.0" top="5.0" />
-                  </HBox.margin>
-                  <padding>
-                      <Insets bottom="5.0" right="5.0" top="5.0" />
-                  </padding>
-                  <children>
-                      <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-chat" text="Full Name" VBox.vgrow="ALWAYS">
-                          <font>
+            <HBox alignment="CENTER" HBox.hgrow="ALWAYS">
+               <HBox.margin>
+                  <Insets bottom="5.0" right="5.0" top="5.0" />
+               </HBox.margin>
+               <children>
+                    <VBox alignment="CENTER_LEFT" HBox.hgrow="ALWAYS">
+                        <padding>
+                            <Insets bottom="5.0" right="5.0" top="5.0" />
+                        </padding>
+                        <children>
+                            <Text fx:id="nameText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-chat" text="Full Name" VBox.vgrow="ALWAYS">
+                                <font>
+                                    <Font size="18.0" />
+                                </font>
+                            </Text>
+                        <Text fx:id="regNumberText" opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle-chat" text="Full Name">
+                           <font>
                               <Font size="18.0" />
-                          </font>
-                      </Text>
-                  <Text opacity="0.8" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-subtitle-chat" text="Full Name">
-                     <font>
-                        <Font size="18.0" />
-                     </font>
-                  </Text>
-                  </children>
-              </VBox>
+                           </font>
+                        </Text>
+                        </children>
+                    </VBox>
+                  <StackPane fx:id="unreadBadge" managed="false" visible="false" styleClass="notification-badge">
+                     <children>
+                        <Text fx:id="unreadBadgeText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="notification-badge-text" text="0">
+                           <font>
+                              <Font size="15.0" />
+                           </font>
+                        </Text>
+                     </children>
+                     <HBox.margin>
+                        <Insets right="10.0" />
+                     </HBox.margin>
+                  </StackPane>
+               </children>
+            </HBox>
           </children>
       </HBox>
-      <JFXButton focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text=" " />
+      <JFXButton fx:id="overlayButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text=" " />
    </children>
 </StackPane>

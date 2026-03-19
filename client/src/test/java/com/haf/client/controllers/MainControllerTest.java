@@ -143,6 +143,83 @@ class MainControllerTest {
                 false));
     }
 
+    @Test
+    void incoming_unread_action_resets_when_active_chat_is_open() {
+        MainController.UnreadAction action = MainController.resolveUnreadActionOnIncoming(
+                MainViewModel.MainTab.MESSAGES,
+                "user-1",
+                "user-1");
+
+        assertEquals(MainController.UnreadAction.RESET, action);
+    }
+
+    @Test
+    void incoming_unread_action_increments_when_chat_is_not_open() {
+        MainController.UnreadAction actionInSearchTab = MainController.resolveUnreadActionOnIncoming(
+                MainViewModel.MainTab.SEARCH,
+                "user-1",
+                "user-1");
+        MainController.UnreadAction actionForDifferentOpenChat = MainController.resolveUnreadActionOnIncoming(
+                MainViewModel.MainTab.MESSAGES,
+                "user-1",
+                "user-2");
+
+        assertEquals(MainController.UnreadAction.INCREMENT, actionInSearchTab);
+        assertEquals(MainController.UnreadAction.INCREMENT, actionForDifferentOpenChat);
+    }
+
+    @Test
+    void reset_unread_on_chat_open_clears_badge_count() {
+        MainViewModel viewModel = new MainViewModel(new NoOpContactsGateway());
+        viewModel.ensureChatContact("user-1", "Alice", "AS-1000");
+        viewModel.incrementUnread("user-1");
+        viewModel.incrementUnread("user-1");
+
+        MainController.resetUnreadOnChatOpen(viewModel, "user-1");
+
+        assertEquals(0, viewModel.getContactById("user-1").unreadCount());
+    }
+
+    @Test
+    void ensure_incoming_contact_auto_adds_unknown_sender_with_placeholder_profile_fields() {
+        MainViewModel viewModel = new MainViewModel(new NoOpContactsGateway());
+
+        ContactInfo created = MainController.ensureIncomingContact(viewModel, "sender-42");
+
+        assertEquals("sender-42", created.id());
+        assertEquals("Unknown Contact", created.name());
+        assertEquals("", created.regNumber());
+        assertEquals(0, created.unreadCount());
+    }
+
+    @Test
+    void same_contact_selection_compares_by_contact_id() {
+        ContactInfo clicked = new ContactInfo(
+                "user-1",
+                "Alice",
+                "AS-1000",
+                "SMINIAS",
+                "alice@haf.gr",
+                "6900000000",
+                "2026-01-01",
+                "Active",
+                "#00b706",
+                0);
+        ContactInfo sameIdWithDifferentUnread = new ContactInfo(
+                "user-1",
+                "Alice",
+                "AS-1000",
+                "SMINIAS",
+                "alice@haf.gr",
+                "6900000000",
+                "2026-01-01",
+                "Active",
+                "#00b706",
+                7);
+
+        assertTrue(MainController.isSameContactSelection(clicked, sameIdWithDifferentUnread));
+    }
+
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
         @Override
         public CompletableFuture<String> fetchContacts() {

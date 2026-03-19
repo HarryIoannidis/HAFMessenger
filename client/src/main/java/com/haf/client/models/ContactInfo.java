@@ -11,6 +11,7 @@ package com.haf.client.models;
  * @param activenessLabel Short status string, e.g. "Online", "Offline".
  * @param activenessColor JavaFX CSS colour string for the status dot, e.g.
  *                        "#00b706".
+ * @param unreadCount     Local unread counter for this contact. Non-negative.
  */
 public record ContactInfo(
         String id,
@@ -21,7 +22,14 @@ public record ContactInfo(
         String telephone,
         String joinedDate,
         String activenessLabel,
-        String activenessColor) {
+        String activenessColor,
+        int unreadCount) {
+
+    public ContactInfo {
+        if (unreadCount < 0) {
+            unreadCount = 0;
+        }
+    }
 
     /** Convenience factory for an active contact. */
     public static ContactInfo online(String id, String name, String regNumber) {
@@ -36,7 +44,19 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Active", "#00b706");
+        return online(id, name, regNumber, rank, email, telephone, joinedDate, 0);
+    }
+
+    public static ContactInfo online(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Active", "#00b706", unreadCount);
     }
 
     /** Convenience factory for an inactive contact. */
@@ -52,7 +72,19 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Inactive", "#ff0000");
+        return offline(id, name, regNumber, rank, email, telephone, joinedDate, unreadCountForNewContact());
+    }
+
+    public static ContactInfo offline(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Inactive", "#ff0000", unreadCount);
     }
 
     /**
@@ -71,7 +103,19 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "", "transparent");
+        return unknown(id, name, regNumber, rank, email, telephone, joinedDate, unreadCountForNewContact());
+    }
+
+    public static ContactInfo unknown(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "", "transparent", unreadCount);
     }
 
     public static ContactInfo active(String id, String name, String regNumber) {
@@ -89,6 +133,18 @@ public record ContactInfo(
         return online(id, name, regNumber, rank, email, telephone, joinedDate);
     }
 
+    public static ContactInfo active(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return online(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount);
+    }
+
     public static ContactInfo inactive(String id, String name, String regNumber) {
         return offline(id, name, regNumber);
     }
@@ -104,6 +160,18 @@ public record ContactInfo(
         return offline(id, name, regNumber, rank, email, telephone, joinedDate);
     }
 
+    public static ContactInfo inactive(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return offline(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount);
+    }
+
     public static ContactInfo fromPresence(String id, String name, String regNumber, boolean active) {
         return fromPresence(id, name, regNumber, null, null, null, null, active);
     }
@@ -117,8 +185,25 @@ public record ContactInfo(
             String telephone,
             String joinedDate,
             boolean active) {
+        return fromPresence(id, name, regNumber, rank, email, telephone, joinedDate, active, unreadCountForNewContact());
+    }
+
+    public static ContactInfo fromPresence(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            boolean active,
+            int unreadCount) {
         return active
-                ? active(id, name, regNumber, rank, email, telephone, joinedDate)
-                : inactive(id, name, regNumber, rank, email, telephone, joinedDate);
+                ? active(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount)
+                : inactive(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount);
+    }
+
+    private static int unreadCountForNewContact() {
+        return 0;
     }
 }

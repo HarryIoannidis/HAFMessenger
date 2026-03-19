@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntUnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -230,7 +231,12 @@ public class MainViewModel {
         long baselinePresenceSignal = presenceSignalByUser.getOrDefault(userId, 0L);
         contacts.add(ContactInfo.unknown(userId, fullName, regNumber, rank, email, telephone, joinedDate));
         contactsGateway.addContact(userId)
-                .thenAccept(ignored -> scheduleAddContactPresenceFallback(userId, baselinePresenceSignal))
+                .thenAccept(ignored -> {
+                    // Hydrate optimistic rows (e.g. incoming unknown sender) with real
+                    // server-side contact profile fields as soon as add succeeds.
+                    fetchContacts();
+                    scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
+                })
                 .exceptionally(ex -> {
                     LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
                     return null;
@@ -261,10 +267,19 @@ public class MainViewModel {
                 existing.email(),
                 existing.telephone(),
                 existing.joinedDate(),
-                active);
+                active,
+                existing.unreadCount());
         contacts.set(index, updated);
         presenceSignalByUser.put(userId, presenceSignalCounter.incrementAndGet());
         return updated;
+    }
+
+    public ContactInfo incrementUnread(String userId) {
+        return updateUnread(userId, count -> count == Integer.MAX_VALUE ? Integer.MAX_VALUE : count + 1);
+    }
+
+    public ContactInfo resetUnread(String userId) {
+        return updateUnread(userId, ignored -> 0);
     }
 
     private void upsertContact(
@@ -276,6 +291,8 @@ public class MainViewModel {
             String telephone,
             String joinedDate,
             boolean active) {
+        int index = findContactIndex(userId);
+        int unreadCount = index >= 0 ? contacts.get(index).unreadCount() : 0;
         ContactInfo contact = ContactInfo.fromPresence(
                 userId,
                 fullName,
@@ -284,8 +301,8 @@ public class MainViewModel {
                 email,
                 telephone,
                 joinedDate,
-                active);
-        int index = findContactIndex(userId);
+                active,
+                unreadCount);
         if (index >= 0) {
             contacts.set(index, contact);
         } else {
@@ -347,8 +364,40 @@ public class MainViewModel {
                 preferNonBlank(telephone, existing.telephone()),
                 preferNonBlank(joinedDate, existing.joinedDate()),
                 existing.activenessLabel(),
-                existing.activenessColor());
+                existing.activenessColor(),
+                existing.unreadCount());
         contacts.set(index, merged);
+    }
+
+    private ContactInfo updateUnread(String userId, IntUnaryOperator updater) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+
+        int index = findContactIndex(userId);
+        if (index < 0) {
+            return null;
+        }
+
+        ContactInfo existing = contacts.get(index);
+        int nextUnread = Math.max(0, updater.applyAsInt(existing.unreadCount()));
+        if (nextUnread == existing.unreadCount()) {
+            return existing;
+        }
+
+        ContactInfo updated = new ContactInfo(
+                existing.id(),
+                existing.name(),
+                existing.regNumber(),
+                existing.rank(),
+                existing.email(),
+                existing.telephone(),
+                existing.joinedDate(),
+                existing.activenessLabel(),
+                existing.activenessColor(),
+                nextUnread);
+        contacts.set(index, updated);
+        return updated;
     }
 
     private static String preferNonBlank(String incoming, String fallback) {

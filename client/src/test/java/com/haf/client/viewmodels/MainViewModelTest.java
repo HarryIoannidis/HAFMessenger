@@ -15,6 +15,7 @@ import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -46,7 +47,7 @@ class MainViewModelTest {
     }
 
     @Test
-    void add_contact_adds_locally_and_triggers_fallback_refresh_when_presence_missing() {
+    void add_contact_adds_locally_and_refreshes_contacts_after_server_add() {
         AtomicInteger addCalls = new AtomicInteger();
         AtomicInteger fetchCalls = new AtomicInteger();
         ContactsResponse refreshed = ContactsResponse.success(List.of(
@@ -67,15 +68,13 @@ class MainViewModelTest {
 
         assertTrue(viewModel.hasContact("u-1"));
         assertEquals(1, viewModel.contactsProperty().size());
-        assertEquals("", viewModel.contactsProperty().getFirst().activenessLabel());
-        assertEquals("transparent", viewModel.contactsProperty().getFirst().activenessColor());
         assertEquals(1, addCalls.get());
-        awaitCondition(() -> fetchCalls.get() == 1);
+        awaitCondition(() -> fetchCalls.get() >= 1);
         awaitCondition(() -> "Active".equals(viewModel.contactsProperty().getFirst().activenessLabel()));
     }
 
     @Test
-    void add_contact_skips_fallback_refresh_when_presence_event_arrives() {
+    void add_contact_still_hydrates_profiles_even_when_presence_event_arrives() {
         AtomicInteger addCalls = new AtomicInteger();
         AtomicInteger fetchCalls = new AtomicInteger();
         ContactsResponse refreshed = ContactsResponse.success(List.of(
@@ -96,8 +95,7 @@ class MainViewModelTest {
 
         assertNotNull(updated);
         awaitCondition(() -> "Active".equals(viewModel.contactsProperty().getFirst().activenessLabel()));
-        sleep(900);
-        assertEquals(0, fetchCalls.get());
+        awaitCondition(() -> fetchCalls.get() >= 1);
         assertEquals(1, addCalls.get());
     }
 
@@ -183,6 +181,68 @@ class MainViewModelTest {
         assertEquals("Active", updated.activenessLabel());
     }
 
+    @Test
+    void increment_and_reset_unread_are_applied_per_contact() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+        viewModel.ensureChatContact("u-1", "Jane", "100");
+
+        ContactInfo first = viewModel.incrementUnread("u-1");
+        ContactInfo second = viewModel.incrementUnread("u-1");
+        ContactInfo reset = viewModel.resetUnread("u-1");
+        ContactInfo resetAgain = viewModel.resetUnread("u-1");
+
+        assertNotNull(first);
+        assertNotNull(second);
+        assertNotNull(reset);
+        assertNotNull(resetAgain);
+        assertEquals(1, first.unreadCount());
+        assertEquals(2, second.unreadCount());
+        assertEquals(0, reset.unreadCount());
+        assertEquals(0, resetAgain.unreadCount());
+        assertEquals(0, viewModel.getContactById("u-1").unreadCount());
+    }
+
+    @Test
+    void unread_is_preserved_when_presence_and_contact_snapshot_update_the_contact() {
+        ContactsResponse refreshed = ContactsResponse.success(List.of(
+                new UserSearchResultDTO("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture(JsonCodec.toJson(refreshed))));
+
+        viewModel.ensureChatContact("u-1", "Jane", "100");
+        viewModel.incrementUnread("u-1");
+        viewModel.incrementUnread("u-1");
+
+        ContactInfo afterPresence = viewModel.updateContactPresence("u-1", true);
+        assertNotNull(afterPresence);
+        assertEquals(2, afterPresence.unreadCount());
+
+        viewModel.fetchContacts();
+        awaitCondition(() -> {
+            ContactInfo current = viewModel.getContactById("u-1");
+            return current != null
+                    && "Jane Updated".equals(current.name())
+                    && current.unreadCount() == 2;
+        });
+    }
+
+    @Test
+    void increment_unread_returns_null_for_missing_contact_until_sender_is_auto_added() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+
+        assertNull(viewModel.incrementUnread("sender-1"));
+
+        viewModel.ensureChatContact("sender-1", "sender-1", "sender-1");
+        ContactInfo updated = viewModel.incrementUnread("sender-1");
+
+        assertNotNull(updated);
+        assertEquals("sender-1", updated.name());
+        assertEquals("sender-1", updated.regNumber());
+        assertEquals(1, updated.unreadCount());
+    }
+
     private static void awaitCondition(BooleanSupplier condition) {
         long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (System.nanoTime() < deadlineNanos) {
@@ -197,15 +257,6 @@ class MainViewModelTest {
             }
         }
         fail("Timed out waiting for async operation");
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            fail("Interrupted while waiting");
-        }
     }
 
     private static final class StubContactsGateway implements MainViewModel.ContactsGateway {

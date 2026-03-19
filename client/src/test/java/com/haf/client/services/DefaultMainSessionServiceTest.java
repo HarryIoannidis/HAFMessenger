@@ -16,19 +16,23 @@ class DefaultMainSessionServiceTest {
     void logout_success_path_revokes_closes_and_clears_sessions() {
         StubNetworkGateway networkGateway = new StubNetworkGateway();
         networkGateway.revokeResult = CompletableFuture.completedFuture("{}");
-        StubPresenceChannel presenceChannel = new StubPresenceChannel();
-        StubSessionContext context = new StubSessionContext(networkGateway, presenceChannel);
+        StubSessionChannel sessionChannel = new StubSessionChannel();
+        StubSessionContext context = new StubSessionContext(networkGateway, sessionChannel);
 
         DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
         service.registerPresenceListener((userId, active) -> {
+        });
+        service.registerIncomingMessageListener((senderId, message) -> {
         });
 
         service.logout().join();
 
         assertEquals(1, networkGateway.revokeCalls.get());
         assertEquals(1, networkGateway.closeCalls.get());
-        assertEquals(1, presenceChannel.addCalls.get());
-        assertEquals(1, presenceChannel.removeCalls.get());
+        assertEquals(1, sessionChannel.presenceAddCalls.get());
+        assertEquals(1, sessionChannel.presenceRemoveCalls.get());
+        assertEquals(1, sessionChannel.incomingAddCalls.get());
+        assertEquals(1, sessionChannel.incomingRemoveCalls.get());
         assertTrue(context.networkCleared);
         assertTrue(context.chatCleared);
         assertTrue(context.currentUserProfileCleared);
@@ -38,7 +42,7 @@ class DefaultMainSessionServiceTest {
     void logout_server_failure_still_closes_and_clears_sessions() {
         StubNetworkGateway networkGateway = new StubNetworkGateway();
         networkGateway.revokeResult = CompletableFuture.failedFuture(new RuntimeException("server down"));
-        StubSessionContext context = new StubSessionContext(networkGateway, new StubPresenceChannel());
+        StubSessionContext context = new StubSessionContext(networkGateway, new StubSessionChannel());
 
         DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
 
@@ -53,8 +57,8 @@ class DefaultMainSessionServiceTest {
 
     @Test
     void register_and_unregister_presence_listener_delegates_to_channel() {
-        StubPresenceChannel presenceChannel = new StubPresenceChannel();
-        StubSessionContext context = new StubSessionContext(null, presenceChannel);
+        StubSessionChannel sessionChannel = new StubSessionChannel();
+        StubSessionContext context = new StubSessionContext(null, sessionChannel);
         DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
 
         MessageViewModel.PresenceListener listener = (userId, active) -> {
@@ -62,9 +66,25 @@ class DefaultMainSessionServiceTest {
         service.registerPresenceListener(listener);
         service.unregisterPresenceListener();
 
-        assertEquals(1, presenceChannel.addCalls.get());
-        assertEquals(1, presenceChannel.removeCalls.get());
-        assertEquals(listener, presenceChannel.lastRemoved.get());
+        assertEquals(1, sessionChannel.presenceAddCalls.get());
+        assertEquals(1, sessionChannel.presenceRemoveCalls.get());
+        assertEquals(listener, sessionChannel.lastPresenceRemoved.get());
+    }
+
+    @Test
+    void register_and_unregister_incoming_listener_delegates_to_channel() {
+        StubSessionChannel sessionChannel = new StubSessionChannel();
+        StubSessionContext context = new StubSessionContext(null, sessionChannel);
+        DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
+
+        MessageViewModel.IncomingMessageListener listener = (senderId, message) -> {
+        };
+        service.registerIncomingMessageListener(listener);
+        service.unregisterIncomingMessageListener();
+
+        assertEquals(1, sessionChannel.incomingAddCalls.get());
+        assertEquals(1, sessionChannel.incomingRemoveCalls.get());
+        assertEquals(listener, sessionChannel.lastIncomingRemoved.get());
     }
 
     private static final class StubNetworkGateway implements DefaultMainSessionService.NetworkGateway {
@@ -84,37 +104,53 @@ class DefaultMainSessionServiceTest {
         }
     }
 
-    private static final class StubPresenceChannel implements DefaultMainSessionService.PresenceChannel {
-        private final AtomicInteger addCalls = new AtomicInteger();
-        private final AtomicInteger removeCalls = new AtomicInteger();
-        private final AtomicReference<MessageViewModel.PresenceListener> lastAdded = new AtomicReference<>();
-        private final AtomicReference<MessageViewModel.PresenceListener> lastRemoved = new AtomicReference<>();
+    private static final class StubSessionChannel implements DefaultMainSessionService.SessionChannel {
+        private final AtomicInteger presenceAddCalls = new AtomicInteger();
+        private final AtomicInteger presenceRemoveCalls = new AtomicInteger();
+        private final AtomicReference<MessageViewModel.PresenceListener> lastPresenceAdded = new AtomicReference<>();
+        private final AtomicReference<MessageViewModel.PresenceListener> lastPresenceRemoved = new AtomicReference<>();
+        private final AtomicInteger incomingAddCalls = new AtomicInteger();
+        private final AtomicInteger incomingRemoveCalls = new AtomicInteger();
+        private final AtomicReference<MessageViewModel.IncomingMessageListener> lastIncomingAdded = new AtomicReference<>();
+        private final AtomicReference<MessageViewModel.IncomingMessageListener> lastIncomingRemoved = new AtomicReference<>();
 
         @Override
         public void addPresenceListener(MessageViewModel.PresenceListener listener) {
-            addCalls.incrementAndGet();
-            lastAdded.set(listener);
+            presenceAddCalls.incrementAndGet();
+            lastPresenceAdded.set(listener);
         }
 
         @Override
         public void removePresenceListener(MessageViewModel.PresenceListener listener) {
-            removeCalls.incrementAndGet();
-            lastRemoved.set(listener);
+            presenceRemoveCalls.incrementAndGet();
+            lastPresenceRemoved.set(listener);
+        }
+
+        @Override
+        public void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+            incomingAddCalls.incrementAndGet();
+            lastIncomingAdded.set(listener);
+        }
+
+        @Override
+        public void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+            incomingRemoveCalls.incrementAndGet();
+            lastIncomingRemoved.set(listener);
         }
     }
 
     private static final class StubSessionContext implements DefaultMainSessionService.SessionContext {
         private final DefaultMainSessionService.NetworkGateway networkGateway;
-        private final DefaultMainSessionService.PresenceChannel presenceChannel;
+        private final DefaultMainSessionService.SessionChannel sessionChannel;
         private boolean networkCleared;
         private boolean chatCleared;
         private boolean currentUserProfileCleared;
 
         private StubSessionContext(
                 DefaultMainSessionService.NetworkGateway networkGateway,
-                DefaultMainSessionService.PresenceChannel presenceChannel) {
+                DefaultMainSessionService.SessionChannel sessionChannel) {
             this.networkGateway = networkGateway;
-            this.presenceChannel = presenceChannel;
+            this.sessionChannel = sessionChannel;
         }
 
         @Override
@@ -123,8 +159,8 @@ class DefaultMainSessionServiceTest {
         }
 
         @Override
-        public DefaultMainSessionService.PresenceChannel presenceChannel() {
-            return presenceChannel;
+        public DefaultMainSessionService.SessionChannel sessionChannel() {
+            return sessionChannel;
         }
 
         @Override
