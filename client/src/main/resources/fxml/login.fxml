@@ -31,7 +31,7 @@
                         <Image url="@../images/logo/app_logo_downscale.png" />
                      </image>
                   </ImageView>
-                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="HAF Messenger">
+                  <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text-bold" text="HAF Messenger">
                      <HBox.margin>
                         <Insets left="10.0" right="10.0" />
                      </HBox.margin>

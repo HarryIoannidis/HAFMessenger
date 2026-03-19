@@ -13,14 +13,14 @@ public final class WindowResizeHelper {
 
     private static final Logger LOGGER = Logger.getLogger(WindowResizeHelper.class.getName());
 
-    /** How many pixels from the edge count as "resize zone". */
+    // How many pixels from the edge count as "resize zone".
     private static final int BORDER = 8;
 
-    /** Fallback minimum dimensions if computed values are unusable. */
+    // Fallback minimum dimensions if computed values are unusable.
     private static final double FALLBACK_MIN_WIDTH = 500;
     private static final double FALLBACK_MIN_HEIGHT = 400;
 
-    /** Computed minimum window dimensions, set after the first layout pass. */
+    // Computed minimum window dimensions, set after the first layout pass.
     private static double minWidth = FALLBACK_MIN_WIDTH;
     private static double minHeight = FALLBACK_MIN_HEIGHT;
 

@@ -455,7 +455,8 @@ public class MessageViewModel {
 
         if (contentType.startsWith("image/")) {
             String localPath = writeTempFile(plaintext, "haf-img-", extensionFor(contentType));
-            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, timestamp, false);
+            String fileName = senderId + "-image" + extensionFor(contentType);
+            return new MessageVM(false, MessageType.IMAGE, localPath, null, fileName, null, timestamp, false);
         }
 
         String ext = extensionFor(contentType);
@@ -583,12 +584,24 @@ public class MessageViewModel {
             LocalDateTime timestamp) {
         if (mediaType != null && mediaType.startsWith("image/")) {
             String localPath = writeTempFile(fileBytes, "haf-img-", extensionFor(mediaType));
-            return new MessageVM(outgoing, MessageType.IMAGE, localPath, null, null, null, timestamp, false);
+            String imageName = sanitizeImageName(fileName, mediaType);
+            return new MessageVM(outgoing, MessageType.IMAGE, localPath, null, imageName, null, timestamp, false);
         }
 
         String ext = extensionFor(mediaType);
         String localPath = writeTempFile(fileBytes, "haf-file-", ext);
         return new MessageVM(outgoing, MessageType.FILE, null, localPath, fileName, formatSize(fileBytes.length), timestamp, false);
+    }
+
+    private static String sanitizeImageName(String fileName, String mediaType) {
+        String extension = extensionFor(mediaType);
+        if (fileName != null && !fileName.isBlank()) {
+            String trimmed = fileName.trim();
+            if (!trimmed.contains("/") && !trimmed.contains("\\")) {
+                return trimmed;
+            }
+        }
+        return "image" + extension;
     }
 
     private static String writeTempFile(byte[] data, String prefix, String suffix) {

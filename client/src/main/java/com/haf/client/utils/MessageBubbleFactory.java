@@ -1,6 +1,7 @@
 package com.haf.client.utils;
 
 import com.haf.client.models.MessageVM;
+import javafx.scene.Cursor;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -79,7 +80,8 @@ public final class MessageBubbleFactory {
      * @return the text content node
      */
     private static Text buildText(MessageVM message) {
-        Text text = new Text(message.content());
+        String body = message.content() == null ? "" : message.content();
+        Text text = new Text(body);
         text.setWrappingWidth(280);
         text.getStyleClass().add(
                 message.isOutgoing() ? "bubble-text-out" : "bubble-text-in");
@@ -96,16 +98,20 @@ public final class MessageBubbleFactory {
         StackPane imageContainer = new StackPane();
         imageContainer.setPrefWidth(220);
         imageContainer.setMaxWidth(220);
+        imageContainer.getStyleClass().add("bubble-image-clickable");
+        imageContainer.setCursor(Cursor.HAND);
 
         ImageView imageView = new ImageView();
         imageView.setFitWidth(220);
         imageView.setPreserveRatio(true);
         imageView.getStyleClass().add("bubble-image");
+        imageView.setCursor(Cursor.HAND);
 
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setPrefSize(28, 28);
         spinner.setMaxSize(28, 28);
         spinner.getStyleClass().add("bubble-image-spinner");
+        spinner.setMouseTransparent(true);
 
         imageContainer.getChildren().addAll(imageView, spinner);
 
@@ -168,6 +174,8 @@ public final class MessageBubbleFactory {
 
         HBox fileRow = new HBox(8, icon, fileText);
         fileRow.setAlignment(Pos.CENTER_LEFT);
+        fileRow.getStyleClass().add("bubble-file-clickable");
+        fileRow.setCursor(Cursor.HAND);
         return fileRow;
     }
 

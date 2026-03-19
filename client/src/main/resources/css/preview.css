@@ -1,3 +1,14 @@
+.preview-window {
+    -fx-background-color: #f4f4f4;
+    -fx-background-radius: 4;
+    -fx-background-insets: 2;
+    -fx-border-insets: 0;
+    -fx-border-radius: 6;
+    -fx-border-color: #acacac;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 10, 0.2, 0, 0);
+}
+
 .button-download {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
@@ -12,5 +23,4 @@
 .button-download:hover {
     -fx-font-size: 15px;
     -fx-background-color: rgba(0, 0, 0, 0.1);
-
 }

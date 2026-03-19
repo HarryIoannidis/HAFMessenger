@@ -108,7 +108,6 @@
     -fx-border-radius: 6;
     -fx-border-color: #acacac;
     -fx-border-width: 2;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0), 0, 0, 0, 0);
 }
 
 /*--------------------- COMPONENTS ---------------------*/
