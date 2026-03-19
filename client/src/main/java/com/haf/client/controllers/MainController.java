@@ -1,10 +1,12 @@
 package com.haf.client.controllers;
 
+import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.services.DefaultMainSessionService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
+import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
@@ -17,11 +19,9 @@ import javafx.geometry.Bounds;
 import javafx.collections.ListChangeListener;
 import javafx.scene.Parent;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -109,6 +109,8 @@ public class MainController implements SearchContactActions {
 
     private double xOffset;
     private double yOffset;
+    private ContactInfo contactContextTarget;
+    private ContextMenu contactContextMenu;
 
     /** Reference to the loaded SearchController (null when not in search mode). */
     private SearchController searchController;
@@ -130,6 +132,12 @@ public class MainController implements SearchContactActions {
     private final java.util.concurrent.atomic.AtomicBoolean searchLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
             false);
 
+    enum ContactContextAction {
+        PROFILE,
+        DELETE_CHAT,
+        REMOVE_CONTACT
+    }
+
     public MainController() {
         this(new DefaultMainSessionService());
     }
@@ -145,6 +153,7 @@ public class MainController implements SearchContactActions {
         setupWindowControls();
         setupNavBar();
         setupDotsMenu();
+        setupContactContextMenu();
         setupContactList();
         setupContactSelection();
         setupSearchField();
@@ -462,6 +471,7 @@ public class MainController implements SearchContactActions {
         contactsList.setCellFactory(lv -> {
             ContactCell cell = new ContactCell();
             cell.setOnClick(this::activateMessagesTab);
+            cell.setOnContextMenuRequest(this::showContactContextMenu);
             return cell;
         });
     }
@@ -502,9 +512,14 @@ public class MainController implements SearchContactActions {
 
     @Override
     public void removeContact(String userId) {
+        ContactInfo selectedBeforeRemoval = contactsList.getSelectionModel().getSelectedItem();
         viewModel.removeContact(userId);
-        ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();
-        if (selected != null && selected.id().equals(userId)) {
+        boolean contactsEmptyAfterRemoval = viewModel.contactsProperty().isEmpty();
+        if (shouldShowPlaceholderAfterRemoval(
+                userId,
+                selectedBeforeRemoval,
+                currentChatRecipientId,
+                contactsEmptyAfterRemoval)) {
             clearSelectionAndShowPlaceholder();
         }
     }
@@ -520,6 +535,10 @@ public class MainController implements SearchContactActions {
 
     private void setupContactSelection() {
         contactsList.setOnMouseClicked(event -> {
+            if (!isPrimaryClick(event.getButton())) {
+                return;
+            }
+
             ContactInfo clicked = contactsList.getSelectionModel().getSelectedItem();
             if (clicked == null) {
                 return;
@@ -571,6 +590,117 @@ public class MainController implements SearchContactActions {
             case DESELECT_AND_SHOW_PLACEHOLDER -> deselectAndPlaceholderAction.run();
             case KEEP_SELECTED_CONTACT -> keepSelectionAction.run();
         }
+    }
+
+    static void applyContactContextAction(
+            ContactContextAction action,
+            Runnable openProfileAction,
+            Runnable deleteChatAction,
+            Runnable removeContactAction) {
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(openProfileAction, "openProfileAction");
+        Objects.requireNonNull(deleteChatAction, "deleteChatAction");
+        Objects.requireNonNull(removeContactAction, "removeContactAction");
+
+        switch (action) {
+            case PROFILE -> openProfileAction.run();
+            case DELETE_CHAT -> deleteChatAction.run();
+            case REMOVE_CONTACT -> removeContactAction.run();
+        }
+    }
+
+    static boolean shouldShowPlaceholderAfterRemoval(
+            String removedUserId,
+            ContactInfo selectedBeforeRemoval,
+            String activeChatRecipientId,
+            boolean contactsEmptyAfterRemoval) {
+        if (contactsEmptyAfterRemoval) {
+            return true;
+        }
+        if (removedUserId == null || removedUserId.isBlank()) {
+            return false;
+        }
+        if (selectedBeforeRemoval != null && removedUserId.equals(selectedBeforeRemoval.id())) {
+            return true;
+        }
+        return activeChatRecipientId != null && removedUserId.equals(activeChatRecipientId);
+    }
+
+    private void setupContactContextMenu() {
+        contactContextMenu = ContextMenuBuilder.create()
+                .addOption(
+                        "mdi2a-account-circle-outline",
+                        "Profile",
+                        () -> handleContactContextAction(ContactContextAction.PROFILE))
+                .addSeparator()
+                .addOption(
+                        "mdi2d-delete-outline",
+                        "Delete chat",
+                        () -> handleContactContextAction(ContactContextAction.DELETE_CHAT))
+                .addOption(
+                        "mdi2a-account-remove-outline",
+                        "Remove contact",
+                        () -> handleContactContextAction(ContactContextAction.REMOVE_CONTACT))
+                .onHidden(() -> contactContextTarget = null)
+                .build();
+    }
+
+    private void showContactContextMenu(ContactInfo contact, double screenX, double screenY) {
+        if (contactContextMenu == null || contact == null) {
+            return;
+        }
+
+        contactContextTarget = contact;
+        if (!contact.equals(contactsList.getSelectionModel().getSelectedItem())) {
+            selectContactAndOpenChat(contact);
+        }
+
+        if (contactContextMenu.isShowing()) {
+            contactContextMenu.hide();
+        }
+        contactContextMenu.show(contactsList, screenX, screenY);
+    }
+
+    private void handleContactContextAction(ContactContextAction action) {
+        ContactInfo target = contactContextTarget != null ? contactContextTarget : contactsList.getSelectionModel().getSelectedItem();
+        if (target == null) {
+            return;
+        }
+
+        applyContactContextAction(
+                action,
+                () -> openProfilePopup(UserProfileInfo.fromContact(target, false)),
+                () -> clearLocalChatHistory(target.id()),
+                () -> removeContact(target.id()));
+    }
+
+    private void clearLocalChatHistory(String contactId) {
+        if (contactId == null || contactId.isBlank()) {
+            return;
+        }
+        var messageViewModel = ChatSession.get();
+        if (messageViewModel == null) {
+            return;
+        }
+
+        messageViewModel.getMessages(contactId).clear();
+        if (currentChatController != null && contactId.equals(currentChatRecipientId)) {
+            currentChatController.setRecipient(contactId);
+        }
+    }
+
+    private void selectContactAndOpenChat(ContactInfo contact) {
+        contactsList.getSelectionModel().select(contact);
+        int index = contactsList.getItems().indexOf(contact);
+        if (index >= 0) {
+            contactsList.getFocusModel().focus(index);
+        }
+        contactsList.setUserData(contact);
+        activateMessagesTab();
+    }
+
+    private static boolean isPrimaryClick(MouseButton button) {
+        return button == MouseButton.PRIMARY;
     }
 
     private void loadPlaceholder() {
@@ -677,26 +807,14 @@ public class MainController implements SearchContactActions {
             return;
         }
 
-        ContextMenu menu = new ContextMenu();
-        menu.getStyleClass().add("dropdown-menu");
-
-        MenuItem profileItem = createIconMenuItem("mdi2a-account-circle-outline", "Profile");
-        MenuItem settingsItem = createIconMenuItem("mdi2c-cog-outline", "Settings");
-        MenuItem helpItem = createIconMenuItem("mdi2h-help-circle-outline", "Help");
-        MenuItem logoutItem = createIconMenuItem("mdi2l-logout", "Log out");
-
-        profileItem.setOnAction(e -> openSelfProfilePopup());
-        settingsItem.setOnAction(e -> LOGGER.info("TODO: Settings clicked"));
-        helpItem.setOnAction(e -> LOGGER.info("TODO: Help clicked"));
-        logoutItem.setOnAction(e -> handleLogout());
-
-        menu.getItems().addAll(
-                profileItem,
-                new SeparatorMenuItem(),
-                settingsItem,
-                helpItem,
-                new SeparatorMenuItem(),
-                logoutItem);
+        ContextMenu menu = ContextMenuBuilder.create()
+                .addOption("mdi2a-account-circle-outline", "Profile", this::openSelfProfilePopup)
+                .addSeparator()
+                .addOption("mdi2c-cog-outline", "Settings", () -> LOGGER.info("TODO: Settings clicked"))
+                .addOption("mdi2h-help-circle-outline", "Help", () -> LOGGER.info("TODO: Help clicked"))
+                .addSeparator()
+                .addOption("mdi2l-logout", "Log out", this::handleLogout)
+                .build();
 
         dotsMenuButton.setOnAction(e -> {
             if (menu.isShowing()) {
@@ -716,18 +834,6 @@ public class MainController implements SearchContactActions {
 
         double menuWidth = Math.max(menu.prefWidth(-1), 220);
         menu.show(dotsMenuButton, bounds.getMaxX() - menuWidth, bounds.getMaxY() + 4);
-    }
-
-    private MenuItem createIconMenuItem(String iconLiteral, String text) {
-        FontIcon icon = new FontIcon(iconLiteral);
-        icon.setIconSize(22);
-        Label label = new Label(text, icon);
-        label.setGraphicTextGap(12);
-        MenuItem item = new MenuItem();
-        item.setGraphic(label);
-        item.getStyleClass().add("dropdown-menu-item");
-        label.getStyleClass().add("dropdown-menu-label");
-        return item;
     }
 
     private void handleLogout() {

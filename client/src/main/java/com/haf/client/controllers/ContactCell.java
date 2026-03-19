@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
+import javafx.animation.PauseTransition;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
@@ -10,6 +11,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,20 +29,22 @@ public class ContactCell extends ListCell<ContactInfo> {
     private Text nameText;
     private Text regNumberText;
     private Circle activenessCircle;
+    private com.jfoenix.controls.JFXButton overlayButton;
+    private PauseTransition contextMenuDelay;
+
+    @FunctionalInterface
+    public interface ContextMenuRequestHandler {
+        void onRequest(ContactInfo contact, double screenX, double screenY);
+    }
 
     public void setOnClick(Runnable clickCallback) {
         ensureLoaded();
-        if (cellRoot != null && cellRoot.getChildren().size() > 1) {
-            var button = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
-            button.setOnAction(e -> {
-                if (getListView() != null) {
-                    getListView().getSelectionModel().select(getItem());
-                }
-                if (clickCallback != null) {
-                    clickCallback.run();
-                }
-            });
-        }
+        installClickHandler(clickCallback);
+    }
+
+    public void setOnContextMenuRequest(ContextMenuRequestHandler handler) {
+        ensureLoaded();
+        installContextMenuHandler(handler);
     }
 
     public ContactCell() {
@@ -92,10 +96,71 @@ public class ContactCell extends ListCell<ContactInfo> {
             return;
         }
 
+        if (cellRoot.getChildren().size() > 1) {
+            overlayButton = (com.jfoenix.controls.JFXButton) cellRoot.getChildren().get(1);
+        }
+
         var hbox = (HBox) cellRoot.getChildren().get(0);
         if (hbox.getChildren().size() > 1) {
             bindHBoxChildren(hbox);
         }
+    }
+
+    private void installClickHandler(Runnable clickCallback) {
+        if (overlayButton == null) {
+            return;
+        }
+
+        overlayButton.setOnAction(e -> {
+            if (getListView() != null) {
+                getListView().getSelectionModel().select(getItem());
+            }
+            if (clickCallback != null) {
+                clickCallback.run();
+            }
+        });
+    }
+
+    private void installContextMenuHandler(ContextMenuRequestHandler handler) {
+        if (overlayButton == null) {
+            return;
+        }
+
+        overlayButton.setOnContextMenuRequested(event -> {
+            ContactInfo item = getItem();
+            if (isEmpty() || item == null) {
+                event.consume();
+                return;
+            }
+            final double screenX = event.getScreenX();
+            final double screenY = event.getScreenY();
+
+            // Treat right-click like a normal click first so the row's ripple/selection
+            // finishes before we render the context menu.
+            overlayButton.fire();
+            if (contextMenuDelay != null) {
+                contextMenuDelay.stop();
+            }
+            contextMenuDelay = new PauseTransition(Duration.millis(170));
+            contextMenuDelay.setOnFinished(ignored -> dispatchContextMenu(handler, item, screenX, screenY));
+            contextMenuDelay.playFromStart();
+            event.consume();
+        });
+    }
+
+    static void dispatchContextMenu(
+            ContextMenuRequestHandler handler,
+            ContactInfo contact,
+            double screenX,
+            double screenY) {
+        if (!canDispatchContextMenu(handler, contact)) {
+            return;
+        }
+        handler.onRequest(contact, screenX, screenY);
+    }
+
+    static boolean canDispatchContextMenu(ContextMenuRequestHandler handler, ContactInfo contact) {
+        return handler != null && contact != null;
     }
 
     private void bindHBoxChildren(HBox hbox) {
@@ -118,6 +183,9 @@ public class ContactCell extends ListCell<ContactInfo> {
         super.updateItem(contact, empty);
 
         if (empty || contact == null) {
+            if (contextMenuDelay != null) {
+                contextMenuDelay.stop();
+            }
             setGraphic(null);
             setText(null);
             return;
