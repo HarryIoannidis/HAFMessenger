@@ -118,3 +118,22 @@
     -fx-font-family: 'Manrope', sans-serif;
     -fx-font-smoothing-type: gray;
 }
+
+.notification-badge {
+    -fx-background-color: #007ABD;
+    -fx-background-radius: 999;
+    -fx-min-width: 25;
+    -fx-min-height: 25;
+    -fx-pref-height: 25;
+    -fx-max-height: 25;
+    -fx-padding: 0 6 0 6;
+    -fx-alignment: center;
+}
+
+.notification-badge-text {
+    -fx-fill: #ffffff;
+    -fx-font-family: 'Manrope-Bold', sans-serif;
+    -fx-font-weight: 700;
+    -fx-font-size: 12px;
+    -fx-text-alignment: center;
+}

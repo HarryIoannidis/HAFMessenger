@@ -25,16 +25,20 @@ public class DefaultMainSessionService implements MainSessionService {
         void close() throws Exception;
     }
 
-    interface PresenceChannel {
+    interface SessionChannel {
         void addPresenceListener(MessageViewModel.PresenceListener listener);
 
         void removePresenceListener(MessageViewModel.PresenceListener listener);
+
+        void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
+
+        void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
     }
 
     interface SessionContext {
         NetworkGateway networkGateway();
 
-        PresenceChannel presenceChannel();
+        SessionChannel sessionChannel();
 
         void clearNetworkSession();
 
@@ -51,8 +55,9 @@ public class DefaultMainSessionService implements MainSessionService {
     private final SessionContext sessionContext;
     private final TaskRunner taskRunner;
 
-    private PresenceChannel activePresenceChannel;
+    private SessionChannel activeSessionChannel;
     private MessageViewModel.PresenceListener activePresenceListener;
+    private MessageViewModel.IncomingMessageListener activeIncomingMessageListener;
 
     public DefaultMainSessionService() {
         this(new DefaultSessionContext(), DefaultMainSessionService::runVirtualTask);
@@ -68,23 +73,47 @@ public class DefaultMainSessionService implements MainSessionService {
         Objects.requireNonNull(listener, "listener");
 
         unregisterPresenceListener();
-        PresenceChannel channel = sessionContext.presenceChannel();
+        SessionChannel channel = sessionContext.sessionChannel();
         if (channel == null) {
             return;
         }
 
         channel.addPresenceListener(listener);
-        activePresenceChannel = channel;
+        activeSessionChannel = channel;
         activePresenceListener = listener;
     }
 
     @Override
     public synchronized void unregisterPresenceListener() {
-        if (activePresenceChannel != null && activePresenceListener != null) {
-            activePresenceChannel.removePresenceListener(activePresenceListener);
+        if (activeSessionChannel != null && activePresenceListener != null) {
+            activeSessionChannel.removePresenceListener(activePresenceListener);
         }
-        activePresenceChannel = null;
         activePresenceListener = null;
+        clearChannelIfUnused();
+    }
+
+    @Override
+    public synchronized void registerIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+        Objects.requireNonNull(listener, "listener");
+
+        unregisterIncomingMessageListener();
+        SessionChannel channel = sessionContext.sessionChannel();
+        if (channel == null) {
+            return;
+        }
+
+        channel.addIncomingMessageListener(listener);
+        activeSessionChannel = channel;
+        activeIncomingMessageListener = listener;
+    }
+
+    @Override
+    public synchronized void unregisterIncomingMessageListener() {
+        if (activeSessionChannel != null && activeIncomingMessageListener != null) {
+            activeSessionChannel.removeIncomingMessageListener(activeIncomingMessageListener);
+        }
+        activeIncomingMessageListener = null;
+        clearChannelIfUnused();
     }
 
     @Override
@@ -122,9 +151,16 @@ public class DefaultMainSessionService implements MainSessionService {
         }
 
         unregisterPresenceListener();
+        unregisterIncomingMessageListener();
         sessionContext.clearNetworkSession();
         sessionContext.clearChatSession();
         sessionContext.clearCurrentUserProfile();
+    }
+
+    private void clearChannelIfUnused() {
+        if (activePresenceListener == null && activeIncomingMessageListener == null) {
+            activeSessionChannel = null;
+        }
     }
 
     private static void runVirtualTask(String taskName, Runnable task) {
@@ -154,13 +190,13 @@ public class DefaultMainSessionService implements MainSessionService {
         }
 
         @Override
-        public PresenceChannel presenceChannel() {
+        public SessionChannel sessionChannel() {
             MessageViewModel messageViewModel = ChatSession.get();
             if (messageViewModel == null) {
                 return null;
             }
 
-            return new PresenceChannel() {
+            return new SessionChannel() {
                 @Override
                 public void addPresenceListener(MessageViewModel.PresenceListener listener) {
                     messageViewModel.addPresenceListener(listener);
@@ -169,6 +205,16 @@ public class DefaultMainSessionService implements MainSessionService {
                 @Override
                 public void removePresenceListener(MessageViewModel.PresenceListener listener) {
                     messageViewModel.removePresenceListener(listener);
+                }
+
+                @Override
+                public void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+                    messageViewModel.addIncomingMessageListener(listener);
+                }
+
+                @Override
+                public void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+                    messageViewModel.removeIncomingMessageListener(listener);
                 }
             };
         }

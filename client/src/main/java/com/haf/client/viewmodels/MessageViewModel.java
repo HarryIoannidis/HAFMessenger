@@ -48,11 +48,17 @@ public class MessageViewModel {
         void onPresenceUpdate(String userId, boolean active);
     }
 
+    @FunctionalInterface
+    public interface IncomingMessageListener {
+        void onIncomingMessage(String senderId, MessageVM message);
+    }
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
 
     private final StringProperty status = new SimpleStringProperty("Ready");
     private final List<PresenceListener> presenceListeners = new CopyOnWriteArrayList<>();
+    private final List<IncomingMessageListener> incomingMessageListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
 
     private final Object policyLock = new Object();
@@ -75,6 +81,7 @@ public class MessageViewModel {
                     MessageVM vm = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
                     runOnUiThread(() -> {
                         getMessages(contactId).add(vm);
+                        notifyIncomingMessageListeners(contactId, vm);
                         status.set("Message received from " + contactId);
                     });
                 } catch (Exception ex) {
@@ -203,10 +210,32 @@ public class MessageViewModel {
         }
     }
 
+    public void addIncomingMessageListener(IncomingMessageListener listener) {
+        if (listener != null) {
+            incomingMessageListeners.add(listener);
+        }
+    }
+
+    public void removeIncomingMessageListener(IncomingMessageListener listener) {
+        if (listener != null) {
+            incomingMessageListeners.remove(listener);
+        }
+    }
+
     private void notifyPresenceListeners(String userId, boolean active) {
         for (PresenceListener listener : presenceListeners) {
             try {
                 listener.onPresenceUpdate(userId, active);
+            } catch (Exception ignored) {
+                // A bad listener must not break dispatching for others.
+            }
+        }
+    }
+
+    private void notifyIncomingMessageListeners(String senderId, MessageVM message) {
+        for (IncomingMessageListener listener : incomingMessageListeners) {
+            try {
+                listener.onIncomingMessage(senderId, message);
             } catch (Exception ignored) {
                 // A bad listener must not break dispatching for others.
             }

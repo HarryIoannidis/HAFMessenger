@@ -3,6 +3,7 @@ package com.haf.client.controllers;
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.models.UserProfileInfo;
+import com.haf.client.models.MessageVM;
 import com.haf.client.services.DefaultMainSessionService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
@@ -46,6 +47,8 @@ public class MainController implements SearchContactActions {
     private static final String NAV_ITEM_ICON = "nav-item-icon";
     private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
     private static final String PROFILE_POPUP_KEY = "profile-popup";
+    private static final String UNKNOWN_CONTACT_NAME_PLACEHOLDER = "Unknown Contact";
+    private static final String UNKNOWN_CONTACT_REG_PLACEHOLDER = "";
 
     // Window chrome
     @FXML
@@ -138,6 +141,11 @@ public class MainController implements SearchContactActions {
         REMOVE_CONTACT
     }
 
+    enum UnreadAction {
+        INCREMENT,
+        RESET
+    }
+
     public MainController() {
         this(new DefaultMainSessionService());
     }
@@ -159,6 +167,7 @@ public class MainController implements SearchContactActions {
         setupSearchField();
         setupProfilePopupTrigger();
         registerPresenceListener();
+        registerIncomingMessageListener();
 
         // Trigger pre-loading immediately
         triggerPreloading();
@@ -547,7 +556,7 @@ public class MainController implements SearchContactActions {
             Object lastSelected = contactsList.getUserData();
             MainViewModel.ContactSelectionAction action = viewModel.resolveContactSelectionAction(
                     viewModel.activeTabProperty().get(),
-                    clicked.equals(lastSelected));
+                    isSameContactSelection(clicked, lastSelected));
 
             applyContactSelectionAction(action,
                     () -> {
@@ -651,7 +660,7 @@ public class MainController implements SearchContactActions {
         }
 
         contactContextTarget = contact;
-        if (!contact.equals(contactsList.getSelectionModel().getSelectedItem())) {
+        if (!isSameContactSelection(contact, contactsList.getSelectionModel().getSelectedItem())) {
             selectContactAndOpenChat(contact);
         }
 
@@ -730,6 +739,7 @@ public class MainController implements SearchContactActions {
     }
 
     private void loadChat(String recipientId) {
+        resetUnreadOnChatOpen(viewModel, recipientId);
         int loadGeneration = chatLoadGeneration.incrementAndGet();
 
         // Reuse chat view if already loaded — just switch recipient
@@ -850,8 +860,25 @@ public class MainController implements SearchContactActions {
         mainSessionService.registerPresenceListener(this::applyPresenceUpdate);
     }
 
+    private void registerIncomingMessageListener() {
+        mainSessionService.registerIncomingMessageListener(this::applyIncomingMessage);
+    }
+
     private void applyPresenceUpdate(String userId, boolean active) {
         Platform.runLater(() -> updateContactPresence(userId, active));
+    }
+
+    private void applyIncomingMessage(String senderId, MessageVM message) {
+        if (senderId == null || senderId.isBlank()) {
+            return;
+        }
+
+        Runnable task = () -> updateUnreadForIncomingMessage(senderId);
+        if (Platform.isFxApplicationThread()) {
+            task.run();
+        } else {
+            Platform.runLater(task);
+        }
     }
 
     private void updateContactPresence(String userId, boolean active) {
@@ -870,5 +897,82 @@ public class MainController implements SearchContactActions {
             currentChatRecipientId = updated.id();
             showProfilePanel(updated);
         }
+    }
+
+    private void updateUnreadForIncomingMessage(String senderId) {
+        ContactInfo contact = ensureIncomingContact(viewModel, senderId);
+        if (contact == null) {
+            return;
+        }
+
+        UnreadAction action = resolveUnreadActionOnIncoming(
+                viewModel.activeTabProperty().get(),
+                currentChatRecipientId,
+                senderId);
+        if (action == UnreadAction.RESET) {
+            viewModel.resetUnread(senderId);
+        } else {
+            viewModel.incrementUnread(senderId);
+        }
+    }
+
+    static ContactInfo ensureIncomingContact(MainViewModel viewModel, String senderId) {
+        if (viewModel == null || senderId == null || senderId.isBlank()) {
+            return null;
+        }
+
+        ContactInfo existing = viewModel.getContactById(senderId);
+        if (existing != null) {
+            return existing;
+        }
+        viewModel.addContact(
+                senderId,
+                incomingContactDisplayName(),
+                incomingContactRegNumber());
+        ContactInfo created = viewModel.getContactById(senderId);
+        if (created == null) {
+            created = viewModel.ensureChatContact(
+                    senderId,
+                    incomingContactDisplayName(),
+                    incomingContactRegNumber());
+        }
+        return created;
+    }
+
+    private static String incomingContactDisplayName() {
+        return UNKNOWN_CONTACT_NAME_PLACEHOLDER;
+    }
+
+    private static String incomingContactRegNumber() {
+        return UNKNOWN_CONTACT_REG_PLACEHOLDER;
+    }
+
+    static UnreadAction resolveUnreadActionOnIncoming(
+            MainViewModel.MainTab activeTab,
+            String currentChatRecipientId,
+            String senderId) {
+        if (activeTab == MainViewModel.MainTab.MESSAGES
+                && senderId != null
+                && senderId.equals(currentChatRecipientId)) {
+            return UnreadAction.RESET;
+        }
+        return UnreadAction.INCREMENT;
+    }
+
+    static boolean isSameContactSelection(ContactInfo clicked, Object candidate) {
+        if (clicked == null || clicked.id() == null || clicked.id().isBlank()) {
+            return false;
+        }
+        if (!(candidate instanceof ContactInfo previous)) {
+            return false;
+        }
+        return clicked.id().equals(previous.id());
+    }
+
+    static void resetUnreadOnChatOpen(MainViewModel viewModel, String recipientId) {
+        if (viewModel == null || recipientId == null || recipientId.isBlank()) {
+            return;
+        }
+        viewModel.resetUnread(recipientId);
     }
 }

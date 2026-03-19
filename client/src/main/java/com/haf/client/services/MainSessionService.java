@@ -20,6 +20,16 @@ public interface MainSessionService {
     void unregisterPresenceListener();
 
     /**
+     * Registers an incoming-message listener against the active chat session, if available.
+     */
+    void registerIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
+
+    /**
+     * Unregisters the previously registered incoming-message listener, if any.
+     */
+    void unregisterIncomingMessageListener();
+
+    /**
      * Performs logout orchestration (best effort server revoke + local session clear).
      *
      * @return future completed when logout orchestration finishes

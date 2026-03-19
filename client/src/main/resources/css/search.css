@@ -9,6 +9,12 @@
     -fx-effect: dropshadow(gaussian, rgba(32, 32, 32, 0.6), 10, 0, 0, 0);
 }
 
+.card .plain-text-bold {
+    -fx-font-family: 'Manrope-Bold', sans-serif;
+    -fx-font-weight: 700;
+    -fx-font-smoothing-type: gray;
+}
+
 .plain-text-bold {
     -fx-fill: #202020;
     -fx-text-alignment: center;
