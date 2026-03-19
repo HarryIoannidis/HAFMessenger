@@ -11,6 +11,7 @@ import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
+import com.haf.client.viewmodels.MessageViewModel;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
@@ -149,6 +150,7 @@ public class MainController implements SearchContactActions {
         setupProfilePopupTrigger();
         registerPresenceListener();
         registerIncomingMessageListener();
+        startMessageReceiving();
 
         // Trigger pre-loading immediately
         contentLoader.triggerPreloading();
@@ -767,6 +769,15 @@ public class MainController implements SearchContactActions {
 
     private void registerIncomingMessageListener() {
         mainSessionService.registerIncomingMessageListener(this::applyIncomingMessage);
+    }
+
+    private void startMessageReceiving() {
+        MessageViewModel chatViewModel = ChatSession.get();
+        if (chatViewModel == null) {
+            LOGGER.warning("Cannot start message receiving: chat session is not initialized.");
+            return;
+        }
+        chatViewModel.startReceiving();
     }
 
     private void applyPresenceUpdate(String userId, boolean active) {

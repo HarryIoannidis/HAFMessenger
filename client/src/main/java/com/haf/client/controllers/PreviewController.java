@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.ImageSaveSupport;
+import com.haf.client.utils.WindowResizeHelper;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -25,6 +26,8 @@ import java.util.logging.Logger;
 public class PreviewController {
 
     private static final Logger LOGGER = Logger.getLogger(PreviewController.class.getName());
+    private static final double MAX_PREVIEW_WIDTH = 400.0;
+    private static final double MAX_PREVIEW_HEIGHT = 400.0;
 
     @FXML
     private BorderPane rootContainer;
@@ -68,8 +71,8 @@ public class PreviewController {
         if (downloadButton == null) {
             return;
         }
-        downloadButton.setVisible(allowed);
-        downloadButton.setManaged(allowed);
+        downloadButton.setVisible(true);
+        downloadButton.setManaged(true);
         downloadButton.setDisable(!allowed);
     }
 
@@ -152,6 +155,10 @@ public class PreviewController {
             if (stage == null) {
                 return;
             }
+            stage.setResizable(true);
+            WindowResizeHelper.enableResizing(stage);
+            stage.setMinWidth(280);
+            stage.setMinHeight(220);
 
             if (minimizeButton != null) {
                 minimizeButton.setOnAction(e -> stage.setIconified(true));
@@ -188,8 +195,9 @@ public class PreviewController {
         if (width <= 0 || height <= 0) {
             return;
         }
-        previewImageView.setFitWidth(width);
-        previewImageView.setFitHeight(height);
+        double scale = Math.min(1.0, Math.min(MAX_PREVIEW_WIDTH / width, MAX_PREVIEW_HEIGHT / height));
+        previewImageView.setFitWidth(width * scale);
+        previewImageView.setFitHeight(height * scale);
         Stage stage = resolveStage();
         if (stage != null) {
             stage.sizeToScene();

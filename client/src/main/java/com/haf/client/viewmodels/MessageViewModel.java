@@ -64,6 +64,7 @@ public class MessageViewModel {
 
     private final Object policyLock = new Object();
     private volatile MessagingPolicyResponse cachedPolicy;
+    private volatile boolean receivingStarted;
     private static volatile boolean fxToolkitUnavailable;
 
     /**
@@ -134,20 +135,29 @@ public class MessageViewModel {
      */
     public void sendAttachment(String recipientId, Path filePath, String mediaTypeHint) {
         String contactId = normalizeContactId(recipientId);
+        CompletableFuture.runAsync(() -> sendAttachmentInternal(contactId, filePath, mediaTypeHint));
+    }
+
+    private void sendAttachmentInternal(String contactId, Path filePath, String mediaTypeHint) {
         try {
             if (filePath == null || !Files.exists(filePath)) {
                 throw new IllegalArgumentException("Attachment file is missing");
             }
 
-            byte[] fileBytes = Files.readAllBytes(filePath);
-            if (fileBytes.length == 0) {
+            long fileSizeBytes = Files.size(filePath);
+            if (fileSizeBytes <= 0) {
                 throw new IllegalArgumentException("Attachment file is empty");
             }
 
             MessagingPolicyResponse policy = getMessagingPolicy();
             String mediaType = normalizeMediaType(mediaTypeHint, filePath);
-            validateAgainstPolicy(mediaType, fileBytes.length, policy);
+            validateAgainstPolicy(mediaType, fileSizeBytes, policy);
             String fileName = sanitizeFileName(filePath.getFileName().toString());
+
+            byte[] fileBytes = Files.readAllBytes(filePath);
+            if (fileBytes.length == 0) {
+                throw new IllegalArgumentException("Attachment file is empty");
+            }
 
             if (fileBytes.length <= policy.getAttachmentInlineMaxBytes()) {
                 sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
@@ -169,8 +179,12 @@ public class MessageViewModel {
      * Starts the message receiver.
      */
     public void startReceiving() {
+        if (receivingStarted) {
+            return;
+        }
         try {
             messageReceiver.start();
+            receivingStarted = true;
             runOnUiThread(() -> status.set("Receiving messages…"));
         } catch (Exception e) {
             runOnUiThread(() -> status.set("Failed to start receiving: " + e.getMessage()));
@@ -181,7 +195,11 @@ public class MessageViewModel {
      * Stops the message receiver.
      */
     public void stopReceiving() {
+        if (!receivingStarted) {
+            return;
+        }
         messageReceiver.stop();
+        receivingStarted = false;
         runOnUiThread(() -> status.set("Stopped receiving messages"));
     }
 

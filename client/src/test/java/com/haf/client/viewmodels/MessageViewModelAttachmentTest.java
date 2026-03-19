@@ -51,6 +51,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, new byte[256]);
 
         viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
 
         assertEquals(1, sender.sendCalls);
         assertEquals(0, sender.initCalls);
@@ -69,6 +70,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, new byte[2_048]);
 
         viewModel.sendAttachment("bob", file, "application/pdf");
+        awaitCondition(() -> sender.bindCalls == 1 && viewModel.getMessages("bob").size() == 1);
 
         assertEquals(0, sender.sendCalls);
         assertEquals(1, sender.initCalls);
@@ -93,6 +95,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, new byte[200]);
 
         viewModel.sendAttachment("bob", file, "application/pdf");
+        awaitCondition(() -> viewModel.statusProperty().get().contains("Failed to send attachment"));
 
         assertEquals(0, sender.sendCalls);
         assertEquals(0, sender.initCalls);
