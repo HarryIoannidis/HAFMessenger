@@ -46,6 +46,7 @@ public final class MessageBubbleFactory {
         bubble.setMaxWidth(320);
         bubble.setPadding(new Insets(14));
         bubble.getStyleClass().add(message.isOutgoing() ? "bubble-out" : "bubble-in");
+        bubble.setCursor(Cursor.HAND);
 
         // Message content
         Node content = buildContent(message);

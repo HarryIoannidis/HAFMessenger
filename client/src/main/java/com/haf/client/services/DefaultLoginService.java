@@ -204,7 +204,6 @@ public class DefaultLoginService implements LoginService {
 
         NetworkSession.set(wsAdapter);
         ChatSession.set(new MessageViewModel(sender, receiver));
-        receiver.start();
     }
 
     private static String fetchPublicKey(WebSocketAdapter wsAdapter, String recipientId) {

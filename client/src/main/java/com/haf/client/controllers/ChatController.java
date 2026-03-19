@@ -25,6 +25,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -308,21 +309,22 @@ public class ChatController {
     }
 
     private void installMessageContextMenu(Node messageNode, MessageVM message) {
+        Node interactionTarget = resolveInteractionTarget(messageNode);
         List<MessageContextAction> actions = resolveContextActions(message);
-        if (messageNode == null || actions.isEmpty()) {
+        if (interactionTarget == null || actions.isEmpty()) {
             return;
         }
 
         ContextMenu menu = buildMessageContextMenu(message, actions);
-        messageNode.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
+        interactionTarget.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
             if (menu.isShowing()) {
                 menu.hide();
             }
-            menu.show(messageNode, event.getScreenX(), event.getScreenY());
+            menu.show(interactionTarget, event.getScreenX(), event.getScreenY());
             event.consume();
         });
 
-        messageNode.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+        interactionTarget.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
             if (menu.isShowing() && event.getButton() != MouseButton.SECONDARY) {
                 menu.hide();
             }
@@ -366,11 +368,24 @@ public class ChatController {
             return;
         }
         String suggestedName = resolveSuggestedDownloadFileName(message);
+        boolean downloadAllowed = isImageDownloadAvailable(message);
         ViewRouter.showPopup(
                 PREVIEW_POPUP_KEY,
                 UiConstants.FXML_PREVIEW,
                 PreviewController.class,
-                controller -> controller.showImage(message.content(), suggestedName, !message.isOutgoing()));
+                controller -> controller.showImage(message.content(), suggestedName, downloadAllowed));
+    }
+
+    private boolean isImageDownloadAvailable(MessageVM message) {
+        if (message == null || message.type() != MessageType.IMAGE) {
+            return false;
+        }
+        String sourceReference = resolveDownloadSourceReference(message);
+        if (sourceReference == null || sourceReference.isBlank()) {
+            return false;
+        }
+        Path sourcePath = ImageSaveSupport.resolveLocalSourcePath(sourceReference);
+        return sourcePath != null && Files.exists(sourcePath);
     }
 
     private void downloadImageFromMessage(MessageVM message) {
@@ -414,11 +429,12 @@ public class ChatController {
     }
 
     private void installFilePrimaryClickDownload(Node messageNode, MessageVM message) {
-        if (messageNode == null || message == null || message.type() != MessageType.FILE) {
+        Node interactionTarget = resolveInteractionTarget(messageNode);
+        if (interactionTarget == null || message == null || message.type() != MessageType.FILE) {
             return;
         }
 
-        messageNode.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+        interactionTarget.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1) {
                 return;
             }
@@ -428,20 +444,28 @@ public class ChatController {
     }
 
     private void installImagePrimaryClickPreview(Node messageNode, MessageVM message) {
-        if (messageNode == null || message == null || message.type() != MessageType.IMAGE) {
+        Node interactionTarget = resolveInteractionTarget(messageNode);
+        if (interactionTarget == null || message == null || message.type() != MessageType.IMAGE) {
             return;
         }
         if (message.content() == null || message.content().isBlank()) {
             return;
         }
 
-        messageNode.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+        interactionTarget.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1) {
                 return;
             }
             openImagePreview(message);
             event.consume();
         });
+    }
+
+    private Node resolveInteractionTarget(Node messageNode) {
+        if (messageNode instanceof HBox row && !row.getChildren().isEmpty()) {
+            return row.getChildren().get(0);
+        }
+        return messageNode;
     }
 
     private Stage resolveOwnerWindow() {

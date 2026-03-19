@@ -33,13 +33,15 @@
 
 .chat-area .scroll-bar:vertical {
     -fx-background-color: transparent;
-    -fx-pref-width: 5px;
+    -fx-pref-width: 8px;
+    -fx-min-width: 8px;
+    -fx-max-width: 8px;
 }
 
 .chat-area .scroll-bar:vertical .thumb {
     -fx-background-color: #A3A3A3;
-    -fx-background-radius: 4px;
-    -fx-opacity: 0.6;
+    -fx-background-radius: 3px;
+    -fx-opacity: 0.8;
 }
 
 .chat-area .scroll-bar:vertical .thumb:hover {
@@ -48,6 +50,8 @@
 
 .chat-area .scroll-bar:vertical .track {
     -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0px;
 }
 
 .chat-area .scroll-bar:vertical .track-background {
@@ -60,6 +64,12 @@
     -fx-pref-height: 0px;
     -fx-min-height: 0px;
     -fx-max-height: 0px;
+    -fx-opacity: 0;
+}
+
+.chat-area .scroll-bar:horizontal {
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
     -fx-opacity: 0;
 }
 
