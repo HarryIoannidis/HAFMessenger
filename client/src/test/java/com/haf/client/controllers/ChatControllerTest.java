@@ -1,10 +1,14 @@
 package com.haf.client.controllers;
 
 import com.haf.client.services.ChatAttachmentService;
+import com.haf.client.models.MessageType;
+import com.haf.client.models.MessageVM;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -42,6 +46,123 @@ class ChatControllerTest {
         controller.dispatchSelectedAttachment("   ", selected);
 
         assertEquals(0, attachmentService.calls.get());
+    }
+
+    @Test
+    void context_action_mapping_matches_spec_for_text_and_images() {
+        MessageVM outgoingText = new MessageVM(
+                true,
+                MessageType.TEXT,
+                "hello",
+                null,
+                null,
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM incomingText = new MessageVM(
+                false,
+                MessageType.TEXT,
+                "hello",
+                null,
+                null,
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM outgoingImage = new MessageVM(
+                true,
+                MessageType.IMAGE,
+                "file:///tmp/outgoing.png",
+                null,
+                "outgoing.png",
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM incomingImage = new MessageVM(
+                false,
+                MessageType.IMAGE,
+                "file:///tmp/incoming.png",
+                null,
+                "incoming.png",
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM fileMessage = new MessageVM(
+                false,
+                MessageType.FILE,
+                null,
+                "file:///tmp/report.pdf",
+                "report.pdf",
+                "25 KB",
+                LocalDateTime.now(),
+                false);
+
+        assertEquals(List.of(ChatController.MessageContextAction.COPY), ChatController.resolveContextActions(outgoingText));
+        assertEquals(List.of(ChatController.MessageContextAction.COPY), ChatController.resolveContextActions(incomingText));
+        assertEquals(List.of(ChatController.MessageContextAction.PREVIEW), ChatController.resolveContextActions(outgoingImage));
+        assertEquals(
+                List.of(ChatController.MessageContextAction.PREVIEW, ChatController.MessageContextAction.DOWNLOAD),
+                ChatController.resolveContextActions(incomingImage));
+        assertEquals(List.of(ChatController.MessageContextAction.DOWNLOAD), ChatController.resolveContextActions(fileMessage));
+    }
+
+    @Test
+    void suggested_image_name_prefers_message_file_name_then_source_then_default() {
+        MessageVM withProvidedName = new MessageVM(
+                false,
+                MessageType.IMAGE,
+                "file:///tmp/fallback.png",
+                null,
+                "provided-name.png",
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM withSourceOnly = new MessageVM(
+                false,
+                MessageType.IMAGE,
+                "file:///tmp/from-source.webp",
+                null,
+                null,
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM withNothing = new MessageVM(
+                false,
+                MessageType.IMAGE,
+                null,
+                null,
+                null,
+                null,
+                LocalDateTime.now(),
+                false);
+
+        assertEquals("provided-name.png", ChatController.resolveSuggestedDownloadFileName(withProvidedName));
+        assertEquals("from-source.webp", ChatController.resolveSuggestedDownloadFileName(withSourceOnly));
+        assertEquals("image-preview.png", ChatController.resolveSuggestedDownloadFileName(withNothing));
+    }
+
+    @Test
+    void download_source_reference_uses_content_for_images_and_local_path_for_files() {
+        MessageVM image = new MessageVM(
+                false,
+                MessageType.IMAGE,
+                "file:///tmp/image.png",
+                null,
+                "image.png",
+                null,
+                LocalDateTime.now(),
+                false);
+        MessageVM file = new MessageVM(
+                false,
+                MessageType.FILE,
+                null,
+                "file:///tmp/report.pdf",
+                "report.pdf",
+                "25 KB",
+                LocalDateTime.now(),
+                false);
+
+        assertEquals("file:///tmp/image.png", ChatController.resolveDownloadSourceReference(image));
+        assertEquals("file:///tmp/report.pdf", ChatController.resolveDownloadSourceReference(file));
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {

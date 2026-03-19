@@ -72,11 +72,27 @@
     -fx-max-width: 320px;
 }
 
+.bubble-out:hover {
+    -fx-background-color: #176EA9;
+}
+
+.bubble-out:pressed {
+    -fx-background-color: #135A87;
+}
+
 .bubble-in {
     -fx-background-color: #E8E8E8;
     -fx-background-radius: 12px 12px 12px 2px;
     -fx-padding: 14px;
     -fx-max-width: 320px;
+}
+
+.bubble-in:hover {
+    -fx-background-color: #DEDEDE;
+}
+
+.bubble-in:pressed {
+    -fx-background-color: #D3D3D3;
 }
 
 .bubble-text-out {
@@ -101,6 +117,11 @@
 
 .bubble-image {
     -fx-background-radius: 10px;
+}
+
+.bubble-image-clickable,
+.bubble-file-clickable {
+    -fx-cursor: hand;
 }
 
 .bubble-image-spinner {

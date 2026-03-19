@@ -3,16 +3,18 @@
 <?import com.jfoenix.controls.JFXButton?>
 <?import java.net.URL?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ProgressIndicator?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.ProfileController">
+<BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" styleClass="preview-window" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.PreviewController">
    <stylesheets>
       <URL value="@../css/global.css" />
       <URL value="@../css/preview.css" />
@@ -44,15 +46,20 @@
       </VBox>
    </top>
    <center>
-      <VBox alignment="CENTER" BorderPane.alignment="CENTER">
+      <VBox alignment="CENTER" spacing="10.0" BorderPane.alignment="CENTER">
          <children>
-            <ImageView fitHeight="400.0" fitWidth="400.0" pickOnBounds="true" preserveRatio="true" />
-            <JFXButton contentDisplay="RIGHT" focusTraversable="false" graphicTextGap="5.0" prefHeight="40.0" prefWidth="150.0" styleClass="button-download" text="Download">
+            <StackPane>
+               <children>
+                  <ImageView fx:id="previewImageView" pickOnBounds="true" preserveRatio="true" />
+                  <ProgressIndicator fx:id="loadingSpinner" managed="false" maxHeight="46.0" maxWidth="46.0" prefHeight="46.0" prefWidth="46.0" visible="false" />
+               </children>
+            </StackPane>
+            <JFXButton fx:id="downloadButton" contentDisplay="RIGHT" focusTraversable="false" graphicTextGap="5.0" prefHeight="40.0" prefWidth="150.0" styleClass="button-download" text="Download">
                <font>
                   <Font size="15.0" />
                </font>
                <VBox.margin>
-                  <Insets top="10.0" />
+                  <Insets bottom="10.0" top="10.0" />
                </VBox.margin>
                <graphic>
                   <FontIcon iconLiteral="mdi2d-download" iconSize="25" selectionEnd="0" />
@@ -63,7 +70,7 @@
             </JFXButton>
          </children>
          <BorderPane.margin>
-            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+            <Insets />
          </BorderPane.margin>
       </VBox>
    </center>

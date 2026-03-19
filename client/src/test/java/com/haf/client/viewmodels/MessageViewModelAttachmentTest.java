@@ -183,6 +183,7 @@ class MessageViewModelAttachmentTest {
         assertEquals(MessageType.IMAGE, resolved.type());
         assertFalse(resolved.isLoading());
         assertNotNull(resolved.content());
+        assertEquals("photo.png", resolved.fileName());
     }
 
     private static MessagingPolicyResponse policy(long max, long inlineMax, int chunk) {
