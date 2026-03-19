@@ -15,14 +15,15 @@ import com.haf.shared.dto.UserSearchResultDTO;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
 import javafx.collections.ListChangeListener;
-import javafx.scene.Parent;
+import javafx.event.EventHandler;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListView;
+import javafx.scene.Scene;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -33,7 +34,6 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 
-import java.io.IOException;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,8 +47,6 @@ public class MainController implements SearchContactActions {
     private static final String NAV_ITEM_ICON = "nav-item-icon";
     private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
     private static final String PROFILE_POPUP_KEY = "profile-popup";
-    private static final String UNKNOWN_CONTACT_NAME_PLACEHOLDER = "Unknown Contact";
-    private static final String UNKNOWN_CONTACT_REG_PLACEHOLDER = "";
 
     // Window chrome
     @FXML
@@ -114,36 +112,17 @@ public class MainController implements SearchContactActions {
     private double yOffset;
     private ContactInfo contactContextTarget;
     private ContextMenu contactContextMenu;
-
-    /** Reference to the loaded SearchController (null when not in search mode). */
-    private SearchController searchController;
+    private EventHandler<MouseEvent> contactContextOutsideClickHandler;
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
     private final MainViewModel viewModel = MainViewModel.createDefault();
     private final MainSessionService mainSessionService;
-
-    // Cached views for performance
-    private Parent currentChatView;
-    private ChatController currentChatController;
-    private String currentChatRecipientId;
-
-    private final java.util.concurrent.CompletableFuture<Parent> placeholderFuture = new java.util.concurrent.CompletableFuture<>();
-    private final java.util.concurrent.CompletableFuture<Parent> searchFuture = new java.util.concurrent.CompletableFuture<>();
-    private final java.util.concurrent.atomic.AtomicInteger chatLoadGeneration = new java.util.concurrent.atomic.AtomicInteger();
-    private final java.util.concurrent.atomic.AtomicBoolean placeholderLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
-            false);
-    private final java.util.concurrent.atomic.AtomicBoolean searchLoadingStarted = new java.util.concurrent.atomic.AtomicBoolean(
-            false);
+    private MainContentLoader contentLoader;
 
     enum ContactContextAction {
         PROFILE,
         DELETE_CHAT,
         REMOVE_CONTACT
-    }
-
-    enum UnreadAction {
-        INCREMENT,
-        RESET
     }
 
     public MainController() {
@@ -156,12 +135,14 @@ public class MainController implements SearchContactActions {
 
     @FXML
     public void initialize() {
+        contentLoader = new MainContentLoader(contentPane, this);
         bindViewModel();
         bindSelectedContactProfileSync();
         setupWindowControls();
         setupNavBar();
         setupDotsMenu();
         setupContactContextMenu();
+        setupContactContextMenuOutsideClickClose();
         setupContactList();
         setupContactSelection();
         setupSearchField();
@@ -170,7 +151,7 @@ public class MainController implements SearchContactActions {
         registerIncomingMessageListener();
 
         // Trigger pre-loading immediately
-        triggerPreloading();
+        contentLoader.triggerPreloading();
 
         // Fetch contacts from server
         viewModel.fetchContacts();
@@ -221,8 +202,9 @@ public class MainController implements SearchContactActions {
     }
 
     private String resolveTrackedContactId() {
-        if (currentChatRecipientId != null && !currentChatRecipientId.isBlank()) {
-            return currentChatRecipientId;
+        String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
+        if (activeChatRecipientId != null && !activeChatRecipientId.isBlank()) {
+            return activeChatRecipientId;
         }
 
         Object tracked = contactsList.getUserData();
@@ -235,13 +217,6 @@ public class MainController implements SearchContactActions {
             return null;
         }
         return selected.id();
-    }
-
-    private void triggerPreloading() {
-        Thread.ofVirtual().name("view-preloader").start(() -> {
-            ensurePlaceholderLoaded();
-            ensureSearchLoaded();
-        });
     }
 
     private void setupNavBar() {
@@ -280,6 +255,7 @@ public class MainController implements SearchContactActions {
      * Performs the search using the current text in the toolbar field.
      */
     private void performSearch() {
+        SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
         if (searchController == null) {
             return;
         }
@@ -299,6 +275,7 @@ public class MainController implements SearchContactActions {
      */
     private void clearSearch() {
         toolbarSearchField.clear();
+        SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
         if (searchController != null) {
             searchController.clearResults();
         }
@@ -324,9 +301,14 @@ public class MainController implements SearchContactActions {
             ContactInfo contactToShow = latest != null ? latest : selected;
             contactsList.setUserData(contactToShow);
             showProfilePanel(contactToShow);
-            loadChat(contactToShow.id());
+            viewModel.resetUnreadOnChatOpen(contactToShow.id());
+            if (contentLoader != null) {
+                contentLoader.showChat(contactToShow.id());
+            }
         } else {
-            loadPlaceholder();
+            if (contentLoader != null) {
+                contentLoader.showPlaceholder();
+            }
         }
     }
 
@@ -342,7 +324,9 @@ public class MainController implements SearchContactActions {
         showSearchPanel();
 
         // Load search FXML into contentPane
-        loadSearchView();
+        if (contentLoader != null) {
+            contentLoader.showSearchView();
+        }
     }
 
     private void updateNavStyles(boolean messagesActive) {
@@ -364,40 +348,6 @@ public class MainController implements SearchContactActions {
             if (!iconMessages.getStyleClass().contains(NAV_ITEM_ICON)) {
                 iconMessages.getStyleClass().add(NAV_ITEM_ICON);
             }
-        }
-    }
-
-    /**
-     * Loads search.fxml into the content pane.
-     */
-    private void loadSearchView() {
-        searchFuture.thenAccept(view -> javafx.application.Platform.runLater(
-                () -> contentPane.getChildren().setAll(view)));
-
-        // If not already loading, trigger it (non-blocking)
-        if (!searchLoadingStarted.get()) {
-            ensureSearchLoaded();
-        }
-    }
-
-    private void ensureSearchLoaded() {
-        if (searchLoadingStarted.getAndSet(true)) {
-            return;
-        }
-
-        try {
-            var resource = getClass().getResource(UiConstants.FXML_SEARCH);
-            LOGGER.log(Level.INFO, "Loading search FXML: {0}", resource);
-            FXMLLoader loader = new FXMLLoader(resource);
-            Parent view = loader.load();
-            SearchController controller = loader.getController();
-            controller.setContactActions(this);
-
-            searchController = controller;
-            searchFuture.complete(view);
-        } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
-            searchFuture.completeExceptionally(e);
         }
     }
 
@@ -523,12 +473,11 @@ public class MainController implements SearchContactActions {
     public void removeContact(String userId) {
         ContactInfo selectedBeforeRemoval = contactsList.getSelectionModel().getSelectedItem();
         viewModel.removeContact(userId);
-        boolean contactsEmptyAfterRemoval = viewModel.contactsProperty().isEmpty();
-        if (shouldShowPlaceholderAfterRemoval(
+        String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
+        if (viewModel.shouldShowPlaceholderAfterRemoval(
                 userId,
                 selectedBeforeRemoval,
-                currentChatRecipientId,
-                contactsEmptyAfterRemoval)) {
+                activeChatRecipientId)) {
             clearSelectionAndShowPlaceholder();
         }
     }
@@ -556,7 +505,7 @@ public class MainController implements SearchContactActions {
             Object lastSelected = contactsList.getUserData();
             MainViewModel.ContactSelectionAction action = viewModel.resolveContactSelectionAction(
                     viewModel.activeTabProperty().get(),
-                    isSameContactSelection(clicked, lastSelected));
+                    MainViewModel.isSameContactSelection(clicked, lastSelected));
 
             applyContactSelectionAction(action,
                     () -> {
@@ -579,9 +528,13 @@ public class MainController implements SearchContactActions {
     private void clearSelectionAndShowPlaceholder() {
         contactsList.getSelectionModel().clearSelection();
         contactsList.setUserData(null);
-        currentChatRecipientId = null;
+        if (contentLoader != null) {
+            contentLoader.clearCurrentChatRecipient();
+        }
         hideProfilePanel();
-        loadPlaceholder();
+        if (contentLoader != null) {
+            contentLoader.showPlaceholder();
+        }
     }
 
     static void applyContactSelectionAction(
@@ -618,23 +571,6 @@ public class MainController implements SearchContactActions {
         }
     }
 
-    static boolean shouldShowPlaceholderAfterRemoval(
-            String removedUserId,
-            ContactInfo selectedBeforeRemoval,
-            String activeChatRecipientId,
-            boolean contactsEmptyAfterRemoval) {
-        if (contactsEmptyAfterRemoval) {
-            return true;
-        }
-        if (removedUserId == null || removedUserId.isBlank()) {
-            return false;
-        }
-        if (selectedBeforeRemoval != null && removedUserId.equals(selectedBeforeRemoval.id())) {
-            return true;
-        }
-        return activeChatRecipientId != null && removedUserId.equals(activeChatRecipientId);
-    }
-
     private void setupContactContextMenu() {
         contactContextMenu = ContextMenuBuilder.create()
                 .addOption(
@@ -652,6 +588,44 @@ public class MainController implements SearchContactActions {
                         () -> handleContactContextAction(ContactContextAction.REMOVE_CONTACT))
                 .onHidden(() -> contactContextTarget = null)
                 .build();
+        contactContextMenu.setAutoHide(true);
+    }
+
+    private void setupContactContextMenuOutsideClickClose() {
+        if (rootContainer == null) {
+            return;
+        }
+
+        contactContextOutsideClickHandler = this::handleContactContextOutsideClick;
+        rootContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            unregisterContactContextOutsideClickHandler(oldScene);
+            registerContactContextOutsideClickHandler(newScene);
+        });
+
+        registerContactContextOutsideClickHandler(rootContainer.getScene());
+    }
+
+    private void registerContactContextOutsideClickHandler(Scene scene) {
+        if (scene == null || contactContextOutsideClickHandler == null) {
+            return;
+        }
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, contactContextOutsideClickHandler);
+    }
+
+    private void unregisterContactContextOutsideClickHandler(Scene scene) {
+        if (scene == null || contactContextOutsideClickHandler == null) {
+            return;
+        }
+        scene.removeEventFilter(MouseEvent.MOUSE_PRESSED, contactContextOutsideClickHandler);
+    }
+
+    private void handleContactContextOutsideClick(MouseEvent event) {
+        if (event == null || contactContextMenu == null || !contactContextMenu.isShowing()) {
+            return;
+        }
+
+        // ContextMenu lives in its own popup window, so scene clicks are outside clicks.
+        contactContextMenu.hide();
     }
 
     private void showContactContextMenu(ContactInfo contact, double screenX, double screenY) {
@@ -660,7 +634,7 @@ public class MainController implements SearchContactActions {
         }
 
         contactContextTarget = contact;
-        if (!isSameContactSelection(contact, contactsList.getSelectionModel().getSelectedItem())) {
+        if (!MainViewModel.isSameContactSelection(contact, contactsList.getSelectionModel().getSelectedItem())) {
             selectContactAndOpenChat(contact);
         }
 
@@ -693,8 +667,8 @@ public class MainController implements SearchContactActions {
         }
 
         messageViewModel.getMessages(contactId).clear();
-        if (currentChatController != null && contactId.equals(currentChatRecipientId)) {
-            currentChatController.setRecipient(contactId);
+        if (contentLoader != null) {
+            contentLoader.refreshActiveChatIfRecipient(contactId);
         }
     }
 
@@ -710,75 +684,6 @@ public class MainController implements SearchContactActions {
 
     private static boolean isPrimaryClick(MouseButton button) {
         return button == MouseButton.PRIMARY;
-    }
-
-    private void loadPlaceholder() {
-        placeholderFuture
-                .thenAccept(view -> javafx.application.Platform.runLater(() -> contentPane.getChildren().setAll(view)));
-
-        if (!placeholderLoadingStarted.get()) {
-            ensurePlaceholderLoaded();
-        }
-    }
-
-    private void ensurePlaceholderLoaded() {
-        if (placeholderLoadingStarted.getAndSet(true)) {
-            return;
-        }
-
-        try {
-            var resource = getClass().getResource(UiConstants.FXML_PLACEHOLDER);
-            LOGGER.log(Level.INFO, "Loading placeholder FXML: {0}", resource);
-            FXMLLoader loader = new FXMLLoader(resource);
-            Parent view = loader.load();
-            placeholderFuture.complete(view);
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
-            placeholderFuture.completeExceptionally(e);
-        }
-    }
-
-    private void loadChat(String recipientId) {
-        resetUnreadOnChatOpen(viewModel, recipientId);
-        int loadGeneration = chatLoadGeneration.incrementAndGet();
-
-        // Reuse chat view if already loaded — just switch recipient
-        if (currentChatView != null && currentChatController != null) {
-            if (!recipientId.equals(currentChatRecipientId)) {
-                currentChatController.setRecipient(recipientId);
-                currentChatRecipientId = recipientId;
-            }
-            contentPane.getChildren().setAll(currentChatView);
-            return;
-        }
-
-        Runnable loadAction = () -> {
-            try {
-                var resource = getClass().getResource(UiConstants.FXML_CHAT);
-                LOGGER.log(Level.INFO, "Loading chat FXML: {0}", resource);
-                FXMLLoader loader = new FXMLLoader(resource);
-                javafx.scene.Parent view = loader.load();
-
-                ChatController chatController = loader.getController();
-
-                if (loadGeneration != chatLoadGeneration.get()) {
-                    return;
-                }
-                chatController.setRecipient(recipientId);
-                currentChatView = view;
-                currentChatController = chatController;
-                currentChatRecipientId = recipientId;
-                contentPane.getChildren().setAll(view);
-            } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
-            }
-        };
-
-        if (javafx.application.Platform.isFxApplicationThread()) {
-            loadAction.run();
-        } else {
-            javafx.application.Platform.runLater(loadAction);
-        }
     }
 
     private void setupWindowControls() {
@@ -894,85 +799,15 @@ public class MainController implements SearchContactActions {
                 contactsList.getSelectionModel().select(updated);
             }
             contactsList.setUserData(updated);
-            currentChatRecipientId = updated.id();
+            if (contentLoader != null) {
+                contentLoader.setCurrentChatRecipientId(updated.id());
+            }
             showProfilePanel(updated);
         }
     }
 
     private void updateUnreadForIncomingMessage(String senderId) {
-        ContactInfo contact = ensureIncomingContact(viewModel, senderId);
-        if (contact == null) {
-            return;
-        }
-
-        UnreadAction action = resolveUnreadActionOnIncoming(
-                viewModel.activeTabProperty().get(),
-                currentChatRecipientId,
-                senderId);
-        if (action == UnreadAction.RESET) {
-            viewModel.resetUnread(senderId);
-        } else {
-            viewModel.incrementUnread(senderId);
-        }
-    }
-
-    static ContactInfo ensureIncomingContact(MainViewModel viewModel, String senderId) {
-        if (viewModel == null || senderId == null || senderId.isBlank()) {
-            return null;
-        }
-
-        ContactInfo existing = viewModel.getContactById(senderId);
-        if (existing != null) {
-            return existing;
-        }
-        viewModel.addContact(
-                senderId,
-                incomingContactDisplayName(),
-                incomingContactRegNumber());
-        ContactInfo created = viewModel.getContactById(senderId);
-        if (created == null) {
-            created = viewModel.ensureChatContact(
-                    senderId,
-                    incomingContactDisplayName(),
-                    incomingContactRegNumber());
-        }
-        return created;
-    }
-
-    private static String incomingContactDisplayName() {
-        return UNKNOWN_CONTACT_NAME_PLACEHOLDER;
-    }
-
-    private static String incomingContactRegNumber() {
-        return UNKNOWN_CONTACT_REG_PLACEHOLDER;
-    }
-
-    static UnreadAction resolveUnreadActionOnIncoming(
-            MainViewModel.MainTab activeTab,
-            String currentChatRecipientId,
-            String senderId) {
-        if (activeTab == MainViewModel.MainTab.MESSAGES
-                && senderId != null
-                && senderId.equals(currentChatRecipientId)) {
-            return UnreadAction.RESET;
-        }
-        return UnreadAction.INCREMENT;
-    }
-
-    static boolean isSameContactSelection(ContactInfo clicked, Object candidate) {
-        if (clicked == null || clicked.id() == null || clicked.id().isBlank()) {
-            return false;
-        }
-        if (!(candidate instanceof ContactInfo previous)) {
-            return false;
-        }
-        return clicked.id().equals(previous.id());
-    }
-
-    static void resetUnreadOnChatOpen(MainViewModel viewModel, String recipientId) {
-        if (viewModel == null || recipientId == null || recipientId.isBlank()) {
-            return;
-        }
-        viewModel.resetUnread(recipientId);
+        String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
+        viewModel.applyIncomingMessage(senderId, activeChatRecipientId);
     }
 }

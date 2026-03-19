@@ -43,6 +43,11 @@ public class MainViewModel {
         KEEP_SELECTED_CONTACT
     }
 
+    public enum IncomingUnreadAction {
+        INCREMENT,
+        RESET
+    }
+
     public interface ContactsGateway {
         CompletableFuture<String> fetchContacts();
 
@@ -53,6 +58,8 @@ public class MainViewModel {
 
     private static final Logger LOGGER = Logger.getLogger(MainViewModel.class.getName());
     private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
+    private static final String UNKNOWN_CONTACT_NAME_PLACEHOLDER = "Unknown Contact";
+    private static final String UNKNOWN_CONTACT_REG_PLACEHOLDER = "";
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
@@ -282,6 +289,53 @@ public class MainViewModel {
         return updateUnread(userId, ignored -> 0);
     }
 
+    public void resetUnreadOnChatOpen(String recipientId) {
+        if (recipientId == null || recipientId.isBlank()) {
+            return;
+        }
+        resetUnread(recipientId);
+    }
+
+    public ContactInfo ensureIncomingContact(String senderId) {
+        if (senderId == null || senderId.isBlank()) {
+            return null;
+        }
+
+        ContactInfo existing = getContactById(senderId);
+        if (existing != null) {
+            return existing;
+        }
+
+        addContact(
+                senderId,
+                UNKNOWN_CONTACT_NAME_PLACEHOLDER,
+                UNKNOWN_CONTACT_REG_PLACEHOLDER);
+
+        ContactInfo created = getContactById(senderId);
+        if (created == null) {
+            created = ensureChatContact(
+                    senderId,
+                    UNKNOWN_CONTACT_NAME_PLACEHOLDER,
+                    UNKNOWN_CONTACT_REG_PLACEHOLDER);
+        }
+        return created;
+    }
+
+    public IncomingUnreadAction applyIncomingMessage(String senderId, String currentChatRecipientId) {
+        ContactInfo contact = ensureIncomingContact(senderId);
+        if (contact == null) {
+            return null;
+        }
+
+        IncomingUnreadAction action = resolveIncomingUnreadAction(activeTab.get(), currentChatRecipientId, senderId);
+        if (action == IncomingUnreadAction.RESET) {
+            resetUnread(senderId);
+        } else {
+            incrementUnread(senderId);
+        }
+        return action;
+    }
+
     private void upsertContact(
             String userId,
             String fullName,
@@ -405,6 +459,56 @@ public class MainViewModel {
             return incoming;
         }
         return fallback;
+    }
+
+    public boolean shouldShowPlaceholderAfterRemoval(
+            String removedUserId,
+            ContactInfo selectedBeforeRemoval,
+            String activeChatRecipientId) {
+        return shouldShowPlaceholderAfterRemoval(
+                removedUserId,
+                selectedBeforeRemoval,
+                activeChatRecipientId,
+                contacts.isEmpty());
+    }
+
+    public static boolean shouldShowPlaceholderAfterRemoval(
+            String removedUserId,
+            ContactInfo selectedBeforeRemoval,
+            String activeChatRecipientId,
+            boolean contactsEmptyAfterRemoval) {
+        if (contactsEmptyAfterRemoval) {
+            return true;
+        }
+        if (removedUserId == null || removedUserId.isBlank()) {
+            return false;
+        }
+        if (selectedBeforeRemoval != null && removedUserId.equals(selectedBeforeRemoval.id())) {
+            return true;
+        }
+        return activeChatRecipientId != null && removedUserId.equals(activeChatRecipientId);
+    }
+
+    public static IncomingUnreadAction resolveIncomingUnreadAction(
+            MainTab activeTab,
+            String currentChatRecipientId,
+            String senderId) {
+        if (activeTab == MainTab.MESSAGES
+                && senderId != null
+                && senderId.equals(currentChatRecipientId)) {
+            return IncomingUnreadAction.RESET;
+        }
+        return IncomingUnreadAction.INCREMENT;
+    }
+
+    public static boolean isSameContactSelection(ContactInfo clicked, Object candidate) {
+        if (clicked == null || clicked.id() == null || clicked.id().isBlank()) {
+            return false;
+        }
+        if (!(candidate instanceof ContactInfo previous)) {
+            return false;
+        }
+        return clicked.id().equals(previous.id());
     }
 
     private void scheduleAddContactPresenceFallback(String userId, long baselinePresenceSignal) {

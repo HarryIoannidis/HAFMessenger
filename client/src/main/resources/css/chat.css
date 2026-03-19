@@ -103,6 +103,10 @@
     -fx-background-radius: 10px;
 }
 
+.bubble-image-spinner {
+    -fx-progress-color: #1A7CC5;
+}
+
 .plain-text-chat {
     -fx-fill: #2b2b2b;
     -fx-text-alignment: center;

@@ -88,6 +88,17 @@
     -fx-background-color: rgba(0, 122, 189, 0.22);
 }
 
+.profile-popup-trigger {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+}
+
+.profile-popup-trigger:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.06);
+}
+
 .list-view .scroll-bar:vertical {
     -fx-pref-width: 8px;
     -fx-min-width: 8px;

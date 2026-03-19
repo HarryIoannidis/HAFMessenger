@@ -243,6 +243,147 @@ class MainViewModelTest {
         assertEquals(1, updated.unreadCount());
     }
 
+    @Test
+    void ensure_incoming_contact_auto_adds_unknown_sender_with_placeholder_profile_fields() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+
+        ContactInfo created = viewModel.ensureIncomingContact("sender-42");
+
+        assertNotNull(created);
+        assertEquals("sender-42", created.id());
+        assertEquals("Unknown Contact", created.name());
+        assertEquals("", created.regNumber());
+        assertEquals(0, created.unreadCount());
+    }
+
+    @Test
+    void incoming_unread_action_resets_when_active_chat_is_open() {
+        MainViewModel.IncomingUnreadAction action = MainViewModel.resolveIncomingUnreadAction(
+                MainViewModel.MainTab.MESSAGES,
+                "user-1",
+                "user-1");
+
+        assertEquals(MainViewModel.IncomingUnreadAction.RESET, action);
+    }
+
+    @Test
+    void incoming_unread_action_increments_when_chat_is_not_open() {
+        MainViewModel.IncomingUnreadAction actionInSearchTab = MainViewModel.resolveIncomingUnreadAction(
+                MainViewModel.MainTab.SEARCH,
+                "user-1",
+                "user-1");
+        MainViewModel.IncomingUnreadAction actionForDifferentOpenChat = MainViewModel.resolveIncomingUnreadAction(
+                MainViewModel.MainTab.MESSAGES,
+                "user-1",
+                "user-2");
+
+        assertEquals(MainViewModel.IncomingUnreadAction.INCREMENT, actionInSearchTab);
+        assertEquals(MainViewModel.IncomingUnreadAction.INCREMENT, actionForDifferentOpenChat);
+    }
+
+    @Test
+    void apply_incoming_message_resets_for_active_chat_and_increments_for_inactive_chat() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+        viewModel.ensureChatContact("user-1", "Alice", "AS-1000");
+        viewModel.ensureChatContact("user-2", "Bob", "AS-2000");
+        viewModel.incrementUnread("user-1");
+        viewModel.incrementUnread("user-2");
+        viewModel.setActiveTab(MainViewModel.MainTab.MESSAGES);
+
+        MainViewModel.IncomingUnreadAction resetAction = viewModel.applyIncomingMessage("user-1", "user-1");
+        MainViewModel.IncomingUnreadAction incrementAction = viewModel.applyIncomingMessage("user-2", "user-1");
+
+        assertEquals(MainViewModel.IncomingUnreadAction.RESET, resetAction);
+        assertEquals(MainViewModel.IncomingUnreadAction.INCREMENT, incrementAction);
+        assertEquals(0, viewModel.getContactById("user-1").unreadCount());
+        assertEquals(2, viewModel.getContactById("user-2").unreadCount());
+    }
+
+    @Test
+    void reset_unread_on_chat_open_clears_badge_count() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+        viewModel.ensureChatContact("user-1", "Alice", "AS-1000");
+        viewModel.incrementUnread("user-1");
+        viewModel.incrementUnread("user-1");
+
+        viewModel.resetUnreadOnChatOpen("user-1");
+
+        assertEquals(0, viewModel.getContactById("user-1").unreadCount());
+    }
+
+    @Test
+    void should_show_placeholder_after_removal_when_contacts_are_empty() {
+        assertTrue(MainViewModel.shouldShowPlaceholderAfterRemoval(
+                "user-1",
+                null,
+                null,
+                true));
+    }
+
+    @Test
+    void should_show_placeholder_after_removal_when_removed_contact_was_selected() {
+        ContactInfo selectedBeforeRemoval = ContactInfo.active("user-1", "Alice", "AS-1000");
+
+        assertTrue(MainViewModel.shouldShowPlaceholderAfterRemoval(
+                "user-1",
+                selectedBeforeRemoval,
+                "other-user",
+                false));
+    }
+
+    @Test
+    void should_show_placeholder_after_removal_when_removed_contact_is_active_chat_recipient() {
+        ContactInfo selectedBeforeRemoval = ContactInfo.active("user-2", "Bob", "AS-2000");
+
+        assertTrue(MainViewModel.shouldShowPlaceholderAfterRemoval(
+                "user-1",
+                selectedBeforeRemoval,
+                "user-1",
+                false));
+    }
+
+    @Test
+    void should_not_show_placeholder_after_removal_for_unrelated_contact_when_contacts_remain() {
+        ContactInfo selectedBeforeRemoval = ContactInfo.active("user-2", "Bob", "AS-2000");
+
+        assertFalse(MainViewModel.shouldShowPlaceholderAfterRemoval(
+                "user-1",
+                selectedBeforeRemoval,
+                "user-3",
+                false));
+    }
+
+    @Test
+    void same_contact_selection_compares_by_contact_id() {
+        ContactInfo clicked = new ContactInfo(
+                "user-1",
+                "Alice",
+                "AS-1000",
+                "SMINIAS",
+                "alice@haf.gr",
+                "6900000000",
+                "2026-01-01",
+                "Active",
+                "#00b706",
+                0);
+        ContactInfo sameIdWithDifferentUnread = new ContactInfo(
+                "user-1",
+                "Alice",
+                "AS-1000",
+                "SMINIAS",
+                "alice@haf.gr",
+                "6900000000",
+                "2026-01-01",
+                "Active",
+                "#00b706",
+                7);
+
+        assertTrue(MainViewModel.isSameContactSelection(clicked, sameIdWithDifferentUnread));
+    }
+
     private static void awaitCondition(BooleanSupplier condition) {
         long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
         while (System.nanoTime() < deadlineNanos) {

@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.models.MessageType;
+import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
 import com.haf.shared.constants.AttachmentConstants;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -135,6 +137,54 @@ class MessageViewModelAttachmentTest {
         assertEquals("report.pdf", viewModel.getMessages("alice").getFirst().fileName());
     }
 
+    @Test
+    void chunked_image_reference_shows_loading_then_swaps_to_image() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(8_192, 512, 256);
+        sender.downloadDelayMs = 120L;
+
+        StubReceiver receiver = new StubReceiver();
+        receiver.detachedDecryptResult = new byte[] { 1, 2, 3, 4 };
+        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+
+        byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
+        sender.downloadResponse = AttachmentDownloadResponse.success(
+                "att-img-1",
+                "alice",
+                "me",
+                AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB,
+                fakeEncryptedBlob.length,
+                2,
+                Base64.getEncoder().encodeToString(fakeEncryptedBlob));
+
+        AttachmentReferencePayload ref = new AttachmentReferencePayload();
+        ref.setAttachmentId("att-img-1");
+        ref.setFileName("photo.png");
+        ref.setMediaType("image/png");
+        ref.setSizeBytes(4);
+
+        receiver.emitMessage(
+                AttachmentPayloadCodec.toReferenceJson(ref).getBytes(StandardCharsets.UTF_8),
+                "alice",
+                AttachmentConstants.CONTENT_TYPE_REFERENCE,
+                Instant.now().toEpochMilli(),
+                "env-2");
+
+        assertEquals(1, viewModel.getMessages("alice").size());
+        assertEquals(MessageType.IMAGE, viewModel.getMessages("alice").getFirst().type());
+        assertTrue(viewModel.getMessages("alice").getFirst().isLoading());
+
+        awaitCondition(() -> {
+            MessageVM first = viewModel.getMessages("alice").getFirst();
+            return first.type() == MessageType.IMAGE && !first.isLoading() && first.content() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("alice").getFirst();
+        assertEquals(MessageType.IMAGE, resolved.type());
+        assertFalse(resolved.isLoading());
+        assertNotNull(resolved.content());
+    }
+
     private static MessagingPolicyResponse policy(long max, long inlineMax, int chunk) {
         return MessagingPolicyResponse.success(
                 max,
@@ -168,9 +218,21 @@ class MessageViewModelAttachmentTest {
         return JsonCodec.toJson(m).getBytes(StandardCharsets.UTF_8);
     }
 
+    private static void awaitCondition(BooleanSupplier condition) throws InterruptedException {
+        long timeoutAt = System.currentTimeMillis() + 2_000L;
+        while (System.currentTimeMillis() < timeoutAt) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            Thread.sleep(10);
+        }
+        fail("Condition not met within timeout");
+    }
+
     private static final class RecordingSender implements MessageSender {
         private MessagingPolicyResponse policy;
         private AttachmentDownloadResponse downloadResponse;
+        private long downloadDelayMs;
 
         private int sendCalls;
         private int sendWithResultCalls;
@@ -244,6 +306,14 @@ class MessageViewModelAttachmentTest {
 
         @Override
         public AttachmentDownloadResponse downloadAttachment(String attachmentId) {
+            if (downloadDelayMs > 0) {
+                try {
+                    Thread.sleep(downloadDelayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+            }
             return downloadResponse;
         }
     }
