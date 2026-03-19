@@ -9,7 +9,7 @@ It follows an **MVVM (Model–View–ViewModel)** structure with a secure **Clie
 
 * Use **Scene Builder** to create a new FXML file under `client/resources/fxml/`.
 * Add your layout components and assign each element an `fx:id`.
-* Set the controller to a new class under `com.haf.client.ui`.
+* Set the controller to a new class under `com.haf.client.controllers`.
 * Keep the layout modular and clean (AnchorPane or GridPane recommended).
 
 **Example**:
@@ -39,7 +39,7 @@ It follows an **MVVM (Model–View–ViewModel)** structure with a secure **Clie
 
 ## **3. Implement the Controller (UI Logic)**
 
-* Create a corresponding controller class under `client/ui/`.
+* Create a corresponding controller class under `client/controllers/`.
 * Handle only **UI events** (button clicks, form submissions).
 * Do **not** implement logic or data handling here — delegate that to the ViewModel.
 
@@ -68,7 +68,7 @@ public class FeatureController {
 
 ## **4. Build the ViewModel (Application Logic)**
 
-* Add a new class in `client/viewmodel/`.
+* Add a new class in `client/viewmodels/`.
 * Handle all **data operations**, **network calls**, and **crypto** interactions.
 * Expose **JavaFX Properties** for two-way data binding with the UI.
 
@@ -144,7 +144,7 @@ public class RequestDTO implements Serializable {
 
 ## **8. Secure the Communication (Crypto Layer)**
 
-* Use modules in `client/crypto/` and `server/crypto/` for encryption.
+* Use modules in `client/crypto/` and `shared/crypto/` for encryption.
 * Apply **X25519** for key agreement and **AES** for message encryption.
 * Store shared helpers (base64 encoding, key generation) in `shared/utils/`.
 
@@ -156,12 +156,14 @@ For each new feature, verify that the full data path works:
 
 ```
 UI (FXML)
- → Controller 
- → ViewModel 
+ → Controller
+ → ViewModel
+ → Services
  → Network (Client)
- → Server Handler 
- → Response 
- → ViewModel Update 
+ → Server Ingress (TLS/WebSocket)
+ → Router → DAO
+ → Response DTO
+ → ViewModel Update
  → UI Refresh
 ```
 

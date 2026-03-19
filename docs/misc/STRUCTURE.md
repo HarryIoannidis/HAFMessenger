@@ -9,12 +9,14 @@ haf-messenger/
 │       └── main/
 │           ├── java/
 │           │   └── com/haf/client/
-│           │       ├── ui/
+│           │       ├── core/
 │           │       ├── controllers/
-│           │       ├── viewmodel/
+│           │       ├── viewmodels/
+│           │       ├── services/
 │           │       ├── crypto/
 │           │       ├── network/
 │           │       ├── models/
+│           │       ├── exceptions/
 │           │       └── utils/
 │           └── resources/
 │               ├── fxml/
@@ -42,8 +44,10 @@ haf-messenger/
 │           │       ├── constants/
 │           │       ├── crypto/
 │           │       ├── dto/
+│           │       ├── requests/
+│           │       ├── responses/
 │           │       ├── exceptions/
-│           │       ├── keystore/            
+│           │       ├── keystore/
 │           │       └── utils/
 │           └── resources/
 ├── scripts/  
@@ -71,12 +75,14 @@ client/
        └── main/
            ├── java/
            │   └── com/haf/client/
-           │       ├── ui/
+           │       ├── core/
            │       ├── controllers/
-           │       ├── viewmodel/
+           │       ├── viewmodels/
+           │       ├── services/
            │       ├── crypto/
            │       ├── network/
            │       ├── models/
+           │       ├── exceptions/
            │       └── utils/
            └── resources/
                ├── fxml/
@@ -84,14 +90,16 @@ client/
                └── images/
 ```               
 
-* **ui/**: FXML views and loaders for the JavaFX UI, without business logic.
-* **controllers/**: Connects UI with ViewModel, handles events and validation.
-* **viewmodel/**: MVVM bindings, business state, and commands for the views.
-* **crypto/**: AES-256 content encryption, X25519 key agreement, and key management.
-* **network/**: TLS/WebSocket client, sending/receiving packets with E2E encryption.
-* **models/**: Object definitions such as User, Message, Session, independent of the UI.
-* **utils/**: Logging, configuration, and shared helper functions.
-* **resources/fxml/**: JavaFX scenes (e.g., login, main chat).
+* **core/**: Application entry point (`Launcher`, `ClientApp`), active session containers (`ChatSession`, `NetworkSession`, `CurrentUserSession`).
+* **controllers/**: FXML controllers connecting the UI with ViewModels — handles events and validation.
+* **viewmodels/**: MVVM bindings, business state, and commands for the views (`LoginViewModel`, `ChatViewModel`, `MainViewModel`, etc.).
+* **services/**: Service interfaces and implementations for login, registration, and attachment operations (`LoginService`, `RegistrationService`, `ChatAttachmentService`, etc.).
+* **crypto/**: Client-side key provider (`UserKeystoreKeyProvider`) bridging the shared keystore with the network layer.
+* **network/**: TLS/WebSocket client — sending/receiving encrypted packets (`WebSocketAdapter`, `DefaultMessageSender`, `DefaultMessageReceiver`).
+* **models/**: Client-side view data classes (`ContactInfo`, `MessageVM`, `MessageType`, `UserProfileInfo`).
+* **exceptions/**: Typed client-side exceptions (`SslConfigurationException`, `RegistrationFlowException`, `HttpCommunicationException`).
+* **utils/**: Logging, configuration, and shared helpers (`ViewRouter`, `ContextMenuBuilder`, `ImageSaveSupport`, `WindowResizeHelper`, `UiConstants`, `SslContextUtils`, `MessageBubbleFactory`).
+* **resources/fxml/**: JavaFX scenes (`login.fxml`, `main.fxml`, `chat.fxml`, `register.fxml`, `splash.fxml`, `profile.fxml`, `search.fxml`, etc.).
 * **resources/css/**: User interface styles.
 * **resources/images/**: Icons and SVG assets for the UI.
 
@@ -149,15 +157,22 @@ shared/
            │       ├── constants/
            │       ├── crypto/
            │       ├── dto/
+           │       ├── requests/
+           │       ├── responses/
            │       ├── exceptions/
-           │       ├── keystore/            
+           │       ├── keystore/
            │       └── utils/
            └── resources/
 ```
 
-* **dto/**: Common Data Transfer Objects for uniform client–server communication.
-* **constants/**: Shared constants (ports, timeouts, protocol flags) for configuration consistency.
-* **utils/**: Shared helper functions (encryption, serialization, utilities).
+* **dto/**: Core wire-format DTOs (`EncryptedMessage`, `EncryptedFileDTO`, `KeyMetadata`, attachment payload types).
+* **requests/**: Client-to-server request DTOs (`LoginRequest`, `RegisterRequest`, `AddContactRequest`, `Attachment*Request`).
+* **responses/**: Server-to-client response DTOs (`LoginResponse`, `RegisterResponse`, `ContactsResponse`, `Attachment*Response`, `PublicKeyResponse`, etc.).
+* **constants/**: Shared constants (`CryptoConstants`, `MessageHeader`, `AttachmentConstants`) for protocol configuration consistency.
+* **crypto/**: Shared cryptographic implementations (`CryptoService`, `MessageEncryptor`, `MessageDecryptor`, `CryptoECC`, `AadCodec`).
+* **keystore/**: Key lifecycle management (`UserKeystore`, `KeystoreBootstrap`, `KeystoreSealing`, `KeystoreRoot`, `KeyProvider`).
+* **exceptions/**: Typed exceptions covering crypto, keystore, validation, and JSON operations.
+* **utils/**: Shared helper functions (`JsonCodec`, `MessageValidator`, `EccKeyIO`, `FingerprintUtil`, `PemCodec`, `FilePerms`, clock providers).
 * **resources/**: Common resources not specific to client or server.
 
 ---
@@ -213,13 +228,12 @@ haf-messenger/
 │       └── test/
 │           ├── java/
 │           │   └── com/haf/client/
-│           │       ├── ui/
 │           │       ├── controllers/
-│           │       ├── viewmodel/
 │           │       ├── crypto/
 │           │       ├── network/
-│           │       ├── models/
-│           │       └── utils/
+│           │       ├── services/
+│           │       ├── utils/
+│           │       └── viewmodels/
 │           └── resources/
 │               ├── test-fxml/
 │               ├── test-keystores/
@@ -272,8 +286,10 @@ haf-messenger/
 │       │   │       ├── constants/
 │       │   │       ├── crypto/
 │       │   │       ├── dto/
+│       │   │       ├── requests/
+│       │   │       ├── responses/
 │       │   │       ├── exceptions/
-│       │   │       ├── keystore/            
+│       │   │       ├── keystore/
 │       │   │       └── utils/
 │       │   └── resources/
 │       └── test/
@@ -285,7 +301,7 @@ haf-messenger/
 │           │           ├── crypto/
 │           │           ├── dto/
 │           │           ├── exceptions/
-│           │           ├── keystore/            
+│           │           ├── keystore/
 │           │           └── utils/
 │           └── resources/
 │               └── vectors/
@@ -411,36 +427,67 @@ Maintaining client-only JavaFX dependencies and shared DTOs exclusively minimize
 
 ### module-info.java files
 Module descriptors define what is required and what is exported, by opening controllers to javafx.fxml for reflection when loading FXML.
-```
+```java
 // shared/src/main/java/module-info.java
-module com.haf.shared {
+module shared {
     exports com.haf.shared.dto;
+    exports com.haf.shared.requests;
+    exports com.haf.shared.responses;
     exports com.haf.shared.constants;
     exports com.haf.shared.utils;
+    exports com.haf.shared.crypto;
+    exports com.haf.shared.exceptions;
+    exports com.haf.shared.keystore;
+
+    requires com.fasterxml.jackson.databind;
+    requires com.fasterxml.jackson.annotation;
 }
 ```
 
 ```java
 // client/src/main/java/module-info.java
-module com.haf.client {
-    requires com.haf.shared;
-    requires javafx.controls;
+module client {
+    requires transitive shared;
+    requires transitive javafx.graphics;
+    requires transitive javafx.controls;
     requires javafx.fxml;
+    requires java.net.http;
+    requires java.logging;
+    requires com.jfoenix;
+    requires org.kordamp.ikonli.javafx;
+    requires org.kordamp.ikonli.materialdesign2;
+    requires java.prefs;
 
-    exports com.haf.client.ui;
-    exports com.haf.client.viewmodel;
+    exports com.haf.client.models;
+    exports com.haf.client.controllers;
+    exports com.haf.client.core;
+    exports com.haf.client.utils;
+    exports com.haf.client.crypto;
+    exports com.haf.client.viewmodels;
+    exports com.haf.client.network;
+    exports com.haf.client.services;
 
     opens com.haf.client.controllers to javafx.fxml;
+    opens com.haf.client.core to javafx.graphics;
 }
 ```
 
 ```java
 // server/src/main/java/module-info.java
-module com.haf.server {
-    requires com.haf.shared;
+module server {
+    requires com.zaxxer.hikari;
+    requires flyway.core;
+    requires java.sql;
+    requires jdk.httpserver;
+    requires org.apache.logging.log4j;
+    requires org.apache.logging.log4j.core;
+    requires org.java_websocket;
+    requires io.github.cdimascio.dotenv.java;
+    requires password4j;
+    requires org.slf4j;
+    requires transitive shared;
 
-    exports com.haf.server.core;
-    exports com.haf.server.handlers;
+    opens com.haf.server.ingress to com.fasterxml.jackson.databind;
 }
 ```
 Limiting exports to the minimum necessary APIs and selective opens only to javafx.fxml reduces the attack surface and stabilizes encapsulation in JPMS.
@@ -458,13 +505,16 @@ Limiting exports to the minimum necessary APIs and selective opens only to javaf
 ### Unit Flow Chart
 Dependency and data flow follows the following, with MVVM bindings and the use of shared DTOs for protocol stability.
 ```
-FXML (client/resources) 
- -> Controller (client/controllers) 
- -> ViewModel (client/viewmodel) 
- -> Network/Crypto (client/network, client/crypto) 
- -> Handlers (server/handlers via TLS/WebSocket) 
- -> Response DTO (shared/dto) 
- -> ViewModel update 
+FXML (client/resources)
+ -> Controller (client/controllers)
+ -> ViewModel (client/viewmodels)
+ -> Services (client/services)
+ -> Network/Crypto (client/network, client/crypto)
+ -> Ingress (server/ingress via TLS/WebSocket)
+ -> Router (server/router)
+ -> DAO (server/db)
+ -> Response DTO (shared/dto, shared/responses)
+ -> ViewModel update
  -> UI refresh
 ```
 This flow is applied for every feature following the WORKFLOW, ensuring clean boundaries and ease of end‑to‑end testing per feature.
@@ -478,152 +528,63 @@ This document describes the folder structure and purpose of each module in **HAF
 
 This is the **desktop app** — the JavaFX interface that users interact with.
 
-### **1.1 ui**
+### **1.1 core**
 
-Contains FXML controllers — the Java classes handling UI events and interactions.
+Application entry point and session management containers.
 
-**Example: `LoginController.java`**
+Key classes: `Launcher` (delegates to `ClientApp.main()`), `ClientApp` (JavaFX Application, registers primary stage), `ChatSession` (active chat context), `NetworkSession` (active network connection container), `CurrentUserSession` (stores authenticated user state).
 
-```java
-package com.haf.client.ui;
+### **1.2 controllers**
 
-import javafx.fxml.FXML;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextField;
-import com.haf.client.viewmodel.LoginViewModel;
+FXML controllers — the Java classes handling UI events and interactions, one per scene.
 
-public class LoginController {
-    @FXML private TextField usernameField;
-    @FXML private PasswordField passwordField;
+Key classes: `LoginController`, `RegisterController`, `SplashController`, `MainController`, `ChatController`, `SearchController`, `ProfileController`, `ContactCell`, `MainContentLoader`, `PreviewController`, `SearchContactActions`.
 
-    private final LoginViewModel viewModel = new LoginViewModel();
+### **1.3 viewmodels**
 
-    @FXML
-    private void onLoginButtonClick() {
-        viewModel.login(usernameField.getText(), passwordField.getText());
-    }
-}
-```
+Implements the **MVVM pattern logic** — connects the UI with the application logic, exposing observable JavaFX properties for data binding.
 
-### **1.2 viewmodel**
+Key classes: `LoginViewModel`, `RegisterViewModel`, `ChatViewModel`, `MainViewModel`, `SearchViewModel`, `MessageViewModel`, `SplashViewModel`.
 
-Implements the **MVVM pattern logic** — connects the UI with the application logic.
+### **1.4 services**
 
-**Example: `LoginViewModel.java`**
+Business service interfaces and their default implementations. Keeps business logic out of controllers.
 
-```java
-package com.haf.client.viewmodel;
+Key classes: `LoginService` / `DefaultLoginService`, `RegistrationService` / `DefaultRegistrationService`, `MainSessionService` / `DefaultMainSessionService`, `ChatAttachmentService` / `DefaultChatAttachmentService`.
 
-import com.haf.client.network.ClientConnection;
+### **1.5 crypto**
 
-public class LoginViewModel {
-    private final ClientConnection connection = new ClientConnection();
+Client-side key provisioning — bridges the shared keystore with the network layer.
 
-    public void login(String username, String password) {
-        connection.sendLogin(username, password);
-    }
-}
-```
+Key class: `UserKeystoreKeyProvider` — implements the shared `KeyProvider` interface to load private keys from `UserKeystore` and look up recipient public keys via the directory service.
 
-### **1.3 crypto**
+### **1.6 network**
 
-Handles encryption and decryption on the client side.
+TLS/WebSocket communication layer — sending and receiving encrypted message frames.
 
-**Example: `CryptoManager.java`**
-
-```java
-package com.haf.client.crypto;
-
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
-
-public class CryptoManager {
-    private static final String ALGO = "AES";
-
-    public static String encrypt(String data, String key) throws Exception {
-        Cipher c = Cipher.getInstance(ALGO);
-        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key.getBytes(), ALGO));
-        return Base64.getEncoder().encodeToString(c.doFinal(data.getBytes()));
-    }
-}
-```
-
-### **1.4 network**
-
-Handles client-server communication via Sockets or WebSockets.
-
-**Example: `ClientConnection.java`**
-
-```java
-package com.haf.client.network;
-
-import java.io.*;
-import java.net.Socket;
-
-public class ClientConnection {
-    private Socket socket;
-    private PrintWriter out;
-    private BufferedReader in;
-
-    public ClientConnection() {
-        try {
-            socket = new Socket("127.0.0.1", 5000);
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void sendLogin(String user, String pass) {
-        out.println("LOGIN:" + user + ":" + pass);
-    }
-}
-```
+Key classes: `WebSocketAdapter` (manages WebSocket lifecycle with TLS 1.3, retry, backpressure), `MessageSender` / `DefaultMessageSender` (validates + serializes + transmits `EncryptedMessage`), `MessageReceiver` / `DefaultMessageReceiver` (receives, validates, and dispatches incoming frames).
 
 
 
-### **1.5 models**
+### **1.7 models**
 
-Plain Java classes representing application data.
+Client-side view data classes representing UI-layer data (not shared DTOs).
 
-**Example: `Message.java`**
-
-```java
-package com.haf.client.models;
-
-import java.time.LocalDateTime;
-
-public class Message {
-    private String sender;
-    private String content;
-    private LocalDateTime timestamp;
-
-    // getters and setters
-}
-```
+Key classes: `ContactInfo`, `MessageVM` (ViewModel representation of a single message), `MessageType` (enum: TEXT, IMAGE, FILE), `UserProfileInfo`.
 
 
 
-### **1.6 utils**
+### **1.8 exceptions**
 
-Helper classes for configuration, logging, and formatting.
+Typed client-side exceptions for clear error propagation.
 
-**Example: `ConfigLoader.java`**
+Key classes: `SslConfigurationException`, `RegistrationFlowException`, `HttpCommunicationException`.
 
-```java
-package com.haf.client.utils;
+### **1.9 utils**
 
-import java.util.Properties;
+Shared helper classes for navigation, configuration, UI construction, and formatting.
 
-public class ConfigLoader {
-    public static Properties loadConfig() {
-        // load from resources/config.properties
-        return new Properties();
-    }
-}
-```
+Key classes: `ViewRouter` (centralized FXML navigation), `ContextMenuBuilder`, `ImageSaveSupport`, `WindowResizeHelper`, `UiConstants`, `SslContextUtils`, `MessageBubbleFactory`.
 
 ---
 
@@ -635,106 +596,59 @@ The **backend** — handles connections, authentication, message routing, and se
 
 ### **2.1 core**
 
-Main server entry point and socket manager.
+Server entry point and bootstrap orchestration.
 
-**Example: `ServerApp.java`**
-
-```java
-package com.haf.server.core;
-
-import java.net.ServerSocket;
-import java.net.Socket;
-
-public class ServerApp {
-    public static void main(String[] args) throws Exception {
-        ServerSocket server = new ServerSocket(5000);
-        System.out.println("Server started on port 5000...");
-
-        while (true) {
-            Socket client = server.accept();
-            new Thread(new ClientHandler(client)).start();
-        }
-    }
-}
-```
+Key class: `Main` — reads `ServerConfig`, initialises HikariCP DataSource, runs Flyway migrations, loads TLS keystore, builds all services, starts `HttpIngressServer` and `WebSocketIngressServer`, and registers a graceful shutdown hook.
 
 
 
 ### **2.2 handlers**
 
-Manage specific types of requests like login or message handling.
+Message validation before persistence — operates on envelope metadata only, never decrypts content.
 
-**Example: `LoginHandler.java`**
-
-```java
-package com.haf.server.handlers;
-
-import com.haf.server.db.DatabaseManager;
-
-public class LoginHandler {
-    public boolean authenticate(String username, String password) {
-        return DatabaseManager.checkUser(username, password);
-    }
-}
-```
+Key class: `EncryptedMessageValidator` — validates required fields, Base64 integrity, TTL bounds, payload size, and timestamp before any DB write.
 
 
 
-### **2.3 crypto**
+### **2.3 ingress**
 
-Server-side encryption, key management, and decryption (X25519, AES).
+HTTP and WebSocket ingress endpoints. Both enforce TLS 1.3, share the same validation and rate-limiting pipeline, and route to `MailboxRouter`.
 
-
-
-### **2.4 db**
-
-Manages database connections (SQLite/MySQL).
-
-**Example: `DatabaseManager.java`**
-
-```java
-package com.haf.server.db;
-
-import java.sql.*;
-
-public class DatabaseManager {
-    public static boolean checkUser(String user, String pass) {
-        try (Connection c = DriverManager.getConnection("jdbc:sqlite:haf.db")) {
-            PreparedStatement ps = c.prepareStatement("SELECT * FROM users WHERE username=? AND password=?");
-            ps.setString(1, user);
-            ps.setString(2, pass);
-            ResultSet rs = ps.executeQuery();
-            return rs.next();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-}
-```
+Key classes: `HttpIngressServer` (HTTPS REST on `HAF_HTTP_PORT`, path `/api/v1/messages`), `WebSocketIngressServer` (WSS on `HAF_WS_PORT`, path `/ws`), `PresenceRegistry` (tracks connected WebSocket clients for push delivery).
 
 
 
-### **2.5 security**
+### **2.4 router**
 
-Monitors and blocks suspicious behavior (failed logins, brute force).
+In-memory message queuing and routing from ingress to recipient mailboxes.
 
-**Example: `BruteForceProtector.java`**
+Key classes: `MailboxRouter` (routes envelopes, manages WebSocket subscriptions, triggers push delivery), `RateLimiterService` (database-backed sliding-window quota enforcement), `QueuedEnvelope` (internal DTO for the routing queue).
 
-```java
-package com.haf.server.security;
+### **2.5 db**
 
-import java.util.HashMap;
+MySQL data access via HikariCP connection pooling and Flyway migrations.
 
-public class BruteForceProtector {
-    private static final HashMap<String, Integer> attempts = new HashMap<>();
+Key classes: `EnvelopeDAO` (insert/fetch/markDelivered/deleteExpired for `message_envelopes`), `UserDAO`, `ContactDAO`, `SessionDAO`, `FileUploadDAO`, `AttachmentDAO`. All use `PreparedStatement` — no plaintext payload is ever read or logged.
 
-    public static boolean check(String ip) {
-        int count = attempts.getOrDefault(ip, 0) + 1;
-        attempts.put(ip, count);
-        return count < 5;
-    }
-}
-```
+
+
+### **2.6 config**
+
+Server configuration sourced exclusively from environment variables — fail-fast if mandatory variables are absent.
+
+Key class: `ServerConfig` — exposes typed accessors for DB credentials, TLS keystore path/password, HTTP/WS ports, max message bytes, and log level.
+
+### **2.7 metrics**
+
+Observability and compliance layer.
+
+Key classes: `AuditLogger` (Log4j2-based structured JSON logging for all audit events), `MetricsRegistry` (in-memory atomic counters for ingress rate, reject codes, queue depth, and delivery latency).
+
+### **2.8 exceptions**
+
+Typed server exceptions for clear error propagation.
+
+Key classes: `ConfigurationException`, `DatabaseOperationException`, `RateLimitException`, `StartupException`.
 
 ---
 

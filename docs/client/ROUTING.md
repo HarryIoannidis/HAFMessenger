@@ -61,7 +61,7 @@
 ### Usage examples
 - Splash screen: `ViewRouter.switchToTransparent("/fxml/splash.fxml")` (custom styled window).
 - Login screen: `ViewRouter.switchToTransparent("/fxml/login.fxml")` (custom styled window).
-- Main chat: `ViewRouter.switchTo("/fxml/main_chat.fxml")` (standard window).
+- Main chat: `ViewRouter.switchTo("/fxml/main.fxml");` (standard window).
 - Error exit: `ViewRouter.close()` (from error dialog).
 
 ### Threading

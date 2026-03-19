@@ -89,14 +89,17 @@ haf-messenger/
 │
 ├── client/
 │   ├── src/main/java/com/haf/client/
-│   │   ├── controllers/         # Controllers (Login, Chat, Settings)
+│   │   ├── core/                # App entry point (Launcher, ClientApp, ChatSession, NetworkSession)
+│   │   ├── controllers/         # FXML controllers (Login, Chat, Main, Register, etc.)
 │   │   ├── viewmodels/          # ViewModels for MVVM pattern
-│   │   ├── crypto/              # Client-side crypto operations (uses shared crypto)
-│   │   ├── network/             # Client-side socket/WebSocket handlers
-│   │   ├── models/              # Message, User, Session classes
-│   │   └── utils/               # Logging, configuration, helpers
+│   │   ├── services/            # Service interfaces and implementations (LoginService, RegistrationService, etc.)
+│   │   ├── crypto/              # Client-side key provider (uses shared crypto)
+│   │   ├── network/             # WebSocket client (WebSocketAdapter, DefaultMessageSender/Receiver)
+│   │   ├── models/              # Client view data classes (ContactInfo, MessageVM, UserProfileInfo)
+│   │   ├── exceptions/          # Typed client exceptions (SslConfigurationException, etc.)
+│   │   └── utils/               # Helpers (ViewRouter, ContextMenuBuilder, SslContextUtils, etc.)
 │   ├── src/main/resources/
-│   │   ├── fxml/                # JavaFX scenes (login.fxml, mainChat.fxml)
+│   │   ├── fxml/                # JavaFX scenes (login.fxml, main.fxml, chat.fxml, etc.)
 │   │   ├── css/                 # Dark military UI theme
 │   │   └── images/              # Icons, SVGs, etc.
 │   └── src/test/                # Test classes mirroring main structure
@@ -119,9 +122,11 @@ haf-messenger/
 │
 ├── shared/
 │   ├── src/main/java/com/haf/shared/
-│   │   ├── dto/                 # Data Transfer Objects (EncryptedMessage, KeyMetadata)
-│   │   ├── constants/           # Shared constants (CryptoConstants, MessageHeader)
-│   │   ├── crypto/              # Crypto implementations (CryptoService, MessageEncryptor, MessageDecryptor)
+│   │   ├── dto/                 # Core wire-format DTOs (EncryptedMessage, EncryptedFileDTO, KeyMetadata, Attachment*)
+│   │   ├── requests/            # Client-to-server request DTOs (LoginRequest, RegisterRequest, AddContactRequest, Attachment*Request)
+│   │   ├── responses/           # Server-to-client response DTOs (LoginResponse, ContactsResponse, PublicKeyResponse, Attachment*Response)
+│   │   ├── constants/           # Shared constants (CryptoConstants, MessageHeader, AttachmentConstants)
+│   │   ├── crypto/              # Crypto implementations (CryptoService, MessageEncryptor, MessageDecryptor, CryptoECC, AadCodec)
 │   │   ├── keystore/            # Key store formats, root selection, bootstrap, key loading logic
 │   │   ├── exceptions/          # Typed exceptions (MessageValidationException, KeyNotFoundException, etc.)
 │   │   └── utils/               # Common utilities (JsonCodec, MessageValidator, EccKeyIO, FilePerms, FingerprintUtil, PemCodec)

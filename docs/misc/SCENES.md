@@ -164,10 +164,10 @@ public class LoginViewModel {
     - Storage of temporary RegistrationState on the client (in-memory).
 
 ### Implementation (FXML + MVVM)
-- FXML: registration_step1.fxml
+- FXML: register.fxml
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<GridPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.RegStep1Controller" hgap="10" vgap="8">
+<GridPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.RegStep1Controller" hgap="10" vgap="8">
   <Label text="Full Name"/><TextField fx:id="fullName"/>
   <Label text="Rank"/><TextField fx:id="rank"/>
   <Label text="Reg. Number"/><TextField fx:id="regNumber"/>
@@ -242,10 +242,10 @@ public boolean validateStep1(){
     - Upload to server with TTL and return of Registration-Receipt.
 
 ### Implementation (FXML + MVVM)
-- FXML: registration_step2.fxml
+- FXML: 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.RegStep2Controller" spacing="12">
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.RegStep2Controller" spacing="12">
   <Label text="Upload Identity Card (ID)"/>
   <StackPane fx:id="idDropZone" styleClass="drop-zone"/>
   <Label text="Upload Selfie"/>
@@ -341,7 +341,7 @@ public void submitAll(Runnable onDone){
     - Open ContextMenu with Profile, Settings, Help, Log out and handle navigation/session cleanup.
 
 ### Implementation (FXML + MVVM)
-- FXML: main_chat.fxml
+- FXML: main.fxml
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.MainChatController">
@@ -456,10 +456,10 @@ public class MainChatViewModel {
     - Choose or drop → client-side chunked encryption, upload, show progress bubble then reference to recipient.
 
 ### Implementation (FXML + MVVM)
-- FXML: chat_area.fxml
+- FXML: chat.fxml
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.ChatController" spacing="6">
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.ChatController" spacing="6">
   <ScrollPane fx:id="scroll" fitToWidth="true">
     <VBox fx:id="messages" spacing="4"/>
   </ScrollPane>
@@ -548,7 +548,7 @@ public List<Node> renderedNodes(){ return items.stream().map(MessageCellFactory:
 - FXML: profile.fxml
 ```java
 <?xml version="1.0" encoding="UTF-8"?>
-<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.ui.ProfileController" spacing="10">
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="com.haf.client.controllers.ProfileController" spacing="10">
   <GridPane hgap="10" vgap="8">
     <Label text="Full Name"/><Label fx:id="fullName"/>
     <Label text="Rank"/><Label fx:id="rank"/>
