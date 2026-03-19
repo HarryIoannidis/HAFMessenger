@@ -17,6 +17,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -123,11 +124,36 @@ public class ChatController {
     }
 
     private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
+        List<MessageVM> addedMessages = new ArrayList<>();
+        boolean requiresFullRefresh = false;
+
         while (change.next()) {
-            if (change.wasAdded()) {
-                processAddedMessages(change.getAddedSubList(), activeRecipient);
+            if (change.wasAdded() && !change.wasRemoved() && !change.wasPermutated() && !change.wasUpdated()) {
+                addedMessages.addAll(change.getAddedSubList());
+            } else {
+                requiresFullRefresh = true;
             }
         }
+
+        if (requiresFullRefresh) {
+            refreshRenderedMessages();
+            return;
+        }
+
+        if (!addedMessages.isEmpty()) {
+            processAddedMessages(addedMessages, activeRecipient);
+        }
+    }
+
+    private void refreshRenderedMessages() {
+        chatBox.getChildren().clear();
+        if (currentObservedList != null) {
+            for (MessageVM vm : currentObservedList) {
+                chatBox.getChildren().add(MessageBubbleFactory.create(vm));
+            }
+        }
+        chatScrollPane.layout();
+        chatScrollPane.setVvalue(1.0);
     }
 
     private void processAddedMessages(List<? extends MessageVM> addedMessages, String activeRecipient) {

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.JFXButton?>
+<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.ProfileController">
+   <stylesheets>
+      <URL value="@../css/global.css" />
+      <URL value="@../css/preview.css" />
+   </stylesheets>
+   <top>
+      <VBox>
+         <children>
+              <HBox fx:id="titleBar" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" styleClass="title-bar">
+                  <children>
+                  <Separator opacity="0.0" prefWidth="200.0" HBox.hgrow="ALWAYS" />
+                      <HBox fx:id="buttonsHBox" alignment="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="title-bar-buttons-Hbox">
+                          <children>
+                          <JFXButton fx:id="minimizeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-minimize">
+                              <graphic>
+                                  <FontIcon iconLiteral="mdi2w-window-minimize" iconSize="20" />
+                              </graphic>
+                          </JFXButton>
+                          <JFXButton fx:id="closeButton" focusTraversable="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="40.0" prefWidth="45.0" styleClass="title-bar-button-close">
+                              <graphic>
+                                  <FontIcon iconLiteral="mdi2c-close" iconSize="20" />
+                              </graphic>
+                          </JFXButton>
+                          </children>
+                      </HBox>
+                  </children>
+              </HBox>
+            <Pane prefHeight="1.0" styleClass="divider" />
+         </children>
+      </VBox>
+   </top>
+   <center>
+      <VBox alignment="CENTER" BorderPane.alignment="CENTER">
+         <children>
+            <ImageView fitHeight="400.0" fitWidth="400.0" pickOnBounds="true" preserveRatio="true" />
+            <JFXButton contentDisplay="RIGHT" focusTraversable="false" graphicTextGap="5.0" prefHeight="40.0" prefWidth="150.0" styleClass="button-download" text="Download">
+               <font>
+                  <Font size="15.0" />
+               </font>
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+               <graphic>
+                  <FontIcon iconLiteral="mdi2d-download" iconSize="25" selectionEnd="0" />
+               </graphic>
+               <padding>
+                  <Insets left="10.0" />
+               </padding>
+            </JFXButton>
+         </children>
+         <BorderPane.margin>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </BorderPane.margin>
+      </VBox>
+   </center>
+</BorderPane>

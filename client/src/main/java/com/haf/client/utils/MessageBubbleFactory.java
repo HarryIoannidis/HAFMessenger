@@ -4,9 +4,11 @@ import com.haf.client.models.MessageVM;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -90,18 +92,61 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the image content node
      */
-    private static ImageView buildImage(MessageVM message) {
+    private static Node buildImage(MessageVM message) {
+        StackPane imageContainer = new StackPane();
+        imageContainer.setPrefWidth(220);
+        imageContainer.setMaxWidth(220);
+
         ImageView imageView = new ImageView();
-        if (message.content() != null && !message.content().isBlank()) {
-            try {
-                imageView.setImage(new Image(message.content(), true)); // background loading
-            } catch (Exception ignored) {
-                /* broken URL – show empty view */ }
-        }
         imageView.setFitWidth(220);
         imageView.setPreserveRatio(true);
         imageView.getStyleClass().add("bubble-image");
-        return imageView;
+
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setPrefSize(28, 28);
+        spinner.setMaxSize(28, 28);
+        spinner.getStyleClass().add("bubble-image-spinner");
+
+        imageContainer.getChildren().addAll(imageView, spinner);
+
+        boolean loadingPlaceholder = message.isLoading()
+                && (message.content() == null || message.content().isBlank());
+        if (loadingPlaceholder) {
+            imageContainer.setMinHeight(140);
+            setSpinnerVisible(spinner, true);
+        } else {
+            setSpinnerVisible(spinner, false);
+        }
+
+        if (message.content() != null && !message.content().isBlank()) {
+            try {
+                Image image = new Image(message.content(), true);
+                imageView.setImage(image);
+                if (message.isLoading() || image.getProgress() < 1.0) {
+                    setSpinnerVisible(spinner, true);
+                }
+
+                image.progressProperty().addListener((obs, oldV, newV) -> {
+                    if (newV != null && newV.doubleValue() >= 1.0) {
+                        setSpinnerVisible(spinner, false);
+                    }
+                });
+                image.errorProperty().addListener((obs, wasError, isError) -> {
+                    if (Boolean.TRUE.equals(isError)) {
+                        setSpinnerVisible(spinner, false);
+                    }
+                });
+            } catch (Exception ignored) {
+                /* broken URL – show empty view */
+                setSpinnerVisible(spinner, false);
+            }
+        }
+        return imageContainer;
+    }
+
+    private static void setSpinnerVisible(ProgressIndicator spinner, boolean visible) {
+        spinner.setVisible(visible);
+        spinner.setManaged(visible);
     }
 
     /**

@@ -34,6 +34,7 @@ import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -78,6 +79,14 @@ public class MessageViewModel {
                     String envelopeId) {
                 String contactId = normalizeContactId(senderId);
                 try {
+                    if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
+                        AttachmentReferencePayload reference = AttachmentPayloadCodec.fromReferenceJson(plaintext);
+                        if (isImageMediaType(reference.getMediaType())) {
+                            receiveChunkedImageAsync(contactId, reference, timestampEpochMs);
+                            return;
+                        }
+                    }
+
                     MessageVM vm = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
                     runOnUiThread(() -> {
                         getMessages(contactId).add(vm);
@@ -270,6 +279,66 @@ public class MessageViewModel {
         return contactId == null ? "" : contactId.trim();
     }
 
+    private static boolean isImageMediaType(String mediaType) {
+        String normalized = AttachmentConstants.normalizeMimeType(mediaType);
+        return normalized != null && normalized.startsWith("image/");
+    }
+
+    private static LocalDateTime toLocalTimestamp(long timestampEpochMs) {
+        return Instant.ofEpochMilli(timestampEpochMs)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime();
+    }
+
+    private void receiveChunkedImageAsync(String senderId,
+            AttachmentReferencePayload reference,
+            long timestampEpochMs) {
+        LocalDateTime timestamp = toLocalTimestamp(timestampEpochMs);
+        MessageVM loadingVm = MessageVM.incomingLoadingImage(timestamp);
+
+        runOnUiThread(() -> {
+            getMessages(senderId).add(loadingVm);
+            // Notify once, when the inbound envelope is first materialized.
+            notifyIncomingMessageListeners(senderId, loadingVm);
+            status.set("Receiving image from " + senderId + "…");
+        });
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                MessageVM loaded = decodeAttachmentReference(reference, timestamp);
+                runOnUiThread(() -> replaceLoadingMessage(senderId, loadingVm, loaded));
+            } catch (Exception ex) {
+                runOnUiThread(() -> replaceLoadingWithFailure(senderId, loadingVm, timestamp, ex));
+            }
+        });
+    }
+
+    private void replaceLoadingMessage(String senderId, MessageVM loadingVm, MessageVM loadedVm) {
+        ObservableList<MessageVM> messages = getMessages(senderId);
+        int index = messages.indexOf(loadingVm);
+        if (index >= 0) {
+            messages.set(index, loadedVm);
+        } else {
+            messages.add(loadedVm);
+        }
+        status.set("Image received from " + senderId);
+    }
+
+    private void replaceLoadingWithFailure(String senderId,
+            MessageVM loadingVm,
+            LocalDateTime timestamp,
+            Exception ex) {
+        ObservableList<MessageVM> messages = getMessages(senderId);
+        int index = messages.indexOf(loadingVm);
+        MessageVM failedVm = MessageVM.incomingText("[Image failed to load]", timestamp);
+        if (index >= 0) {
+            messages.set(index, failedVm);
+        } else {
+            messages.add(failedVm);
+        }
+        status.set("Failed to load image: " + ex.getMessage());
+    }
+
     private void sendInlineAttachment(String recipientId,
             String fileName,
             String mediaType,
@@ -362,9 +431,7 @@ public class MessageViewModel {
             String senderId,
             String contentType,
             long timestampEpochMs) throws Exception {
-        LocalDateTime timestamp = Instant.ofEpochMilli(timestampEpochMs)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDateTime();
+        LocalDateTime timestamp = toLocalTimestamp(timestampEpochMs);
 
         if (contentType == null) {
             contentType = "text/plain";
@@ -378,35 +445,39 @@ public class MessageViewModel {
 
         if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
             AttachmentReferencePayload ref = AttachmentPayloadCodec.fromReferenceJson(plaintext);
-            AttachmentDownloadResponse downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
-            ensureNoError(downloadResponse.getError());
-            if (downloadResponse.getEncryptedBlobB64() == null || downloadResponse.getEncryptedBlobB64().isBlank()) {
-                throw new IOException("Attachment download response is empty");
-            }
-
-            byte[] encryptedBlob = Base64.getDecoder().decode(downloadResponse.getEncryptedBlobB64());
-            EncryptedMessage encryptedMessage = JsonCodec.fromJson(
-                    new String(encryptedBlob, StandardCharsets.UTF_8),
-                    EncryptedMessage.class);
-            byte[] fileBytes = messageReceiver.decryptDetachedMessage(encryptedMessage);
-            return toAttachmentVm(false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);
+            return decodeAttachmentReference(ref, timestamp);
         }
 
         if (contentType.startsWith("text/")) {
             String text = new String(plaintext, StandardCharsets.UTF_8);
-            return new MessageVM(false, MessageType.TEXT, text, null, null, null, timestamp);
+            return new MessageVM(false, MessageType.TEXT, text, null, null, null, timestamp, false);
         }
 
         if (contentType.startsWith("image/")) {
             String localPath = writeTempFile(plaintext, "haf-img-", extensionFor(contentType));
-            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, timestamp);
+            return new MessageVM(false, MessageType.IMAGE, localPath, null, null, null, timestamp, false);
         }
 
         String ext = extensionFor(contentType);
         String fileName = senderId + "-attachment" + ext;
         String fileSize = formatSize(plaintext.length);
         String localPath = writeTempFile(plaintext, "haf-file-", ext);
-        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp);
+        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
+    }
+
+    private MessageVM decodeAttachmentReference(AttachmentReferencePayload ref, LocalDateTime timestamp) throws Exception {
+        AttachmentDownloadResponse downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
+        ensureNoError(downloadResponse.getError());
+        if (downloadResponse.getEncryptedBlobB64() == null || downloadResponse.getEncryptedBlobB64().isBlank()) {
+            throw new IOException("Attachment download response is empty");
+        }
+
+        byte[] encryptedBlob = Base64.getDecoder().decode(downloadResponse.getEncryptedBlobB64());
+        EncryptedMessage encryptedMessage = JsonCodec.fromJson(
+                new String(encryptedBlob, StandardCharsets.UTF_8),
+                EncryptedMessage.class);
+        byte[] fileBytes = messageReceiver.decryptDetachedMessage(encryptedMessage);
+        return toAttachmentVm(false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);
     }
 
     private MessagingPolicyResponse getMessagingPolicy() throws IOException {
@@ -512,12 +583,12 @@ public class MessageViewModel {
             LocalDateTime timestamp) {
         if (mediaType != null && mediaType.startsWith("image/")) {
             String localPath = writeTempFile(fileBytes, "haf-img-", extensionFor(mediaType));
-            return new MessageVM(outgoing, MessageType.IMAGE, localPath, null, null, null, timestamp);
+            return new MessageVM(outgoing, MessageType.IMAGE, localPath, null, null, null, timestamp, false);
         }
 
         String ext = extensionFor(mediaType);
         String localPath = writeTempFile(fileBytes, "haf-file-", ext);
-        return new MessageVM(outgoing, MessageType.FILE, null, localPath, fileName, formatSize(fileBytes.length), timestamp);
+        return new MessageVM(outgoing, MessageType.FILE, null, localPath, fileName, formatSize(fileBytes.length), timestamp, false);
     }
 
     private static String writeTempFile(byte[] data, String prefix, String suffix) {

@@ -1,14 +1,14 @@
 .dropdown-menu {
     -fx-background-color: #d9d9d9;
     -fx-background-radius: 16;
-    -fx-padding: 8;
+    -fx-padding: 6;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 16, 0.18, 0, 4);
 }
 
 .dropdown-menu .menu-item {
     -fx-background-color: transparent;
     -fx-background-radius: 12;
-    -fx-padding: 16 20 16 20;
+    -fx-padding: 10 14 10 14;
     -fx-cursor: hand;
 }
 
@@ -27,7 +27,7 @@
 .dropdown-menu .menu-item .label {
     -fx-text-fill: #2b2b2b;
     -fx-font-family: "Manrope", sans-serif;
-    -fx-font-size: 17px;
+    -fx-font-size: 15px;
     -fx-font-weight: 600;
 }
 
@@ -44,7 +44,7 @@
 }
 
 .dropdown-menu .separator {
-    -fx-padding: 6 12 6 12;
+    -fx-padding: 4 10 4 10;
 }
 
 .dropdown-menu .separator .line {
