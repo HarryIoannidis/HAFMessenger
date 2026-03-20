@@ -749,7 +749,11 @@ public class MainController implements SearchContactActions {
             return;
         }
 
-        double menuWidth = Math.max(menu.prefWidth(-1), 220);
+        double menuWidth = menu.prefWidth(-1);
+        if (menuWidth <= 0) {
+            menu.show(dotsMenuButton, bounds.getMinX(), bounds.getMaxY() + 4);
+            return;
+        }
         menu.show(dotsMenuButton, bounds.getMaxX() - menuWidth, bounds.getMaxY() + 4);
     }
 
