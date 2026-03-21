@@ -65,7 +65,7 @@ haf-messenger/
 
 The client represents the presentation layer, implemented in **JavaFX**, following the **MVVM** pattern to separate the presentation from the logic and data models.
 Encryption is applied on the client side (AES-256 for content, X25519 for key exchange), and no sensitive data are permanently stored on the workstation.
-The networking stack uses **TLS/WebSocket** for secure communication and integrates **2FA** (TOTP, WebAuthn/FIDO2).
+The networking stack uses secure HTTPS/WebSocket communication with session-based authentication.
 
 **Folder structure:**
 
@@ -636,7 +636,7 @@ Key classes: `EnvelopeDAO` (insert/fetch/markDelivered/deleteExpired for `messag
 
 Server configuration sourced exclusively from environment variables — fail-fast if mandatory variables are absent.
 
-Key class: `ServerConfig` — exposes typed accessors for DB credentials, TLS keystore path/password, HTTP/WS ports, max message bytes, and log level.
+Key class: `ServerConfig` — exposes typed accessors for DB credentials, TLS keystore path/password, HTTP/WS ports, search paging limits, and attachment policy settings.
 
 ### **2.7 metrics**
 
@@ -662,17 +662,24 @@ Contains code used by both client and server to avoid duplication.
 
 Data Transfer Objects sent over the network.
 
-**Example: `MessageDTO.java`**
+**Example: `EncryptedMessage.java`**
 
 ```java
 package com.haf.shared.dto;
 
 import java.io.Serializable;
 
-public class MessageDTO implements Serializable {
-    public String sender;
-    public String content;
-    public String timestamp;
+public class EncryptedMessage implements Serializable {
+    private String version;
+    private String senderId;
+    private String recipientId;
+    private long timestampEpochMs;
+    private long ttlSeconds;
+    private String algorithm;
+    private String ivB64;
+    private String ephemeralPublicB64;
+    private String ciphertextB64;
+    private String tagB64;
 }
 ```
 

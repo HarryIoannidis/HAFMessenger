@@ -56,8 +56,8 @@ Database (server) stores:
 
 ### Authentication and 2FA
 
-- Username/password with salted hashing (BCrypt) on the server.
-- TOTP and optional WebAuthn/FIDO2 where required.
+- Username/password with salted hashing (Argon2id) on the server.
+- Optional 2FA/WebAuthn can be layered in future phases.
 - Rate limiting, lockout, and auditing.
 
 ---
