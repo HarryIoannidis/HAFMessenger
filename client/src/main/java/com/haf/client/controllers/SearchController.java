@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.UiConstants;
+import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
 import com.haf.shared.dto.UserSearchResultDTO;
 import javafx.application.Platform;
@@ -66,6 +67,16 @@ public class SearchController {
     }
 
     /**
+     * Triggers an asynchronous search against the server with sort options.
+     *
+     * @param query       the search term (name or reg number)
+     * @param sortOptions selected sort field + direction
+     */
+    public void search(String query, SearchSortViewModel.SortOptions sortOptions) {
+        viewModel.search(query, sortOptions);
+    }
+
+    /**
      * Clears the results pane and resets the status text.
      */
     public void clearResults() {
@@ -96,13 +107,16 @@ public class SearchController {
 
     private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResultDTO> change) {
         boolean needsFullRender = false;
-        List<UserSearchResultDTO> addedRows = new ArrayList<>();
+        List<UserSearchResultDTO> addedRows = null;
 
         while (change.next()) {
             if (change.wasPermutated() || change.wasReplaced() || change.wasRemoved() || change.wasUpdated()) {
                 needsFullRender = true;
             }
             if (change.wasAdded()) {
+                if (addedRows == null) {
+                    addedRows = new ArrayList<>();
+                }
                 addedRows.addAll(change.getAddedSubList());
             }
         }
@@ -112,7 +126,7 @@ public class SearchController {
             return;
         }
 
-        if (!addedRows.isEmpty()) {
+        if (addedRows != null) {
             appendResults(addedRows);
         }
     }
