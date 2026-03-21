@@ -51,3 +51,80 @@
     -fx-border-color: #a3a3a3;
     -fx-border-width: 1 0 0 0;
 }
+
+.search-filter-menu .search-filter-popup {
+    -fx-min-width: 196;
+    -fx-pref-width: 196;
+}
+
+.search-filter-menu .menu-item {
+    -fx-padding: 4 6 4 6;
+    -fx-background-color: transparent;
+}
+
+.search-filter-menu .search-filter-radio {
+    -fx-text-fill: #2b2b2b;
+    -fx-font-family: "Manrope", sans-serif;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
+    -fx-cursor: hand;
+    -fx-padding: 2 0 2 0;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.search-filter-menu .search-filter-radio .radio {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-min-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-width: 18px;
+    -fx-pref-height: 18px;
+    -fx-max-width: 18px;
+    -fx-max-height: 18px;
+    -fx-border-color: #7f7f7f;
+    -fx-border-width: 2;
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+    -fx-padding: 0;
+}
+
+.search-filter-menu .search-filter-radio:selected .radio {
+    -fx-background-color: #007abd;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.search-filter-menu .search-filter-radio .dot {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.search-filter-menu .search-filter-separator .line {
+    -fx-border-color: #a3a3a3;
+    -fx-border-width: 1 0 0 0;
+}
+
+.search-filter-menu .search-filter-apply-button {
+    -fx-min-height: 42;
+    -fx-pref-height: 42;
+    -fx-font-size: 15px;
+}
+
+.search-filter-menu .search-filter-radio:hover .radio {
+    -fx-border-color: #007abd;
+}
+
+.search-filter-menu .search-filter-radio:selected:hover .radio {
+    -fx-border-color: transparent;
+}
+
+.search-filter-menu .search-filter-radio:hover {
+    -fx-text-fill: #1f5f8a;
+}
+
+.search-filter-menu .menu-item:hover,
+.search-filter-menu .menu-item:focused,
+.search-filter-menu .menu-item:armed {
+    -fx-background-color: transparent;
+}

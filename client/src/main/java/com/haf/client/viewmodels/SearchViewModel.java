@@ -17,6 +17,7 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,7 +48,7 @@ public class SearchViewModel {
     private static final Logger LOGGER = Logger.getLogger(SearchViewModel.class.getName());
 
     public interface SearchGateway {
-        String searchUsers(String query, int limit, String cursor) throws Exception;
+        String searchUsers(String query, int limit, String cursor) throws IOException;
     }
 
     public enum ContactToggleAction {
@@ -58,7 +60,8 @@ public class SearchViewModel {
     private final AtomicInteger generation = new AtomicInteger();
 
     private final ObservableList<UserSearchResultDTO> results = FXCollections.observableArrayList();
-    private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections.unmodifiableObservableList(results);
+    private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections
+            .unmodifiableObservableList(results);
     private final StringProperty statusText = new SimpleStringProperty(STATUS_IDLE);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty loadingMore = new SimpleBooleanProperty(false);
@@ -66,6 +69,7 @@ public class SearchViewModel {
     private String activeQuery = "";
     private boolean hasMore;
     private String nextCursor;
+    private SearchSortViewModel.SortOptions sortOptions = SearchSortViewModel.SortOptions.DEFAULT;
 
     public SearchViewModel(SearchGateway searchGateway) {
         this.searchGateway = Objects.requireNonNull(searchGateway, "searchGateway");
@@ -86,7 +90,18 @@ public class SearchViewModel {
             if (cursor != null && !cursor.isBlank()) {
                 path += "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8);
             }
-            return NetworkSession.get().getAuthenticated(path).get();
+            try {
+                return NetworkSession.get().getAuthenticated(path).get();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Search request was interrupted.", ex);
+            } catch (ExecutionException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof IOException ioException) {
+                    throw ioException;
+                }
+                throw new IOException("Search request failed.", cause != null ? cause : ex);
+            }
         });
     }
 
@@ -94,6 +109,15 @@ public class SearchViewModel {
      * Starts an asynchronous user search.
      */
     public void search(String query) {
+        search(query, sortOptions);
+    }
+
+    /**
+     * Starts an asynchronous user search with the provided sort options.
+     */
+    public void search(String query, SearchSortViewModel.SortOptions sortOptions) {
+        this.sortOptions = SearchSortViewModel.normalize(sortOptions);
+
         String normalized = query == null ? "" : query.trim();
         if (normalized.isEmpty()) {
             clearResults();
@@ -123,6 +147,15 @@ public class SearchViewModel {
         });
 
         Thread.ofVirtual().name("search-query").start(() -> runSearch(normalized, null, false, searchGeneration));
+    }
+
+    public void setSortOptions(SearchSortViewModel.SortOptions sortOptions) {
+        this.sortOptions = SearchSortViewModel.normalize(sortOptions);
+        runOnUiThread(this::sortResultsInPlace);
+    }
+
+    public SearchSortViewModel.SortOptions getSortOptions() {
+        return sortOptions;
     }
 
     /**
@@ -194,7 +227,7 @@ public class SearchViewModel {
             String json = searchGateway.searchUsers(query, UiConstants.SEARCH_PAGE_SIZE, cursor);
             UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
             runOnUiThread(() -> applyResponse(response, append, searchGeneration));
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             LOGGER.log(Level.WARNING, "Search request failed", ex);
             runOnUiThread(() -> {
                 if (searchGeneration != generation.get()) {
@@ -221,25 +254,8 @@ public class SearchViewModel {
             return;
         }
 
-        if (append) {
-            loadingMore.set(false);
-        } else {
-            loading.set(false);
-        }
-
-        if (response == null) {
-            if (!append) {
-                results.clear();
-                statusText.set(STATUS_GENERIC_FAILURE);
-            }
-            return;
-        }
-
-        if (response.getError() != null) {
-            if (!append) {
-                results.clear();
-                statusText.set("Error: " + response.getError());
-            }
+        finishLoading(append);
+        if (shouldStopAfterError(response, append)) {
             return;
         }
 
@@ -249,21 +265,63 @@ public class SearchViewModel {
         hasMore = response.isHasMore();
         nextCursor = hasMore ? response.getNextCursor() : null;
 
-        if (normalizedResults.isEmpty()) {
-            if (append) {
-                return;
-            }
-            results.clear();
-            statusText.set(STATUS_NO_RESULTS);
+        if (handleEmptyResults(normalizedResults, append)) {
             return;
         }
 
         if (append) {
             appendUnique(normalizedResults);
+            sortResultsInPlace();
         } else {
-            results.setAll(normalizedResults);
+            setSortedResults(normalizedResults);
         }
         statusText.set("");
+    }
+
+    private void finishLoading(boolean append) {
+        if (append) {
+            loadingMore.set(false);
+        } else {
+            loading.set(false);
+        }
+    }
+
+    private boolean shouldStopAfterError(UserSearchResponse response, boolean append) {
+        if (response == null) {
+            if (!append) {
+                setErrorStatus(STATUS_GENERIC_FAILURE);
+            }
+            return true;
+        }
+
+        String error = response.getError();
+        if (error != null) {
+            if (!append) {
+                setErrorStatus("Error: " + error);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean handleEmptyResults(List<UserSearchResultDTO> normalizedResults, boolean append) {
+        if (!normalizedResults.isEmpty()) {
+            return false;
+        }
+
+        if (append) {
+            return true;
+        }
+
+        results.clear();
+        statusText.set(STATUS_NO_RESULTS);
+        return true;
+    }
+
+    private void setErrorStatus(String message) {
+        results.clear();
+        statusText.set(message);
     }
 
     private void appendUnique(List<UserSearchResultDTO> incoming) {
@@ -288,6 +346,31 @@ public class SearchViewModel {
         if (!additions.isEmpty()) {
             results.addAll(additions);
         }
+    }
+
+    private void setSortedResults(List<UserSearchResultDTO> incoming) {
+        results.setAll(sortSnapshot(incoming));
+    }
+
+    private void sortResultsInPlace() {
+        if (results.size() < 2) {
+            return;
+        }
+
+        List<UserSearchResultDTO> sorted = sortSnapshot(results);
+        if (!results.equals(sorted)) {
+            results.setAll(sorted);
+        }
+    }
+
+    private List<UserSearchResultDTO> sortSnapshot(List<UserSearchResultDTO> incoming) {
+        if (incoming == null || incoming.isEmpty()) {
+            return List.of();
+        }
+
+        List<UserSearchResultDTO> sorted = new ArrayList<>(incoming);
+        sorted.sort(SearchSortViewModel.comparator(sortOptions));
+        return sorted;
     }
 
     private static void runOnUiThread(Runnable action) {

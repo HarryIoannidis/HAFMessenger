@@ -12,6 +12,7 @@ import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
 import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
@@ -87,6 +88,8 @@ public class MainController implements SearchContactActions {
     @FXML
     private JFXButton searchActionButton;
     @FXML
+    private JFXButton filterButton;
+    @FXML
     private FontIcon searchActionIcon;
 
     // Profile panel detail nodes
@@ -119,6 +122,7 @@ public class MainController implements SearchContactActions {
     private final MainViewModel viewModel = MainViewModel.createDefault();
     private final MainSessionService mainSessionService;
     private MainContentLoader contentLoader;
+    private SearchFilterController searchFilterUi;
 
     enum ContactContextAction {
         PROFILE,
@@ -146,6 +150,7 @@ public class MainController implements SearchContactActions {
         setupContactContextMenuOutsideClickClose();
         setupContactList();
         setupContactSelection();
+        setupSearchFilterUi();
         setupSearchField();
         setupProfilePopupTrigger();
         registerPresenceListener();
@@ -230,8 +235,8 @@ public class MainController implements SearchContactActions {
      * Wires Enter key on the search field and the action button (magnify / clear).
      */
     private void setupSearchField() {
-        // Enter key triggers search
-        toolbarSearchField.setOnAction(e -> performSearch());
+        // Enter key triggers search flow through the filter UI state machine.
+        toolbarSearchField.setOnAction(e -> triggerSearchFlow());
 
         // Action button: search or clear depending on state
         if (searchActionButton != null) {
@@ -239,9 +244,21 @@ public class MainController implements SearchContactActions {
                 if (viewModel.hasSearchResultsProperty().get()) {
                     clearSearch();
                 } else {
-                    performSearch();
+                    triggerSearchFlow();
                 }
             });
+        }
+    }
+
+    private void setupSearchFilterUi() {
+        searchFilterUi = new SearchFilterController(
+                this::executeSearchWithFilters,
+                this::onSearchExecuted);
+
+        if (filterButton != null) {
+            filterButton.setOnAction(e -> searchFilterUi.onFilterButtonTrigger(
+                    toolbarSearchField == null ? null : toolbarSearchField.getText(),
+                    filterButton));
         }
     }
 
@@ -253,22 +270,28 @@ public class MainController implements SearchContactActions {
         profilePopupButton.setOnAction(e -> openSelectedContactProfilePopup());
     }
 
-    /**
-     * Performs the search using the current text in the toolbar field.
-     */
-    private void performSearch() {
-        SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
-        if (searchController == null) {
+    private void triggerSearchFlow() {
+        if (searchFilterUi == null) {
             return;
         }
-        String query = toolbarSearchField.getText();
-        if (query != null && !query.isBlank()) {
-            searchController.search(query);
-            viewModel.setHasSearchResults(true);
-            // Switch icon to clear (X)
-            if (searchActionIcon != null) {
-                searchActionIcon.setIconLiteral("mdi2c-close");
-            }
+        searchFilterUi.onSearchTrigger(
+                toolbarSearchField == null ? null : toolbarSearchField.getText(),
+                filterButton != null ? filterButton : searchActionButton);
+    }
+
+    private boolean executeSearchWithFilters(String query, SearchSortViewModel.SortOptions sortOptions) {
+        SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
+        if (searchController == null) {
+            return false;
+        }
+        searchController.search(query, sortOptions);
+        return true;
+    }
+
+    private void onSearchExecuted() {
+        viewModel.setHasSearchResults(true);
+        if (searchActionIcon != null) {
+            searchActionIcon.setIconLiteral("mdi2c-close");
         }
     }
 
@@ -280,6 +303,9 @@ public class MainController implements SearchContactActions {
         SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
         if (searchController != null) {
             searchController.clearResults();
+        }
+        if (searchFilterUi != null) {
+            searchFilterUi.onClear();
         }
         viewModel.setHasSearchResults(false);
         // Restore magnify icon
@@ -328,6 +354,9 @@ public class MainController implements SearchContactActions {
         // Load search FXML into contentPane
         if (contentLoader != null) {
             contentLoader.showSearchView();
+        }
+        if (searchFilterUi != null) {
+            searchFilterUi.onSearchTabActivated();
         }
     }
 

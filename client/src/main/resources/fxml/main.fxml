@@ -178,7 +178,7 @@
                                      <Insets left="10.0" />
                                   </HBox.margin>
                                </StackPane>
-                               <JFXButton contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
+                               <JFXButton fx:id="filterButton" contentDisplay="CENTER" prefHeight="40.0" prefWidth="40.0" styleClass="field-icon-button" text=" ">
                                   <graphic>
                                      <FontIcon iconLiteral="mdi2f-filter-outline" iconSize="25" />
                                   </graphic>
