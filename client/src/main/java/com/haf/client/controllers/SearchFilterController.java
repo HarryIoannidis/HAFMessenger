@@ -14,6 +14,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.util.Objects;
@@ -223,9 +224,7 @@ final class SearchFilterController {
 
         applyButton.getStyleClass().add("button-primary");
         applyButton.getStyleClass().add("search-filter-apply-button");
-        applyButton.setMinWidth(108);
-        applyButton.setPrefWidth(108);
-        applyButton.setMaxWidth(108);
+        applyButton.setMaxWidth(Double.MAX_VALUE);
         applyButton.setDefaultButton(true);
         applyButton.setOnAction(event -> handleApply());
 
@@ -234,6 +233,7 @@ final class SearchFilterController {
 
         HBox applyRow = new HBox(applyButton);
         applyRow.setAlignment(Pos.CENTER);
+        HBox.setHgrow(applyButton, Priority.ALWAYS);
 
         VBox content = new VBox(6,
                 ascendingRadio,
@@ -243,7 +243,8 @@ final class SearchFilterController {
                 regNumberRadio,
                 rankRadio,
                 applyRow);
-        content.setPadding(new Insets(4));
+        VBox.setMargin(applyRow, new Insets(6, 0, 0, 0));
+        content.setPadding(new Insets(0));
         content.setAlignment(Pos.TOP_LEFT);
         content.getStyleClass().add("search-filter-popup");
         content.setOnKeyPressed(event -> {

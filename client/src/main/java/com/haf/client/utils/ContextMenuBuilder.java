@@ -1,9 +1,11 @@
 package com.haf.client.utils;
 
+import javafx.geometry.Pos;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.layout.HBox;
+import javafx.scene.text.Text;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
@@ -13,7 +15,7 @@ public final class ContextMenuBuilder {
 
     private static final String DEFAULT_MENU_STYLE = "dropdown-menu";
     private static final String DEFAULT_ITEM_STYLE = "dropdown-menu-item";
-    private static final String DEFAULT_LABEL_STYLE = "dropdown-menu-label";
+    private static final String DEFAULT_TEXT_STYLE = "dropdown-menu-option-text";
     private static final int DEFAULT_ICON_SIZE = 22;
 
     private final ContextMenu menu;
@@ -71,13 +73,16 @@ public final class ContextMenuBuilder {
     private static MenuItem createIconMenuItem(String iconLiteral, String text) {
         FontIcon icon = new FontIcon(iconLiteral == null ? "" : iconLiteral);
         icon.setIconSize(DEFAULT_ICON_SIZE);
-        Label label = new Label(text == null ? "" : text, icon);
-        label.setGraphicTextGap(12);
+
+        Text optionText = new Text(text == null ? "" : text);
+        optionText.getStyleClass().add(DEFAULT_TEXT_STYLE);
+
+        HBox row = new HBox(12, icon, optionText);
+        row.setAlignment(Pos.CENTER_LEFT);
 
         MenuItem item = new MenuItem();
-        item.setGraphic(label);
+        item.setGraphic(row);
         item.getStyleClass().add(DEFAULT_ITEM_STYLE);
-        label.getStyleClass().add(DEFAULT_LABEL_STYLE);
         return item;
     }
 }
