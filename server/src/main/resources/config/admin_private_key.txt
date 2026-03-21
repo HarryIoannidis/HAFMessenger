@@ -1,0 +1,4 @@
+DO NOT COMMIT THIS FILE TO VERSION CONTROL.
+This is the admin's X25519 private key, needed to decrypt registration photos.
+
+MC4CAQAwBQYDK2VuBCIEID+2c+Efzhl1l7L1salwXAnPPDzl68jT01SB6xD0gMeW
