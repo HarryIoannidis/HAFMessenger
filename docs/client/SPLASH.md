@@ -21,11 +21,11 @@
     - Throws exception if any provider unavailable (prevents runtime crypto failures).
 3. **Resource verification** (progress: 0.6):
     - `ResourceChecker.verify()`: Ensures required FXML, images, and CSS files exist.
-    - Checks: `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/app_logo.png`, `/css/global.css`.
+    - Checks: `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/logo/app_logo.png`, `/css/global.css`.
     - Throws `IOException` with descriptive message if resource missing.
 4. **Network reachability** (progress: 0.8):
     - `NetworkChecker.check()`: Performs HEAD request to server endpoint (if configured).
-    - Endpoint from `haf.server.url` system property or `HAF_SERVER_URL` environment variable.
+    - Endpoint resolution order: `/config/client.properties` (`server.url`) -> `haf.server.url` system property -> `HAF_SERVER_URL` environment variable.
     - Skips check if endpoint not configured (allows offline development).
     - Timeout: 2s connect, 3s request.
     - Throws `IOException` if server unreachable or returns error status.

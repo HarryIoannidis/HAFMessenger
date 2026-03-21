@@ -109,8 +109,8 @@ This example shows the intent, test design, and representative code to add tests
   - When user sends a message, the client must AES‑256‑GCM encrypt content and derive key via X25519 ECDH; the server must accept the DTO, store only the opaque ciphertext blob with TTL, and never decrypt content; UI shows sent status upon server ACK.
 
 - Tests to add
-  - Shared unit: MessageDTO serialize/deserialize, size limits, and required fields; CryptoUtils AES‑GCM vector.
-  - Server IT: Start server with TLS 1.3 and test CA, POST/route DTO over WebSocket/TCP, assert DB contains only ciphertext and TTL deletes on time; audit log entry exists.
+  - Shared unit: `EncryptedMessage` serialize/deserialize, size limits, and required fields; AES-GCM crypto vector checks.
+  - Server IT: Start server with TLS 1.3 and test CA, POST routed envelopes to `/api/v1/messages`, assert DB contains only ciphertext and TTL deletes on time; audit log entry exists.
   - Client unit: ChatViewModel validates non‑empty content and disabled “Send” until valid; crypto envelope built before send.
   - Client UI: Headless FXML binds text field to ViewModel; “Send” disabled until valid; status label updates after ACK.
 

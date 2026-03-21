@@ -1,134 +1,87 @@
 # INGRESS
 
 ### Purpose
-- Two parallel ingress endpoints: HTTPS REST and secure WebSocket for encrypted message input.
-- Common validation, rate limiting, routing to `MailboxRouter`.
+- Documents the real ingress behavior implemented in `HttpIngressServer` and `WebSocketIngressServer`.
+- Covers authentication, routing, rate limiting, and wire-level response behavior.
 
 ---
 
 ## HttpIngressServer
 
-### Purpose
-- HTTPS listener for `POST /api/v1/messages`.
+### Bound HTTPS contexts
+- `POST /api/v1/messages`: authenticated encrypted message ingress.
+- `POST /api/v1/register`: registration.
+- `POST /api/v1/login`: login.
+- `POST /api/v1/logout`: logout (session revoke).
+- `GET /api/v1/users/{userId}/key`: public key lookup.
+- `GET /api/v1/search`: authenticated user search (cursor pagination).
+- `GET|POST|DELETE /api/v1/contacts`: contacts list/add/remove.
+- `GET|HEAD /api/v1/health`: health probe.
+- `GET /api/v1/config/admin-key`: optional admin public key for encrypted registration photos.
+- `GET /api/v1/config/messaging`: authenticated attachment/messaging policy.
+- `POST /api/v1/attachments/init`
+- `POST /api/v1/attachments/{attachmentId}/chunk`
+- `POST /api/v1/attachments/{attachmentId}/complete`
+- `POST /api/v1/attachments/{attachmentId}/bind`
+- `GET /api/v1/attachments/{attachmentId}`
 
-### Responsibilities
-- Parse JSON body to `EncryptedMessage`.
-- Validate via `EncryptedMessageValidator`.
-- Rate limit check via `RateLimiterService`.
-- Enqueue validated envelope in `MailboxRouter`.
-- HTTP responses: `202`, `400`, `413`, `429`, `500`.
+### Message ingress flow (`POST /api/v1/messages`)
+1. Require `Authorization: Bearer <sessionId>`; invalid session returns `401`.
+2. Parse JSON to `EncryptedMessage`.
+3. Validate via `EncryptedMessageValidator`.
+4. Rate-limit via `RateLimiterService.checkAndConsume`.
+5. Route via `MailboxRouter.ingress(message)`.
+6. Return `202` with `IngressResponse(envelopeId, expiresAt)`.
 
-### Request flow
-- Client POST with JSON body.
-- Server deserialize (if fail → `400 MALFORMED_JSON`).
-- Validate (if invalid → `400`/`413`).
-- Rate limit (if blocked → `429` with `Retry-After` header).
-- Enqueue (if success → `202`, if DB error → `500`).
-- Increment metrics.
+### Security headers
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none';`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-Request-Id` per request
 
 ### TLS
-- `SSLContext` from `Main` (PKCS12, TLS 1.3).
-- Ciphers: `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`.
-- Client auth: `HAF_TLS_CLIENT_AUTH` (`NONE`/`OPTIONAL`/`REQUIRED`).
-
-### Threading
-- Java `HttpServer` or embedded (Jetty/Netty) with thread pool.
-- Stateless handlers, dependencies injected.
-
-### Shutdown
-- `stop(timeout)`: stops new connections, waits for in-flight requests, closes sockets.
+- HTTPS uses a TLS 1.3 `SSLContext` created in `Main`.
+- Cipher suites restricted to:
+  - `TLS_AES_256_GCM_SHA384`
+  - `TLS_CHACHA20_POLY1305_SHA256`
 
 ---
 
 ## WebSocketIngressServer
 
 ### Purpose
-- Secure WebSocket listener on `/ws` for persistent connections.
-
-### Responsibilities
-- Parse text frames as JSON `EncryptedMessage`.
-- Validate, rate limit, enqueue (same logic as HTTP).
-- WebSocket close codes: `1000`, `1003`, `1008`, `1011`.
+- Authenticated WebSocket channel for real-time delivery and acknowledgements.
 
 ### Connection lifecycle
-- Client opens `wss://server:port/ws`.
-- For each frame:
-    - Parse JSON.
-    - Validate (if invalid → error frame + close `1008`).
-    - Rate limit (if blocked → error frame + close `1008`).
-    - Enqueue (if success → ack frame, if error → error frame + close `1011`).
-- Client or server closes connection.
+- Client connects with `Authorization: Bearer <sessionId>` in handshake headers.
+- On open:
+  - session is validated via `SessionDAO`
+  - mailbox subscription is created
+  - up to 100 undelivered envelopes are pushed immediately
+  - presence snapshot is sent for contacts
+- On close: subscription and presence registrations are cleaned up.
+
+### Inbound frame handling
+- Inbound text frames are treated as ACK payloads, not new encrypted messages.
+- Expected shape includes `envelopeIds` array.
+- `MailboxRouter.acknowledgeOwned(userId, envelopeIds)` enforces ownership-safe ACK.
+- Rate-limited connections receive `{"type":"rate_limit","retryAfterSeconds":...}`.
+
+### Outbound push payloads
+- Message push:
+  - `{"type":"message","envelopeId":"...","payload":<EncryptedMessage>,"expiresAt":...}`
+- Presence push:
+  - `{"type":"presence","userId":"...","active":true|false}`
 
 ### Error handling
-- Parse errors: `{"error": "MALFORMED_JSON"}` + close `1003`.
-- Validation: `{"error": "VALIDATION_FAILED", "reason": "..."}` + close `1008`.
-- Rate limit: `{"error": "RATE_LIMITED", "retryAfter": <sec>}` + close `1008`.
-- Internal: generic error + close `1011`.
-- Audit log for everything.
-
-### TLS
-- Same `SSLContext` as HTTP.
-- Upgrade via standard handshake.
-
-### Threading
-- Asynchronous I/O (Java-WebSocket/Jetty).
-- State managed per connection.
-
-### Shutdown
-- `stop()`: sends close frame `1001 Going Away`, waits ack/timeout, closes.
+- Unauthorized websocket: policy close (`1008`/`POLICY_VALIDATION`).
+- Internal processing errors: logged via `AuditLogger`, connection closed with `1011`.
 
 ---
 
-## EncryptedMessageValidator
-
-### Purpose
-- Common validator for HTTP and WebSocket.
-
-### Validation checks
-- Required fields: `senderId`, `recipientId`, `ciphertextB64`, headers (`CLIENT_TIMESTAMP`, `TTL_MILLIS`).
-- Valid base64 for `ciphertextB64`.
-- TTL not expired (client timestamp + TTL > now).
-- Payload size <= `HAF_MAX_MESSAGE_BYTES`.
-
-### Output
-- `ValidationResult(valid, reason, expiresAtMillis)`.
-
----
-
-## RateLimiterService integration
-
-### Purpose
-- Common rate limiter for HTTP and WebSocket.
-
-### Policy
-- Sliding window: 60 sec, threshold 100 messages/user.
-- Lockout: 15 min after sustained abuse.
-
-### Output
-- `RateLimitDecision(allowed, retryAfterSeconds)`.
-
----
-
-## MailboxRouter integration
-
-### Purpose
-- Both endpoints call `MailboxRouter.enqueue(envelope)`.
-
-### Flow
-- Router stores in the DB via `EnvelopeDAO`.
-- Updates in-memory queues for delivery.
-
----
-
-## Metrics and audits
-
-### AuditLogger events
-- `logIngressAccepted(requestId, userId, recipientId, status, latencyMs)`.
-- `logIngressRejected(requestId, userId, reason, status)`.
-- `logRateLimit(requestId, userId, retryAfterSeconds)`.
-- `logError(action, requestId, userId, exception)`.
-
-### MetricsRegistry counters
-- `incrementIngress()` for valid requests.
-- `incrementRejects()` for validation/malformed.
-- `incrementRateLimitRejects()` for rate-limited.
+## Shared ingress dependencies
+- `EncryptedMessageValidator`: structural + expiry validation for encrypted messages.
+- `RateLimiterService`: DB-backed 60-second window + lockout.
+- `MailboxRouter`: persistence-backed routing, push dispatch, ACK ownership checks.
+- `AuditLogger` + `MetricsRegistry`: structured event logging and counters.

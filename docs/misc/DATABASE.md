@@ -11,10 +11,10 @@ The database serves as the central routing and mailbox infrastructure for Phase 
 ## Database Selection & Requirements
 
 ### Technology Stack
-- **Primary:** MySQL 8.0+ (production) / SQLite 3.35+ (development/testing)
-- **Connection Pooling:** HikariCP 5.0+ with 20 max connections, 5 min idle
-- **Migration Tool:** Flyway 9.0+ or Liquibase 4.0+ for schema versioning
-- **JDBC Driver:** MySQL Connector/J 8.0.33+ with TLS 1.3 enforcement
+- **Primary:** MySQL 8.0+ (all runtime profiles)
+- **Connection Pooling:** HikariCP 5.1.x (default pool size 20)
+- **Migration Tool:** Flyway 12.x
+- **JDBC Driver:** MySQL Connector/J 8.2.x
 
 ### Core Requirements
 1. **Zero-Knowledge Storage:** Server never decrypts message payloads; stores encrypted blobs with routing metadata only.
@@ -23,7 +23,7 @@ The database serves as the central routing and mailbox infrastructure for Phase 
 4. **High Availability:** Connection pooling with automatic failover, read replicas for audit log queries (future Phase 9).
 5. **Audit Trail:** Immutable log of all critical operations (LOGIN, SEND_MESSAGE, KEY_ROTATION, ADMIN_ACTION) with timestamp and metadata.
 6. **Rate Limiting:** Per-user quotas enforced via `rate_limits` table with sliding window counters.
-7. **Secure Credentials:** Environment variables only (`DB_USER`, `DB_PASS`), never hardcoded; support for AWS Secrets Manager/Vault integration.
+7. **Secure Credentials:** Environment-driven configuration (`HAF_DB_USER`, `HAF_DB_PASS`), never hardcoded.
 
 ---
 
@@ -400,10 +400,10 @@ import java.util.*;
  * Production-grade database manager with HikariCP pooling.
  * 
  * Configuration via environment variables:
- * - DB_URL: JDBC connection string (e.g., jdbc:mysql://localhost:3306/haf_messenger)
- * - DB_USER: Database username
- * - DB_PASS: Database password (from AWS Secrets Manager in production)
- * - DB_POOL_SIZE: Maximum connection pool size (default: 20)
+ * - HAF_DB_URL: JDBC connection string (e.g., jdbc:mysql://localhost:3306/haf_messenger)
+ * - HAF_DB_USER: Database username
+ * - HAF_DB_PASS: Database password (from AWS Secrets Manager in production)
+ * - HAF_DB_POOL_SIZE: Maximum connection pool size (default: 20)
  */
 public class DatabaseManager {
     
@@ -411,12 +411,12 @@ public class DatabaseManager {
     
     static {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(System.getenv("DB_URL"));
-        config.setUsername(System.getenv("DB_USER"));
-        config.setPassword(System.getenv("DB_PASS"));
+        config.setJdbcUrl(System.getenv("HAF_DB_URL"));
+        config.setUsername(System.getenv("HAF_DB_USER"));
+        config.setPassword(System.getenv("HAF_DB_PASS"));
         
         // Connection pool tuning
-        config.setMaximumPoolSize(getEnvInt("DB_POOL_SIZE", 20));
+        config.setMaximumPoolSize(getEnvInt("HAF_DB_POOL_SIZE", 20));
         config.setMinimumIdle(5);
         config.setConnectionTimeout(30000);              // 30 seconds
         config.setIdleTimeout(600000);                   // 10 minutes
@@ -448,7 +448,7 @@ public class DatabaseManager {
     /**
      * Store encrypted message envelope (Phase 5 ingress).
      */
-    public static boolean storeEnvelope(EncryptedMessageDTO envelope) {
+    public static boolean storeEnvelope(EncryptedMessage envelope) {
         String sql = """
             INSERT INTO message_envelopes 
             (envelope_id, sender_id, recipient_id, encrypted_payload, wrapped_key, 
@@ -491,7 +491,7 @@ public class DatabaseManager {
     /**
      * Retrieve undelivered messages for recipient (mailbox pattern).
      */
-    public static List<EncryptedMessageDTO> getMailbox(String recipientId) {
+    public static List<EncryptedMessage> getMailbox(String recipientId) {
         String sql = """
             SELECT * FROM message_envelopes 
             WHERE recipient_id = ? AND delivered = FALSE AND expires_at > NOW()
@@ -499,7 +499,7 @@ public class DatabaseManager {
             LIMIT 100
         """;
         
-        List<EncryptedMessageDTO> messages = new ArrayList<>();
+        List<EncryptedMessage> messages = new ArrayList<>();
         
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -604,7 +604,7 @@ public class DatabaseManager {
     }
     
     // Helper methods
-    private static String computeAadHash(EncryptedMessageDTO envelope) {
+    private static String computeAadHash(EncryptedMessage envelope) {
         // SHA-256 of immutable header fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength)
         String aad = String.join("|", 
             envelope.version, envelope.algorithm, envelope.senderId, envelope.recipientId,
@@ -614,8 +614,8 @@ public class DatabaseManager {
         return Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(aad.getBytes()));
     }
     
-    private static EncryptedMessageDTO mapToDTO(ResultSet rs) throws SQLException {
-        EncryptedMessageDTO dto = new EncryptedMessageDTO();
+    private static EncryptedMessage mapToDTO(ResultSet rs) throws SQLException {
+        EncryptedMessage dto = new EncryptedMessage();
         dto.messageId = rs.getString("envelope_id");
         dto.senderId = rs.getString("sender_id");
         dto.recipientId = rs.getString("recipient_id");
@@ -818,7 +818,7 @@ CREATE INDEX idx_resume_token ON file_uploads(chunk_resume_token);
 
 #### Phase 8 – Authentication Enhancements
 
-**New Table:** `two_factor_auth` for TOTP/WebAuthn.
+**Possible Future Table (not currently implemented):** `two_factor_auth` for optional TOTP/WebAuthn.
 
 ```sql
 -- Migration V8_1__add_2fa.sql
@@ -934,9 +934,9 @@ server/src/main/resources/db/migration/
     <artifactId>flyway-maven-plugin</artifactId>
     <version>9.22.0</version>
     <configuration>
-        <url>${DB_URL}</url>
-        <user>${DB_USER}</user>
-        <password>${DB_PASS}</password>
+        <url>${HAF_DB_URL}</url>
+        <user>${HAF_DB_USER}</user>
+        <password>${HAF_DB_PASS}</password>
         <locations>
             <location>filesystem:src/main/resources/db/migration</location>
         </locations>
@@ -947,7 +947,7 @@ server/src/main/resources/db/migration/
 
 **Execution:**
 ```bash
-mvn flyway:migrate -DDB_URL=jdbc:mysql://localhost:3306/haf_messenger -DDB_USER=haf_admin -DDB_PASS=$DB_PASS
+mvn flyway:migrate -DHAF_DB_URL=jdbc:mysql://localhost:3306/haf_messenger -DHAF_DB_USER=haf_admin -DHAF_DB_PASS=$HAF_DB_PASS
 ```
 
 ---
@@ -961,24 +961,24 @@ mvn flyway:migrate -DDB_URL=jdbc:mysql://localhost:3306/haf_messenger -DDB_USER=
 
 @Test
 public void testStoreAndRetrieveEnvelope() {
-EncryptedMessageDTO envelope = TestFixtures.createValidEnvelope();
+EncryptedMessage envelope = TestFixtures.createValidEnvelope();
 
     assertTrue(DatabaseManager.storeEnvelope(envelope));
     
-    List<EncryptedMessageDTO> mailbox = DatabaseManager.getMailbox(envelope.recipientId);
+    List<EncryptedMessage> mailbox = DatabaseManager.getMailbox(envelope.recipientId);
     assertEquals(1, mailbox.size());
     assertEquals(envelope.messageId, mailbox.get(0).messageId);
 }
 
 @Test
 public void testTTLCleanup() {
-EncryptedMessageDTO envelope = TestFixtures.createExpiredEnvelope();
+EncryptedMessage envelope = TestFixtures.createExpiredEnvelope();
 DatabaseManager.storeEnvelope(envelope);
 
     int deleted = DatabaseManager.cleanupExpiredMessages();
     assertEquals(1, deleted);
     
-    List<EncryptedMessageDTO> mailbox = DatabaseManager.getMailbox(envelope.recipientId);
+    List<EncryptedMessage> mailbox = DatabaseManager.getMailbox(envelope.recipientId);
     assertTrue(mailbox.isEmpty());
 }
 
@@ -1008,11 +1008,11 @@ public void testEndToEndMessageFlow() {
     UserRepository.createUser(TestFixtures.createBobRegistration());
     
     // 2. Send message from Alice to Bob
-    EncryptedMessageDTO msg = TestFixtures.createAliceToBobMessage();
+    EncryptedMessage msg = TestFixtures.createAliceToBobMessage();
     DatabaseManager.storeEnvelope(msg);
     
     // 3. Bob fetches mailbox
-    List<EncryptedMessageDTO> bobMailbox = DatabaseManager.getMailbox("bob-user-id");
+    List<EncryptedMessage> bobMailbox = DatabaseManager.getMailbox("bob-user-id");
     assertEquals(1, bobMailbox.size());
     
     // 4. Mark as delivered

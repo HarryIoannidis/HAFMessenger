@@ -10,13 +10,13 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
 ## **Key Features**
 
 * End-to-end encryption: AES-256 for message content + X25519 (ECDH) for key agreement
-* Authentication: username/password + TOTP (Google Authenticator) + WebAuthn/FIDO2 support
+* Authentication: email/password over TLS with Argon2id password verification and server-side sessions
 * Real-time user presence and push notifications
 * Encrypted file transfer (images, PDFs) with temporary encrypted server storage and automatic deletion
 * No local storage of sensitive data on the client side (when required)
 * Self-destructing messages (configurable TTL)
 * Logging & auditing with brute-force protection
-* Admin panel for monitoring and user management
+* Contact management and public-key lookup for secure recipient targeting
 
 ---
 
@@ -31,10 +31,8 @@ The purpose of the project is to deliver **end-to-end encryption**, strict user 
   - Log4j2 for structured logging
 * Database: MySQL
 * Cryptography: Java Cryptography (AES-256, X25519, SHA-256)
-* 2FA: otp-java (TOTP)
-* WebAuthn: WebAuthn4J (when required)
 * Build / Packaging: Maven, jlink / jpackage for self-contained installers
-* Logging: Log4j2 or SLF4J + Logback
+* Logging: Log4j2 (server), java.util.logging (client internals), SLF4J API (dependency bridge)
 
 ---
 

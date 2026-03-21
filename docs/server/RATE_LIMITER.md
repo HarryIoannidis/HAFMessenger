@@ -1,100 +1,59 @@
 # RATE_LIMITER
 
 ### Purpose
-- Prevents abuse by enforcing per-user message quotas using a database-backed sliding window with daily reset.
-- Integrates with `AuditLogger` for audit trail of rate-limit events.
+- Documents `RateLimiterService`, the DB-backed per-user ingress throttle.
 
-### Database schema
+### Runtime policy
+- Window: `60` seconds.
+- Max messages per window: `100`.
+- Lockout duration after threshold: `15` minutes.
+
+---
+
+## Backing table
+
+`rate_limits` schema (from Flyway migration):
 ```sql
 CREATE TABLE rate_limits (
-    user_id        VARCHAR(128) NOT NULL,
-    window_start   TIMESTAMP    NOT NULL,
-    message_count  INT          NOT NULL DEFAULT 0,
-    total_bytes    BIGINT       NOT NULL DEFAULT 0,
-    locked_until   TIMESTAMP    NULL,
-    PRIMARY KEY (user_id, window_start)
+    user_id VARCHAR(64) NOT NULL,
+    message_count INT DEFAULT 0,
+    window_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    lockout_until TIMESTAMP NULL,
+    PRIMARY KEY (user_id)
 );
 ```
 
 ---
 
-## checkAndConsume
-
-### Purpose
-- Core method that atomically checks quota and records usage.
-
-### Flow
-1. Read current window for `userId`:
-```sql
-SELECT message_count, total_bytes, locked_until
-FROM rate_limits
-WHERE user_id = ? AND window_start = ?
-FOR UPDATE;
-```
-2. Check lockout:
-    - If `locked_until > NOW()` → return `RateLimitDecision(allowed=false, retryAfterSeconds)`.
-3. Check message count:
-    - If `message_count >= MAX_DAILY_MESSAGES` → lock user, return denied.
-4. Check byte total:
-    - If `total_bytes + messageBytes > MAX_MESSAGE_BYTES` → return denied.
-5. Update counters:
-```sql
-INSERT INTO rate_limits (user_id, window_start, message_count, total_bytes)
-VALUES (?, ?, 1, ?)
-ON DUPLICATE KEY UPDATE
-    message_count = message_count + 1,
-    total_bytes = total_bytes + ?;
-```
-6. Return `RateLimitDecision(allowed=true)`.
-
-### Configuration constants
-- `MAX_DAILY_MESSAGES = 1000`: maximum messages per user per window.
-- `MAX_MESSAGE_BYTES = 50 * 1024 * 1024` (50 MB): maximum total bytes per window.
-- `WINDOW_DURATION_SECONDS = 86400` (24 hours): sliding window size.
-- `LOCKOUT_DURATION_SECONDS = 900` (15 min): lockout after sustained abuse.
+## `checkAndConsume(requestId, userId)` flow
+1. Upsert/update the user row:
+  - reset `message_count` and `window_start` when 60s window elapsed
+  - increment `message_count` otherwise
+  - set `lockout_until` when threshold is reached
+2. Read current state.
+3. If `lockout_until` is still in the future:
+  - return `RateLimitDecision.block(retryAfterSeconds)`
+  - emit `AuditLogger.logRateLimit(...)`
+4. If over threshold in current window:
+  - return blocked decision.
+5. Otherwise return `RateLimitDecision.allow()`.
 
 ---
 
-## RateLimitDecision
-
-### Purpose
-- Immutable result object from `checkAndConsume()`.
-
-### Fields
-- `boolean allowed`: whether the request is permitted.
-- `int retryAfterSeconds`: seconds until quota resets (0 if allowed).
+## Decision type
+- `RateLimitDecision(boolean allowed, long retryAfterSeconds)`
+- Constructors:
+  - `allow()` -> `(true, 0)`
+  - `block(seconds)` -> `(false, max(seconds,1))`
 
 ---
 
-## Thread safety
-- Database-level locking: `SELECT ... FOR UPDATE` ensures atomic read-check-update.
-- Multiple server instances: safe due to DB-level row locking.
-- Connection pooling: HikariCP manages concurrent connections.
+## Failure behavior
+- SQL failures are logged via `AuditLogger.logError("rate_limit_failed", ...)`.
+- Service throws `RateLimitException` to caller.
 
 ---
 
-## Audit logging
-- Denied requests: `AuditLogger.logRateLimit(requestId, userId, retryAfterSeconds)`.
-- Lockout events: `AuditLogger.logError("rate_limit_lockout", requestId, userId, null)` with lockout duration.
-- Allowed requests: no explicit audit log (covered by ingress accepted log).
-
----
-
-## Error handling
-- Database connection failure: throws `RuntimeException`, ingress server returns `500`.
-- SQL errors: caught, logged via `AuditLogger.logError()`, request denied as precaution.
-- Invalid userId: validated before `checkAndConsume()` (non-null, non-blank).
-
----
-
-## Testing
-
-### Unit tests
-- Mocked `DataSource` and `Connection` to verify SQL execution and decision logic.
-- Test cases: under limit, at limit, over limit, lockout active, lockout expired, byte limit exceeded.
-
-### Integration tests
-- Real MySQL instance (testcontainers or embedded).
-- Concurrent requests to verify atomicity.
-- Window rollover behavior.
-- Verify audit log entries.
+## Notes
+- This implementation is message-count based (not byte-budget based).
+- Enforcement is shared by HTTP message ingress and WebSocket ACK processing.

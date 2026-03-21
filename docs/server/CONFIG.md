@@ -1,65 +1,53 @@
 # CONFIG
 
 ### Purpose
-- Central configuration object for the Phase 5 server, responsible for reading all the necessary environment variables and exposing them as typed values to the rest of the components.
-- Isolates access to `System.getenv(...)` so that HttpIngressServer, WebSocketIngressServer, EnvelopeDAO, MailboxRouter, RateLimiterService, AuditLogger etc. do not know the details of the environment.
+- Documents the actual runtime configuration surface loaded by `ServerConfig`.
+- Centralizes server settings (DB, TLS, search, attachments) and fail-fast validation rules.
 
-### Database configuration
-- `HAF_DB_URL`
-    - JDBC URL for MySQL 8.0+ (e.g., `jdbc:mysql://db:3306/haf_messenger?useSSL=true`).
-    - Mandatory; If it is missing or empty, the server terminates with a configuration error.
-- `HAF_DB_USER`
-    - DB user with permissions for Flyway migrations and runtime queries.
-    - Mandatory.
-- `HAF_DB_PASS`
-    - Password for `HAF_DB_USER`.
-    - Mandatory.
-- `HAF_DB_POOL_SIZE`
-    - Maximum HikariCP connection pool (integer) size.
-    - Optional; If it is missing or invalid, a secure default (e.g. `20`) is applied.
+### Loading behavior
+- `ServerConfig.load()` starts from `System.getenv()` and then overlays values from `server/src/main/resources/config/variables.env` if present.
+- In this implementation, values from `variables.env` override environment variables with the same key.
 
-### TLS / HTTPS configuration
-- `HAF_TLS_KEYSTORE_PATH`
-    - Path to PKCS12 keystore with TLS certificate server and private key.
-    - Compulsory for production; In the tests, bypass or use test keystore can be done.
-- `HAF_TLS_KEYSTORE_PASS`
-    - Password for the keystore.
-    - Mandatory when TLS is active.
-- `HAF_TLS_CLIENT_AUTH`
-    - Optional mTLS flag (`NONE` / `OPTIONAL` / `REQUIRED`).
-    - In Phase 5 it can remain `NONE`, but it is reserved for future use.
+### Required variables
+- `HAF_DB_URL`: JDBC URL for MySQL.
+- `HAF_DB_USER`: database username.
+- `HAF_DB_PASS`: database password.
+- `HAF_KEY_PASS`: keystore passphrase used by shared keystore flows.
+- `HAF_TLS_KEYSTORE_PATH`: PKCS12 path for TLS server cert/key.
+- `HAF_TLS_KEYSTORE_PASS`: password for the TLS keystore.
+- `HAF_SEARCH_CURSOR_SECRET`: HMAC secret used to sign search cursors.
 
-### Ingress configuration
-- `HAF_HTTP_PORT`
-    - HTTPS port for `HttpIngressServer` (`/api/v1/messages`).
-    - If missing, default is used (e.g. `8443`).
-- `HAF_WS_PORT`
-    - Secure WebSocket port for `WebSocketIngressServer` (`/ws`).
-    - If it is missing, it gets the value of `HAF_HTTP_PORT` for a common listener.
-- `HAF_MAX_MESSAGE_BYTES`
-    - Maximum allowable size of encrypted payload in bytes.
-    - Used by `EncryptedMessageValidator` to reject oversized messages before DB; Phase 5 baseline: `8*1024*1024` bytes if not set.
+### Optional variables (with defaults)
+- `HAF_DB_POOL_SIZE` (default `20`).
+- `HAF_HTTP_PORT` (default `8443`).
+- `HAF_WS_PORT` (default `8444`).
+- `HAF_KEYSTORE_ROOT` (optional path override).
+- `HAF_ADMIN_PUBLIC_KEY` (optional PEM returned by `/api/v1/config/admin-key`).
 
-### Logging / metrics configuration
-- `HAF_LOG_LEVEL`
-    - Optional log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`) for Log4j2.
-    - If missing, default `INFO`.
-- Can be used to enable detailed auditing in tests or events without code changes.
+### Search configuration
+- `HAF_SEARCH_PAGE_SIZE` (default `20`).
+- `HAF_SEARCH_MAX_PAGE_SIZE` (default `50`).
+- `HAF_SEARCH_MIN_QUERY_LENGTH` (default `3`).
+- `HAF_SEARCH_MAX_QUERY_LENGTH` (default `128`).
 
-### Construction / validation
-- `ServerConfig` is generated once in `Main` during startup.
-- During construction:
-    - Reads all relevant env vars.
-    - Trims/checks for `null` or blank values in required fields.
-    - Parse numeric (ports, pool size, max bytes) and apply defaults to the wrong values.
-    - If a mandatory field is missing/invalid, it throws unchecked exception and stops the server instead of running misconfigured.
+### Attachment policy configuration
+- `HAF_ATTACHMENT_MAX_BYTES` (default `10485760` / 10 MB).
+- `HAF_ATTACHMENT_INLINE_MAX_BYTES` (default `1048576` / 1 MB).
+- `HAF_ATTACHMENT_CHUNK_BYTES` (default `524288` / 512 KB).
+- `HAF_ATTACHMENT_ALLOWED_TYPES` (CSV MIME allowlist; defaults to shared attachment constants).
+- `HAF_ATTACHMENT_UNBOUND_TTL_SECONDS` (default `1800`).
 
-### Usage
-- `Main`
-    - Gets DB params for HikariCP/Flyway and TLS params for `SSLContext`, as well as HTTP/WS ports.
-- `HttpIngressServer` / `WebSocketIngressServer`
-    - Read ports and `maxMessageBytes` from `ServerConfig` instead of hard-coded constants.
-- `EncryptedMessageValidator`
-    - Uses `getMaxMessageBytes()` for payload size enforcement.
-- `RateLimiterService`, `MailboxRouter`, `AuditLogger`
-    - They can pull future tunables (thresholds, intervals, etc.) from `ServerConfig`, so that all operational settings are centralized.
+### Validation rules
+- Missing required values throw `ConfigurationException` and abort startup.
+- Search constraints are validated at boot:
+  - `minQueryLength >= 1`
+  - `maxQueryLength >= minQueryLength`
+  - `pageSize` and `maxPageSize` are positive
+- Attachment constraints are validated at boot:
+  - all size/TTL values must be positive
+  - `inlineMaxBytes <= maxBytes`
+  - MIME allowlist must not be empty
+
+### Path normalization notes
+- TLS keystore path is resolved with compatibility fallbacks when prefixed or not prefixed by `server/`.
+- If the configured path does not exist directly, `ServerConfig` tries alternative relative forms.

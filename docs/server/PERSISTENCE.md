@@ -1,98 +1,95 @@
 # PERSISTENCE
 
-## EnvelopeDAO
-
 ### Purpose
-- Data Access Object for encrypted message envelopes in MySQL.
-- Handles insert, fetch, delivery status update, and TTL-based expiration.
-- Never decrypts message content (zero-knowledge storage).
-
-### Database schema
-```sql
-CREATE TABLE message_envelopes (
-    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-    sender_id    VARCHAR(128)  NOT NULL,
-    recipient_id VARCHAR(128)  NOT NULL,
-    payload      LONGBLOB      NOT NULL,
-    aad_hash     CHAR(64)      NOT NULL,
-    created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at   TIMESTAMP     NOT NULL,
-    delivered    BOOLEAN       NOT NULL DEFAULT FALSE,
-    INDEX idx_recipient (recipient_id, delivered, expires_at)
-);
-```
-
-### Methods
-
-#### insert(EncryptedMessageDTO dto, long expiresAtMs) → long id
-- PreparedStatement with parameterized query.
-- Stores full JSON payload as BLOB.
-- Computes AAD hash (SHA-256 of canonical AAD bytes).
-- Sets `expires_at` from `timestampEpochMs + ttlSeconds * 1000`.
-- Returns generated ID.
-
-#### fetchForRecipient(String recipientId) → List<EnvelopeRow>
-- `WHERE recipient_id = ? AND delivered = FALSE AND expires_at > NOW()`.
-- Returns list of pending envelopes ordered by `created_at`.
-
-#### fetchByIds(List<Long> ids) → List<EnvelopeRow>
-- `WHERE id IN (?)`.
-- Batch fetch for specific envelopes.
-
-#### markDelivered(long id) → boolean
-- `UPDATE ... SET delivered = TRUE WHERE id = ?`.
-- Returns true if row was updated.
-
-#### deleteExpired() → int
-- `DELETE FROM message_envelopes WHERE expires_at < NOW()`.
-- Returns number of deleted rows.
-- Called by scheduled cleanup job (every 5 minutes).
-
-### Connection management
-- Uses HikariCP `DataSource` for connection pooling.
-- All methods use try-with-resources for `Connection` and `PreparedStatement`.
-- No connection leaks: `finally` block ensures cleanup.
-
-### Security rules
-- **Zero-knowledge**: `payload` stored as opaque BLOB, never parsed or decrypted.
-- **Parameterized queries**: all SQL uses `PreparedStatement` (no string concatenation).
-- **AAD hash**: integrity verification without decryption.
-- **Audit**: all operations logged via `AuditLogger` (no payload content in logs).
+- Documents current DAO responsibilities and how encrypted data is stored.
+- Focuses on implemented behavior in `server/src/main/java/com/haf/server/db`.
 
 ---
 
-## Ingress validation (EncryptedMessageValidator)
+## EnvelopeDAO
 
-### Purpose
-- Structural validation of incoming envelopes before persistence.
+### Scope
+- Stores encrypted message envelopes in `message_envelopes`.
+- Never decrypts payloads; only persists/re-hydrates opaque fields.
 
-### Checks
-- Required fields: `senderId`, `recipientId`, `ciphertextB64`, `ivB64`, `tagB64`, `ephemeralPublicB64`.
-- TTL: within `[MIN_TTL_SECONDS, MAX_TTL_SECONDS]`.
-- Payload size: `ciphertextB64.length() <= MAX_CIPHERTEXT_BASE64`.
-- Base64 fields: decodable without error.
-- Timestamp: not in future, not older than `MAX_TTL_SECONDS`.
+### Stored envelope fields
+- `envelope_id`, `sender_id`, `recipient_id`
+- `encrypted_payload` (ciphertext bytes)
+- `wrapped_key` (ephemeral public key bytes)
+- `iv`, `auth_tag`
+- `aad_hash`, `content_type`, `content_length`, `timestamp`, `ttl`, `expires_at`
 
-### Output
-- `ValidationResult(valid, reason, expiresAtMillis)`.
-- Reject codes: `STRUCTURAL_INVALID`, `TTL_EXPIRED`, `PAYLOAD_TOO_LARGE`, `MALFORMED_BASE64`.
+### Key methods
+- `insert(EncryptedMessage message) -> QueuedEnvelope`
+- `fetchForRecipient(String recipientId, int limit) -> List<QueuedEnvelope>`
+- `fetchByIds(Collection<String> envelopeIds) -> Map<String, QueuedEnvelope>`
+- `markDelivered(List<String> envelopeIds) -> boolean`
+- `deleteExpired() -> int`
 
 ---
 
 ## UserDAO
 
-### Purpose
-- Data Access Object for user accounts and authentication.
-- Handles user registration, lookup, and password verification based on BCrypt.
+### Scope
+- Registration persistence and user/profile lookup.
+- Public-key lookup for recipient encryption.
+- Search + cursor pagination support.
+
+### Key methods
+- `insert(RegisterRequest request, String hashedPassword) -> String userId`
+- `updatePhotoIds(userId, idPhotoId, selfiePhotoId)`
+- `existsByEmail(email)`
+- `findByEmail(email)`
+- `getPublicKey(userId)`
+- `searchUsersPage(query, excludeUserId, limit, cursorFullName, cursorUserId)`
+
+---
 
 ## SessionDAO
 
-### Purpose
-- Data Access Object for user sessions.
-- Manages issuance, validation, and revocation of authentication tokens.
+### Scope
+- Session creation, validation, and revocation in `sessions`.
+
+### Key methods
+- `createSession(userId) -> sessionId`
+- `getUserIdForSession(sessionId) -> userId|null`
+- `revokeSession(sessionId)`
+
+### Note
+- `jwt_token` is currently persisted as a placeholder string while session ID is the active bearer credential.
+
+---
 
 ## FileUploadDAO
 
-### Purpose
-- Data Access Object for E2E-encrypted file uploads.
-- Stores opaque ciphertext blobs linked to message envelopes or user identities.
+### Scope
+- Stores encrypted registration photos (`EncryptedFileDTO`) in `file_uploads`.
+- Used by registration flow for ID/selfie evidence.
+
+### Key method
+- `insert(EncryptedFileDTO dto, String uploaderId) -> fileId`
+
+---
+
+## AttachmentDAO
+
+### Scope
+- Chunked encrypted chat attachments using:
+  - `message_attachments`
+  - `message_attachment_chunks`
+
+### Upload lifecycle methods
+- `initUpload(...) -> UploadInitResult`
+- `storeChunk(...) -> ChunkStoreResult`
+- `completeUpload(...) -> CompletionResult`
+- `bindUploadToEnvelope(...) -> BindResult`
+- `loadForRecipient(...) -> DownloadBlob`
+- `deleteExpiredUploads() -> int`
+
+---
+
+## Security and correctness rules
+- DAOs use `PreparedStatement` throughout.
+- Encrypted payload bytes are stored opaquely (no decryption in server DB layer).
+- Expiry is enforced by TTL/`expires_at` queries plus scheduled cleanup jobs.
+- Errors are wrapped in `DatabaseOperationException` (or specific domain exceptions) and audited by callers.

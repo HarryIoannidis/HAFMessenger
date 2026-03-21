@@ -10,7 +10,7 @@
 - `ClientApp.start(Stage primaryStage)`:
     - Called by JavaFX Application framework after toolkit initialization.
     - Registers primary stage with `ViewRouter.setMainStage(primaryStage)`.
-    - Loads application icon from `/images/app_logo.png` (logs warning if missing, non-fatal).
+    - Loads application icon from `/images/logo/app_logo.png` (logs warning if missing, non-fatal).
     - Sets window title to "HAF Messenger".
     - Launches splash screen via `ViewRouter.switchToTransparent("/fxml/splash.fxml")`.
 - Splash screen bootstrap:

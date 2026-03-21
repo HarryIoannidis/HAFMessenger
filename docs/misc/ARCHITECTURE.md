@@ -278,7 +278,7 @@ The server follows a **4-layer architecture**:
 
 | Component | Responsibility | Port |
 |-----------|----------------|------|
-| `HttpIngressServer` | REST API endpoints (send, fetch, acknowledge) | 8443 (HTTPS) |
+| `HttpIngressServer` | REST API endpoints (messages, auth, search, contacts, attachments) | 8443 (HTTPS) |
 | `WebSocketIngressServer` | Real-time push notifications | 8444 (WSS) |
 
 **Key Features:**
@@ -314,9 +314,9 @@ public class HttpIngressServer {
         ((HttpsServer) server).setHttpsConfigurator(configurator);
         
         // Endpoints
-        server.createContext("/api/v1/send", this::handleSend);
-        server.createContext("/api/v1/fetch", this::handleFetch);
-        server.createContext("/api/v1/ack", this::handleAcknowledge);
+        server.createContext("/api/v1/messages", this::handleSend);
+        server.createContext("/api/v1/search", this::handleSearch);
+        server.createContext("/api/v1/contacts", this::handleContacts);
         
         server.start();
     }

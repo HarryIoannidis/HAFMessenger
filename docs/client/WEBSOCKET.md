@@ -1,36 +1,45 @@
 # WEBSOCKET
 
 ### Purpose
-- Manages WebSocket lifecycle (connect, send, receive, close) with TLS policy, retry logic, and backpressure for client-side messaging.
+- Documents `WebSocketAdapter`, the client network bridge used for authenticated WebSocket and HTTPS API calls.
 
-### Architecture
-- Wraps Java-WebSocket or similar library.
-- Exposes: `connect(URI)`, `sendText(String)`, `close()`, `setMessageHandler(DefaultMessageReceiver)`.
+### Implementation
+- Uses Java `HttpClient` + `java.net.http.WebSocket` (not Java-WebSocket).
+- Shares one TLS-configured `HttpClient` for websocket and authenticated HTTP calls.
 
-### Connection flow
-1. `connect(URI wssUri)`:
-    - TLS 1.3+ configuration (cipher suite allowlist).
-    - Certificate pinning hooks (TODO: implement pinning validation).
-    - Establish WebSocket handshake.
-    - Start reconnect watchdog.
+### Exposed operations
+- `connect(Consumer<String> onMessage, Consumer<Throwable> onError)`
+- `sendText(String message)`
+- `close()`
+- `isConnected()`
+- `getAuthenticated(String path)`
+- `postAuthenticated(String path, String body)`
+- `deleteAuthenticated(String path)`
 
-### Send flow
-1. `sendText(String json)`:
-    - Check connection state → throw if disconnected.
-    - Write frame to WebSocket.
-    - Backpressure: if send queue > limit, drop oldest or block (configurable).
+### Connection behavior
+- Connects to `wss://...` URI with `Authorization: Bearer <sessionId>` header.
+- Incoming text frames are reassembled across fragments.
+- Max inbound message size: 2 MB; oversized frames emit `IOException("Inbound message too large")`.
 
-### Receive flow
-1. `onMessage(String text)`:
-    - Dispatch to `DefaultMessageReceiver.handleIncomingMessage(text)`.
+### Heartbeat and liveness
+- Sends ping every 5 seconds.
+- Tracks latest pong timestamp.
+- If no pong for >15 seconds, aborts websocket and marks disconnected.
 
-### Retry policy
-- Transient IO failures: bounded exponential backoff with jitter (max 3 retries, cap 5s).
-- Validation/tamper/expiry failures: **no retry** (dispatch to onError).
-- Reconnect: automatic reconnection with backoff on disconnect.
+### Reconnect policy
+- Automatic reconnect unless user explicitly closed connection.
+- Max retry attempts: 3.
+- Exponential backoff: 1s, 2s, 4s (capped at 5s).
 
-### Security rules
-- TLS 1.3+ only, cipher suite allowlist (TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256).
-- Certificate pinning: validate server cert fingerprint (SHA-256) during handshake (TODO).
-- Does not log frame payloads—only frame size and event types.
-- Backpressure: drop oversize frames before allocation (max frame size: 2MB).
+### Authenticated HTTP helper behavior
+- Rewrites websocket host URI to `https://<host>:8443/...` for REST paths.
+- Adds bearer session header.
+- Retries once on connection-level failures (e.g., stale pooled connection).
+
+### TLS policy
+- TLS 1.3 only.
+- Cipher allowlist:
+  - `TLS_AES_256_GCM_SHA384`
+  - `TLS_CHACHA20_POLY1305_SHA256`
+- Endpoint identification algorithm: `HTTPS`.
+- SSL context is provided by `SslContextUtils`.

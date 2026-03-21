@@ -14,8 +14,8 @@
 - Bootstrap sequence (via `SplashViewModel.startBootstrap()`):
     1. Loading configuration (0.1): Reads version from manifest or `HAF_APP_VERSION` env var.
     2. Initializing security modules (0.3): Verifies `SecureRandom.getInstanceStrong()`, `AES/GCM/NoPadding`, `X25519` key agreement, `SHA-256`.
-    3. Checking local resources (0.6): Verifies `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/app_logo.png`, `/css/global.css` exist.
-    4. Verifying network reachability (0.8): HEAD request to server endpoint (if `haf.server.url` or `HAF_SERVER_URL` configured).
+    3. Checking local resources (0.6): Verifies `/fxml/login.fxml`, `/fxml/splash.fxml`, `/images/logo/app_logo.png`, `/css/global.css` exist.
+    4. Verifying network reachability (0.8): HEAD request to server endpoint (from `client.properties`, then `haf.server.url`, then `HAF_SERVER_URL`).
     5. Ready (1.0): Navigates to login screen.
 
 ### Implementation (FXML + MVVM)
@@ -46,17 +46,17 @@
 ## LOGIN SCREEN
 
 ### Screen objective
-- To perform reliable user authentication with minimal friction and immediate readiness for 2FA/TOTP where required.
+- To perform reliable user authentication with minimal friction using session-based login.
 - To enforce security policies: no plaintext password storage, “remember” option only via secure token/OS keystore, clear error messages.
 
 ### UI elements (proposed)
 - TextField: Email or Username, PasswordField: Password, CheckBox: Remember credentials, Button: Sign In, Link: Register.
-- Optional: small status label for “Connecting…/Authenticating…/TOTP required”.
+- Optional: small status label for “Connecting…/Authenticating…”.
 
 ### Flows and checks
 - Field validation before call: email format, password length, no blanks.
 - Call AuthService.login(username, password) over TLS 1.3 with pinning.
-- If the account requires 2FA: transition to 2FA prompt (TOTP). Otherwise, transition to Main Chat.
+- On success, create session and transition to Main Chat.
 
 ### Implementation (FXML + MVVM)
 - FXML: login.fxml
@@ -137,7 +137,7 @@ public class LoginViewModel {
 
 ### Error handling
 - Network error: “Cannot reach server. Check connection.” with Retry.
-- TOTP error: “Incorrect code. Please retry.” with countdown for new code.
+- Authentication error: “Incorrect credentials. Please retry.” with neutral messaging.
 - In general: no disclosure of internal causes (e.g. “user not found”), only neutral messages.
 
 ---

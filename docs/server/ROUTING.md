@@ -1,91 +1,62 @@
 # ROUTING
 
 ### Purpose
-- In-memory queue management for routing encrypted envelopes to recipients.
-- Manages subscriptions, polling, and TTL-based cleanup.
+- Documents `MailboxRouter` behavior for envelope ingress, push delivery, acknowledgements, and TTL cleanup.
 
 ---
 
 ## MailboxRouter
 
-### Purpose
-- Routes validated envelopes from ingress to recipient mailboxes.
-
 ### Dependencies
-- `EnvelopeDAO`: persistence layer for envelope storage.
-- `MetricsRegistry`: queue depth tracking.
-- `AuditLogger`: logging for routing events.
+- `EnvelopeDAO`: stores and retrieves envelopes from `message_envelopes`.
+- `MetricsRegistry`: queue depth and delivery-latency tracking.
+- `AuditLogger`: cleanup and error event logging.
+- `ScheduledExecutorService`: runs periodic TTL cleanup.
 
-### Methods
+### Core methods
+- `start()`
+  - schedules `runTtlCleanup()` every 5 minutes.
 
-#### ingressEnvelope(EncryptedMessageDTO dto, String senderId, String recipientId, long ttlSeconds)
-- Validates envelope metadata (sender, recipient, TTL).
-- Stores via `EnvelopeDAO.insert()`.
-- Adds to in-memory queue for recipient.
-- If recipient is subscribed (online via WebSocket): delivers immediately.
-- Increments `MetricsRegistry.increaseQueueDepth()`.
+- `ingress(EncryptedMessage message) -> QueuedEnvelope`
+  - persists via `EnvelopeDAO.insert(message)`.
+  - increments queue depth.
+  - dispatches to current subscribers for recipient.
 
-#### subscribe(String userId, WebSocket connection)
-- Registers WebSocket connection for real-time delivery.
-- Flushes any pending envelopes for the user.
+- `fetchUndelivered(String recipientId, int limit) -> List<QueuedEnvelope>`
+  - loads undelivered, unexpired envelopes from DAO.
 
-#### unsubscribe(String userId)
-- Removes WebSocket connection.
-- Pending envelopes remain in queue for polling.
+- `acknowledge(Collection<String> envelopeIds) -> boolean`
+  - bulk mark-delivered path.
 
-#### poll(String userId) → List<QueuedEnvelope>
-- Returns pending envelopes for offline delivery.
-- Marks delivered envelopes via `EnvelopeDAO.markDelivered()`.
-- Decrements `MetricsRegistry.decreaseQueueDepth()`.
+- `acknowledgeOwned(String userId, Collection<String> envelopeIds) -> boolean`
+  - ownership-safe ACK path used by WebSocket ingress.
+  - only marks envelopes belonging to `userId`.
+  - decreases queue depth only for acknowledged owned envelopes.
 
-#### cleanupExpired()
-- Called by scheduled task (every 5 minutes).
-- Delegates to `EnvelopeDAO.deleteExpired()`.
-- Decrements queue depth for expired envelopes.
-- Logs cleanup via `AuditLogger.logCleanup()`.
+- `subscribe(String recipientId, MailboxSubscriber subscriber)`
+  - registers recipient push subscriber.
+
+- `unsubscribe(MailboxSubscription subscription)`
+  - unregisters subscriber.
+
+### Cleanup behavior
+- `runTtlCleanup()` calls `EnvelopeDAO.deleteExpired()`.
+- Queue depth reduced by deleted count.
+- Emits `AuditLogger.logCleanup(deleted, durationMs)`.
 
 ---
 
 ## QueuedEnvelope
 
-### Purpose
-- Internal DTO representing an envelope in the routing queue.
-
-### Fields
-- `long id`: database ID.
-- `String senderId`: sender user ID.
-- `String recipientId`: recipient user ID.
-- `byte[] payload`: encrypted payload (opaque blob).
-- `long createdAtMs`: creation timestamp.
-- `long expiresAtMs`: expiration timestamp.
-- `boolean delivered`: delivery status.
+`QueuedEnvelope` stores:
+- `envelopeId`
+- `payload` (`EncryptedMessage`)
+- `createdAtEpochMs`
+- `expiresAtEpochMs`
 
 ---
 
-## Thread safety
-- In-memory queues use `ConcurrentHashMap<String, Queue<QueuedEnvelope>>`.
-- Queue operations are atomic per recipient.
-- Subscribe/unsubscribe are thread-safe (ConcurrentHashMap).
-- Cleanup scheduled via `ScheduledExecutorService`.
-
----
-
-## Metrics
-- `increaseQueueDepth()`: on enqueue.
-- `decreaseQueueDepth()`: on delivery or expiry.
-- `snapshot().queueDepth`: current pending count.
-
----
-
-## Error handling
-- Database errors during insert: throws exception, ingress returns 500.
-- Delivery errors (WebSocket send failure): log error, keep envelope in queue for polling.
-- Cleanup errors: log via `AuditLogger`, retry on next scheduled run.
-
----
-
-## TTL cleanup job
-- Scheduled every 5 minutes via `ScheduledExecutorService.scheduleAtFixedRate()`.
-- Calls `EnvelopeDAO.deleteExpired()`.
-- Logs results via `AuditLogger.logCleanup(deleted, durationMs)`.
-- Thread-safe: runs on dedicated thread, does not block ingress.
+## Concurrency model
+- Subscriber registry uses `ConcurrentHashMap<String, CopyOnWriteArraySet<MailboxSubscriber>>`.
+- Cleanup runs on scheduler thread; ingress and ACK run concurrently with thread-safe counters/collections.
+- DAO remains source-of-truth for persistence and ACK state.
