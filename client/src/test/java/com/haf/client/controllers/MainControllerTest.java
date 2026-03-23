@@ -98,6 +98,40 @@ class MainControllerTest {
         assertEquals(1, removeContactCalls.get());
     }
 
+    @Test
+    void contact_context_destructive_actions_route_through_confirmation_gate() {
+        AtomicInteger profileCalls = new AtomicInteger();
+        AtomicInteger confirmDeleteCalls = new AtomicInteger();
+        AtomicInteger confirmRemoveCalls = new AtomicInteger();
+
+        MainController.applyContactContextActionWithConfirmation(
+                MainController.ContactContextAction.PROFILE,
+                profileCalls::incrementAndGet,
+                confirmDeleteCalls::incrementAndGet,
+                confirmRemoveCalls::incrementAndGet);
+        assertEquals(1, profileCalls.get());
+        assertEquals(0, confirmDeleteCalls.get());
+        assertEquals(0, confirmRemoveCalls.get());
+
+        MainController.applyContactContextActionWithConfirmation(
+                MainController.ContactContextAction.DELETE_CHAT,
+                profileCalls::incrementAndGet,
+                confirmDeleteCalls::incrementAndGet,
+                confirmRemoveCalls::incrementAndGet);
+        assertEquals(1, profileCalls.get());
+        assertEquals(1, confirmDeleteCalls.get());
+        assertEquals(0, confirmRemoveCalls.get());
+
+        MainController.applyContactContextActionWithConfirmation(
+                MainController.ContactContextAction.REMOVE_CONTACT,
+                profileCalls::incrementAndGet,
+                confirmDeleteCalls::incrementAndGet,
+                confirmRemoveCalls::incrementAndGet);
+        assertEquals(1, profileCalls.get());
+        assertEquals(1, confirmDeleteCalls.get());
+        assertEquals(1, confirmRemoveCalls.get());
+    }
+
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
         @Override
         public CompletableFuture<String> fetchContacts() {

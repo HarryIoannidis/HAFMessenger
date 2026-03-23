@@ -1,0 +1,51 @@
+.popup-message-window {
+    -fx-background-color: #f4f4f4;
+    -fx-background-radius: 4;
+    -fx-background-insets: 2;
+    -fx-border-insets: 0;
+    -fx-border-radius: 6;
+    -fx-border-color: #acacac;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 10, 0.2, 0, 0);
+}
+
+.popup-title {
+    -fx-text-fill: #2b2b2b;
+    -fx-font-family: 'Manrope-Bold', sans-serif;
+}
+
+.popup-message {
+    -fx-text-fill: #2b2b2b;
+    -fx-text-alignment: center;
+    -fx-alignment: center;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-smoothing-type: gray;
+}
+
+.button-close,
+.button-action {
+    -fx-background-color: #ececec;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 5;
+    -fx-background-insets: 1;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-border-color: #a3a3a3;
+    -fx-cursor: hand;
+}
+
+.button-close:hover,
+.button-action:hover {
+    -fx-background-color: #dedede;
+}
+
+.button-action-danger {
+    -fx-background-color: #ca0707;
+    -fx-border-color: #9f0707;
+    -fx-text-fill: #ececec;
+}
+
+.button-action-danger:hover {
+    -fx-background-color: #a60505;
+}

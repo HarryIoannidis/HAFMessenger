@@ -165,6 +165,19 @@ class ChatControllerTest {
         assertEquals("file:///tmp/report.pdf", ChatController.resolveDownloadSourceReference(file));
     }
 
+    @Test
+    void attachment_error_spec_defaults_and_custom_messages_are_stable() {
+        assertEquals(
+                "Attachment operation failed.",
+                ChatController.buildAttachmentErrorSpec(null).message());
+        assertEquals(
+                "Attachment source file could not be found.",
+                ChatController.buildAttachmentErrorSpec("Attachment source file could not be found.").message());
+        assertEquals(
+                "Attachment error",
+                ChatController.buildAttachmentErrorSpec("x").title());
+    }
+
     private static final class StubChatAttachmentService implements ChatAttachmentService {
         private final AtomicInteger calls = new AtomicInteger();
         private final AtomicReference<String> recipientId = new AtomicReference<>();

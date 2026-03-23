@@ -27,16 +27,31 @@ class SearchControllerTest {
     }
 
     @Test
-    void toggle_contact_delegates_to_remove_when_user_already_contact() {
-        SearchController controller = new SearchController();
-        StubSearchContactActions actions = new StubSearchContactActions();
-        actions.hasContact.set(true);
-        controller.setContactActions(actions);
+    void toggle_contact_routes_remove_through_confirmation_gate() {
+        AtomicInteger addCalls = new AtomicInteger();
+        AtomicInteger confirmRemoveCalls = new AtomicInteger();
 
-        controller.handleToggleContact(sampleUser());
+        SearchController.applyContactToggleAction(
+                SearchViewModel.ContactToggleAction.REMOVE_CONTACT,
+                addCalls::incrementAndGet,
+                confirmRemoveCalls::incrementAndGet);
 
-        assertEquals(0, actions.addCalls.get());
-        assertEquals(1, actions.removeCalls.get());
+        assertEquals(0, addCalls.get());
+        assertEquals(1, confirmRemoveCalls.get());
+    }
+
+    @Test
+    void toggle_contact_routes_add_immediately() {
+        AtomicInteger addCalls = new AtomicInteger();
+        AtomicInteger confirmRemoveCalls = new AtomicInteger();
+
+        SearchController.applyContactToggleAction(
+                SearchViewModel.ContactToggleAction.ADD_CONTACT,
+                addCalls::incrementAndGet,
+                confirmRemoveCalls::incrementAndGet);
+
+        assertEquals(1, addCalls.get());
+        assertEquals(0, confirmRemoveCalls.get());
     }
 
     @Test

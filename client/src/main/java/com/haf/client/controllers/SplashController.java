@@ -1,17 +1,26 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.PopupMessageSpec;
+import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.SplashViewModel;
-import com.haf.client.utils.UiConstants;
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.net.http.HttpTimeoutException;
+import java.security.GeneralSecurityException;
+
 public class SplashController {
+
+    record FailurePresentation(String title, String message) {
+    }
 
     @FXML
     private StackPane rootContainer;
@@ -68,24 +77,115 @@ public class SplashController {
     }
 
     /**
-     * Displays a failure dialog with retry/cancel options.
+     * Displays a failure popup with retry/exit options.
      *
      * @param error the Throwable containing the error details
      */
     private void showFailureDialog(Throwable error) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(UiConstants.DIALOG_INIT_FAILED_TITLE);
-        alert.setHeaderText(UiConstants.DIALOG_INIT_FAILED_HEADER);
-        String message = (error != null && error.getMessage() != null) ? error.getMessage() : String.valueOf(error);
-        alert.setContentText(message);
-        alert.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        PopupMessageSpec spec = buildFailurePopupSpec(
+                error,
+                () -> viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog),
+                ViewRouter::close);
 
-        alert.showAndWait().ifPresent(type -> {
-            if (type == ButtonType.OK) {
-                viewModel.startBootstrap(this::navigateToLogin, this::showFailureDialog);
-            } else {
-                ViewRouter.close();
-            }
-        });
+        PopupMessageBuilder.create()
+                .popupKey(spec.popupKey())
+                .title(spec.title())
+                .message(spec.message())
+                .actionText(spec.actionText())
+                .cancelText(spec.cancelText())
+                .showCancel(spec.showCancel())
+                .dangerAction(spec.dangerAction())
+                .onAction(spec.onAction())
+                .onCancel(spec.onCancel())
+                .show();
+    }
+
+    static PopupMessageSpec buildFailurePopupSpec(Throwable error, Runnable onRetry, Runnable onExit) {
+        FailurePresentation presentation = classifyFailure(error);
+        return new PopupMessageSpec(
+                UiConstants.POPUP_SPLASH_FAILURE,
+                presentation.title(),
+                presentation.message(),
+                "Retry",
+                "Exit",
+                true,
+                false,
+                onRetry,
+                onExit);
+    }
+
+    static FailurePresentation classifyFailure(Throwable error) {
+        Throwable root = rootCause(error);
+        String details = root == null || root.getMessage() == null || root.getMessage().isBlank()
+                ? "No additional details available."
+                : root.getMessage();
+
+        String normalized = details.toLowerCase();
+
+        if (isNetworkFailure(root, normalized)) {
+            return new FailurePresentation(
+                    "Cannot reach server",
+                    "Network reachability check failed. " + details);
+        }
+
+        if (isResourceFailure(normalized)) {
+            return new FailurePresentation(
+                    "Application files missing",
+                    "Some required local resources are unavailable. " + details);
+        }
+
+        if (isSecurityFailure(root, normalized)) {
+            return new FailurePresentation(
+                    "Security initialization failed",
+                    "Security modules could not be initialized. " + details);
+        }
+
+        return new FailurePresentation(
+                "Startup failed",
+                "Initialization could not complete. " + details);
+    }
+
+    private static boolean isNetworkFailure(Throwable root, String normalizedMessage) {
+        if (root instanceof ConnectException
+                || root instanceof UnknownHostException
+                || root instanceof SocketTimeoutException
+                || root instanceof HttpTimeoutException) {
+            return true;
+        }
+
+        return normalizedMessage.contains("network")
+                || normalizedMessage.contains("reachability")
+                || normalizedMessage.contains("server unreachable")
+                || normalizedMessage.contains("connection")
+                || normalizedMessage.contains("timeout")
+                || normalizedMessage.contains("refused");
+    }
+
+    private static boolean isResourceFailure(String normalizedMessage) {
+        return normalizedMessage.contains("missing at")
+                || normalizedMessage.contains("resource")
+                || normalizedMessage.contains("/fxml/")
+                || normalizedMessage.contains("/images/")
+                || normalizedMessage.contains("/css/");
+    }
+
+    private static boolean isSecurityFailure(Throwable root, String normalizedMessage) {
+        if (root instanceof GeneralSecurityException) {
+            return true;
+        }
+
+        return normalizedMessage.contains("security")
+                || normalizedMessage.contains("ssl")
+                || normalizedMessage.contains("cipher")
+                || normalizedMessage.contains("keystore")
+                || normalizedMessage.contains("key agreement");
+    }
+
+    private static Throwable rootCause(Throwable error) {
+        Throwable cause = error;
+        while (cause != null && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 }

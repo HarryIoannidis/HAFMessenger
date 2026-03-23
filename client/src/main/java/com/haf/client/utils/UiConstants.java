@@ -17,6 +17,7 @@ public final class UiConstants {
     public static final String FXML_SEARCH_RESULT_ITEM = "/fxml/search_result_item.fxml";
     public static final String FXML_PROFILE = "/fxml/profile.fxml";
     public static final String FXML_PREVIEW = "/fxml/preview.fxml";
+    public static final String FXML_POPUP_MESSAGE = "/fxml/popup_message.fxml";
 
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";
@@ -88,6 +89,16 @@ public final class UiConstants {
     public static final String DIALOG_INIT_FAILED_TITLE = "Initialization failed";
     public static final String DIALOG_INIT_FAILED_HEADER = "Startup could not complete";
 
+    // Popup keys
+    public static final String POPUP_CONFIRM_EXIT_APP = "popup-confirm-exit-app";
+    public static final String POPUP_CONFIRM_DELETE_CHAT = "popup-confirm-delete-chat";
+    public static final String POPUP_CONFIRM_REMOVE_CONTACT = "popup-confirm-remove-contact";
+    public static final String POPUP_CONFIRM_LOGOUT = "popup-confirm-logout";
+    public static final String POPUP_SPLASH_FAILURE = "popup-splash-failure";
+    public static final String POPUP_PROFILE_STUB = "popup-profile-stub";
+    public static final String POPUP_ATTACHMENT_ERROR = "popup-attachment-error";
+    public static final String POPUP_VIEW_LOAD_ERROR = "popup-view-load-error";
+
     // Stylesheets
     public static final String CSS_GLOBAL = "/css/global.css";
     public static final String CSS_REGISTER = "/css/register.css";
@@ -98,6 +109,7 @@ public final class UiConstants {
     public static final String CSS_OPTIONS = "/css/options.css";
     public static final String CSS_PROFILE = "/css/profile.css";
     public static final String CSS_PREVIEW = "/css/preview.css";
+    public static final String CSS_POPUP = "/css/popup.css";
 
     // Fonts
     public static final String FONT_MANROPE = "/fonts/Manrope.ttf";
