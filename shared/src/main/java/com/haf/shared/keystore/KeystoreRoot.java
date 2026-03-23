@@ -4,6 +4,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public final class KeystoreRoot {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private KeystoreRoot() {}
 
     /**
@@ -29,6 +32,12 @@ public final class KeystoreRoot {
         return userId == null ? root : root.resolve("u-" + userId);
     }
 
+    /**
+     * Resolves the preferred base keystore directory from system properties, environment,
+     * and platform defaults.
+     *
+     * @return base preferred keystore path
+     */
     private static Path getBasePreferred() {
         String prop = System.getProperty("haf.keystore.root");
         if (prop != null && !prop.isBlank()) {
@@ -75,6 +84,11 @@ public final class KeystoreRoot {
         return userId == null ? root : root.resolve("u-" + userId);
     }
 
+    /**
+     * Resolves a per-user fallback keystore directory from environment and platform defaults.
+     *
+     * @return base fallback keystore path
+     */
     private static Path getBaseUserFallback() {
         String os = System.getProperty("os.name", "").toLowerCase();
         if (os.contains("win")) {

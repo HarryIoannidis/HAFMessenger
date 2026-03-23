@@ -80,14 +80,26 @@ public class ChatController {
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
 
+    /**
+     * Creates the chat controller with the default attachment service.
+     */
     public ChatController() {
         this(new DefaultChatAttachmentService());
     }
 
+    /**
+     * Creates the chat controller with an explicit attachment service dependency.
+     *
+     * @param chatAttachmentService service responsible for attachment sending
+     * @throws NullPointerException when {@code chatAttachmentService} is {@code null}
+     */
     ChatController(ChatAttachmentService chatAttachmentService) {
         this.chatAttachmentService = Objects.requireNonNull(chatAttachmentService, "chatAttachmentService");
     }
 
+    /**
+     * Initializes chat view bindings and UI action handlers.
+     */
     @FXML
     public void initialize() {
         MessageViewModel messageViewModel = ChatSession.get();
@@ -108,6 +120,9 @@ public class ChatController {
         }
     }
 
+    /**
+     * Binds compose field and send-button enablement to the chat view-model state.
+     */
     private void bindViewModel() {
         if (messageField != null) {
             messageField.textProperty().bindBidirectional(viewModel.draftTextProperty());
@@ -132,18 +147,27 @@ public class ChatController {
         viewModel.acknowledgeActiveRecipient();
     }
 
+    /**
+     * Detaches the listener from the previously observed message list.
+     */
     private void removeCurrentListener() {
         if (currentObservedList != null && weakMessageListener != null) {
             currentObservedList.removeListener(weakMessageListener);
         }
     }
 
+    /**
+     * Renders already-existing messages for the active recipient into the chat container.
+     */
     private void loadInitialMessages() {
         for (MessageVM vm : viewModel.getActiveMessages()) {
             chatBox.getChildren().add(createMessageNode(vm));
         }
     }
 
+    /**
+     * Attaches a weak list-change listener to the active message list.
+     */
     private void setupMessageListener() {
         String activeRecipient = viewModel.getRecipientId();
         messageListener = change -> handleMessageChange(change, activeRecipient);
@@ -152,6 +176,12 @@ public class ChatController {
         currentObservedList.addListener(weakMessageListener);
     }
 
+    /**
+     * Applies incremental UI updates for message-list changes and falls back to full refresh when needed.
+     *
+     * @param change list change descriptor from observable messages list
+     * @param activeRecipient active recipient id used for acknowledgements
+     */
     private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
         List<MessageVM> addedMessages = null;
         boolean requiresFullRefresh = false;
@@ -177,6 +207,9 @@ public class ChatController {
         }
     }
 
+    /**
+     * Re-renders all messages from the currently observed list and scrolls to bottom.
+     */
     private void refreshRenderedMessages() {
         chatBox.getChildren().clear();
         if (currentObservedList != null) {
@@ -188,6 +221,12 @@ public class ChatController {
         chatScrollPane.setVvalue(1.0);
     }
 
+    /**
+     * Renders newly added messages and acknowledges inbound messages for active recipient.
+     *
+     * @param addedMessages newly appended messages
+     * @param activeRecipient active recipient id used for ack
+     */
     private void processAddedMessages(List<? extends MessageVM> addedMessages, String activeRecipient) {
         boolean hasIncomingMessages = false;
         for (MessageVM vm : addedMessages) {
@@ -215,12 +254,18 @@ public class ChatController {
         loadMessages();
     }
 
+    /**
+     * Sends the current draft text using the view-model.
+     */
     private void sendMessage() {
         if (viewModel == null)
             return;
         viewModel.sendCurrentDraft();
     }
 
+    /**
+     * Opens file chooser restricted to supported image extensions and sends selected file.
+     */
     private void chooseImageAttachment() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Select Image");
@@ -229,6 +274,9 @@ public class ChatController {
         selectAndSendAttachment(chooser);
     }
 
+    /**
+     * Opens file chooser restricted to supported document extensions and sends selected file.
+     */
     private void chooseDocumentAttachment() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Select Document");
@@ -237,6 +285,11 @@ public class ChatController {
         selectAndSendAttachment(chooser);
     }
 
+    /**
+     * Opens chooser and dispatches selected attachment for the active recipient.
+     *
+     * @param chooser preconfigured chooser instance
+     */
     private void selectAndSendAttachment(FileChooser chooser) {
         if (viewModel == null || !viewModel.isReady()) {
             return;
@@ -246,6 +299,12 @@ public class ChatController {
         dispatchSelectedAttachment(viewModel.getRecipientId(), selected);
     }
 
+    /**
+     * Sends selected attachment file to recipient through attachment service.
+     *
+     * @param recipientId target recipient id
+     * @param selected selected file
+     */
     void dispatchSelectedAttachment(String recipientId, File selected) {
         if (selected == null || recipientId == null || recipientId.isBlank()) {
             return;
@@ -253,6 +312,12 @@ public class ChatController {
         chatAttachmentService.sendAttachment(recipientId, selected.toPath());
     }
 
+    /**
+     * Builds a message bubble node and installs interaction handlers.
+     *
+     * @param message message model to render
+     * @return rendered node for the message
+     */
     private Node createMessageNode(MessageVM message) {
         Node node = MessageBubbleFactory.create(message);
         installMessageContextMenu(node, message);
@@ -261,6 +326,12 @@ public class ChatController {
         return node;
     }
 
+    /**
+     * Resolves context-menu actions available for a message based on type, direction, and available data.
+     *
+     * @param message message candidate
+     * @return immutable list of actions to expose
+     */
     static List<MessageContextAction> resolveContextActions(MessageVM message) {
         if (message == null) {
             return List.of();
@@ -293,6 +364,12 @@ public class ChatController {
         return List.of();
     }
 
+    /**
+     * Resolves suggested filename for saving/downloading attachment messages.
+     *
+     * @param message message carrying attachment metadata
+     * @return suggested filename
+     */
     static String resolveSuggestedDownloadFileName(MessageVM message) {
         if (message == null) {
             return ImageSaveSupport.resolveSuggestedFileName(null, null);
@@ -300,6 +377,12 @@ public class ChatController {
         return ImageSaveSupport.resolveSuggestedFileName(message.fileName(), resolveDownloadSourceReference(message));
     }
 
+    /**
+     * Resolves local source reference used for download/preview depending on message type.
+     *
+     * @param message message candidate
+     * @return content/local-path source reference, or {@code null} when unavailable
+     */
     static String resolveDownloadSourceReference(MessageVM message) {
         if (message == null) {
             return null;
@@ -313,6 +396,12 @@ public class ChatController {
         return null;
     }
 
+    /**
+     * Installs right-click context menu on the message interaction target.
+     *
+     * @param messageNode rendered message node
+     * @param message message model backing the node
+     */
     private void installMessageContextMenu(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
         List<MessageContextAction> actions = resolveContextActions(message);
@@ -336,6 +425,13 @@ public class ChatController {
         });
     }
 
+    /**
+     * Builds context menu entries for the provided message actions.
+     *
+     * @param message message bound to actions
+     * @param actions actions to include
+     * @return configured context menu
+     */
     private ContextMenu buildMessageContextMenu(MessageVM message, List<MessageContextAction> actions) {
         ContextMenuBuilder builder = ContextMenuBuilder.create();
         for (MessageContextAction action : actions) {
@@ -359,6 +455,11 @@ public class ChatController {
         return menu;
     }
 
+    /**
+     * Copies text message content to system clipboard.
+     *
+     * @param message text message to copy
+     */
     private void copyMessageText(MessageVM message) {
         if (message == null || message.content() == null || message.content().isBlank()) {
             return;
@@ -368,6 +469,11 @@ public class ChatController {
         Clipboard.getSystemClipboard().setContent(content);
     }
 
+    /**
+     * Opens the image preview popup for an image message.
+     *
+     * @param message image message to preview
+     */
     private void openImagePreview(MessageVM message) {
         if (message == null || message.content() == null || message.content().isBlank()) {
             return;
@@ -381,6 +487,12 @@ public class ChatController {
                 controller -> controller.showImage(message.content(), suggestedName, downloadAllowed));
     }
 
+    /**
+     * Checks whether the message can be downloaded as an image from an existing local source path.
+     *
+     * @param message message candidate
+     * @return {@code true} when download source exists locally
+     */
     private boolean isImageDownloadAvailable(MessageVM message) {
         if (message == null || message.type() != MessageType.IMAGE) {
             return false;
@@ -393,6 +505,11 @@ public class ChatController {
         return sourcePath != null && Files.exists(sourcePath);
     }
 
+    /**
+     * Prompts user for destination and copies message attachment/image to disk.
+     *
+     * @param message message containing downloadable source
+     */
     private void downloadImageFromMessage(MessageVM message) {
         if (message == null) {
             return;
@@ -436,6 +553,12 @@ public class ChatController {
         }
     }
 
+    /**
+     * Installs primary-click handler for file messages to trigger download.
+     *
+     * @param messageNode rendered message node
+     * @param message backing file message
+     */
     private void installFilePrimaryClickDownload(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
         if (interactionTarget == null || message == null || message.type() != MessageType.FILE) {
@@ -451,6 +574,12 @@ public class ChatController {
         });
     }
 
+    /**
+     * Installs primary-click handler for image messages to open preview.
+     *
+     * @param messageNode rendered message node
+     * @param message backing image message
+     */
     private void installImagePrimaryClickPreview(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
         if (interactionTarget == null || message == null || message.type() != MessageType.IMAGE) {
@@ -469,6 +598,12 @@ public class ChatController {
         });
     }
 
+    /**
+     * Resolves best interaction target node for event filters (bubble content for row wrappers).
+     *
+     * @param messageNode rendered message node
+     * @return interaction target node
+     */
     private Node resolveInteractionTarget(Node messageNode) {
         if (messageNode instanceof HBox row && !row.getChildren().isEmpty()) {
             return row.getChildren().get(0);
@@ -476,6 +611,11 @@ public class ChatController {
         return messageNode;
     }
 
+    /**
+     * Resolves owner stage for file chooser dialogs.
+     *
+     * @return owner stage, or {@code null} when none can be derived
+     */
     private Stage resolveOwnerWindow() {
         if (sendButton != null && sendButton.getScene() != null
                 && sendButton.getScene().getWindow() instanceof Stage stage) {
@@ -487,6 +627,11 @@ public class ChatController {
         return null;
     }
 
+    /**
+     * Displays a standardized attachment error popup.
+     *
+     * @param message error message body
+     */
     private void showAttachmentError(String message) {
         PopupMessageSpec spec = buildAttachmentErrorSpec(message);
         PopupMessageBuilder.create()
@@ -498,6 +643,12 @@ public class ChatController {
                 .show();
     }
 
+    /**
+     * Builds popup specification for attachment-related error messages.
+     *
+     * @param message raw message text
+     * @return popup configuration object
+     */
     static PopupMessageSpec buildAttachmentErrorSpec(String message) {
         String resolved = message == null || message.isBlank() ? "Attachment operation failed." : message;
         return new PopupMessageSpec(

@@ -134,6 +134,9 @@ public final class UiConstants {
     public static final String STYLE_PASSWORD_FIELD_ERROR = "password-field-error";
     public static final String STYLE_BORDER_ERROR = "-fx-border-color: red; -fx-border-style: dashed; -fx-border-width: 2;";
 
+    /**
+     * Prevents instantiation of this constants container.
+     */
     private UiConstants() {
     }
 }

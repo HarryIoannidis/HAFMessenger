@@ -47,6 +47,16 @@ public class SearchViewModel {
     private static final Logger LOGGER = Logger.getLogger(SearchViewModel.class.getName());
 
     public interface SearchGateway {
+
+        /**
+         * Executes a paginated user-search request.
+         *
+         * @param query  search query text
+         * @param limit  maximum number of results to fetch
+         * @param cursor optional pagination cursor for next page
+         * @return raw JSON search response payload
+         * @throws IOException when request execution fails
+         */
         String searchUsers(String query, int limit, String cursor) throws IOException;
     }
 
@@ -57,7 +67,6 @@ public class SearchViewModel {
 
     private final SearchGateway searchGateway;
     private final AtomicInteger generation = new AtomicInteger();
-
     private final ObservableList<UserSearchResultDTO> results = FXCollections.observableArrayList();
     private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections
             .unmodifiableObservableList(results);
@@ -70,6 +79,11 @@ public class SearchViewModel {
     private String nextCursor;
     private SearchSortViewModel.SortOptions sortOptions = SearchSortViewModel.SortOptions.DEFAULT;
 
+    /**
+     * Creates search view-model with an injected gateway implementation.
+     *
+     * @param searchGateway gateway used to execute server-side search requests
+     */
     public SearchViewModel(SearchGateway searchGateway) {
         this.searchGateway = Objects.requireNonNull(searchGateway, "searchGateway");
         hasResults.bind(Bindings.isNotEmpty(results));
@@ -106,6 +120,8 @@ public class SearchViewModel {
 
     /**
      * Starts an asynchronous user search.
+     * 
+     * @param query search query text
      */
     public void search(String query) {
         search(query, sortOptions);
@@ -113,6 +129,9 @@ public class SearchViewModel {
 
     /**
      * Starts an asynchronous user search with the provided sort options.
+     * 
+     * @param query       search query text
+     * @param sortOptions sort options to apply
      */
     public void search(String query, SearchSortViewModel.SortOptions sortOptions) {
         this.sortOptions = SearchSortViewModel.normalize(sortOptions);
@@ -148,11 +167,21 @@ public class SearchViewModel {
         Thread.ofVirtual().name("search-query").start(() -> runSearch(normalized, null, false, searchGeneration));
     }
 
+    /**
+     * Updates active sort options and re-sorts current in-memory results.
+     *
+     * @param sortOptions new sort options to apply
+     */
     public void setSortOptions(SearchSortViewModel.SortOptions sortOptions) {
         this.sortOptions = SearchSortViewModel.normalize(sortOptions);
         runOnUiThread(this::sortResultsInPlace);
     }
 
+    /**
+     * Returns currently active sort options.
+     *
+     * @return active sort options
+     */
     public SearchSortViewModel.SortOptions getSortOptions() {
         return sortOptions;
     }
@@ -191,24 +220,47 @@ public class SearchViewModel {
         });
     }
 
+    /**
+     * Exposes read-only observable search results.
+     *
+     * @return observable list of current results
+     */
     public ObservableList<UserSearchResultDTO> resultsProperty() {
         return readOnlyResults;
     }
 
+    /**
+     * Exposes status text for the search screen.
+     *
+     * @return read-only status text property
+     */
     public ReadOnlyStringProperty statusTextProperty() {
         return statusText;
     }
 
+    /**
+     * Exposes loading state used to disable controls/show progress.
+     *
+     * @return observable loading property
+     */
     public BooleanProperty loadingProperty() {
         return loading;
     }
 
+    /**
+     * Exposes whether the current result list is non-empty.
+     *
+     * @return read-only boolean property bound to list emptiness
+     */
     public ReadOnlyBooleanProperty hasResultsProperty() {
         return hasResults.getReadOnlyProperty();
     }
 
     /**
      * Pure policy for contact toggle action.
+     * 
+     * @param alreadyInContacts whether the user is already in contacts
+     * @return contact toggle action
      */
     public ContactToggleAction resolveContactToggleAction(boolean alreadyInContacts) {
         return alreadyInContacts ? ContactToggleAction.REMOVE_CONTACT : ContactToggleAction.ADD_CONTACT;
@@ -216,11 +268,22 @@ public class SearchViewModel {
 
     /**
      * Pure policy for contact toggle label text.
+     * 
+     * @param action contact toggle action
+     * @return contact toggle label text
      */
     public String resolveContactToggleLabel(ContactToggleAction action) {
         return action == ContactToggleAction.REMOVE_CONTACT ? "Remove contact" : "Add contact";
     }
 
+    /**
+     * Executes a search request and routes results/errors back to the UI thread.
+     *
+     * @param query            query text
+     * @param cursor           pagination cursor for incremental loading
+     * @param append           whether this call appends to existing results
+     * @param searchGeneration generation token used to drop stale responses
+     */
     private void runSearch(String query, String cursor, boolean append, int searchGeneration) {
         try {
             String json = searchGateway.searchUsers(query, UiConstants.SEARCH_PAGE_SIZE, cursor);
@@ -248,6 +311,13 @@ public class SearchViewModel {
         }
     }
 
+    /**
+     * Applies a parsed search response to view-model state on the UI thread.
+     *
+     * @param response         parsed server response
+     * @param append           whether this response is for pagination append
+     * @param searchGeneration generation token used to ignore stale responses
+     */
     private void applyResponse(UserSearchResponse response, boolean append, int searchGeneration) {
         if (searchGeneration != generation.get()) {
             return;
@@ -277,6 +347,11 @@ public class SearchViewModel {
         statusText.set("");
     }
 
+    /**
+     * Clears loading flags after a search call completes.
+     *
+     * @param append whether current call represented load-more behavior
+     */
     private void finishLoading(boolean append) {
         if (append) {
             loadingMore.set(false);
@@ -285,6 +360,14 @@ public class SearchViewModel {
         }
     }
 
+    /**
+     * Applies error handling rules and indicates whether response processing should
+     * stop.
+     *
+     * @param response parsed server response
+     * @param append   whether response belongs to pagination append
+     * @return {@code true} when processing should stop due to null/error response
+     */
     private boolean shouldStopAfterError(UserSearchResponse response, boolean append) {
         if (response == null) {
             if (!append) {
@@ -304,6 +387,13 @@ public class SearchViewModel {
         return false;
     }
 
+    /**
+     * Handles empty-result responses and updates status text accordingly.
+     *
+     * @param normalizedResults normalized result list from response
+     * @param append            whether response belongs to pagination append
+     * @return {@code true} when caller should stop further result processing
+     */
     private boolean handleEmptyResults(List<UserSearchResultDTO> normalizedResults, boolean append) {
         if (!normalizedResults.isEmpty()) {
             return false;
@@ -318,11 +408,21 @@ public class SearchViewModel {
         return true;
     }
 
+    /**
+     * Sets error status and clears current results.
+     *
+     * @param message status/error text to display
+     */
     private void setErrorStatus(String message) {
         results.clear();
         statusText.set(message);
     }
 
+    /**
+     * Appends only unique users (by userId) to existing results.
+     *
+     * @param incoming incoming page of candidates
+     */
     private void appendUnique(List<UserSearchResultDTO> incoming) {
         Set<String> knownUserIds = new HashSet<>();
         for (UserSearchResultDTO existing : results) {
@@ -347,10 +447,18 @@ public class SearchViewModel {
         }
     }
 
+    /**
+     * Replaces current results with a sorted snapshot of incoming results.
+     *
+     * @param incoming incoming results to sort and apply
+     */
     private void setSortedResults(List<UserSearchResultDTO> incoming) {
         results.setAll(sortSnapshot(incoming));
     }
 
+    /**
+     * Sorts current results list in place using active sort options.
+     */
     private void sortResultsInPlace() {
         if (results.size() < 2) {
             return;
@@ -362,6 +470,12 @@ public class SearchViewModel {
         }
     }
 
+    /**
+     * Creates a sorted copy of an input list using active comparator settings.
+     *
+     * @param incoming source list to sort
+     * @return sorted copy (or empty immutable list when input is null/empty)
+     */
     private List<UserSearchResultDTO> sortSnapshot(List<UserSearchResultDTO> incoming) {
         if (incoming == null || incoming.isEmpty()) {
             return List.of();
@@ -372,6 +486,12 @@ public class SearchViewModel {
         return sorted;
     }
 
+    /**
+     * Executes a UI mutation safely on JavaFX thread, with fallback for test
+     * environments.
+     *
+     * @param action UI mutation callback
+     */
     private static void runOnUiThread(Runnable action) {
         try {
             Platform.runLater(action);

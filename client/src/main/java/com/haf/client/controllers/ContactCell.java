@@ -36,24 +36,47 @@ public class ContactCell extends ListCell<ContactInfo> {
 
     @FunctionalInterface
     public interface ContextMenuRequestHandler {
+        /**
+         * Handles a context-menu request for a specific contact cell.
+         *
+         * @param contact contact represented by the row
+         * @param screenX request X coordinate in screen space
+         * @param screenY request Y coordinate in screen space
+         */
         void onRequest(ContactInfo contact, double screenX, double screenY);
     }
 
+    /**
+     * Registers a click callback for the overlay button that covers the cell content.
+     *
+     * @param clickCallback callback invoked after selection is updated; may be {@code null}
+     */
     public void setOnClick(Runnable clickCallback) {
         ensureLoaded();
         installClickHandler(clickCallback);
     }
 
+    /**
+     * Registers a context-menu callback for right-click requests on the cell overlay.
+     *
+     * @param handler handler invoked with contact and screen coordinates
+     */
     public void setOnContextMenuRequest(ContextMenuRequestHandler handler) {
         ensureLoaded();
         installContextMenuHandler(handler);
     }
 
+    /**
+     * Creates a contact cell. FXML is loaded lazily on first render to reduce eager startup cost.
+     */
     public ContactCell() {
         // We move the loading logic out of the constructor to avoid
         // "burst" loading when the ListView pre-instantiates cells.
     }
 
+    /**
+     * Lazily loads the cell FXML and binds node references once per cell instance.
+     */
     private void ensureLoaded() {
         if (cellRoot != null) {
             return;
@@ -71,6 +94,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Ensures the contact-cell FXML bytes are cached in memory for subsequent fast loads.
+     *
+     * @throws IOException when stream read fails
+     */
     private static synchronized void ensureFXMLBytesCached() throws IOException {
         if (cachedFXMLBytes == null) {
             try (var is = ContactCell.class.getResourceAsStream(UiConstants.FXML_CONTACT_CELL)) {
@@ -81,6 +109,12 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Loads the cell FXML either from cached bytes or from the classpath resource.
+     *
+     * @param loader configured FXMLLoader for the contact-cell resource
+     * @throws IOException when FXML loading fails
+     */
     private void loadFXML(FXMLLoader loader) throws IOException {
         // Optimization: If we already have the bytes in memory, use them
         // instead of hitting the disk again.
@@ -93,6 +127,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Binds commonly used nodes from the FXMLLoader namespace into cached fields.
+     *
+     * @param loader loader containing namespace entries after FXML load
+     */
     private void bindReferences(FXMLLoader loader) {
         if (cellRoot == null || loader == null) {
             return;
@@ -107,6 +146,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         overlayButton = asNamespaceNode(namespace, "overlayButton", JFXButton.class);
     }
 
+    /**
+     * Installs left-click behavior that selects the row and then invokes the optional callback.
+     *
+     * @param clickCallback callback invoked after row selection; may be {@code null}
+     */
     private void installClickHandler(Runnable clickCallback) {
         if (overlayButton == null) {
             return;
@@ -122,6 +166,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         });
     }
 
+    /**
+     * Installs right-click behavior and dispatches delayed context-menu requests for smoother UX.
+     *
+     * @param handler context-menu request handler
+     */
     private void installContextMenuHandler(ContextMenuRequestHandler handler) {
         if (overlayButton == null) {
             return;
@@ -149,6 +198,14 @@ public class ContactCell extends ListCell<ContactInfo> {
         });
     }
 
+    /**
+     * Dispatches a context-menu request only when dispatch preconditions are met.
+     *
+     * @param handler callback handler
+     * @param contact contact target
+     * @param screenX popup X in screen coordinates
+     * @param screenY popup Y in screen coordinates
+     */
     static void dispatchContextMenu(
             ContextMenuRequestHandler handler,
             ContactInfo contact,
@@ -160,10 +217,23 @@ public class ContactCell extends ListCell<ContactInfo> {
         handler.onRequest(contact, screenX, screenY);
     }
 
+    /**
+     * Determines whether a context-menu request can be dispatched.
+     *
+     * @param handler callback handler
+     * @param contact contact target
+     * @return {@code true} when both handler and contact are present
+     */
     static boolean canDispatchContextMenu(ContextMenuRequestHandler handler, ContactInfo contact) {
         return handler != null && contact != null;
     }
 
+    /**
+     * Updates row visuals for the current contact item or clears visuals when row becomes empty.
+     *
+     * @param contact contact item assigned to this cell
+     * @param empty JavaFX empty-row flag
+     */
     @Override
     protected void updateItem(ContactInfo contact, boolean empty) {
         super.updateItem(contact, empty);
@@ -181,16 +251,31 @@ public class ContactCell extends ListCell<ContactInfo> {
         renderCell();
     }
 
+    /**
+     * Determines whether the current row should be treated as empty.
+     *
+     * @param empty JavaFX empty flag
+     * @param contact assigned contact item
+     * @return {@code true} when row is empty or contact is absent
+     */
     private static boolean isEmptyItem(boolean empty, ContactInfo contact) {
         return empty || contact == null;
     }
 
+    /**
+     * Clears cell graphics/text and stops any pending context-menu delay timers.
+     */
     private void clearCellVisuals() {
         stopContextMenuDelay();
         setGraphic(null);
         setText(null);
     }
 
+    /**
+     * Ensures FXML root is available before rendering contact data.
+     *
+     * @return {@code true} when cell root is ready for rendering
+     */
     private boolean ensureCellAvailable() {
         ensureLoaded();
         if (cellRoot == null) {
@@ -201,12 +286,22 @@ public class ContactCell extends ListCell<ContactInfo> {
         return true;
     }
 
+    /**
+     * Applies all contact data fragments to the visual nodes.
+     *
+     * @param contact contact model to render
+     */
     private void bindContactData(ContactInfo contact) {
         applyPrimaryText(contact);
         applyActiveness(contact);
         applyUnreadBadge(contact);
     }
 
+    /**
+     * Applies contact primary text fields (name and registration number).
+     *
+     * @param contact contact model
+     */
     private void applyPrimaryText(ContactInfo contact) {
         if (nameText != null) {
             nameText.setText(contact.name());
@@ -216,6 +311,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Applies activeness indicator visibility and color based on contact presence fields.
+     *
+     * @param contact contact model
+     */
     private void applyActiveness(ContactInfo contact) {
         if (activenessCircle == null) {
             return;
@@ -229,10 +329,21 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Normalizes activeness labels for rendering logic.
+     *
+     * @param label raw activeness label
+     * @return trimmed label or empty string when absent
+     */
     private static String normalizeActivenessLabel(String label) {
         return label == null ? "" : label.trim();
     }
 
+    /**
+     * Applies activeness circle color with a gray fallback on invalid color input.
+     *
+     * @param color CSS/web color value
+     */
     private void applyActivenessColor(String color) {
         try {
             activenessCircle.setFill(Color.web(color));
@@ -241,6 +352,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Applies unread badge visibility and text formatting for the contact row.
+     *
+     * @param contact contact model containing unread count
+     */
     private void applyUnreadBadge(ContactInfo contact) {
         if (unreadBadge == null || unreadBadgeText == null) {
             return;
@@ -254,17 +370,32 @@ public class ContactCell extends ListCell<ContactInfo> {
         }
     }
 
+    /**
+     * Renders the loaded cell root as the active row graphic.
+     */
     private void renderCell() {
         setGraphic(cellRoot);
         setText(null);
     }
 
+    /**
+     * Stops any pending delayed context-menu dispatch timer.
+     */
     private void stopContextMenuDelay() {
         if (contextMenuDelay != null) {
             contextMenuDelay.stop();
         }
     }
 
+    /**
+     * Retrieves and casts a node/object from an FXMLLoader namespace map.
+     *
+     * @param namespace loader namespace map
+     * @param key namespace key
+     * @param type expected runtime type
+     * @param <T> expected type parameter
+     * @return cast value when key exists and matches type, otherwise {@code null}
+     */
     private static <T> T asNamespaceNode(Map<String, Object> namespace, String key, Class<T> type) {
         if (namespace == null || key == null || key.isBlank() || type == null) {
             return null;
@@ -276,10 +407,22 @@ public class ContactCell extends ListCell<ContactInfo> {
         return type.cast(value);
     }
 
+    /**
+     * Determines whether unread badge should be shown for a count.
+     *
+     * @param unreadCount normalized unread count
+     * @return {@code true} when unread count is greater than zero
+     */
     private static boolean shouldShowUnreadBadge(int unreadCount) {
         return unreadCount > 0;
     }
 
+    /**
+     * Formats unread badge text with capped display style (for example {@code 9+}).
+     *
+     * @param unreadCount unread count value
+     * @return badge label text
+     */
     private static String formatUnreadBadgeText(int unreadCount) {
         int normalized = Math.max(0, unreadCount);
         if (normalized > 9) {

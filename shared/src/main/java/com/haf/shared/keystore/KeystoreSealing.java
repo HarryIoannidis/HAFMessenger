@@ -11,6 +11,9 @@ import com.haf.shared.exceptions.KeystoreOperationException;
 public final class KeystoreSealing {
     private static final SecureRandom RNG = new SecureRandom();
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private KeystoreSealing() {
     }
 
@@ -20,7 +23,7 @@ public final class KeystoreSealing {
      * @param pass      the password to use for sealing
      * @param plaintext the plaintext to seal
      * @return the sealed ciphertext
-     * @throws Exception if sealing fails
+     * @throws GeneralSecurityException if key derivation or encryption fails
      */
     public static byte[] sealWithPass(char[] pass, byte[] plaintext) throws GeneralSecurityException {
         byte[] salt = new byte[CryptoConstants.SALT_LEN];
@@ -46,7 +49,8 @@ public final class KeystoreSealing {
      * @param pass     the password to use for opening
      * @param envelope the envelope to open
      * @return the plaintext
-     * @throws Exception
+     * @throws GeneralSecurityException if key derivation or cipher setup fails
+     * @throws KeystoreOperationException if envelope format is invalid or decryption/authentication fails
      */
     public static byte[] openWithPass(char[] pass, byte[] envelope) throws GeneralSecurityException, KeystoreOperationException {
         String env = new String(envelope, java.nio.charset.StandardCharsets.US_ASCII);
@@ -92,6 +96,7 @@ public final class KeystoreSealing {
      *
      * @param s the base64 encoded string
      * @return the decoded byte array
+     * @throws IllegalArgumentException if the input is not valid Base64
      */
     private static byte[] b64d(String s) {
         return Base64.getDecoder().decode(s);

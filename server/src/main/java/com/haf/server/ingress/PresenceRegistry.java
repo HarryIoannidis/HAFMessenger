@@ -18,15 +18,16 @@ public final class PresenceRegistry {
     /**
      * Registers a connection for a user.
      *
-     * @param userId      the user ID
-     * @param connection  the websocket connection
+     * @param userId     the user ID
+     * @param connection the websocket connection
      * @return true when the user transitioned from inactive to active
      */
     public boolean registerConnection(String userId, WebSocket connection) {
         Objects.requireNonNull(userId, "userId");
         Objects.requireNonNull(connection, "connection");
 
-        Set<WebSocket> userConnections = connectionsByUser.computeIfAbsent(userId, ignored -> ConcurrentHashMap.newKeySet());
+        Set<WebSocket> userConnections = connectionsByUser.computeIfAbsent(userId,
+                ignored -> ConcurrentHashMap.newKeySet());
         userConnections.add(connection);
         return userConnections.size() == 1;
     }
@@ -34,8 +35,8 @@ public final class PresenceRegistry {
     /**
      * Unregisters a connection for a user.
      *
-     * @param userId      the user ID
-     * @param connection  the websocket connection
+     * @param userId     the user ID
+     * @param connection the websocket connection
      * @return true when the user transitioned from active to inactive
      */
     public boolean unregisterConnection(String userId, WebSocket connection) {

@@ -23,21 +23,43 @@ public class SplashViewModel {
 
     @FunctionalInterface
     public interface ConfigLoader {
+        /**
+         * Loads application version metadata for splash display.
+         *
+         * @return resolved application version text
+         * @throws IOException when version metadata cannot be read
+         */
         String loadVersion() throws IOException;
     }
 
     @FunctionalInterface
     public interface CryptoInitializer {
+        /**
+         * Verifies required cryptographic primitives/providers.
+         *
+         * @throws GeneralSecurityException when required crypto primitives are
+         *                                  unavailable
+         */
         void initialize() throws GeneralSecurityException;
     }
 
     @FunctionalInterface
     public interface ResourceChecker {
+        /**
+         * Validates availability of required local resources.
+         *
+         * @throws IOException when one or more required resources are missing
+         */
         void verify() throws IOException;
     }
 
     @FunctionalInterface
     public interface NetworkChecker {
+        /**
+         * Verifies remote server/network reachability.
+         *
+         * @throws IOException when reachability check fails
+         */
         void check() throws IOException;
     }
 
@@ -46,7 +68,6 @@ public class SplashViewModel {
     private final StringProperty version = new SimpleStringProperty("1.0.0");
     private final StringProperty percentage = new SimpleStringProperty("0%");
     private final javafx.beans.property.BooleanProperty error = new javafx.beans.property.SimpleBooleanProperty(false);
-
     private final ConfigLoader configLoader;
     private final CryptoInitializer cryptoInitializer;
     private final ResourceChecker resourceChecker;
@@ -54,10 +75,21 @@ public class SplashViewModel {
 
     private Task<Void> runningTask;
 
+    /**
+     * Creates splash view-model with default bootstrap dependency providers.
+     */
     public SplashViewModel() {
         this(defaultConfigLoader(), defaultCryptoInitializer(), defaultResourceChecker(), defaultNetworkChecker());
     }
 
+    /**
+     * Creates splash view-model with injectable bootstrap dependency providers.
+     *
+     * @param configLoader      loader used to resolve app version
+     * @param cryptoInitializer validator for required crypto capabilities
+     * @param resourceChecker   validator for required local assets/resources
+     * @param networkChecker    validator for backend reachability
+     */
     public SplashViewModel(
             ConfigLoader configLoader,
             CryptoInitializer cryptoInitializer,
@@ -70,26 +102,57 @@ public class SplashViewModel {
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
     }
 
+    /**
+     * Factory method returning a splash view-model configured with production
+     * defaults.
+     *
+     * @return default-configured {@link SplashViewModel}
+     */
     public static SplashViewModel createDefault() {
         return new SplashViewModel();
     }
 
+    /**
+     * Exposes splash status text property.
+     *
+     * @return observable status property
+     */
     public StringProperty statusProperty() {
         return status;
     }
 
+    /**
+     * Exposes splash progress value property.
+     *
+     * @return observable progress property in range {@code [0,1]}
+     */
     public DoubleProperty progressProperty() {
         return progress;
     }
 
+    /**
+     * Exposes application version text property.
+     *
+     * @return observable version property
+     */
     public StringProperty versionProperty() {
         return version;
     }
 
+    /**
+     * Exposes formatted percentage text property derived from progress.
+     *
+     * @return observable percentage property
+     */
     public StringProperty percentageProperty() {
         return percentage;
     }
 
+    /**
+     * Exposes startup error-state property.
+     *
+     * @return observable error flag property
+     */
     public javafx.beans.property.BooleanProperty errorProperty() {
         return error;
     }
@@ -115,6 +178,12 @@ public class SplashViewModel {
         percentage.bind(progress.multiply(100).asString("%.0f%%"));
 
         Task<Void> task = new Task<>() {
+            /**
+             * Executes staged bootstrap checks and updates progress/message bindings.
+             *
+             * @return {@code null} when bootstrap completes
+             * @throws Exception when any bootstrap stage fails
+             */
             @Override
             protected Void call() throws Exception {
                 update(UiConstants.BOOTSTRAP_STARTING, 0.0);
@@ -144,6 +213,12 @@ public class SplashViewModel {
                 return null;
             }
 
+            /**
+             * Pushes message/progress updates into task-bound observable properties.
+             *
+             * @param msg status message
+             * @param p   progress value between 0 and 1
+             */
             private void update(String msg, double p) {
                 updateMessage(msg);
                 updateProgress(p, 1.0);
@@ -182,6 +257,11 @@ public class SplashViewModel {
         t.start();
     }
 
+    /**
+     * Adds slight random delay jitter to bootstrap steps for smoother UX pacing.
+     *
+     * @param millis base delay duration in milliseconds
+     */
     private static void delay(long millis) {
         try {
             long randomOffset = ThreadLocalRandom.current().nextLong(-100, 101);
@@ -237,6 +317,12 @@ public class SplashViewModel {
         };
     }
 
+    /**
+     * Builds the default checker that validates all required local app resources
+     * (FXML, CSS, images, fonts).
+     *
+     * @return resource-check callback used during splash bootstrap
+     */
     private static ResourceChecker defaultResourceChecker() {
         return () -> {
             // FXML resources

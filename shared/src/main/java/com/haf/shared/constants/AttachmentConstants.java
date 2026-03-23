@@ -28,11 +28,17 @@ public final class AttachmentConstants {
 
     public static final Set<String> DEFAULT_ALLOWED_TYPES_SET = Set.copyOf(DEFAULT_ALLOWED_TYPES);
 
+    /**
+     * Prevents instantiation of this constants holder.
+     */
     private AttachmentConstants() {
     }
 
     /**
      * Normalizes MIME value by stripping parameters and lowercasing.
+     *
+     * @param mimeType MIME value to normalize
+     * @return normalized MIME type without parameters, or {@code null} when input is blank/null
      */
     public static String normalizeMimeType(String mimeType) {
         if (mimeType == null) {
@@ -46,6 +52,9 @@ public final class AttachmentConstants {
 
     /**
      * Returns true if MIME type is allowed for chat attachments.
+     *
+     * @param mimeType MIME value to validate
+     * @return {@code true} when the MIME type is in the attachment allowlist
      */
     public static boolean isAllowedAttachmentType(String mimeType) {
         String normalized = normalizeMimeType(mimeType);

@@ -48,10 +48,27 @@ public class MainViewModel {
     }
 
     public interface ContactsGateway {
+        /**
+         * Fetches full contact list snapshot from backend.
+         *
+         * @return future containing raw contacts JSON payload
+         */
         CompletableFuture<String> fetchContacts();
 
+        /**
+         * Adds a contact by user id on backend.
+         *
+         * @param userId target user id
+         * @return future containing backend response payload
+         */
         CompletableFuture<String> addContact(String userId);
 
+        /**
+         * Removes a contact by user id on backend.
+         *
+         * @param userId target user id
+         * @return future containing backend response payload
+         */
         CompletableFuture<String> removeContact(String userId);
     }
 
@@ -67,6 +84,11 @@ public class MainViewModel {
     private final ConcurrentHashMap<String, Long> presenceSignalByUser = new ConcurrentHashMap<>();
     private final AtomicLong presenceSignalCounter = new AtomicLong();
 
+    /**
+     * Creates main view-model with an injected contacts gateway.
+     *
+     * @param contactsGateway gateway used for contact CRUD synchronization
+     */
     public MainViewModel(ContactsGateway contactsGateway) {
         this.contactsGateway = Objects.requireNonNull(contactsGateway, "contactsGateway");
     }
@@ -76,6 +98,14 @@ public class MainViewModel {
      */
     public static MainViewModel createDefault() {
         return new MainViewModel(new ContactsGateway() {
+            /**
+             * Loads the authenticated user's current contacts snapshot.
+             *
+             * Used by the main screen to populate the left contact list from the backend.
+             *
+             * @return future with the raw contacts payload as JSON, or an empty JSON object
+             *         when no session exists
+             */
             @Override
             public CompletableFuture<String> fetchContacts() {
                 if (NetworkSession.get() == null) {
@@ -84,6 +114,13 @@ public class MainViewModel {
                 return NetworkSession.get().getAuthenticated("/api/v1/contacts");
             }
 
+            /**
+             * Sends an authenticated add-contact request for a user id.
+             *
+             * @param userId id of the user to add to the contact list
+             * @return future with the backend response body
+             * @throws IllegalStateException when there is no active network session
+             */
             @Override
             public CompletableFuture<String> addContact(String userId) {
                 if (NetworkSession.get() == null) {
@@ -95,6 +132,13 @@ public class MainViewModel {
                 return NetworkSession.get().postAuthenticated("/api/v1/contacts", body);
             }
 
+            /**
+             * Sends an authenticated remove-contact request for a user id.
+             *
+             * @param userId id of the contact to remove
+             * @return future with the backend response body
+             * @throws IllegalStateException when there is no active network session
+             */
             @Override
             public CompletableFuture<String> removeContact(String userId) {
                 if (NetworkSession.get() == null) {
@@ -108,22 +152,47 @@ public class MainViewModel {
         });
     }
 
+    /**
+     * Exposes observable contacts list used by contact list UI.
+     *
+     * @return observable contacts list
+     */
     public ObservableList<ContactInfo> contactsProperty() {
         return contacts;
     }
 
+    /**
+     * Exposes active main-tab property.
+     *
+     * @return observable active-tab property
+     */
     public ObjectProperty<MainTab> activeTabProperty() {
         return activeTab;
     }
 
+    /**
+     * Exposes whether search currently has results.
+     *
+     * @return observable search-results flag
+     */
     public BooleanProperty hasSearchResultsProperty() {
         return hasSearchResults;
     }
 
+    /**
+     * Sets currently active tab.
+     *
+     * @param tab tab to activate
+     */
     public void setActiveTab(MainTab tab) {
         activeTab.set(tab);
     }
 
+    /**
+     * Sets whether search result panel currently has results.
+     *
+     * @param value search-results flag value
+     */
     public void setHasSearchResults(boolean value) {
         hasSearchResults.set(value);
     }
@@ -131,7 +200,8 @@ public class MainViewModel {
     /**
      * Pure UI-state decision for contact click behavior on the Main screen.
      */
-    public ContactSelectionAction resolveContactSelectionAction(MainTab currentTab, boolean clickedSameAsLastSelection) {
+    public ContactSelectionAction resolveContactSelectionAction(MainTab currentTab,
+            boolean clickedSameAsLastSelection) {
         if (currentTab == MainTab.SEARCH) {
             return ContactSelectionAction.SWITCH_TO_MESSAGES_TAB;
         }
@@ -141,6 +211,9 @@ public class MainViewModel {
         return ContactSelectionAction.KEEP_SELECTED_CONTACT;
     }
 
+    /**
+     * Refreshes contacts list from backend snapshot.
+     */
     public void fetchContacts() {
         contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
@@ -150,10 +223,24 @@ public class MainViewModel {
                 });
     }
 
+    /**
+     * Ensures contact exists (or is created) for chat/open-conversation use.
+     *
+     * @param userId    user id
+     * @param fullName  contact full name
+     * @param regNumber registration number
+     * @return existing or newly created contact entry
+     */
     public ContactInfo ensureChatContact(String userId, String fullName, String regNumber) {
         return ensureChatContact(userId, fullName, regNumber, null, null, null, null);
     }
 
+    /**
+     * Ensures contact exists using fields from search result DTO.
+     *
+     * @param result search result payload
+     * @return existing or newly created contact entry
+     */
     public ContactInfo ensureChatContact(UserSearchResultDTO result) {
         if (result == null) {
             return null;
@@ -168,6 +255,18 @@ public class MainViewModel {
                 result.getJoinedDate());
     }
 
+    /**
+     * Ensures contact exists and merges profile fields when contact already exists.
+     *
+     * @param userId     user id
+     * @param fullName   contact full name
+     * @param regNumber  registration number
+     * @param rank       rank
+     * @param email      email
+     * @param telephone  telephone
+     * @param joinedDate joined date
+     * @return existing or newly created contact entry
+     */
     public ContactInfo ensureChatContact(
             String userId,
             String fullName,
@@ -187,10 +286,22 @@ public class MainViewModel {
         return created;
     }
 
+    /**
+     * Checks whether a contact exists locally.
+     *
+     * @param userId user id to check
+     * @return {@code true} when contact exists
+     */
     public boolean hasContact(String userId) {
         return findContactIndex(userId) >= 0;
     }
 
+    /**
+     * Finds contact by id.
+     *
+     * @param userId contact id
+     * @return contact entry or {@code null} when not found
+     */
     public ContactInfo getContactById(String userId) {
         int index = findContactIndex(userId);
         if (index < 0) {
@@ -199,10 +310,22 @@ public class MainViewModel {
         return contacts.get(index);
     }
 
+    /**
+     * Adds a contact using minimal profile fields.
+     *
+     * @param userId    user id
+     * @param fullName  full name
+     * @param regNumber registration number
+     */
     public void addContact(String userId, String fullName, String regNumber) {
         addContact(userId, fullName, regNumber, null, null, null, null);
     }
 
+    /**
+     * Adds a contact using fields from search result DTO.
+     *
+     * @param result search result payload
+     */
     public void addContact(UserSearchResultDTO result) {
         if (result == null) {
             return;
@@ -217,6 +340,17 @@ public class MainViewModel {
                 result.getJoinedDate());
     }
 
+    /**
+     * Adds contact optimistically and syncs with backend.
+     *
+     * @param userId     user id
+     * @param fullName   full name
+     * @param regNumber  registration number
+     * @param rank       rank
+     * @param email      email
+     * @param telephone  telephone
+     * @param joinedDate joined date
+     */
     public void addContact(
             String userId,
             String fullName,
@@ -249,6 +383,11 @@ public class MainViewModel {
                 });
     }
 
+    /**
+     * Removes contact locally and attempts backend removal.
+     *
+     * @param userId user id to remove
+     */
     public void removeContact(String userId) {
         contacts.removeIf(info -> info.id().equals(userId));
         contactsGateway.removeContact(userId)
@@ -258,6 +397,13 @@ public class MainViewModel {
                 });
     }
 
+    /**
+     * Updates contact presence state and records a presence signal marker.
+     *
+     * @param userId contact id
+     * @param active presence flag
+     * @return updated contact, or {@code null} when contact does not exist
+     */
     public ContactInfo updateContactPresence(String userId, boolean active) {
         int index = findContactIndex(userId);
         if (index < 0) {
@@ -280,14 +426,31 @@ public class MainViewModel {
         return updated;
     }
 
+    /**
+     * Increments unread count for a contact.
+     *
+     * @param userId contact id
+     * @return updated contact, or {@code null} when contact does not exist
+     */
     public ContactInfo incrementUnread(String userId) {
         return updateUnread(userId, count -> count == Integer.MAX_VALUE ? Integer.MAX_VALUE : count + 1);
     }
 
+    /**
+     * Resets unread count for a contact.
+     *
+     * @param userId contact id
+     * @return updated contact, or {@code null} when contact does not exist
+     */
     public ContactInfo resetUnread(String userId) {
         return updateUnread(userId, ignored -> 0);
     }
 
+    /**
+     * Resets unread count when opening chat with specific recipient.
+     *
+     * @param recipientId active chat recipient id
+     */
     public void resetUnreadOnChatOpen(String recipientId) {
         if (recipientId == null || recipientId.isBlank()) {
             return;
@@ -295,6 +458,13 @@ public class MainViewModel {
         resetUnread(recipientId);
     }
 
+    /**
+     * Ensures an incoming sender exists in contacts, creating placeholders when
+     * needed.
+     *
+     * @param senderId sender id from incoming message
+     * @return existing or newly created contact entry
+     */
     public ContactInfo ensureIncomingContact(String senderId) {
         if (senderId == null || senderId.isBlank()) {
             return null;
@@ -320,6 +490,14 @@ public class MainViewModel {
         return created;
     }
 
+    /**
+     * Applies unread policy for incoming message based on active tab/recipient.
+     *
+     * @param senderId               sender id of incoming message
+     * @param currentChatRecipientId currently opened chat recipient id
+     * @return unread action that was applied, or {@code null} when contact cannot
+     *         be resolved
+     */
     public IncomingUnreadAction applyIncomingMessage(String senderId, String currentChatRecipientId) {
         ContactInfo contact = ensureIncomingContact(senderId);
         if (contact == null) {
@@ -335,6 +513,10 @@ public class MainViewModel {
         return action;
     }
 
+    /**
+     * Inserts or replaces a contact entry from server snapshot fields and presence
+     * state.
+     */
     private void upsertContact(
             String userId,
             String fullName,
@@ -346,6 +528,7 @@ public class MainViewModel {
             boolean active) {
         int index = findContactIndex(userId);
         int unreadCount = index >= 0 ? contacts.get(index).unreadCount() : 0;
+
         ContactInfo contact = ContactInfo.fromPresence(
                 userId,
                 fullName,
@@ -363,6 +546,12 @@ public class MainViewModel {
         }
     }
 
+    /**
+     * Finds index of contact by user id.
+     *
+     * @param userId contact id
+     * @return contact index or {@code -1} when not found
+     */
     private int findContactIndex(String userId) {
         for (int i = 0; i < contacts.size(); i++) {
             ContactInfo info = contacts.get(i);
@@ -373,6 +562,11 @@ public class MainViewModel {
         return -1;
     }
 
+    /**
+     * Applies backend contacts response JSON snapshot into local observable list.
+     *
+     * @param responseJson contacts response payload
+     */
     private void applyContactsSnapshot(String responseJson) {
         ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
         if (response == null || response.getContacts() == null) {
@@ -394,6 +588,9 @@ public class MainViewModel {
         });
     }
 
+    /**
+     * Merges non-blank profile fields into an existing contact entry.
+     */
     private void mergeContactProfile(
             String userId,
             String fullName,
@@ -422,6 +619,9 @@ public class MainViewModel {
         contacts.set(index, merged);
     }
 
+    /**
+     * Updates unread count for a contact using provided update function.
+     */
     private ContactInfo updateUnread(String userId, IntUnaryOperator updater) {
         if (userId == null || userId.isBlank()) {
             return null;
@@ -453,6 +653,9 @@ public class MainViewModel {
         return updated;
     }
 
+    /**
+     * Prefers incoming non-blank field value, otherwise keeps fallback.
+     */
     private static String preferNonBlank(String incoming, String fallback) {
         if (incoming != null && !incoming.isBlank()) {
             return incoming;
@@ -460,6 +663,11 @@ public class MainViewModel {
         return fallback;
     }
 
+    /**
+     * Evaluates whether chat placeholder should be shown after contact removal
+     * using
+     * current contacts state.
+     */
     public boolean shouldShowPlaceholderAfterRemoval(
             String removedUserId,
             ContactInfo selectedBeforeRemoval,
@@ -471,6 +679,9 @@ public class MainViewModel {
                 contacts.isEmpty());
     }
 
+    /**
+     * Evaluates whether chat placeholder should be shown after contact removal.
+     */
     public static boolean shouldShowPlaceholderAfterRemoval(
             String removedUserId,
             ContactInfo selectedBeforeRemoval,
@@ -488,6 +699,10 @@ public class MainViewModel {
         return activeChatRecipientId != null && removedUserId.equals(activeChatRecipientId);
     }
 
+    /**
+     * Resolves unread action for incoming message based on active tab and selected
+     * chat recipient.
+     */
     public static IncomingUnreadAction resolveIncomingUnreadAction(
             MainTab activeTab,
             String currentChatRecipientId,
@@ -500,6 +715,9 @@ public class MainViewModel {
         return IncomingUnreadAction.INCREMENT;
     }
 
+    /**
+     * Compares two potential contact selections by id.
+     */
     public static boolean isSameContactSelection(ContactInfo clicked, Object candidate) {
         if (clicked == null || clicked.id() == null || clicked.id().isBlank()) {
             return false;
@@ -510,6 +728,10 @@ public class MainViewModel {
         return clicked.id().equals(previous.id());
     }
 
+    /**
+     * Schedules a delayed contacts refresh when no newer presence signal has
+     * arrived.
+     */
     private void scheduleAddContactPresenceFallback(String userId, long baselinePresenceSignal) {
         if (userId == null || userId.isBlank()) {
             return;
@@ -541,6 +763,9 @@ public class MainViewModel {
         });
     }
 
+    /**
+     * Runs UI updates on JavaFX thread with fallback for non-JavaFX test contexts.
+     */
     private static void runOnUiThread(Runnable action) {
         try {
             Platform.runLater(action);

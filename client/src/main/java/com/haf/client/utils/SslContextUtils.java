@@ -10,6 +10,12 @@ import java.util.Properties;
 
 public class SslContextUtils {
 
+    /**
+     * Prevents instantiation of this utility class.
+     *
+     * @throws IllegalStateException always, because this class exposes only static
+     *                               utility methods
+     */
     private SslContextUtils() {
         throw new IllegalStateException("Utility class");
     }

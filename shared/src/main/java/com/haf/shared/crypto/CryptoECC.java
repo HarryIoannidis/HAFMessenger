@@ -13,6 +13,9 @@ import java.security.PublicKey;
  * Handles X25519 Key Agreement (ECDH) and Key Derivation for AES.
  */
 public final class CryptoECC {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private CryptoECC() {
     }
 
@@ -61,6 +64,7 @@ public final class CryptoECC {
      * @param myPrivate   my private X25519 key
      * @param theirPublic their public X25519 key
      * @return derived AES session key
+     * @throws CryptoOperationException if key agreement or derivation fails
      */
     public static SecretKeySpec generateAndDeriveAesKey(PrivateKey myPrivate, PublicKey theirPublic) {
         byte[] sharedSecret = generateSharedSecret(myPrivate, theirPublic);

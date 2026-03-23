@@ -72,6 +72,10 @@ public final class EncryptedMessageValidator {
 
     /**
      * The result of validating an EncryptedMessage.
+     * 
+     * @param valid           whether the message is valid
+     * @param reason          the reason for the invalidation
+     * @param expiresAtMillis the expiration time of the message
      */
     public record ValidationResult(boolean valid, String reason, long expiresAtMillis) {
 

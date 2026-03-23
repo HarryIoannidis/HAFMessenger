@@ -12,13 +12,29 @@ import com.haf.shared.utils.FingerprintUtil;
 
 public final class KeystoreBootstrap {
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private KeystoreBootstrap() {
     }
 
+    /**
+     * Bootstraps a shared keystore using the default passphrase source.
+     *
+     * @return resolved keystore root path
+     * @throws Exception when directory setup or key material initialization fails
+     */
     public static Path run() throws Exception {
         return run(null, null);
     }
 
+    /**
+     * Bootstraps a keystore for a specific user using the default passphrase source.
+     *
+     * @param userId user identifier used for per-user isolation
+     * @return resolved keystore root path
+     * @throws Exception when directory setup or key material initialization fails
+     */
     public static Path run(String userId) throws Exception {
         return run(userId, null);
     }
@@ -27,8 +43,9 @@ public final class KeystoreBootstrap {
      * Bootstraps the keystore if needed for a specific user.
      *
      * @param userId the user ID (can be null for shared)
+     * @param passphrase optional passphrase used to seal the generated private key
      * @return the root directory of the keystore
-     * @throws Exception
+     * @throws Exception when directory setup or key material initialization fails
      */
     public static Path run(String userId, char[] passphrase) throws Exception {
         Path root = KeystoreRoot.preferred(userId);
@@ -49,8 +66,9 @@ public final class KeystoreBootstrap {
     /**
      * Bootstraps the keystore if needed.
      *
-     * @param root the root directory of the keystore
-     * @throws Exception
+     * @param root resolved root directory of the keystore
+     * @param passphrase optional passphrase used to seal the generated private key
+     * @throws Exception when keystore files cannot be created or written
      */
     private static void firstRunIfMissing(Path root, char[] passphrase) throws Exception {
         try (var s = Files.list(root)) {

@@ -130,14 +130,26 @@ public class MainController implements SearchContactActions {
         REMOVE_CONTACT
     }
 
+    /**
+     * Creates the controller with the default main-session service implementation.
+     */
     public MainController() {
         this(new DefaultMainSessionService());
     }
 
+    /**
+     * Creates the controller with an explicit session service dependency.
+     *
+     * @param mainSessionService service responsible for logout and event listener wiring
+     * @throws NullPointerException when {@code mainSessionService} is {@code null}
+     */
     MainController(MainSessionService mainSessionService) {
         this.mainSessionService = Objects.requireNonNull(mainSessionService, "mainSessionService");
     }
 
+    /**
+     * Initializes main view bindings, UI interactions, listeners, and initial content state.
+     */
     @FXML
     public void initialize() {
         contentLoader = new MainContentLoader(contentPane, this, this::handleViewLoadFailure);
@@ -167,10 +179,16 @@ public class MainController implements SearchContactActions {
         activateMessagesTab();
     }
 
+    /**
+     * Binds the contacts list view to the view-model observable contacts collection.
+     */
     private void bindViewModel() {
         contactsList.setItems(viewModel.contactsProperty());
     }
 
+    /**
+     * Keeps the profile strip synchronized when contact entries are replaced in the list.
+     */
     private void bindSelectedContactProfileSync() {
         viewModel.contactsProperty().addListener((ListChangeListener<ContactInfo>) change -> {
             boolean changed = false;
@@ -185,6 +203,9 @@ public class MainController implements SearchContactActions {
         });
     }
 
+    /**
+     * Refreshes profile-strip data for the tracked/selected contact when contact model instances are replaced.
+     */
     private void refreshProfilePanelForSelectedContact() {
         if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
             return;
@@ -208,6 +229,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Resolves the contact id currently tracked by the chat area or list selection state.
+     *
+     * @return tracked contact id, or {@code null} when no contact is currently tracked
+     */
     private String resolveTrackedContactId() {
         String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
         if (activeChatRecipientId != null && !activeChatRecipientId.isBlank()) {
@@ -226,6 +252,9 @@ public class MainController implements SearchContactActions {
         return selected.id();
     }
 
+    /**
+     * Wires navigation buttons to switch between messages and search tabs.
+     */
     private void setupNavBar() {
         navMessages.setOnAction(e -> activateMessagesTab());
         navSearch.setOnAction(e -> activateSearchTab());
@@ -250,6 +279,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Creates and wires the search/filter orchestration controller used by toolbar actions.
+     */
     private void setupSearchFilterUi() {
         searchFilterUi = new SearchFilterController(
                 this::executeSearchWithFilters,
@@ -262,6 +294,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Wires the profile button in the toolbar to open the selected-contact profile popup.
+     */
     private void setupProfilePopupTrigger() {
         if (profilePopupButton == null) {
             return;
@@ -270,6 +305,9 @@ public class MainController implements SearchContactActions {
         profilePopupButton.setOnAction(e -> openSelectedContactProfilePopup());
     }
 
+    /**
+     * Triggers the search flow using the current toolbar query and active filter options.
+     */
     private void triggerSearchFlow() {
         if (searchFilterUi == null) {
             return;
@@ -279,6 +317,13 @@ public class MainController implements SearchContactActions {
                 filterButton != null ? filterButton : searchActionButton);
     }
 
+    /**
+     * Executes a search request through the loaded search content controller.
+     *
+     * @param query raw search query text
+     * @param sortOptions selected sort/filter options to apply
+     * @return {@code true} when a search controller is available and search is dispatched, otherwise {@code false}
+     */
     private boolean executeSearchWithFilters(String query, SearchSortViewModel.SortOptions sortOptions) {
         SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
         if (searchController == null) {
@@ -288,6 +333,9 @@ public class MainController implements SearchContactActions {
         return true;
     }
 
+    /**
+     * Marks search state as populated and flips the toolbar action icon to the clear symbol.
+     */
     private void onSearchExecuted() {
         viewModel.setHasSearchResults(true);
         if (searchActionIcon != null) {
@@ -314,6 +362,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Activates the messages tab, restores message-oriented panels, and opens current chat/placeholder content.
+     */
     private void activateMessagesTab() {
         viewModel.setActiveTab(MainViewModel.MainTab.MESSAGES);
         indicatorMessages.setVisible(true);
@@ -340,6 +391,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Activates the search tab and ensures search UI/content are visible and initialized.
+     */
     private void activateSearchTab() {
         viewModel.setActiveTab(MainViewModel.MainTab.SEARCH);
         indicatorMessages.setVisible(false);
@@ -360,6 +414,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Applies active/inactive CSS classes on navigation icons according to the active tab.
+     *
+     * @param messagesActive whether the messages tab is the active tab
+     */
     private void updateNavStyles(boolean messagesActive) {
         if (messagesActive) {
             iconMessages.getStyleClass().remove(NAV_ITEM_ICON);
@@ -382,6 +441,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Shows the profile panel with contact identity and activeness presentation.
+     *
+     * @param contact contact whose profile data should be rendered in the panel
+     */
     private void showProfilePanel(ContactInfo contact) {
         profileNameText.setText(contact.name());
         String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
@@ -403,22 +467,34 @@ public class MainController implements SearchContactActions {
         hideSearchPanel();
     }
 
+    /**
+     * Hides the profile panel from both visibility and layout participation.
+     */
     private void hideProfilePanel() {
         profilePanel.setVisible(false);
         profilePanel.setManaged(false);
     }
 
+    /**
+     * Shows the search panel and hides the profile panel.
+     */
     private void showSearchPanel() {
         searchPanel.setVisible(true);
         searchPanel.setManaged(true);
         hideProfilePanel();
     }
 
+    /**
+     * Hides the search panel from both visibility and layout participation.
+     */
     private void hideSearchPanel() {
         searchPanel.setVisible(false);
         searchPanel.setManaged(false);
     }
 
+    /**
+     * Opens a profile popup for the currently tracked or selected contact, if available.
+     */
     private void openSelectedContactProfilePopup() {
         String trackedContactId = resolveTrackedContactId();
         if (trackedContactId == null) {
@@ -436,6 +512,9 @@ public class MainController implements SearchContactActions {
         openProfilePopup(UserProfileInfo.fromContact(contact, false));
     }
 
+    /**
+     * Opens the current user's own profile popup from session data.
+     */
     private void openSelfProfilePopup() {
         UserProfileInfo profile = CurrentUserSession.get();
         if (profile == null) {
@@ -445,6 +524,11 @@ public class MainController implements SearchContactActions {
         openProfilePopup(profile.asSelfProfile(true));
     }
 
+    /**
+     * Opens the generic profile popup with the provided profile model.
+     *
+     * @param profile profile payload to display
+     */
     private void openProfilePopup(UserProfileInfo profile) {
         if (profile == null) {
             return;
@@ -457,6 +541,9 @@ public class MainController implements SearchContactActions {
                 controller -> controller.showProfile(profile));
     }
 
+    /**
+     * Configures contact list cells and wires click/context-menu callbacks for each row.
+     */
     private void setupContactList() {
         contactsList.setCellFactory(lv -> {
             ContactCell cell = new ContactCell();
@@ -490,16 +577,32 @@ public class MainController implements SearchContactActions {
         contactsList.setUserData(target);
     }
 
+    /**
+     * Checks whether a user id already exists in the current contacts collection.
+     *
+     * @param userId user id to test
+     * @return {@code true} when contact exists locally
+     */
     @Override
     public boolean hasContact(String userId) {
         return viewModel.hasContact(userId);
     }
 
+    /**
+     * Adds a search result as a contact in local state.
+     *
+     * @param result search result to convert into a contact entry
+     */
     @Override
     public void addContact(UserSearchResultDTO result) {
         viewModel.addContact(result);
     }
 
+    /**
+     * Removes a contact and clears active selection/content when needed.
+     *
+     * @param userId contact id to remove
+     */
     @Override
     public void removeContact(String userId) {
         ContactInfo selectedBeforeRemoval = contactsList.getSelectionModel().getSelectedItem();
@@ -513,6 +616,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Opens the profile popup for a search-result user.
+     *
+     * @param result search result whose profile should be displayed
+     */
     @Override
     public void openProfile(UserSearchResultDTO result) {
         UserProfileInfo profile = UserProfileInfo.fromSearchResult(result, false);
@@ -522,6 +630,9 @@ public class MainController implements SearchContactActions {
         openProfilePopup(profile);
     }
 
+    /**
+     * Wires mouse/selection interactions for contacts and maps them to view-model selection actions.
+     */
     private void setupContactSelection() {
         contactsList.setOnMouseClicked(event -> {
             if (!isPrimaryClick(event.getButton())) {
@@ -556,6 +667,9 @@ public class MainController implements SearchContactActions {
                 });
     }
 
+    /**
+     * Clears selected contact state and displays the placeholder content.
+     */
     private void clearSelectionAndShowPlaceholder() {
         contactsList.getSelectionModel().clearSelection();
         contactsList.setUserData(null);
@@ -568,6 +682,15 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Executes contact-selection behavior for the action resolved by {@link MainViewModel}.
+     *
+     * @param action resolved action for the current click/selection state
+     * @param switchToMessagesAction callback for switching into messages tab
+     * @param deselectAndPlaceholderAction callback for deselecting contact and showing placeholder
+     * @param keepSelectionAction callback for keeping current selection intact
+     * @throws NullPointerException when any parameter is {@code null}
+     */
     static void applyContactSelectionAction(
             MainViewModel.ContactSelectionAction action,
             Runnable switchToMessagesAction,
@@ -585,6 +708,15 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Executes immediate contact-context menu actions.
+     *
+     * @param action context action selected from the menu
+     * @param openProfileAction callback for opening profile
+     * @param deleteChatAction callback for deleting local chat history
+     * @param removeContactAction callback for removing contact
+     * @throws NullPointerException when any parameter is {@code null}
+     */
     static void applyContactContextAction(
             ContactContextAction action,
             Runnable openProfileAction,
@@ -602,6 +734,15 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Executes contact-context actions where destructive operations are confirmation-gated.
+     *
+     * @param action context action selected from the menu
+     * @param openProfileAction callback for profile action
+     * @param confirmDeleteChatAction callback for delete-chat confirmation flow
+     * @param confirmRemoveContactAction callback for remove-contact confirmation flow
+     * @throws NullPointerException when any parameter is {@code null}
+     */
     static void applyContactContextActionWithConfirmation(
             ContactContextAction action,
             Runnable openProfileAction,
@@ -619,6 +760,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Builds the context menu shown for contact list rows.
+     */
     private void setupContactContextMenu() {
         contactContextMenu = ContextMenuBuilder.create()
                 .addOption(
@@ -639,6 +783,9 @@ public class MainController implements SearchContactActions {
         contactContextMenu.setAutoHide(true);
     }
 
+    /**
+     * Installs scene-level outside-click handling so the contact context menu closes on external clicks.
+     */
     private void setupContactContextMenuOutsideClickClose() {
         if (rootContainer == null) {
             return;
@@ -653,6 +800,11 @@ public class MainController implements SearchContactActions {
         registerContactContextOutsideClickHandler(rootContainer.getScene());
     }
 
+    /**
+     * Registers the outside-click event filter on a scene.
+     *
+     * @param scene scene receiving the filter
+     */
     private void registerContactContextOutsideClickHandler(Scene scene) {
         if (scene == null || contactContextOutsideClickHandler == null) {
             return;
@@ -660,6 +812,11 @@ public class MainController implements SearchContactActions {
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, contactContextOutsideClickHandler);
     }
 
+    /**
+     * Removes the previously registered outside-click event filter from a scene.
+     *
+     * @param scene scene from which the filter should be removed
+     */
     private void unregisterContactContextOutsideClickHandler(Scene scene) {
         if (scene == null || contactContextOutsideClickHandler == null) {
             return;
@@ -667,6 +824,11 @@ public class MainController implements SearchContactActions {
         scene.removeEventFilter(MouseEvent.MOUSE_PRESSED, contactContextOutsideClickHandler);
     }
 
+    /**
+     * Hides the contact context menu when any scene mouse-press happens outside the popup.
+     *
+     * @param event scene mouse event
+     */
     private void handleContactContextOutsideClick(MouseEvent event) {
         if (event == null || contactContextMenu == null || !contactContextMenu.isShowing()) {
             return;
@@ -676,6 +838,13 @@ public class MainController implements SearchContactActions {
         contactContextMenu.hide();
     }
 
+    /**
+     * Shows the contact context menu at a screen coordinate and syncs selection with the targeted contact.
+     *
+     * @param contact contact row target
+     * @param screenX popup anchor X coordinate in screen space
+     * @param screenY popup anchor Y coordinate in screen space
+     */
     private void showContactContextMenu(ContactInfo contact, double screenX, double screenY) {
         if (contactContextMenu == null || contact == null) {
             return;
@@ -692,6 +861,11 @@ public class MainController implements SearchContactActions {
         contactContextMenu.show(contactsList, screenX, screenY);
     }
 
+    /**
+     * Dispatches the currently selected contact context action.
+     *
+     * @param action selected context-menu action
+     */
     private void handleContactContextAction(ContactContextAction action) {
         ContactInfo target = contactContextTarget != null ? contactContextTarget : contactsList.getSelectionModel().getSelectedItem();
         if (target == null) {
@@ -705,6 +879,11 @@ public class MainController implements SearchContactActions {
                 () -> confirmRemoveContact(target));
     }
 
+    /**
+     * Clears locally cached chat messages for a contact and refreshes the active chat view when necessary.
+     *
+     * @param contactId contact id whose local timeline should be cleared
+     */
     private void clearLocalChatHistory(String contactId) {
         if (contactId == null || contactId.isBlank()) {
             return;
@@ -720,6 +899,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Selects a contact in the list, focuses its row, and opens the messages tab/chat.
+     *
+     * @param contact contact to select and open
+     */
     private void selectContactAndOpenChat(ContactInfo contact) {
         contactsList.getSelectionModel().select(contact);
         int index = contactsList.getItems().indexOf(contact);
@@ -730,10 +914,19 @@ public class MainController implements SearchContactActions {
         activateMessagesTab();
     }
 
+    /**
+     * Checks whether a mouse click button is the primary button.
+     *
+     * @param button mouse button to evaluate
+     * @return {@code true} when {@code button} is primary
+     */
     private static boolean isPrimaryClick(MouseButton button) {
         return button == MouseButton.PRIMARY;
     }
 
+    /**
+     * Wires window chrome actions (minimize/maximize/close and title-bar drag movement).
+     */
     private void setupWindowControls() {
         Stage stage = ViewRouter.getMainStage();
 
@@ -762,6 +955,9 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Builds and wires the top-right dots menu actions.
+     */
     private void setupDotsMenu() {
         if (dotsMenuButton == null) {
             return;
@@ -785,6 +981,11 @@ public class MainController implements SearchContactActions {
         });
     }
 
+    /**
+     * Shows the dots menu aligned to the button's bottom-right corner when geometry is available.
+     *
+     * @param menu menu instance to show
+     */
     private void showDotsMenuAnchored(ContextMenu menu) {
         Bounds bounds = dotsMenuButton.localToScreen(dotsMenuButton.getBoundsInLocal());
         if (bounds == null) {
@@ -800,6 +1001,9 @@ public class MainController implements SearchContactActions {
         menu.show(dotsMenuButton, bounds.getMaxX() - menuWidth, bounds.getMaxY() + 4);
     }
 
+    /**
+     * Executes logout flow and routes the user back to the login view.
+     */
     private void handleLogout() {
         LOGGER.info("Logging out...");
         mainSessionService.logout().whenComplete((unused, throwable) -> {
@@ -810,6 +1014,9 @@ public class MainController implements SearchContactActions {
         });
     }
 
+    /**
+     * Displays confirmation popup before terminating the application.
+     */
     private void confirmExitApplication() {
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
@@ -822,6 +1029,11 @@ public class MainController implements SearchContactActions {
                 .show();
     }
 
+    /**
+     * Displays confirmation popup before clearing local chat history for a contact.
+     *
+     * @param target contact whose chat history may be deleted
+     */
     private void confirmDeleteChat(ContactInfo target) {
         String contactName = target == null || target.name() == null || target.name().isBlank() ? "this contact"
                 : target.name();
@@ -836,6 +1048,11 @@ public class MainController implements SearchContactActions {
                 .show();
     }
 
+    /**
+     * Displays confirmation popup before removing a contact from the contact list.
+     *
+     * @param target contact candidate to remove
+     */
     private void confirmRemoveContact(ContactInfo target) {
         if (target == null || target.id() == null || target.id().isBlank()) {
             return;
@@ -852,6 +1069,13 @@ public class MainController implements SearchContactActions {
                 .show();
     }
 
+    /**
+     * Resolves a human-readable contact display name for confirmation dialogs.
+     *
+     * @param name contact name candidate
+     * @param id contact id fallback
+     * @return preferred display name string
+     */
     private static String resolveContactDisplayName(String name, String id) {
         if (name != null && !name.isBlank()) {
             return name.trim();
@@ -862,6 +1086,9 @@ public class MainController implements SearchContactActions {
         return "this user";
     }
 
+    /**
+     * Displays confirmation popup before executing logout.
+     */
     private void confirmLogout() {
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_LOGOUT)
@@ -873,11 +1100,21 @@ public class MainController implements SearchContactActions {
                 .show();
     }
 
+    /**
+     * Terminates the JavaFX application and exits the JVM process.
+     */
     private void exitApplication() {
         Platform.exit();
         System.exit(0);
     }
 
+    /**
+     * Handles content-view loading failures by showing a retry-capable popup message.
+     *
+     * @param viewKind failing view type
+     * @param error underlying error
+     * @param retryAction action invoked when user selects Retry
+     */
     private void handleViewLoadFailure(MainContentLoader.ViewKind viewKind, Throwable error, Runnable retryAction) {
         String viewLabel = switch (viewKind) {
             case PLACEHOLDER -> "placeholder";
@@ -903,14 +1140,23 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Registers the main presence listener bridge from session service to UI update handler.
+     */
     private void registerPresenceListener() {
         mainSessionService.registerPresenceListener(this::applyPresenceUpdate);
     }
 
+    /**
+     * Registers the main incoming-message listener bridge from session service to unread update handler.
+     */
     private void registerIncomingMessageListener() {
         mainSessionService.registerIncomingMessageListener(this::applyIncomingMessage);
     }
 
+    /**
+     * Starts chat message receiving if the chat session has been initialized.
+     */
     private void startMessageReceiving() {
         MessageViewModel chatViewModel = ChatSession.get();
         if (chatViewModel == null) {
@@ -920,10 +1166,22 @@ public class MainController implements SearchContactActions {
         chatViewModel.startReceiving();
     }
 
+    /**
+     * Schedules a presence update to run on the JavaFX application thread.
+     *
+     * @param userId user id whose presence changed
+     * @param active latest activity flag
+     */
     private void applyPresenceUpdate(String userId, boolean active) {
         Platform.runLater(() -> updateContactPresence(userId, active));
     }
 
+    /**
+     * Updates unread counters in response to an incoming message event.
+     *
+     * @param senderId sender/contact id
+     * @param message incoming message payload (unused here but included by listener contract)
+     */
     private void applyIncomingMessage(String senderId, MessageVM message) {
         if (senderId == null || senderId.isBlank()) {
             return;
@@ -937,6 +1195,12 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Applies a contact presence change to the list and profile-strip state.
+     *
+     * @param userId user id whose presence changed
+     * @param active latest activity flag
+     */
     private void updateContactPresence(String userId, boolean active) {
         ContactInfo updated = viewModel.updateContactPresence(userId, active);
         if (updated == null) {
@@ -957,6 +1221,11 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    /**
+     * Applies unread-count update logic for a sender against the currently active chat recipient.
+     *
+     * @param senderId sender/contact id of the incoming message
+     */
     private void updateUnreadForIncomingMessage(String senderId) {
         String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
         viewModel.applyIncomingMessage(senderId, activeChatRecipientId);

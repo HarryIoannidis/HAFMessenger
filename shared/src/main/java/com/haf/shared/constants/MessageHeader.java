@@ -45,5 +45,8 @@ public final class MessageHeader {
             "application/octet-stream"
     );
 
+    /**
+     * Prevents instantiation of this constants holder.
+     */
     private MessageHeader() {}
 }

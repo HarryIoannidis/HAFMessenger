@@ -96,14 +96,25 @@ public class LoginController {
     private double xOffset;
     private double yOffset;
 
+    /**
+     * Creates a login controller using the default login service.
+     */
     public LoginController() {
         this(new DefaultLoginService());
     }
 
+    /**
+     * Creates a login controller with an injected login service.
+     *
+     * @param loginService login service used for authentication calls
+     */
     LoginController(LoginService loginService) {
         this.loginService = Objects.requireNonNull(loginService, "loginService");
     }
 
+    /**
+     * Initializes UI bindings, listeners, and persisted preference state.
+     */
     @FXML
     public void initialize() {
         bindViewModel();
@@ -158,6 +169,10 @@ public class LoginController {
         setupValidationErrorListeners();
     }
 
+    /**
+     * Wires keyboard/input interactions and clears validation styling while user
+     * edits fields.
+     */
     private void setupInputInteractionListeners() {
         // Clear errors when user types
         emailField.textProperty().addListener((obs, oldVal, newVal) -> {
@@ -175,12 +190,20 @@ public class LoginController {
         emailField.setOnAction(event -> passwordField.requestFocus());
     }
 
+    /**
+     * Observes validation state flags and updates field error styling.
+     */
     private void setupValidationErrorListeners() {
         // Apply error styling reactively
         viewModel.emailErrorProperty().addListener((obs, oldVal, newVal) -> handleEmailError(newVal));
         viewModel.passwordErrorProperty().addListener((obs, oldVal, newVal) -> handlePasswordError(newVal));
     }
 
+    /**
+     * Applies/removes email error style classes.
+     *
+     * @param isError whether email field is currently invalid
+     */
     private void handleEmailError(Boolean isError) {
         if (Boolean.TRUE.equals(isError)) {
             if (!emailField.getStyleClass().contains(UiConstants.STYLE_TEXT_FIELD_ERROR)) {
@@ -191,6 +214,12 @@ public class LoginController {
         }
     }
 
+    /**
+     * Applies/removes password error style classes on hidden and visible password
+     * controls.
+     *
+     * @param isError whether password field is currently invalid
+     */
     private void handlePasswordError(Boolean isError) {
         if (Boolean.TRUE.equals(isError)) {
             if (!passwordField.getStyleClass().contains(UiConstants.STYLE_PASSWORD_FIELD_ERROR)) {
@@ -224,6 +253,9 @@ public class LoginController {
         }
     }
 
+    /**
+     * Toggles password-field visibility and keeps caret/focus behavior consistent.
+     */
     private void handleTogglePassword() {
         viewModel.togglePasswordVisibility();
         boolean visible = viewModel.passwordVisibleProperty().get();
@@ -272,15 +304,28 @@ public class LoginController {
         loginThread.start();
     }
 
+    /**
+     * Executes the login request on a background thread.
+     */
     private void performLoginTask() {
         LoginService.LoginResult result = loginService.login(buildLoginCommand());
         handleLoginResult(result);
     }
 
+    /**
+     * Creates a login command from current view-model credentials.
+     *
+     * @return login command containing email and password input values
+     */
     LoginService.LoginCommand buildLoginCommand() {
         return new LoginService.LoginCommand(viewModel.getEmail(), viewModel.getPassword());
     }
 
+    /**
+     * Routes login result variants to specialized handlers.
+     *
+     * @param result login result returned by the service layer
+     */
     private void handleLoginResult(LoginService.LoginResult result) {
         if (result instanceof LoginService.LoginResult.Success) {
             handleLoginSuccess();
@@ -297,6 +342,9 @@ public class LoginController {
         handleLoginError("Connection failed. Please try again.");
     }
 
+    /**
+     * Handles successful authentication by navigating to the main screen.
+     */
     private void handleLoginSuccess() {
         javafx.application.Platform.runLater(() -> {
             viewModel.loadingProperty().set(false);
@@ -307,6 +355,11 @@ public class LoginController {
         });
     }
 
+    /**
+     * Handles explicit credential rejection from backend.
+     *
+     * @param errorMsg rejection reason text
+     */
     private void handleRejectedLoginResponse(String errorMsg) {
         javafx.application.Platform.runLater(() -> {
             viewModel.loadingProperty().set(false);
@@ -316,6 +369,12 @@ public class LoginController {
         });
     }
 
+    /**
+     * Handles service failure results and special-cases secure-session bootstrap
+     * failures.
+     *
+     * @param message failure message returned by the login service
+     */
     private void handleFailureResult(String message) {
         if ("Failed to initialize secure session locally.".equals(message)) {
             handleSecureSessionInitializationError();
@@ -324,6 +383,10 @@ public class LoginController {
         handleLoginError(message);
     }
 
+    /**
+     * Updates UI for secure-session initialization failure after successful
+     * credential validation.
+     */
     private void handleSecureSessionInitializationError() {
         javafx.application.Platform.runLater(() -> {
             viewModel.loadingProperty().set(false);
@@ -333,6 +396,9 @@ public class LoginController {
         });
     }
 
+    /**
+     * Loads remember-me preferences and restores saved email when enabled.
+     */
     private void loadPreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
         boolean remember = prefs.getBoolean(PREF_REMEMBER, false);
@@ -344,6 +410,9 @@ public class LoginController {
         }
     }
 
+    /**
+     * Persists remember-me choice and associated email.
+     */
     private void savePreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
         if (viewModel.isRememberCredentials()) {
@@ -355,6 +424,11 @@ public class LoginController {
         }
     }
 
+    /**
+     * Applies generic login error state to the UI.
+     *
+     * @param message error message to display
+     */
     private void handleLoginError(String message) {
         javafx.application.Platform.runLater(() -> {
             viewModel.loadingProperty().set(false);
@@ -423,6 +497,9 @@ public class LoginController {
         shake.play();
     }
 
+    /**
+     * Shakes currently invalid input fields for visual validation feedback.
+     */
     private void shakeInvalidFields() {
         if (viewModel.emailErrorProperty().get()) {
             shakeNode(emailField.getParent());
@@ -432,6 +509,9 @@ public class LoginController {
         }
     }
 
+    /**
+     * Shows an exit confirmation popup and terminates the process on confirm.
+     */
     private void confirmExitApplication() {
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)

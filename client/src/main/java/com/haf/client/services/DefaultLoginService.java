@@ -44,16 +44,37 @@ public class DefaultLoginService implements LoginService {
 
     @FunctionalInterface
     interface LoginGateway {
+        /**
+         * Executes the login transport call.
+         *
+         * @param command login command containing credentials
+         * @return HTTP response containing login payload
+         * @throws Exception when transport fails
+         */
         HttpResponse<String> send(LoginCommand command) throws Exception;
     }
 
     @FunctionalInterface
     interface SessionBootstrap {
+        /**
+         * Initializes local secure-session state after successful authentication.
+         *
+         * @param userId authenticated user identifier
+         * @param sessionId authenticated server session id
+         * @param passphrase passphrase used to unlock local key material
+         * @throws Exception when secure session bootstrap fails
+         */
         void initialize(String userId, String sessionId, String passphrase) throws Exception;
     }
 
     @FunctionalInterface
     interface Sleeper {
+        /**
+         * Blocks for the requested retry delay.
+         *
+         * @param millis delay duration in milliseconds
+         * @throws InterruptedException when sleep is interrupted
+         */
         void sleep(long millis) throws InterruptedException;
     }
 
@@ -61,16 +82,33 @@ public class DefaultLoginService implements LoginService {
     private final SessionBootstrap sessionBootstrap;
     private final Sleeper sleeper;
 
+    /**
+     * Creates the default login service using real HTTP/network/bootstrap
+     * dependencies.
+     */
     public DefaultLoginService() {
         this(DefaultLoginService::sendLoginRequest, DefaultLoginService::initializeSecureSession, Thread::sleep);
     }
 
+    /**
+     * Creates a login service with injectable dependencies (primarily for tests).
+     *
+     * @param loginGateway gateway used to submit login requests
+     * @param sessionBootstrap callback used to initialize local secure session
+     * @param sleeper delay strategy for retry backoff
+     */
     DefaultLoginService(LoginGateway loginGateway, SessionBootstrap sessionBootstrap, Sleeper sleeper) {
         this.loginGateway = loginGateway;
         this.sessionBootstrap = sessionBootstrap;
         this.sleeper = sleeper;
     }
 
+    /**
+     * Attempts user login with bounded retries and local secure-session bootstrap.
+     *
+     * @param command login credentials command
+     * @return login result representing success, rejection, or failure
+     */
     @Override
     public LoginResult login(LoginCommand command) {
         CurrentUserSession.clear();
@@ -89,6 +127,14 @@ public class DefaultLoginService implements LoginService {
         return new LoginResult.Failure(CONNECTION_FAILED_MESSAGE);
     }
 
+    /**
+     * Performs a single login attempt and returns a terminal result or
+     * {@code null} to continue retrying.
+     *
+     * @param command normalized login command
+     * @param attempt current attempt number (1-based)
+     * @return attempt result, or {@code null} when caller should retry
+     */
     private LoginResult performAttempt(LoginCommand command, int attempt) {
         try {
             HttpResponse<String> httpResponse = loginGateway.send(command);
@@ -106,6 +152,14 @@ public class DefaultLoginService implements LoginService {
         }
     }
 
+    /**
+     * Initializes local secure session after successful authentication response.
+     *
+     * @param response successful login response payload
+     * @param command login command containing user passphrase
+     * @param attempt current attempt number
+     * @return success/failure result, or {@code null} when caller should retry
+     */
     private LoginResult initializeSessionOrRetry(LoginResponse response, LoginCommand command, int attempt) {
         try {
             sessionBootstrap.initialize(response.getUserId(), response.getSessionId(), command.password());
@@ -130,6 +184,13 @@ public class DefaultLoginService implements LoginService {
         }
     }
 
+    /**
+     * Converts request/transport failures into retry or terminal failure results.
+     *
+     * @param attempt current attempt number
+     * @param error failure caught during request execution
+     * @return failure result, or {@code null} when retry should continue
+     */
     private LoginResult handleRequestFailure(int attempt, Exception error) {
         if (isLastAttempt(attempt)) {
             LOGGER.log(Level.SEVERE, "Login failed", error);
@@ -140,6 +201,11 @@ public class DefaultLoginService implements LoginService {
         return waitBeforeRetry();
     }
 
+    /**
+     * Waits before retrying login.
+     *
+     * @return {@code null} when wait succeeds (caller may retry), otherwise failure result
+     */
     private LoginResult waitBeforeRetry() {
         try {
             sleeper.sleep(LOGIN_RETRY_DELAY_MS);
@@ -150,16 +216,36 @@ public class DefaultLoginService implements LoginService {
         }
     }
 
+    /**
+     * Normalizes nullable login fields to non-null strings.
+     *
+     * @param command raw login command
+     * @return normalized login command safe for downstream processing
+     */
     private static LoginCommand normalize(LoginCommand command) {
         String email = command.email() == null ? "" : command.email();
         String password = command.password() == null ? "" : command.password();
         return new LoginCommand(email, password);
     }
 
+    /**
+     * Determines whether an HTTP/login payload pair represents successful
+     * authentication.
+     *
+     * @param statusCode HTTP status code
+     * @param response parsed login response body
+     * @return {@code true} when authentication succeeded
+     */
     private static boolean isAuthenticated(int statusCode, LoginResponse response) {
         return statusCode == 200 && response != null && response.getError() == null;
     }
 
+    /**
+     * Extracts user-friendly rejection text from login response.
+     *
+     * @param response parsed login response body
+     * @return rejection reason or default login-failed text
+     */
     private static String resolveRejectedMessage(LoginResponse response) {
         if (response != null && response.getError() != null) {
             return response.getError();
@@ -167,10 +253,23 @@ public class DefaultLoginService implements LoginService {
         return LOGIN_FAILED_MESSAGE;
     }
 
+    /**
+     * Checks whether the given attempt is the final allowed attempt.
+     *
+     * @param attempt current attempt number
+     * @return {@code true} when no retries remain
+     */
     private static boolean isLastAttempt(int attempt) {
         return attempt >= MAX_LOGIN_ATTEMPTS;
     }
 
+    /**
+     * Sends the HTTP login request to the server.
+     *
+     * @param command normalized login command
+     * @return HTTP response containing login payload
+     * @throws Exception when request construction, SSL, serialization, or transport fails
+     */
     private static HttpResponse<String> sendLoginRequest(LoginCommand command) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setEmail(command.email());
@@ -190,6 +289,14 @@ public class DefaultLoginService implements LoginService {
         return client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Builds local websocket + messaging session state for authenticated users.
+     *
+     * @param userId authenticated user identifier
+     * @param sessionId authenticated websocket session id
+     * @param passphraseStr passphrase used to unlock local keys
+     * @throws Exception when key/bootstrap/session setup fails
+     */
     private static void initializeSecureSession(String userId, String sessionId, String passphraseStr) throws Exception {
         ClockProvider clockProvider = SystemClockProvider.getInstance();
         char[] passphrase = passphraseStr.toCharArray();
@@ -206,6 +313,14 @@ public class DefaultLoginService implements LoginService {
         ChatSession.set(new MessageViewModel(sender, receiver));
     }
 
+    /**
+     * Fetches a recipient public key from the authenticated directory endpoint.
+     *
+     * @param wsAdapter authenticated websocket adapter used for REST call
+     * @param recipientId recipient identifier to look up
+     * @return PEM-encoded public key, or {@code null} when key is not available
+     * @throws CryptoOperationException when network/json operations fail
+     */
     private static String fetchPublicKey(WebSocketAdapter wsAdapter, String recipientId) {
         try {
             String path = "/api/v1/users/" + recipientId + "/key";

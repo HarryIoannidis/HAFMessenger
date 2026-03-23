@@ -89,9 +89,27 @@ public final class EnvelopeDAO {
                    created_at,
                    expires_at
               FROM message_envelopes
+            WHERE envelope_id IN (%s)
+              AND delivered = FALSE
+              AND expires_at > NOW()
+            """;
+
+    /**
+     * SQL query template for marking multiple envelopes as delivered.
+     * Placeholder %s will be replaced with IN clause placeholders.
+     */
+    private static final String MARK_DELIVERED_BY_IDS_SQL = """
+            UPDATE message_envelopes
+               SET delivered = TRUE
              WHERE envelope_id IN (%s)
-               AND delivered = FALSE
-               AND expires_at > NOW()
+            """;
+
+    /**
+     * SQL query for deleting expired envelopes.
+     */
+    private static final String DELETE_EXPIRED_SQL = """
+            DELETE FROM message_envelopes
+             WHERE expires_at < NOW()
             """;
 
     /**
@@ -234,7 +252,7 @@ public final class EnvelopeDAO {
         }
 
         String placeholders = envelopeIds.stream().map(id -> "?").reduce((a, b) -> a + "," + b).orElse("?");
-        String sql = "UPDATE message_envelopes SET delivered = TRUE WHERE envelope_id IN (" + placeholders + ")";
+        String sql = String.format(MARK_DELIVERED_BY_IDS_SQL, placeholders);
 
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -260,7 +278,7 @@ public final class EnvelopeDAO {
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
 
-            return statement.executeUpdate("DELETE FROM message_envelopes WHERE expires_at < NOW()");
+            return statement.executeUpdate(DELETE_EXPIRED_SQL);
         } catch (SQLException ex) {
             auditLogger.logError("db_delete_expired", null, "system", ex);
 

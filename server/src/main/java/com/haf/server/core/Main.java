@@ -233,6 +233,11 @@ public final class Main {
         return Executors.newScheduledThreadPool(2, factory);
     }
 
+    /**
+     * Blocks the main thread until shutdown is requested.
+     *
+     * @param shutdownLatch latch that is counted down by shutdown hooks/paths
+     */
     private static void awaitShutdown(CountDownLatch shutdownLatch) {
         try {
             shutdownLatch.await();

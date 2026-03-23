@@ -52,16 +52,27 @@ public class ProfileController {
     private double yOffset;
     private UserProfileInfo profile;
 
+    /**
+     * Initializes profile popup window controls.
+     */
     @FXML
     public void initialize() {
         setupWindowControls();
     }
 
+    /**
+     * Displays profile details in the popup.
+     *
+     * @param profile profile information to render
+     */
     public void showProfile(UserProfileInfo profile) {
         this.profile = profile;
         applyProfile();
     }
 
+    /**
+     * Applies loaded profile data into UI fields and action visibility.
+     */
     private void applyProfile() {
         if (profile == null) {
             return;
@@ -79,6 +90,11 @@ public class ProfileController {
         configureSelfActionVisibility(showSelfActions);
     }
 
+    /**
+     * Toggles visibility of self-profile action buttons.
+     *
+     * @param visible whether self action buttons should be visible
+     */
     private void configureSelfActionVisibility(boolean visible) {
         if (requestEditButton != null) {
             requestEditButton.setVisible(visible);
@@ -92,6 +108,11 @@ public class ProfileController {
         }
     }
 
+    /**
+     * Displays a placeholder popup for not-yet-implemented profile actions.
+     *
+     * @param actionLabel action name displayed in popup/log output
+     */
     private void showStubDialog(String actionLabel) {
         LOGGER.log(Level.INFO, "{0} clicked.", actionLabel);
         PopupMessageBuilder.create()
@@ -103,6 +124,9 @@ public class ProfileController {
                 .show();
     }
 
+    /**
+     * Wires stage controls and draggable title bar behavior.
+     */
     private void setupWindowControls() {
         Platform.runLater(() -> {
             Stage stage = resolveStage();
@@ -129,6 +153,11 @@ public class ProfileController {
         });
     }
 
+    /**
+     * Resolves the popup stage hosting this controller.
+     *
+     * @return host stage, or {@code null} when scene/window is unavailable
+     */
     private Stage resolveStage() {
         if (rootContainer == null || rootContainer.getScene() == null || rootContainer.getScene().getWindow() == null) {
             return null;
@@ -136,6 +165,12 @@ public class ProfileController {
         return (Stage) rootContainer.getScene().getWindow();
     }
 
+    /**
+     * Formats user id values for display.
+     *
+     * @param value raw user id
+     * @return formatted id (prefixed with {@code #}) or a placeholder when blank
+     */
     private static String formatUserId(String value) {
         if (value == null || value.isBlank()) {
             return MISSING_VALUE;
@@ -143,6 +178,12 @@ public class ProfileController {
         return "#" + value;
     }
 
+    /**
+     * Formats optional text values for display.
+     *
+     * @param value raw value
+     * @return original value, or placeholder when blank
+     */
     private static String formatValue(String value) {
         if (value == null || value.isBlank()) {
             return MISSING_VALUE;

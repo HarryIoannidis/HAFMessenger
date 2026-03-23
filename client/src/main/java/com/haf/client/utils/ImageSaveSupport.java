@@ -13,9 +13,23 @@ public final class ImageSaveSupport {
 
     private static final String DEFAULT_IMAGE_NAME = "image-preview.png";
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private ImageSaveSupport() {
     }
 
+    /**
+     * Resolves the best filename suggestion for save dialogs.
+     *
+     * Resolution order: explicit preferred name, filename derived from source
+     * URI/path, then a default fallback.
+     *
+     * @param preferredName  explicit filename preferred by caller
+     * @param imageUriOrPath source image URI/path used as fallback for filename
+     *                       extraction
+     * @return sanitized filename suggestion that can be displayed by file choosers
+     */
     public static String resolveSuggestedFileName(String preferredName, String imageUriOrPath) {
         String preferred = sanitizeFileName(preferredName);
         if (preferred != null) {
@@ -30,6 +44,17 @@ public final class ImageSaveSupport {
         return DEFAULT_IMAGE_NAME;
     }
 
+    /**
+     * Attempts to resolve a local filesystem {@link Path} from the provided image
+     * source.
+     *
+     * Supports both {@code file://} URIs and plain filesystem paths, returning only
+     * existing files.
+     *
+     * @param imageUriOrPath source image URI or local path string
+     * @return existing local path, or {@code null} when the source is
+     *         invalid/non-local
+     */
     public static Path resolveLocalSourcePath(String imageUriOrPath) {
         if (imageUriOrPath == null || imageUriOrPath.isBlank()) {
             return null;
@@ -53,6 +78,12 @@ public final class ImageSaveSupport {
         }
     }
 
+    /**
+     * Resolves the preferred downloads target directory for save dialogs.
+     *
+     * @return user's {@code Downloads} folder when present, otherwise the home
+     *         directory
+     */
     public static Path resolveDownloadsDirectory() {
         Path home = Path.of(System.getProperty("user.home"));
         Path downloads = home.resolve("Downloads");
@@ -62,6 +93,13 @@ public final class ImageSaveSupport {
         return home;
     }
 
+    /**
+     * Configures a {@link FileChooser} for image-export workflows.
+     *
+     * @param chooser           chooser instance to configure
+     * @param suggestedFileName preferred output filename
+     * @param imageUriOrPath    source URI/path used for filename inference fallback
+     */
     public static void configureImageSaveChooser(
             FileChooser chooser,
             String suggestedFileName,
@@ -79,6 +117,13 @@ public final class ImageSaveSupport {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("All Files", "*.*"));
     }
 
+    /**
+     * Configures a generic save chooser for non-image attachments.
+     *
+     * @param chooser           chooser instance to configure
+     * @param suggestedFileName preferred output filename
+     * @param sourceUriOrPath   source URI/path used for filename inference fallback
+     */
     public static void configureSaveChooser(
             FileChooser chooser,
             String suggestedFileName,
@@ -89,6 +134,12 @@ public final class ImageSaveSupport {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("All Files", "*.*"));
     }
 
+    /**
+     * Applies common file chooser settings (filename + initial directory).
+     *
+     * @param chooser   chooser instance to configure
+     * @param finalName resolved filename to prefill
+     */
     private static void configureChooserBase(FileChooser chooser, String finalName) {
         if (chooser == null) {
             return;
@@ -100,6 +151,13 @@ public final class ImageSaveSupport {
         }
     }
 
+    /**
+     * Extracts a filename candidate from a URI/path source string.
+     *
+     * @param imageUriOrPath source URI/path
+     * @return sanitized filename candidate, or {@code null} when none can be
+     *         derived
+     */
     private static String deriveFileNameFromSource(String imageUriOrPath) {
         if (imageUriOrPath == null || imageUriOrPath.isBlank()) {
             return null;
@@ -129,6 +187,12 @@ public final class ImageSaveSupport {
         return null;
     }
 
+    /**
+     * Validates and sanitizes a raw filename string.
+     *
+     * @param value candidate filename
+     * @return trimmed filename, or {@code null} when invalid/unsafe
+     */
     private static String sanitizeFileName(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -140,6 +204,13 @@ public final class ImageSaveSupport {
         return trimmed;
     }
 
+    /**
+     * Returns a known image extension for the provided filename.
+     *
+     * @param fileName filename to inspect
+     * @return one of supported image extensions (including dot), or {@code null} if
+     *         unknown
+     */
     private static String extensionFromName(String fileName) {
         if (fileName == null) {
             return null;

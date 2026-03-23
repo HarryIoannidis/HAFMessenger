@@ -260,6 +260,14 @@ public class WebSocketAdapter {
                 });
     }
 
+    /**
+     * Validates HTTP response status for authenticated REST helpers.
+     *
+     * @param response HTTP response received from the server
+     * @param method   HTTP method name used for error messaging
+     * @return response body when status is successful (2xx)
+     * @throws HttpCommunicationException when status code is non-successful
+     */
     private String validateResponse(HttpResponse<String> response, String method) {
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             return response.body();
@@ -269,6 +277,14 @@ public class WebSocketAdapter {
                 response.statusCode(), response.body());
     }
 
+    /**
+     * Detects recoverable connection-level errors used to trigger a one-time HTTP
+     * retry.
+     *
+     * @param error throwable chain from async HTTP completion
+     * @return {@code true} when throwable chain contains connect/closed-channel
+     *         failures
+     */
     private static boolean isConnectionError(Throwable error) {
         Throwable cause = error;
         while (cause != null) {
@@ -281,8 +297,19 @@ public class WebSocketAdapter {
         return false;
     }
 
+    /**
+     * Creates the websocket listener used for open/text/error/close/pong events.
+     *
+     * @return listener instance bound to this adapter's callback fields
+     */
     private WebSocket.Listener createWebSocketListener() {
         return new WebSocket.Listener() {
+
+            /**
+             * Marks adapter as connected and starts heartbeat tracking.
+             *
+             * @param webSocket newly opened websocket connection
+             */
             @Override
             public void onOpen(WebSocket webSocket) {
                 isConnected = true;
@@ -293,12 +320,26 @@ public class WebSocketAdapter {
                 startHeartbeat();
             }
 
+            /**
+             * Handles inbound text frames from the websocket.
+             *
+             * @param webSocket websocket connection delivering the frame
+             * @param data      frame payload chunk
+             * @param last      whether this chunk is the final fragment
+             * @return completion stage delegated to default listener behavior
+             */
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
                 handleIncomingText(webSocket, data, last);
                 return WebSocket.Listener.super.onText(webSocket, data, last);
             }
 
+            /**
+             * Handles websocket transport errors and triggers reconnect policy.
+             *
+             * @param webSocket websocket that raised the error
+             * @param error     transport error
+             */
             @Override
             public void onError(WebSocket webSocket, Throwable error) {
                 isConnected = false;
@@ -309,6 +350,14 @@ public class WebSocketAdapter {
                 scheduleReconnect();
             }
 
+            /**
+             * Handles websocket close events and schedules reconnect attempts.
+             *
+             * @param webSocket  websocket that closed
+             * @param statusCode websocket close status code
+             * @param reason     close reason text
+             * @return completion stage delegated to default listener behavior
+             */
             @Override
             public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
                 isConnected = false;
@@ -318,6 +367,13 @@ public class WebSocketAdapter {
                 return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
             }
 
+            /**
+             * Updates last-pong timestamp used by heartbeat stale-connection checks.
+             *
+             * @param webSocket websocket that received pong
+             * @param message   pong payload
+             * @return completion stage delegated to default listener behavior
+             */
             @Override
             public CompletionStage<?> onPong(WebSocket webSocket, java.nio.ByteBuffer message) {
                 lastPongAtNanos = System.nanoTime();
@@ -326,6 +382,13 @@ public class WebSocketAdapter {
         };
     }
 
+    /**
+     * Handles fragmented websocket text frames and dispatches complete messages.
+     *
+     * @param webSocket active websocket
+     * @param data      incoming frame fragment
+     * @param last      whether this frame is the final fragment of the message
+     */
     private void handleIncomingText(WebSocket webSocket, CharSequence data, boolean last) {
         try {
             if (data != null) {
@@ -343,10 +406,20 @@ public class WebSocketAdapter {
         }
     }
 
+    /**
+     * Checks if adding a frame would exceed the inbound message size guard.
+     *
+     * @param data incoming frame data
+     * @return {@code true} when message exceeds configured max inbound bytes
+     */
     private boolean isMessageOversize(CharSequence data) {
         return inboundBuffer.length() + data.length() > MAX_INBOUND_MESSAGE_BYTES;
     }
 
+    /**
+     * Handles oversize inbound messages by clearing state and notifying error
+     * callback.
+     */
     private void handleOversizeError() {
         inboundBuffer.setLength(0);
         if (errorConsumer != null) {
@@ -354,6 +427,9 @@ public class WebSocketAdapter {
         }
     }
 
+    /**
+     * Finalizes current inbound buffer as a full message and dispatches it.
+     */
     private void processCompleteMessage() {
         String message = inboundBuffer.toString();
         inboundBuffer.setLength(0);
@@ -362,6 +438,11 @@ public class WebSocketAdapter {
         }
     }
 
+    /**
+     * Invokes the configured message consumer with protective error handling.
+     *
+     * @param message complete inbound message payload
+     */
     private void notifyMessageConsumer(String message) {
         try {
             messageConsumer.accept(message);
@@ -486,6 +567,9 @@ public class WebSocketAdapter {
         }
     }
 
+    /**
+     * Sends periodic ping frames and marks stale connections for reconnection.
+     */
     private void heartbeatTask() {
         try {
             WebSocket ws = webSocket;
@@ -505,6 +589,11 @@ public class WebSocketAdapter {
         }
     }
 
+    /**
+     * Force-aborts the underlying websocket transport.
+     *
+     * @param ws websocket to abort
+     */
     private void abortWebSocket(WebSocket ws) {
         try {
             if (ws != null) {

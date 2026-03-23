@@ -16,6 +16,11 @@ public final class FixedClockProvider implements ClockProvider {
         this.fixedTimeMillis = fixedTimeMillis;
     }
 
+    /**
+     * Returns the fixed timestamp configured for this provider.
+     *
+     * @return fixed epoch milliseconds value
+     */
     @Override
     public long currentTimeMillis() {
         return fixedTimeMillis;
@@ -30,4 +35,3 @@ public final class FixedClockProvider implements ClockProvider {
         return fixedTimeMillis;
     }
 }
-

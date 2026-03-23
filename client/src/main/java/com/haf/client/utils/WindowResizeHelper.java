@@ -23,6 +23,9 @@ public final class WindowResizeHelper {
     private static double minWidth = FALLBACK_MIN_WIDTH;
     private static double minHeight = FALLBACK_MIN_HEIGHT;
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private WindowResizeHelper() {
         // Utility class
     }
@@ -72,6 +75,12 @@ public final class WindowResizeHelper {
         scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> handleMouseReleased(e, scene));
     }
 
+    /**
+     * Updates the cursor when hovering near resizable edges.
+     *
+     * @param e     mouse move event
+     * @param stage stage being resized
+     */
     private static void handleMouseMoved(MouseEvent e, Stage stage) {
         if (resizing) {
             return;
@@ -80,6 +89,12 @@ public final class WindowResizeHelper {
         stage.getScene().setCursor(cursor);
     }
 
+    /**
+     * Captures starting geometry when edge-resize begins.
+     *
+     * @param e     mouse press event
+     * @param stage stage being resized
+     */
     private static void handleMousePressed(MouseEvent e, Stage stage) {
         detectEdges(e, stage);
         resizing = left || right || top || bottom;
@@ -110,6 +125,12 @@ public final class WindowResizeHelper {
         }
     }
 
+    /**
+     * Applies dynamic width/height updates while dragging a resize edge.
+     *
+     * @param e     mouse drag event
+     * @param stage stage being resized
+     */
     private static void handleMouseDragged(MouseEvent e, Stage stage) {
         if (!resizing) {
             return;
@@ -151,6 +172,12 @@ public final class WindowResizeHelper {
         stage.setY(newY);
     }
 
+    /**
+     * Resets resize state and cursor after the mouse is released.
+     *
+     * @param e     mouse release event
+     * @param scene scene whose cursor is controlled during resizing
+     */
     private static void handleMouseReleased(MouseEvent e, Scene scene) {
         if (resizing) {
             resizing = false;
@@ -163,6 +190,12 @@ public final class WindowResizeHelper {
         }
     }
 
+    /**
+     * Detects which stage edges are currently active for resizing.
+     *
+     * @param e     current mouse event
+     * @param stage stage being resized
+     */
     private static void detectEdges(MouseEvent e, Stage stage) {
         double x = e.getSceneX();
         double y = e.getSceneY();
@@ -175,6 +208,14 @@ public final class WindowResizeHelper {
         bottom = y > h - BORDER;
     }
 
+    /**
+     * Resolves the cursor shape for the current edge/corner hover position.
+     *
+     * @param e     current mouse event
+     * @param stage stage being resized
+     * @return cursor indicating resize direction, or {@link Cursor#DEFAULT} when
+     *         outside resize zones
+     */
     private static Cursor detectEdgeCursor(MouseEvent e, Stage stage) {
         double x = e.getSceneX();
         double y = e.getSceneY();

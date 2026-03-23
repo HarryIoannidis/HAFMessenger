@@ -71,6 +71,20 @@ import javax.crypto.spec.SecretKeySpec;
 @SuppressWarnings("java:S1075")
 public final class HttpIngressServer {
 
+    private HttpsServer server;
+    private final ServerConfig config;
+    private final MailboxRouter mailboxRouter;
+    private final RateLimiterService rateLimiterService;
+    private final AuditLogger auditLogger;
+    private final MetricsRegistry metricsRegistry;
+    private final EncryptedMessageValidator validator;
+    private final UserDAO userDAO;
+    private final SessionDAO sessionDAO;
+    private final FileUploadDAO fileUploadDAO;
+    private final AttachmentDAO attachmentDAO;
+    private final ContactDAO contactDAO;
+    private final PresenceRegistry presenceRegistry;
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
     private static final String MESSAGES_PATH = "/api/v1/messages";
     private static final String REGISTER_PATH = "/api/v1/register";
@@ -116,22 +130,16 @@ public final class HttpIngressServer {
             CryptoConstants.ARGON2_OUTPUT_LENGTH,
             com.password4j.types.Argon2.ID);
 
-    private final ServerConfig config;
-    private final MailboxRouter mailboxRouter;
-    private final RateLimiterService rateLimiterService;
-    private final AuditLogger auditLogger;
-    private final MetricsRegistry metricsRegistry;
-    private final EncryptedMessageValidator validator;
-    private final UserDAO userDAO;
-    private final SessionDAO sessionDAO;
-    private final FileUploadDAO fileUploadDAO;
-    private final AttachmentDAO attachmentDAO;
-    private final ContactDAO contactDAO;
-    private final PresenceRegistry presenceRegistry;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
-
-    private HttpsServer server;
-
+    /**
+     * Pushes contact presence to all active requester connections after contact
+     * mutations.
+     *
+     * @param presenceRegistry presence registry used for active lookups
+     * @param auditLogger      logger used for push-failure diagnostics
+     * @param requestId        request identifier
+     * @param callerId         requester user id
+     * @param contactId        contact user id whose presence should be emitted
+     */
     static void pushContactPresenceToRequester(PresenceRegistry presenceRegistry,
             AuditLogger auditLogger,
             String requestId,
@@ -156,10 +164,24 @@ public final class HttpIngressServer {
         }
     }
 
+    /**
+     * Builds compact presence JSON payload.
+     *
+     * @param userId user id to include
+     * @param active active flag value
+     * @return serialized JSON payload
+     */
     static String presenceJson(String userId, boolean active) {
         return "{\"type\":\"presence\",\"userId\":\"" + escapeJson(userId) + "\",\"active\":" + active + "}";
     }
 
+    /**
+     * Checks whether a login attempt is duplicate based on active presence state.
+     *
+     * @param presenceRegistry presence registry
+     * @param userId           user attempting login
+     * @return {@code true} when user already has active presence
+     */
     static boolean isDuplicateLoginAttempt(PresenceRegistry presenceRegistry, String userId) {
         if (presenceRegistry == null || userId == null || userId.isBlank()) {
             return false;
@@ -167,6 +189,12 @@ public final class HttpIngressServer {
         return presenceRegistry.isActive(userId);
     }
 
+    /**
+     * Escapes a string for safe JSON literal embedding.
+     *
+     * @param value raw input value
+     * @return escaped value or empty string for {@code null}
+     */
     static String escapeJson(String value) {
         if (value == null) {
             return "";
@@ -223,6 +251,11 @@ public final class HttpIngressServer {
     private HttpsServer createServer(SSLContext sslContext) throws IOException {
         HttpsServer httpsServer = HttpsServer.create(new InetSocketAddress(config.getHttpPort()), 0);
         httpsServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
+            /**
+             * Applies strict TLS protocol/cipher restrictions on the HTTPS server endpoint.
+             *
+             * @param params mutable HTTPS parameters for the connection
+             */
             @Override
             public void configure(HttpsParameters params) {
                 SSLParameters sslParameters = sslContext.getDefaultSSLParameters();
@@ -416,6 +449,13 @@ public final class HttpIngressServer {
      */
     private final class RegistrationHandler implements HttpHandler {
 
+        /**
+         * Handles user registration requests including validation, duplication checks,
+         * and persistence.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when I/O operations fail
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -472,6 +512,12 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Validates required registration fields and basic constraints.
+         *
+         * @param r registration request payload
+         * @return validation error message, or {@code null} when payload is valid
+         */
         private String validateRegistration(RegisterRequest r) {
             if (isBlank(r.getFullName()))
                 return "fullName is required";
@@ -502,10 +548,23 @@ public final class HttpIngressServer {
             return fileUploadDAO.insert(dto, userId);
         }
 
+        /**
+         * Checks whether a string is null or blank.
+         *
+         * @param value string value to test
+         * @return {@code true} when value is null/blank
+         */
         private boolean isBlank(String value) {
             return value == null || value.isBlank();
         }
 
+        /**
+         * Reads request body with hard byte-limit enforcement.
+         *
+         * @param body request body stream
+         * @return UTF-8 decoded body text
+         * @throws IOException when read fails or body exceeds configured limit
+         */
         private String readBody(InputStream body) throws IOException {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[4096];
@@ -521,6 +580,11 @@ public final class HttpIngressServer {
             return buffer.toString(StandardCharsets.UTF_8);
         }
 
+        /**
+         * Applies baseline security headers for registration responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -528,6 +592,15 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response with request id propagation.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request id for tracing
+         * @param status    HTTP status code
+         * @param body      JSON body
+         * @throws IOException when response write fails
+         */
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             Headers responseHeaders = exchange.getResponseHeaders();
@@ -559,6 +632,13 @@ public final class HttpIngressServer {
      */
     private final class LoginHandler implements HttpHandler {
 
+        /**
+         * Handles login requests, credential verification, account-status checks, and
+         * session creation.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when I/O operations fail
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -634,10 +714,23 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Checks whether a string is null or blank.
+         *
+         * @param value string value to test
+         * @return {@code true} when value is null/blank
+         */
         private boolean isBlank(String value) {
             return value == null || value.isBlank();
         }
 
+        /**
+         * Reads request body with hard byte-limit enforcement.
+         *
+         * @param body request body stream
+         * @return UTF-8 decoded body text
+         * @throws IOException when read fails or body exceeds configured limit
+         */
         private String readBody(InputStream body) throws IOException {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[4096];
@@ -653,6 +746,11 @@ public final class HttpIngressServer {
             return buffer.toString(StandardCharsets.UTF_8);
         }
 
+        /**
+         * Applies baseline security headers for login responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -660,6 +758,15 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response with request id propagation.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request id for tracing
+         * @param status    HTTP status code
+         * @param body      JSON body
+         * @throws IOException when response write fails
+         */
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             Headers responseHeaders = exchange.getResponseHeaders();
@@ -682,6 +789,12 @@ public final class HttpIngressServer {
      */
     private final class LogoutHandler implements HttpHandler {
 
+        /**
+         * Handles logout by revoking the caller session token.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response writing fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -717,6 +830,11 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Applies baseline security headers for logout responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -724,6 +842,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for logout endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -740,6 +866,12 @@ public final class HttpIngressServer {
      */
     private final class AdminKeyHandler implements HttpHandler {
 
+        /**
+         * Handles public admin-key fetch requests.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response writing fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             exchange.getResponseHeaders().add(X_REQUEST_ID, UUID.randomUUID().toString());
@@ -759,6 +891,11 @@ public final class HttpIngressServer {
             exchange.close();
         }
 
+        /**
+         * Applies baseline security headers for admin-key responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -766,6 +903,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for admin-key endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -781,6 +926,12 @@ public final class HttpIngressServer {
      */
     private final class UserKeyHandler implements HttpHandler {
 
+        /**
+         * Handles user public-key lookup by path {@code /api/v1/users/{userId}/key}.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response writing fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -829,6 +980,11 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Applies baseline security headers for key-lookup responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -836,6 +992,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for key-lookup endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -858,6 +1022,12 @@ public final class HttpIngressServer {
         private static final String INVALID_CURSOR = "invalid cursor";
         private static final String INVALID_QUERY_PARAMS = "invalid query parameters";
 
+        /**
+         * Handles authenticated user search with keyset pagination and signed cursors.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response writing fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -950,7 +1120,8 @@ public final class HttpIngressServer {
                                 r.joinedDate()))
                         .toList();
                 String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
-                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
+                sendPlain(exchange, 200,
+                        JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
             } catch (Exception ex) {
                 auditLogger.logError("search_error", requestId, callerId, ex, Map.of(
                         "queryLength", normalizedQuery.length(),
@@ -961,6 +1132,13 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Resolves effective page limit from query string and configured bounds.
+         *
+         * @param rawLimit raw {@code limit} parameter
+         * @return bounded page size
+         * @throws IllegalArgumentException when raw limit is not numeric
+         */
         private int resolveLimit(String rawLimit) {
             if (rawLimit == null || rawLimit.isBlank()) {
                 return config.getSearchPageSize();
@@ -973,7 +1151,12 @@ public final class HttpIngressServer {
             }
         }
 
-
+        /**
+         * Parses URL query parameters into a first-value-wins map.
+         *
+         * @param rawQuery raw query string (without leading {@code ?})
+         * @return decoded query parameter map
+         */
         private Map<String, String> parseQueryParams(String rawQuery) {
             Map<String, String> params = new HashMap<>();
             if (rawQuery == null || rawQuery.isBlank()) {
@@ -995,6 +1178,14 @@ public final class HttpIngressServer {
             return params;
         }
 
+        /**
+         * Decodes and validates signed cursor token.
+         *
+         * @param cursorToken cursor token from query string
+         * @return cursor key values or empty cursor when token is blank
+         * @throws IllegalArgumentException when cursor is malformed or signature is
+         *                                  invalid
+         */
         private CursorKey decodeCursor(String cursorToken) {
             if (cursorToken == null || cursorToken.isBlank()) {
                 return CursorKey.empty();
@@ -1027,6 +1218,13 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Encodes cursor components into signed token.
+         *
+         * @param fullName last full-name key
+         * @param userId   last user-id key
+         * @return encoded cursor token or {@code null} when inputs are incomplete
+         */
         private String encodeCursor(String fullName, String userId) {
             if (fullName == null || userId == null) {
                 return null;
@@ -1048,6 +1246,13 @@ public final class HttpIngressServer {
                     .encodeToString(cursorPayload.getBytes(StandardCharsets.UTF_8));
         }
 
+        /**
+         * Computes HMAC signature for cursor payload.
+         *
+         * @param payload unsigned cursor payload
+         * @return signature bytes
+         * @throws IllegalStateException when signing fails
+         */
         private byte[] hmac(String payload) {
             try {
                 Mac mac = Mac.getInstance(CURSOR_HMAC_ALGO);
@@ -1059,6 +1264,13 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Computes SHA-256 hex digest used in search audit logs.
+         *
+         * @param value source value
+         * @return lowercase hex digest
+         * @throws IllegalStateException when SHA-256 is unavailable
+         */
         private static String sha256Hex(String value) {
             try {
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -1074,15 +1286,30 @@ public final class HttpIngressServer {
         }
 
         private record CursorKey(String fullName, String userId) {
+            /**
+             * Creates an empty cursor placeholder.
+             *
+             * @return cursor with null keys
+             */
             static CursorKey empty() {
                 return new CursorKey(null, null);
             }
 
+            /**
+             * Indicates whether cursor carries both pagination keys.
+             *
+             * @return {@code true} when fullName and userId are both present
+             */
             boolean isPresent() {
                 return fullName != null && userId != null;
             }
         }
 
+        /**
+         * Applies baseline security headers for search responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -1090,6 +1317,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for search endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -1105,6 +1340,12 @@ public final class HttpIngressServer {
      */
     private final class HealthHandler implements HttpHandler {
 
+        /**
+         * Handles health checks supporting GET and HEAD.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response write fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             exchange.getResponseHeaders().add(X_REQUEST_ID, UUID.randomUUID().toString());
@@ -1120,6 +1361,11 @@ public final class HttpIngressServer {
             exchange.close();
         }
 
+        /**
+         * Applies baseline security headers for health responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -1127,6 +1373,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for health endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -1144,6 +1398,12 @@ public final class HttpIngressServer {
      */
     private final class ContactsHandler implements HttpHandler {
 
+        /**
+         * Handles authenticated contacts API requests.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response write fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -1183,6 +1443,13 @@ public final class HttpIngressServer {
             }
         }
 
+        /**
+         * Returns current caller contacts with live presence projection.
+         *
+         * @param exchange HTTP exchange
+         * @param callerId authenticated caller id
+         * @throws IOException when response write fails
+         */
         private void handleGet(HttpExchange exchange, String callerId) throws IOException {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResultDTO> results = records.stream()
@@ -1199,6 +1466,15 @@ public final class HttpIngressServer {
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
         }
 
+        /**
+         * Adds a contact for the caller and pushes immediate presence snapshot for the
+         * new contact.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request id for diagnostics
+         * @param callerId  authenticated caller id
+         * @throws IOException when response write fails
+         */
         private void handlePost(HttpExchange exchange, String requestId, String callerId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AddContactRequest request = JsonCodec.fromJson(body, AddContactRequest.class);
@@ -1212,6 +1488,13 @@ public final class HttpIngressServer {
             sendPlain(exchange, 200, "{}");
         }
 
+        /**
+         * Removes a caller contact identified by {@code contactId} query parameter.
+         *
+         * @param exchange HTTP exchange
+         * @param callerId authenticated caller id
+         * @throws IOException when response write fails
+         */
         private void handleDelete(HttpExchange exchange, String callerId) throws IOException {
             String rawQuery = exchange.getRequestURI().getQuery();
             String contactId = "";
@@ -1231,6 +1514,13 @@ public final class HttpIngressServer {
             sendPlain(exchange, 200, "{}");
         }
 
+        /**
+         * Reads request body with hard byte-limit enforcement.
+         *
+         * @param body request body stream
+         * @return UTF-8 decoded body text
+         * @throws IOException when read fails or body exceeds configured limit
+         */
         private String readBody(InputStream body) throws IOException {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[4096];
@@ -1246,6 +1536,11 @@ public final class HttpIngressServer {
             return buffer.toString(StandardCharsets.UTF_8);
         }
 
+        /**
+         * Applies baseline security headers for contacts responses.
+         *
+         * @param headers response headers
+         */
         private void applySecurityHeaders(Headers headers) {
             headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
             headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -1253,6 +1548,14 @@ public final class HttpIngressServer {
             headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
         }
 
+        /**
+         * Sends JSON response for contacts endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param status   HTTP status code
+         * @param body     JSON body
+         * @throws IOException when response write fails
+         */
         private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
@@ -1267,6 +1570,12 @@ public final class HttpIngressServer {
      * Handles authenticated messaging policy fetches.
      */
     private final class MessagingConfigHandler implements HttpHandler {
+        /**
+         * Handles authenticated messaging-policy fetch requests.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response write fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -1304,6 +1613,12 @@ public final class HttpIngressServer {
      * Handles attachment upload/download lifecycle endpoints.
      */
     private final class AttachmentsHandler implements HttpHandler {
+        /**
+         * Handles authenticated attachment lifecycle requests.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response write fails
+         */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String requestId = UUID.randomUUID().toString();
@@ -1336,7 +1651,17 @@ public final class HttpIngressServer {
             }
         }
 
-        private void dispatchRequest(HttpExchange exchange, String callerId, String method, String suffix) throws IOException {
+        /**
+         * Routes attachment request to init/chunk/complete/bind/download handlers.
+         *
+         * @param exchange HTTP exchange
+         * @param callerId authenticated caller id
+         * @param method   HTTP method
+         * @param suffix   path suffix under attachments root
+         * @throws IOException when response write fails
+         */
+        private void dispatchRequest(HttpExchange exchange, String callerId, String method, String suffix)
+                throws IOException {
             if ("/init".equals(suffix)) {
                 if (!METHOD_POST.equalsIgnoreCase(method)) {
                     sendJson(exchange, 405, JsonCodec.toJson(AttachmentInitResponse.error(METHOD_NOT_ALLOWED)));
@@ -1371,10 +1696,18 @@ public final class HttpIngressServer {
                 case "chunk" -> handleChunk(exchange, callerId, attachmentId);
                 case "complete" -> handleComplete(exchange, callerId, attachmentId);
                 case "bind" -> handleBind(exchange, callerId, attachmentId);
-                default -> sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                default ->
+                    sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
             }
         }
 
+        /**
+         * Handles upload initialization endpoint.
+         *
+         * @param exchange HTTP exchange
+         * @param callerId authenticated caller id
+         * @throws IOException when response write fails
+         */
         private void handleInit(HttpExchange exchange, String callerId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AttachmentInitRequest request = JsonCodec.fromJson(body, AttachmentInitRequest.class);
@@ -1405,7 +1738,8 @@ public final class HttpIngressServer {
             }
 
             int expectedChunks = request.getExpectedChunks();
-            int computedChunks = (int) Math.ceil(request.getEncryptedSizeBytes() / (double) config.getAttachmentChunkBytes());
+            int computedChunks = (int) Math
+                    .ceil(request.getEncryptedSizeBytes() / (double) config.getAttachmentChunkBytes());
             if (expectedChunks <= 0 || expectedChunks != computedChunks) {
                 throw new IllegalArgumentException("expectedChunks does not match attachment size");
             }
@@ -1423,6 +1757,14 @@ public final class HttpIngressServer {
                             result.expiresAtEpochMs())));
         }
 
+        /**
+         * Handles upload chunk endpoint.
+         *
+         * @param exchange     HTTP exchange
+         * @param callerId     authenticated caller id
+         * @param attachmentId attachment id
+         * @throws IOException when response write fails
+         */
         private void handleChunk(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AttachmentChunkRequest request = JsonCodec.fromJson(body, AttachmentChunkRequest.class);
@@ -1456,6 +1798,14 @@ public final class HttpIngressServer {
                     AttachmentChunkResponse.success(attachmentId, result.chunkIndex(), result.stored())));
         }
 
+        /**
+         * Handles upload completion endpoint.
+         *
+         * @param exchange     HTTP exchange
+         * @param callerId     authenticated caller id
+         * @param attachmentId attachment id
+         * @throws IOException when response write fails
+         */
         private void handleComplete(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AttachmentCompleteRequest request = JsonCodec.fromJson(body, AttachmentCompleteRequest.class);
@@ -1482,6 +1832,14 @@ public final class HttpIngressServer {
                             result.status())));
         }
 
+        /**
+         * Handles attachment bind endpoint.
+         *
+         * @param exchange     HTTP exchange
+         * @param callerId     authenticated caller id
+         * @param attachmentId attachment id
+         * @throws IOException when response write fails
+         */
         private void handleBind(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
             String body = readBody(exchange.getRequestBody());
             AttachmentBindRequest request = JsonCodec.fromJson(body, AttachmentBindRequest.class);
@@ -1500,6 +1858,14 @@ public final class HttpIngressServer {
                             result.expiresAtEpochMs())));
         }
 
+        /**
+         * Handles attachment download endpoint.
+         *
+         * @param exchange     HTTP exchange
+         * @param callerId     authenticated caller id
+         * @param attachmentId attachment id
+         * @throws IOException when response write fails
+         */
         private void handleDownload(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
             AttachmentDAO.DownloadBlob blob = attachmentDAO.loadForRecipient(callerId, attachmentId);
             AttachmentDownloadResponse response = AttachmentDownloadResponse.success(
@@ -1513,6 +1879,12 @@ public final class HttpIngressServer {
             sendJson(exchange, 200, JsonCodec.toJson(response));
         }
 
+        /**
+         * Splits attachment path suffix into path parts.
+         *
+         * @param suffix path suffix after {@code /api/v1/attachments}
+         * @return path segments
+         */
         private String[] splitAttachmentPath(String suffix) {
             if (suffix == null || suffix.isBlank() || "/".equals(suffix)) {
                 return new String[0];
@@ -1524,6 +1896,13 @@ public final class HttpIngressServer {
             return trimmed.split("/");
         }
 
+        /**
+         * Reads request body with hard byte-limit enforcement.
+         *
+         * @param body request body stream
+         * @return UTF-8 decoded body text
+         * @throws IOException when read fails or body exceeds configured limit
+         */
         private String readBody(InputStream body) throws IOException {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[4096];
@@ -1540,6 +1919,14 @@ public final class HttpIngressServer {
         }
     }
 
+    /**
+     * Authenticates caller from bearer session token.
+     *
+     * @param exchange HTTP exchange
+     * @return caller user id, or {@code null} when authentication fails (response
+     *         already written)
+     * @throws IOException when error response cannot be written
+     */
     private String authenticateCaller(HttpExchange exchange) throws IOException {
         String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
@@ -1556,11 +1943,22 @@ public final class HttpIngressServer {
         return callerId;
     }
 
+    /**
+     * Builds standard JSON error payload with escaped message.
+     *
+     * @param message error message
+     * @return JSON error object string
+     */
     private String jsonError(String message) {
         String safe = message == null ? INTERNAL_SERVER_ERROR : message.replace("\"", "\\\"");
         return JSON_ERROR_PREFIX + safe + JSON_ERROR_SUFFIX;
     }
 
+    /**
+     * Applies baseline security headers for shared handler helpers.
+     *
+     * @param headers response headers
+     */
     private void applySecurityHeaders(Headers headers) {
         headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
         headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
@@ -1568,7 +1966,14 @@ public final class HttpIngressServer {
         headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
     }
 
-
+    /**
+     * Sends JSON response body for shared handler helpers.
+     *
+     * @param exchange HTTP exchange
+     * @param status   HTTP status code
+     * @param body     JSON body
+     * @throws IOException when response write fails
+     */
     private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
         byte[] payload = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
