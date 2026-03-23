@@ -11,13 +11,13 @@ import com.haf.client.network.WebSocketAdapter;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.viewmodels.MessageViewModel;
 import com.haf.shared.exceptions.CryptoOperationException;
+import com.haf.shared.exceptions.JsonCodecException;
 import com.haf.shared.requests.LoginRequest;
 import com.haf.shared.responses.LoginResponse;
 import com.haf.shared.responses.PublicKeyResponse;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.SystemClockProvider;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -218,7 +218,7 @@ public class DefaultLoginService implements LoginService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new CryptoOperationException("Directory service fetch interrupted", e);
-        } catch (ExecutionException | com.haf.shared.exceptions.JsonCodecException e) {
+        } catch (ExecutionException | JsonCodecException e) {
             throw new CryptoOperationException("Directory service fetch failed", e);
         }
     }

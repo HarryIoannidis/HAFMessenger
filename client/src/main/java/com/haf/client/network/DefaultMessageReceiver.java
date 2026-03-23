@@ -5,6 +5,7 @@ import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.exceptions.MessageExpiredException;
 import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
@@ -133,13 +134,13 @@ public class DefaultMessageReceiver implements MessageReceiver {
             if (messageListener != null) {
                 messageListener.onError(e);
             }
-        } catch (com.haf.shared.exceptions.KeystoreOperationException e) {
+        } catch (KeystoreOperationException e) {
             LOGGER.log(Level.WARNING, "Keystore decryption failed: {0}", e.getMessage());
             if (messageListener != null) {
                 messageListener.onError(
                         new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
             }
-        } catch (com.haf.shared.exceptions.MessageValidationException | MessageExpiredException e) {
+        } catch (MessageValidationException | MessageExpiredException e) {
             LOGGER.log(Level.FINE, "Rejected incoming envelope {0}: {1}", new Object[] { envelopeId, e.getMessage() });
             if (messageListener != null) {
                 messageListener.onError(e);
@@ -186,7 +187,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         // Validate with MessageValidator
         List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
         if (!errors.isEmpty()) {
-            throw new com.haf.shared.exceptions.MessageValidationException(errors);
+            throw new MessageValidationException(errors);
         }
 
         // Check recipient ID matches local recipient
@@ -329,7 +330,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param encryptedMessage the message to validate
      * @throws MessageValidationException if the recipient ID does not match
      */
-    private void validateRecipient(com.haf.shared.dto.EncryptedMessage encryptedMessage)
+    private void validateRecipient(EncryptedMessage encryptedMessage)
             throws MessageValidationException {
         try {
             MessageValidator.validateRecipientOrThrow(localRecipientId, encryptedMessage);

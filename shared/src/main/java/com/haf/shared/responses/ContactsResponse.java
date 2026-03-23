@@ -1,7 +1,6 @@
 package com.haf.shared.responses;
 
 import com.haf.shared.dto.UserSearchResultDTO;
-
 import java.util.List;
 
 public class ContactsResponse {

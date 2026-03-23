@@ -1,9 +1,7 @@
 package com.haf.client.controllers;
 
 import org.junit.jupiter.api.Test;
-
 import java.util.concurrent.CompletableFuture;
-
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;

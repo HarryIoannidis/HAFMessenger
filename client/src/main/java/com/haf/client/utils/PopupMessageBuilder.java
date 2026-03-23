@@ -1,5 +1,7 @@
 package com.haf.client.utils;
 
+import com.haf.client.controllers.PopupMessageController;
+
 /**
  * Fluent builder for reusable popup messages rendered via {@link ViewRouter}.
  */
@@ -90,7 +92,7 @@ public final class PopupMessageBuilder {
         ViewRouter.showPopup(
                 spec.popupKey(),
                 UiConstants.FXML_POPUP_MESSAGE,
-                com.haf.client.controllers.PopupMessageController.class,
+                PopupMessageController.class,
                 controller -> controller.showMessage(spec));
     }
 }

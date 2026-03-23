@@ -3,11 +3,11 @@ package com.haf.shared.utils;
 import com.haf.shared.exceptions.JsonCodecException;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.dto.KeyMetadata;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class JsonCodecTest {
@@ -113,7 +113,7 @@ class JsonCodecTest {
 
   @Test
   void key_metadata_roundtrip_ok() {
-    var meta = new com.haf.shared.dto.KeyMetadata(
+    var meta = new KeyMetadata(
         "key-2025Q4",
         "X25519",
         "ABCD1234EF...FA", // 64-hex in practice
@@ -122,7 +122,7 @@ class JsonCodecTest {
         "CURRENT");
 
     String json = JsonCodec.toJson(meta);
-    var back = JsonCodec.fromJson(json, com.haf.shared.dto.KeyMetadata.class);
+    var back = JsonCodec.fromJson(json, KeyMetadata.class);
 
     assertEquals(meta.keyId(), back.keyId());
     assertEquals(meta.algorithm(), back.algorithm());
@@ -147,7 +147,7 @@ class JsonCodecTest {
         """.formatted("A".repeat(64));
 
     assertThrows(JsonCodecException.class,
-        () -> JsonCodec.fromJson(json, com.haf.shared.dto.KeyMetadata.class));
+        () -> JsonCodec.fromJson(json, KeyMetadata.class));
   }
 
 }

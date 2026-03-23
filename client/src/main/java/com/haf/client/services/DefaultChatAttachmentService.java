@@ -2,7 +2,6 @@ package com.haf.client.services;
 
 import com.haf.client.core.ChatSession;
 import com.haf.client.viewmodels.MessageViewModel;
-
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;

@@ -1,11 +1,11 @@
 package com.haf.client.services;
 
 import com.haf.client.core.CurrentUserSession;
+import com.haf.client.models.UserProfileInfo;
 import com.haf.shared.responses.LoginResponse;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import javax.net.ssl.SSLSession;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -15,7 +15,6 @@ import java.net.http.HttpResponse;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -196,7 +195,7 @@ class DefaultLoginServiceTest {
 
     @Test
     void login_failure_clears_previous_current_user_profile() {
-        CurrentUserSession.set(new com.haf.client.models.UserProfileInfo(
+        CurrentUserSession.set(new UserProfileInfo(
                 "old", "Old", "Rank", "REG", "2025-01-01", "old@haf.gr", "6999999999", true));
         DefaultLoginService service = new DefaultLoginService(
                 command -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),

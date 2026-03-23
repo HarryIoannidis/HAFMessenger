@@ -5,6 +5,7 @@ import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.keystore.KeystoreBootstrap;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.utils.EccKeyIO;
 import java.nio.file.Path;
 import java.security.PublicKey;
 import java.util.List;
@@ -113,7 +114,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         try {
             String pem = directoryServiceFetcher.apply(recipientId);
             if (pem != null) {
-                return com.haf.shared.utils.EccKeyIO.publicFromPem(pem);
+                return EccKeyIO.publicFromPem(pem);
             }
             return null; // Or throw if pem is expected to be non-null when fetcher is present
         } catch (Exception fetchEx) {

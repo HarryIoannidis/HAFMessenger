@@ -16,7 +16,6 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-
 import java.util.Objects;
 import java.util.function.Consumer;
 

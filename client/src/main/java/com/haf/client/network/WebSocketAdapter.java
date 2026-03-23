@@ -17,7 +17,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.exceptions.SslConfigurationException;

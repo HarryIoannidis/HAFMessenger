@@ -3,12 +3,12 @@ package com.haf.shared.keystore;
 import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
-
 import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
 
 public final class KeystoreBootstrap {
 
@@ -71,8 +71,8 @@ public final class KeystoreBootstrap {
         byte[] sealed = KeystoreSealing.sealWithPass(pass, prvPem);
         FilePerms.writeFile600(dir.resolve("private.enc"), sealed);
 
-        String fp = com.haf.shared.utils.FingerprintUtil
-                .sha256Hex(com.haf.shared.utils.EccKeyIO.publicDer(kp.getPublic()));
+        String fp = FingerprintUtil
+                .sha256Hex(EccKeyIO.publicDer(kp.getPublic()));
         KeyMetadata meta = new KeyMetadata(keyId, CryptoConstants.X25519_CURVE, fp, "Primary-" + keyId,
                 System.currentTimeMillis() / 1000, "CURRENT");
         FilePerms.writeFile600(dir.resolve("metadata.json"), JsonCodec.toJson(meta).getBytes(StandardCharsets.UTF_8));

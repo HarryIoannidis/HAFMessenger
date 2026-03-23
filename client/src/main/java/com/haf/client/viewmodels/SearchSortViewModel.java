@@ -2,7 +2,6 @@ package com.haf.client.viewmodels;
 
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.dto.UserSearchResultDTO;
-
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;

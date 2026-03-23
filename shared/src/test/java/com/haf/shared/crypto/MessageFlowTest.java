@@ -8,7 +8,6 @@ import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageFlowTest {

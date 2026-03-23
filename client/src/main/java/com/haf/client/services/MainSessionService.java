@@ -1,7 +1,6 @@
 package com.haf.client.services;
 
 import com.haf.client.viewmodels.MessageViewModel;
-
 import java.util.concurrent.CompletableFuture;
 
 /**

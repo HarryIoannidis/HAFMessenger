@@ -1,7 +1,6 @@
 package com.haf.shared.requests;
 
 import com.haf.shared.dto.EncryptedFileDTO;
-
 import java.io.Serializable;
 
 /**

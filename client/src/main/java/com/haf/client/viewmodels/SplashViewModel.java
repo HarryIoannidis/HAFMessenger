@@ -1,6 +1,8 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.utils.SslContextUtils;
 import com.haf.client.utils.UiConstants;
+import com.haf.shared.constants.CryptoConstants;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -225,10 +227,10 @@ public class SplashViewModel {
             SecureRandom.getInstanceStrong().nextBytes(new byte[16]);
 
             // Verify AES/GCM availability
-            javax.crypto.Cipher.getInstance(com.haf.shared.constants.CryptoConstants.AES_GCM_TRANSFORMATION);
+            javax.crypto.Cipher.getInstance(CryptoConstants.AES_GCM_TRANSFORMATION);
 
             // Verify X25519 (ECDH) availability (Critical for Key Exchange)
-            javax.crypto.KeyAgreement.getInstance(com.haf.shared.constants.CryptoConstants.KEY_AGREEMENT_ALGO);
+            javax.crypto.KeyAgreement.getInstance(CryptoConstants.KEY_AGREEMENT_ALGO);
 
             // Verify SHA-256 availability
             java.security.MessageDigest.getInstance("SHA-256");
@@ -338,7 +340,7 @@ public class SplashViewModel {
 
             javax.net.ssl.SSLContext sslContext;
             try {
-                sslContext = com.haf.client.utils.SslContextUtils.getTrustingSslContext();
+                sslContext = SslContextUtils.getTrustingSslContext();
             } catch (Exception e) {
                 throw new IOException("Failed to initialize SSL context for network check", e);
             }

@@ -6,12 +6,10 @@ import com.haf.client.network.MessageSender;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
 import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

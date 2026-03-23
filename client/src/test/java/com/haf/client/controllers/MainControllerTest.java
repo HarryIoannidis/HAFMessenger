@@ -2,10 +2,8 @@ package com.haf.client.controllers;
 
 import com.haf.client.viewmodels.MainViewModel;
 import org.junit.jupiter.api.Test;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

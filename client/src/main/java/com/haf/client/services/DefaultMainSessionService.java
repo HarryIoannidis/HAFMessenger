@@ -4,7 +4,6 @@ import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.viewmodels.MessageViewModel;
-
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;

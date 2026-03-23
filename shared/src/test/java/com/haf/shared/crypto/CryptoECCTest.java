@@ -2,10 +2,8 @@ package com.haf.shared.crypto;
 
 import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
-
 import javax.crypto.spec.SecretKeySpec;
 import java.security.KeyPair;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class CryptoECCTest {
