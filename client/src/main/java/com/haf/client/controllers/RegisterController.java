@@ -184,14 +184,26 @@ public class RegisterController {
     private double xOffset;
     private double yOffset;
 
+    /**
+     * Creates a register controller using the default registration service.
+     */
     public RegisterController() {
         this(new DefaultRegistrationService());
     }
 
+    /**
+     * Creates a register controller with injected registration service.
+     *
+     * @param registrationService registration service used for backend registration flow
+     */
     RegisterController(RegistrationService registrationService) {
         this.registrationService = Objects.requireNonNull(registrationService, "registrationService");
     }
 
+    /**
+     * Initializes controls, bindings, listeners, drag-drop behavior, and initial
+     * step state.
+     */
     @FXML
     public void initialize() {
         setupRankComboBox();
@@ -203,6 +215,9 @@ public class RegisterController {
         initializeStep();
     }
 
+    /**
+     * Resets UI to the first registration step (credentials).
+     */
     private void initializeStep() {
         // Initial State: Credentials
         currentStep = RegistrationStep.CREDENTIALS;
@@ -271,6 +286,9 @@ public class RegisterController {
         setupValidationErrorListeners();
     }
 
+    /**
+     * Wires field-level listeners that clear validation errors as user edits input.
+     */
     private void setupInputInteractionListeners() {
         // Clear errors when user types in any field
         addClearErrorListener(nameField, UiConstants.STYLE_TEXT_FIELD_ERROR);
@@ -296,6 +314,9 @@ public class RegisterController {
         rankComboBox.valueProperty().addListener((obs, oldVal, newVal) -> viewModel.rankProperty().set(newVal));
     }
 
+    /**
+     * Binds validation flags to UI error styles for each relevant control.
+     */
     private void setupValidationErrorListeners() {
         // Apply error styling reactively for each field
         addErrorStyleListener(viewModel.nameErrorProperty(), nameField, UiConstants.STYLE_TEXT_FIELD_ERROR);
@@ -318,6 +339,9 @@ public class RegisterController {
         addErrorStyleListener(viewModel.rankErrorProperty(), rankComboBox, UiConstants.STYLE_TEXT_FIELD_ERROR);
     }
 
+    /**
+     * Initializes password and confirm-password visibility toggles.
+     */
     private void setupPasswordToggle() {
         // Password Field Toggle
         if (passwordVisibleField != null) {
@@ -340,6 +364,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Toggles visibility of primary password field.
+     */
     private void handleTogglePassword() {
         viewModel.togglePasswordVisibility();
         boolean visible = viewModel.passwordVisibleProperty().get();
@@ -364,6 +391,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Toggles visibility of confirm-password field.
+     */
     private void handleTogglePasswordConf() {
         viewModel.togglePasswordConfVisibility();
         boolean visible = viewModel.passwordConfVisibleProperty().get();
@@ -451,6 +481,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Handles drag/drop photo validation errors and updates error state messaging.
+     */
     private void handlePhotoError() {
         dropZoneContainer.setStyle(UiConstants.STYLE_BORDER_ERROR);
         shakeNode(dropZoneContainer);
@@ -484,6 +517,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Shakes all controls currently marked as invalid by validation flags.
+     */
     private void shakeInvalidFields() {
         if (viewModel.nameErrorProperty().get())
             shakeNode(nameField.getParent());
@@ -505,6 +541,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Starts asynchronous registration execution after final-step validation.
+     */
     private void performRegistration() {
         // Validation passed — attempt registration
         viewModel.loadingProperty().set(true);
@@ -521,11 +560,21 @@ public class RegisterController {
         registrationThread.start();
     }
 
+    /**
+     * Executes service-level registration call in background thread.
+     *
+     * @param originalText register button text to restore after request completes
+     */
     private void executeRegistrationFlow(String originalText) {
         RegistrationService.RegistrationResult result = registrationService.register(buildRegistrationCommand());
         handleRegistrationResult(result, originalText);
     }
 
+    /**
+     * Builds immutable registration command from current form state.
+     *
+     * @return registration command payload consumed by service layer
+     */
     RegistrationService.RegistrationCommand buildRegistrationCommand() {
         return new RegistrationService.RegistrationCommand(
                 viewModel.getName(),
@@ -539,6 +588,12 @@ public class RegisterController {
                 viewModel.selfiePhotoFileProperty().get());
     }
 
+    /**
+     * Applies registration result to UI state on JavaFX thread.
+     *
+     * @param result registration result returned by service layer
+     * @param originalText original register button text to restore
+     */
     private void handleRegistrationResult(RegistrationService.RegistrationResult result, String originalText) {
         javafx.application.Platform.runLater(() -> {
             viewModel.loadingProperty().set(false);
@@ -564,6 +619,9 @@ public class RegisterController {
         });
     }
 
+    /**
+     * Transitions wizard from credentials step to ID-photo step.
+     */
     private void transitionToIdPhoto() {
         currentStep = RegistrationStep.ID_PHOTO;
 
@@ -587,6 +645,9 @@ public class RegisterController {
         updateDropZoneView();
     }
 
+    /**
+     * Transitions wizard from ID-photo step to selfie-photo step.
+     */
     private void transitionToSelfiePhoto() {
         currentStep = RegistrationStep.SELFIE_PHOTO;
 
@@ -634,6 +695,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Refreshes drop-zone visual state for current photo step.
+     */
     private void updateDropZoneView() {
         // Reset Error Style
         dropZoneContainer.setStyle("");
@@ -663,6 +727,11 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Shows selected photo preview with filename and formatted size.
+     *
+     * @param file selected image file
+     */
     private void showPreview(File file) {
         previewSateZoneId.setVisible(true);
         emptyStateZoneId.setVisible(false);
@@ -689,6 +758,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Configures drag-and-drop, click-to-browse, replace, and remove photo actions.
+     */
     private void setupDragAndDrop() {
         dropZoneContainer.setOnDragOver(event -> {
             if (event.getGestureSource() != dropZoneContainer && event.getDragboard().hasFiles()) {
@@ -730,6 +802,9 @@ public class RegisterController {
         previewRemoveButton.setOnAction(e -> removeFile());
     }
 
+    /**
+     * Opens file chooser for image selection in the active photo step.
+     */
     private void browseFile() {
         // Reset UI to clean state (clears errors, resets borders)
         updateDropZoneView();
@@ -744,6 +819,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Removes currently selected file for the active photo step.
+     */
     private void removeFile() {
         if (dropZoneErrorText != null)
             dropZoneErrorText.setText("");
@@ -755,6 +833,11 @@ public class RegisterController {
         updateDropZoneView();
     }
 
+    /**
+     * Validates and applies a selected file to the active photo step.
+     *
+     * @param file selected file
+     */
     private void handleFileSelection(File file) {
         // Reset styles and text
         dropZoneContainer.setStyle("");
@@ -778,6 +861,9 @@ public class RegisterController {
         }
     }
 
+    /**
+     * Shows drop-zone error visual state and shakes the container for feedback.
+     */
     private void showErrorState() {
         previewSateZoneId.setVisible(false);
         emptyStateZoneId.setVisible(false);
@@ -883,7 +969,9 @@ public class RegisterController {
     private static class RankListCell extends ListCell<String> {
         private final ImageView imageView = new ImageView();
 
-        // Constructor
+        /**
+         * Creates a rank list cell used by rank ComboBox list and button cell.
+         */
         public RankListCell() {
             // Initialization handled by field declarations and updateItem
         }
@@ -946,10 +1034,18 @@ public class RegisterController {
     }
 
     // Get the selected rank
+    /**
+     * Returns currently selected rank from rank ComboBox.
+     *
+     * @return selected rank label, or {@code null} when none selected
+     */
     public String getSelectedRank() {
         return rankComboBox.getValue();
     }
 
+    /**
+     * Shows exit confirmation popup and terminates process on confirmation.
+     */
     private void confirmExitApplication() {
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)

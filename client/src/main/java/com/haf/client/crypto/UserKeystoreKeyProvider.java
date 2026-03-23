@@ -13,12 +13,11 @@ import java.util.function.UnaryOperator;
 
 /**
  * KeyProvider implementation that uses UserKeystore for key management.
- * <p>
+ *
  * Sender ID is derived from the oldest CURRENT key directory in the local
  * keystore.
  * Recipient public keys are resolved by first checking the local keystore and
- * then
- * falling back to an optional directory-service fetcher callback.
+ * then falling back to an optional directory-service fetcher callback.
  */
 public class UserKeystoreKeyProvider implements KeyProvider {
     private final UserKeystore keyStore;
@@ -31,6 +30,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * passphrase.
      *
      * @param keystoreRoot the root directory of the keystore
+     * @param senderId     sender identifier associated with the local keystore
      * @param passphrase   the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
      */
@@ -43,19 +43,13 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     /**
      * Creates a UserKeystoreKeyProvider using the default keystore location.
      *
+     * @param senderId   sender identifier associated with the local keystore
      * @param passphrase the passphrase for unlocking private keys
      * @throws Exception if keystore initialization fails
      */
     public UserKeystoreKeyProvider(String senderId, char[] passphrase) throws Exception {
         this(KeystoreBootstrap.run(senderId, passphrase), senderId, passphrase);
     }
-
-    /**
-     * Derives the sender ID from the current key's metadata.
-     *
-     * @return the sender ID (currently the keyId)
-     * @throws Exception if keystore is invalid or empty
-     */
 
     /**
      * Sets a callback to fetch public keys from a directory service (e.g., the
@@ -69,6 +63,15 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         this.directoryServiceFetcher = fetcher;
     }
 
+    /**
+     * Resolves a recipient public key from local keystore metadata, with optional
+     * directory-service fallback.
+     *
+     * @param recipientId recipient identifier whose public key is required
+     * @return recipient public key used for message encryption
+     * @throws KeyNotFoundException when local lookup and optional directory
+     *                              fallback both fail
+     */
     @Override
     public PublicKey getRecipientPublicKey(String recipientId) throws KeyNotFoundException {
         // Try to load recipient key from local keystore first,
@@ -102,6 +105,13 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         }
     }
 
+    /**
+     * Loads a recipient public key by key id from the local keystore.
+     *
+     * @param recipientId key id to load
+     * @return loaded public key
+     * @throws KeyNotFoundException when key loading fails
+     */
     private PublicKey loadRecipientKey(String recipientId) throws KeyNotFoundException {
         try {
             return keyStore.loadPublicKeyByKeyId(recipientId);
@@ -110,6 +120,15 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         }
     }
 
+    /**
+     * Retrieves a PEM public key via external directory service and converts it to
+     * {@link PublicKey}.
+     *
+     * @param recipientId recipient identifier to resolve remotely
+     * @return resolved public key, or {@code null} when directory lookup returns no
+     *         key
+     * @throws KeyNotFoundException when remote fetch or PEM parsing fails
+     */
     private PublicKey fetchPublicKeyFromDirectoryService(String recipientId) throws KeyNotFoundException {
         try {
             String pem = directoryServiceFetcher.apply(recipientId);
@@ -123,6 +142,11 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         }
     }
 
+    /**
+     * Returns the sender id associated with the currently loaded keystore.
+     *
+     * @return sender identifier used in message envelopes
+     */
     @Override
     public String getSenderId() {
         return senderId;

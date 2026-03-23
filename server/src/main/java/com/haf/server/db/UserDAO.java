@@ -20,15 +20,16 @@ import java.util.UUID;
 /**
  * Data-access object for the {@code users} table.
  *
- * <p>
  * Follows the same DataSource + AuditLogger pattern as {@link EnvelopeDAO}.
- * </p>
  */
 public final class UserDAO {
 
     private final DataSource dataSource;
     private final AuditLogger auditLogger;
 
+    /**
+     * SQL query for inserting a pending user record.
+     */
     private static final String INSERT_SQL = """
             INSERT INTO users (
                 user_id,
@@ -47,17 +48,33 @@ public final class UserDAO {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'USER')
             """;
 
+    /**
+     * SQL query for updating stored registration photo ids.
+     */
     private static final String UPDATE_PHOTOS_SQL = """
             UPDATE users SET id_photo_id = ?, selfie_photo_id = ? WHERE user_id = ?
             """;
 
+    /**
+     * SQL query for checking whether an email already exists.
+     */
     private static final String EXISTS_BY_EMAIL_SQL = """
             SELECT 1 FROM users WHERE email = ? LIMIT 1
             """;
 
+    /**
+     * SQL query for fetching login/profile fields by email.
+     */
     private static final String FIND_BY_EMAIL_SQL = """
             SELECT user_id, password_hash, full_name, `rank`, reg_number, email, telephone, joined_date, `status`
             FROM users WHERE email = ? LIMIT 1
+            """;
+
+    /**
+     * SQL query for selecting stored public-key material by user id.
+     */
+    private static final String SELECT_PUBLIC_KEY_SQL = """
+            SELECT public_key_pem, public_key_fingerprint FROM users WHERE user_id = ?
             """;
 
     /**
@@ -204,9 +221,8 @@ public final class UserDAO {
      * @throws DatabaseOperationException if a database error occurs
      */
     public PublicKeyRecord getPublicKey(String userId) {
-        String sql = "SELECT public_key_pem, public_key_fingerprint FROM users WHERE user_id = ?";
         try (Connection conn = dataSource.getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(SELECT_PUBLIC_KEY_SQL)) {
 
             stmt.setString(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -243,6 +259,9 @@ public final class UserDAO {
     public record SearchPage(List<SearchRecord> results, boolean hasMore, String lastFullName, String lastUserId) {
     }
 
+    /**
+     * SQL query for paged search over approved users with keyset cursor conditions.
+     */
     private static final String SEARCH_USERS_PAGED_SQL = """
             SELECT user_id, full_name, reg_number, email, `rank`, telephone, joined_date
             FROM users
@@ -339,15 +358,35 @@ public final class UserDAO {
         return searchUsersPage(query, excludeUserId, limit, null, null).results();
     }
 
+    /**
+     * Converts raw query text into a SQL LIKE prefix pattern with escaping.
+     *
+     * @param input raw user query text
+     * @return escaped pattern ending with {@code %}
+     */
     private static String toPrefixPattern(String input) {
         return escapeLikeLiteral(input) + "%";
     }
 
+    /**
+     * Reads a SQL DATE column and converts it to ISO-8601 local-date text.
+     *
+     * @param rs source result set
+     * @param columnLabel column name to read
+     * @return ISO date string, or {@code null} when DB value is NULL
+     * @throws SQLException when column access fails
+     */
     private static String toIsoDate(ResultSet rs, String columnLabel) throws SQLException {
         java.sql.Date value = rs.getDate(columnLabel);
         return value == null ? null : value.toLocalDate().toString();
     }
 
+    /**
+     * Escapes SQL LIKE wildcard and escape characters in a literal fragment.
+     *
+     * @param input literal text fragment
+     * @return escaped text safe for LIKE patterns with ESCAPE clause
+     */
     private static String escapeLikeLiteral(String input) {
         StringBuilder escaped = new StringBuilder(input.length() + 8);
         for (int i = 0; i < input.length(); i++) {
@@ -360,6 +399,13 @@ public final class UserDAO {
         return escaped.toString();
     }
 
+    /**
+     * Computes SHA-256 hex digest for audit-safe query fingerprinting.
+     *
+     * @param value source value to hash
+     * @return lowercase hex SHA-256 digest
+     * @throws IllegalStateException when SHA-256 is unavailable in runtime
+     */
     private static String sha256Hex(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

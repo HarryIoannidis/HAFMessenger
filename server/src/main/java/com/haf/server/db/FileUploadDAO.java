@@ -13,16 +13,17 @@ import java.util.UUID;
 /**
  * Data-access object for the {@code file_uploads} table.
  *
- * <p>
  * Files are stored as opaque, client-side-encrypted blobs. This DAO
  * deliberately never inspects or decrypts the ciphertext – it is only
  * responsible for persisting and retrieving bytes.
- * </p>
  */
 public final class FileUploadDAO {
 
     private final DataSource dataSource;
 
+    /**
+     * SQL query for inserting an encrypted file upload record.
+     */
     private static final String INSERT_SQL = """
             INSERT INTO file_uploads (
                 file_id,

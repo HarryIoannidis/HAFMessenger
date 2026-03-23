@@ -16,13 +16,16 @@ public final class FilePerms {
             EnumSet.of(PosixFilePermission.OWNER_READ,
                     PosixFilePermission.OWNER_WRITE);
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private FilePerms() {}
 
     /**
      * Ensures that the given directory exists and is 700.
      *
      * @param dir the directory to ensure
-     * @throws IOException
+     * @throws IOException if the directory cannot be created or secured
      */
     public static void ensureDir700(Path dir) throws IOException {
         if (!Files.exists(dir)) Files.createDirectories(dir);
@@ -40,7 +43,7 @@ public final class FilePerms {
      *
      * @param file the file to write to
      * @param data the data to write
-     * @throws IOException
+     * @throws IOException if the file cannot be created, written, or secured
      */
     public static void writeFile600(Path file, byte[] data) throws IOException {
         if (Files.notExists(file)) Files.createFile(file);

@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessageViewModel.IncomingMessageListener;
+import com.haf.client.viewmodels.MessageViewModel.PresenceListener;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -10,8 +11,10 @@ public interface MainSessionService {
 
     /**
      * Registers a presence listener against the active chat session, if available.
+     *
+     * @param listener the listener
      */
-    void registerPresenceListener(MessageViewModel.PresenceListener listener);
+    void registerPresenceListener(PresenceListener listener);
 
     /**
      * Unregisters the previously registered presence listener, if any.
@@ -19,9 +22,12 @@ public interface MainSessionService {
     void unregisterPresenceListener();
 
     /**
-     * Registers an incoming-message listener against the active chat session, if available.
+     * Registers an incoming-message listener against the active chat session, if
+     * available.
+     *
+     * @param listener the listener
      */
-    void registerIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
+    void registerIncomingMessageListener(IncomingMessageListener listener);
 
     /**
      * Unregisters the previously registered incoming-message listener, if any.
@@ -29,7 +35,8 @@ public interface MainSessionService {
     void unregisterIncomingMessageListener();
 
     /**
-     * Performs logout orchestration (best effort server revoke + local session clear).
+     * Performs logout orchestration (best effort server revoke + local session
+     * clear).
      *
      * @return future completed when logout orchestration finishes
      */

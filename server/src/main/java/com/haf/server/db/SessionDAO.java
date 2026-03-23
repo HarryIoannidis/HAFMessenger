@@ -15,15 +15,16 @@ import java.util.UUID;
 /**
  * Data-access object for the {@code sessions} table.
  *
- * <p>
  * Follows the same DataSource + AuditLogger pattern as {@link UserDAO}.
- * </p>
  */
 public final class SessionDAO {
 
     private final DataSource dataSource;
     private final AuditLogger auditLogger;
 
+    /**
+     * SQL query for inserting a new session row.
+     */
     private static final String INSERT_SQL = """
             INSERT INTO sessions (session_id, user_id, jwt_token, expires_at)
             VALUES (?, ?, ?, ?)
@@ -71,11 +72,17 @@ public final class SessionDAO {
         }
     }
 
+    /**
+     * SQL query for selecting user id from an active, non-revoked session.
+     */
     private static final String SELECT_USER_SQL = """
             SELECT user_id FROM sessions
             WHERE session_id = ? AND expires_at > ? AND revoked = FALSE
             """;
 
+    /**
+     * SQL query for revoking a session.
+     */
     private static final String REVOKE_SESSION_SQL = """
             UPDATE sessions
             SET revoked = TRUE
@@ -115,6 +122,7 @@ public final class SessionDAO {
      * a successful no-op.
      *
      * @param sessionId the session ID to revoke
+     * @throws DatabaseOperationException if the revoke fails
      */
     public void revokeSession(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {

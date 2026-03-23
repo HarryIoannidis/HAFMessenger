@@ -23,7 +23,9 @@ public final class MessageBubbleFactory {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    /* utility class */
+    /**
+     * Prevents instantiation of this utility factory.
+     */
     private MessageBubbleFactory() {
     }
 
@@ -125,32 +127,53 @@ public final class MessageBubbleFactory {
             setSpinnerVisible(spinner, false);
         }
 
-        if (message.content() != null && !message.content().isBlank()) {
-            try {
-                Image image = new Image(message.content(), true);
-                imageView.setImage(image);
-                if (message.isLoading() || image.getProgress() < 1.0) {
-                    setSpinnerVisible(spinner, true);
-                }
-
-                image.progressProperty().addListener((obs, oldV, newV) -> {
-                    if (newV != null && newV.doubleValue() >= 1.0) {
-                        setSpinnerVisible(spinner, false);
-                    }
-                });
-                image.errorProperty().addListener((obs, wasError, isError) -> {
-                    if (Boolean.TRUE.equals(isError)) {
-                        setSpinnerVisible(spinner, false);
-                    }
-                });
-            } catch (Exception ignored) {
-                /* broken URL – show empty view */
-                setSpinnerVisible(spinner, false);
-            }
-        }
+        loadImageContent(message, imageView, spinner);
         return imageContainer;
     }
 
+    /**
+     * Loads the actual image from the message content URL and manages
+     * the spinner visibility during loading, completion, and error states.
+     *
+     * @param message   the message containing the image URL
+     * @param imageView the view to display the image in
+     * @param spinner   the loading spinner overlay
+     */
+    private static void loadImageContent(MessageVM message,
+                                         ImageView imageView,
+                                         ProgressIndicator spinner) {
+        if (message.content() == null || message.content().isBlank()) {
+            return;
+        }
+        try {
+            Image image = new Image(message.content(), true);
+            imageView.setImage(image);
+            if (message.isLoading() || image.getProgress() < 1.0) {
+                setSpinnerVisible(spinner, true);
+            }
+
+            image.progressProperty().addListener((obs, oldV, newV) -> {
+                if (newV != null && newV.doubleValue() >= 1.0) {
+                    setSpinnerVisible(spinner, false);
+                }
+            });
+            image.errorProperty().addListener((obs, wasError, isError) -> {
+                if (Boolean.TRUE.equals(isError)) {
+                    setSpinnerVisible(spinner, false);
+                }
+            });
+        } catch (Exception ignored) {
+            /* broken URL – show empty view */
+            setSpinnerVisible(spinner, false);
+        }
+    }
+
+    /**
+     * Toggles visibility/management for the image loading spinner.
+     *
+     * @param spinner spinner node rendered over preview images
+     * @param visible {@code true} when loading is in progress
+     */
     private static void setSpinnerVisible(ProgressIndicator spinner, boolean visible) {
         spinner.setVisible(visible);
         spinner.setManaged(visible);

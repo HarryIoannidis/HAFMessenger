@@ -208,6 +208,9 @@ public final class WebSocketIngressServer extends WebSocketServer {
         auditLogger.logError("ws_error", null, connectionUsers.get(conn), ex);
     }
 
+    /**
+     * Signals successful WebSocket server startup for awaiters.
+     */
     @Override
     public void onStart() {
         startupComplete.set(true);
@@ -253,6 +256,12 @@ public final class WebSocketIngressServer extends WebSocketServer {
         conn.send(json);
     }
 
+    /**
+     * Unsubscribes and clears connection-local state, then broadcasts offline
+     * presence if needed.
+     *
+     * @param conn websocket connection being cleaned up
+     */
     private void cleanupConnection(WebSocket conn) {
         mailboxRouter.unsubscribe(subscriptions.remove(conn));
         String userId = connectionUsers.remove(conn);
@@ -265,6 +274,13 @@ public final class WebSocketIngressServer extends WebSocketServer {
         }
     }
 
+    /**
+     * Broadcasts a user's current presence state to all accepted watcher contacts
+     * currently connected.
+     *
+     * @param userId user whose presence changed
+     * @param active latest active state
+     */
     private void broadcastPresenceToWatchers(String userId, boolean active) {
         try {
             List<String> watcherUserIds = contactDAO.getWatcherUserIds(userId);
@@ -284,6 +300,14 @@ public final class WebSocketIngressServer extends WebSocketServer {
         }
     }
 
+    /**
+     * Sends a pre-built presence payload to one watcher connection with
+     * per-recipient error isolation.
+     *
+     * @param watcherUserId     watcher user id for logging context
+     * @param watcherConnection watcher websocket connection
+     * @param payload           serialized presence payload
+     */
     private void sendPresenceToWatcher(String watcherUserId, WebSocket watcherConnection, String payload) {
         try {
             watcherConnection.send(payload);
@@ -292,6 +316,12 @@ public final class WebSocketIngressServer extends WebSocketServer {
         }
     }
 
+    /**
+     * Sends initial presence snapshot for all of the caller's contacts on connect.
+     *
+     * @param conn   websocket connection of the caller
+     * @param userId caller user id
+     */
     private void sendPresenceSnapshot(WebSocket conn, String userId) {
         try {
             List<ContactDAO.ContactRecord> contacts = contactDAO.getContacts(userId);
@@ -319,6 +349,13 @@ public final class WebSocketIngressServer extends WebSocketServer {
         return "{\"type\":\"rate_limit\",\"retryAfterSeconds\":" + Math.max(1, retryAfterSeconds) + "}";
     }
 
+    /**
+     * Builds a compact presence payload.
+     *
+     * @param userId user id included in payload
+     * @param active presence state flag
+     * @return compact JSON payload string
+     */
     private String presenceJson(String userId, boolean active) {
         return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active + "}";
     }

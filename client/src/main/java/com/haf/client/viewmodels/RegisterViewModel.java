@@ -65,74 +65,164 @@ public class RegisterViewModel {
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
 
     // Property accessors
+    /**
+     * Exposes full-name input property.
+     *
+     * @return observable name property
+     */
     public StringProperty nameProperty() {
         return name;
     }
 
+    /**
+     * Exposes registration-number input property.
+     *
+     * @return observable registration-number property
+     */
     public StringProperty regNumProperty() {
         return regNum;
     }
 
+    /**
+     * Exposes id-number input property.
+     *
+     * @return observable id-number property
+     */
     public StringProperty idNumProperty() {
         return idNum;
     }
 
+    /**
+     * Exposes selected rank property.
+     *
+     * @return observable rank property
+     */
     public StringProperty rankProperty() {
         return rank;
     }
 
+    /**
+     * Exposes phone-number input property.
+     *
+     * @return observable phone-number property
+     */
     public StringProperty phoneNumProperty() {
         return phoneNum;
     }
 
+    /**
+     * Exposes email input property.
+     *
+     * @return observable email property
+     */
     public StringProperty emailProperty() {
         return email;
     }
 
+    /**
+     * Exposes password input property.
+     *
+     * @return observable password property
+     */
     public StringProperty passwordProperty() {
         return password;
     }
 
+    /**
+     * Exposes password-confirmation input property.
+     *
+     * @return observable password-confirmation property
+     */
     public StringProperty passwordConfProperty() {
         return passwordConf;
     }
 
+    /**
+     * Exposes registration error message property.
+     *
+     * @return observable error-message property
+     */
     public StringProperty errorMessageProperty() {
         return errorMessage;
     }
 
+    /**
+     * Exposes name-field error flag.
+     *
+     * @return observable name-error property
+     */
     public BooleanProperty nameErrorProperty() {
         return nameError;
     }
 
+    /**
+     * Exposes registration-number error flag.
+     *
+     * @return observable registration-number error property
+     */
     public BooleanProperty regNumErrorProperty() {
         return regNumError;
     }
 
+    /**
+     * Exposes id-number error flag.
+     *
+     * @return observable id-number error property
+     */
     public BooleanProperty idNumErrorProperty() {
         return idNumError;
     }
 
+    /**
+     * Exposes rank-selection error flag.
+     *
+     * @return observable rank error property
+     */
     public BooleanProperty rankErrorProperty() {
         return rankError;
     }
 
+    /**
+     * Exposes phone-number error flag.
+     *
+     * @return observable phone error property
+     */
     public BooleanProperty phoneNumErrorProperty() {
         return phoneNumError;
     }
 
+    /**
+     * Exposes email error flag.
+     *
+     * @return observable email error property
+     */
     public BooleanProperty emailErrorProperty() {
         return emailError;
     }
 
+    /**
+     * Exposes password error flag.
+     *
+     * @return observable password error property
+     */
     public BooleanProperty passwordErrorProperty() {
         return passwordError;
     }
 
+    /**
+     * Exposes password-confirmation error flag.
+     *
+     * @return observable password-confirmation error property
+     */
     public BooleanProperty passwordConfErrorProperty() {
         return passwordConfError;
     }
 
+    /**
+     * Exposes registration loading flag.
+     *
+     * @return observable loading property
+     */
     public BooleanProperty loadingProperty() {
         return loading;
     }
@@ -140,63 +230,134 @@ public class RegisterViewModel {
     private final BooleanProperty passwordVisible = new SimpleBooleanProperty(false);
     private final BooleanProperty passwordConfVisible = new SimpleBooleanProperty(false);
 
+    /**
+     * Exposes password-visibility state.
+     *
+     * @return observable password visibility property
+     */
     public BooleanProperty passwordVisibleProperty() {
         return passwordVisible;
     }
 
+    /**
+     * Exposes confirm-password visibility state.
+     *
+     * @return observable confirm-password visibility property
+     */
     public BooleanProperty passwordConfVisibleProperty() {
         return passwordConfVisible;
     }
 
+    /**
+     * Toggles password visibility state.
+     */
     public void togglePasswordVisibility() {
         passwordVisible.set(!passwordVisible.get());
     }
 
+    /**
+     * Toggles confirm-password visibility state.
+     */
     public void togglePasswordConfVisibility() {
         passwordConfVisible.set(!passwordConfVisible.get());
     }
 
+    /**
+     * Exposes selected ID photo file property.
+     *
+     * @return observable ID-photo file property
+     */
     public ObjectProperty<File> idPhotoFileProperty() {
         return idPhotoFile;
     }
 
+    /**
+     * Exposes selected selfie photo file property.
+     *
+     * @return observable selfie-photo file property
+     */
     public ObjectProperty<File> selfiePhotoFileProperty() {
         return selfiePhotoFile;
     }
 
     // Getters
+    /**
+     * Returns current full-name value.
+     *
+     * @return entered full name
+     */
     public String getName() {
         return name.get();
     }
 
+    /**
+     * Returns current registration-number value.
+     *
+     * @return entered registration number
+     */
     public String getRegNum() {
         return regNum.get();
     }
 
+    /**
+     * Returns current id-number value.
+     *
+     * @return entered id number
+     */
     public String getIdNum() {
         return idNum.get();
     }
 
+    /**
+     * Returns current rank value.
+     *
+     * @return selected rank
+     */
     public String getRank() {
         return rank.get();
     }
 
+    /**
+     * Returns current phone-number value.
+     *
+     * @return entered phone number
+     */
     public String getPhoneNum() {
         return phoneNum.get();
     }
 
+    /**
+     * Returns current email value.
+     *
+     * @return entered email address
+     */
     public String getEmail() {
         return email.get();
     }
 
+    /**
+     * Returns current password value.
+     *
+     * @return entered password
+     */
     public String getPassword() {
         return password.get();
     }
 
+    /**
+     * Returns current password-confirmation value.
+     *
+     * @return entered password-confirmation text
+     */
     public String getPasswordConf() {
         return passwordConf.get();
     }
 
+    /**
+     * Returns current validation/registration error message.
+     *
+     * @return error message text
+     */
     public String getErrorMessage() {
         return errorMessage.get();
     }
@@ -333,10 +494,20 @@ public class RegisterViewModel {
 
     }
 
+    /**
+     * Validates the credentials step fields.
+     *
+     * @return {@code true} when credential fields are valid
+     */
     public boolean validateCredentials() {
         return validate();
     }
 
+    /**
+     * Validates whether ID-photo step has a selected file.
+     *
+     * @return {@code true} when ID photo has been selected
+     */
     public boolean validateIdPhoto() {
         if (idPhotoFile.get() == null) {
             errorMessage.set(ERROR_ID_PHOTO_MISSING);
@@ -345,6 +516,11 @@ public class RegisterViewModel {
         return true;
     }
 
+    /**
+     * Validates whether selfie-photo step has a selected file.
+     *
+     * @return {@code true} when selfie photo has been selected
+     */
     public boolean validateSelfiePhoto() {
         if (selfiePhotoFile.get() == null) {
             errorMessage.set(ERROR_SELFIE_PHOTO_MISSING);
@@ -353,6 +529,12 @@ public class RegisterViewModel {
         return true;
     }
 
+    /**
+     * Validates selected photo file against size/type restrictions.
+     *
+     * @param file selected file
+     * @return {@code true} when file satisfies validation constraints
+     */
     public boolean validateFile(File file) {
         if (file == null) {
             return false;

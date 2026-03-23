@@ -5,6 +5,9 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 
 public final class FingerprintUtil {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private FingerprintUtil() {
     }
 

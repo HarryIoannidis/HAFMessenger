@@ -5,6 +5,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 public final class AadCodec {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private AadCodec() {
     }
 

@@ -66,13 +66,12 @@ public final class MetricsRegistry {
                 rateLimitRejectCount.get(),
                 queueDepth.get(),
                 getAverageDeliveryLatencyMs(),
-                deliveredCount.get()
-        );
+                deliveredCount.get());
     }
 
-
     /**
-     * Records the latency of message delivery and increments the delivered message count.
+     * Records the latency of message delivery and increments the delivered message
+     * count.
      *
      * @param latencyMs the latency in milliseconds.
      */
@@ -95,10 +94,10 @@ public final class MetricsRegistry {
      * Represents a snapshot of the current metrics.
      */
     public record MetricsSnapshot(long ingressCount,
-                                  long rejectCount,
-                                  long rateLimitRejectCount,
-                                  long queueDepth,
-                                  double avgDeliveryLatencyMs,
-                                  long deliveredCount) {}
+            long rejectCount,
+            long rateLimitRejectCount,
+            long queueDepth,
+            double avgDeliveryLatencyMs,
+            long deliveredCount) {
+    }
 }
-

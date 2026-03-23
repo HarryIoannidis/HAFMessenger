@@ -35,7 +35,7 @@ public final class JsonCodec {
     /**
      * Deserializes JSON to given type with FAIL_ON_UNKNOWN_PROPERTIES.
      *
-     * @param JSON incoming JSON
+     * @param json incoming JSON
      * @param type target class
      * @param <T>  type of return
      * @return t-type object

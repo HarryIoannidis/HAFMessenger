@@ -24,6 +24,9 @@ public final class CryptoConstants {
     public static final int ARGON2_PARALLELISM = 4;
     public static final int ARGON2_OUTPUT_LENGTH = 32;
 
+    /**
+     * Prevents instantiation of this constants holder.
+     */
     private CryptoConstants() {
     }
 }

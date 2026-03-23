@@ -43,6 +43,9 @@ public class PopupMessageController {
             null,
             null);
 
+    /**
+     * Initializes popup controls, drag behavior, and button event wiring.
+     */
     @FXML
     public void initialize() {
         setupDragBehavior();
@@ -57,11 +60,21 @@ public class PopupMessageController {
         }
     }
 
+    /**
+     * Applies a popup specification to the currently displayed popup instance.
+     *
+     * @param spec popup specification to display; falls back to current spec when null
+     */
     public void showMessage(PopupMessageSpec spec) {
         currentSpec = spec == null ? currentSpec : spec;
         applySpec(currentSpec);
     }
 
+    /**
+     * Pushes popup spec values into the UI controls.
+     *
+     * @param spec popup specification to render
+     */
     private void applySpec(PopupMessageSpec spec) {
         if (titleText != null) {
             titleText.setText(spec.title());
@@ -83,14 +96,25 @@ public class PopupMessageController {
         }
     }
 
+    /**
+     * Handles primary action clicks and executes the configured action callback.
+     */
     private void handleAction() {
         hideThenRun(currentSpec.onAction());
     }
 
+    /**
+     * Handles cancel/close actions and executes the configured cancel callback.
+     */
     private void handleCancel() {
         hideThenRun(currentSpec.onCancel());
     }
 
+    /**
+     * Hides the popup window and then executes a callback if provided.
+     *
+     * @param action callback to execute after the popup is hidden
+     */
     private void hideThenRun(Runnable action) {
         Stage stage = resolveStage();
         if (stage != null) {
@@ -101,6 +125,9 @@ public class PopupMessageController {
         }
     }
 
+    /**
+     * Enables drag-to-move behavior using the popup title bar.
+     */
     private void setupDragBehavior() {
         if (titleBar == null) {
             return;
@@ -120,6 +147,11 @@ public class PopupMessageController {
         });
     }
 
+    /**
+     * Resolves the hosting popup stage from the current root container.
+     *
+     * @return hosting {@link Stage}, or {@code null} when scene/window is not available
+     */
     private Stage resolveStage() {
         if (rootContainer == null || rootContainer.getScene() == null || rootContainer.getScene().getWindow() == null) {
             return null;

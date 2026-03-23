@@ -118,11 +118,11 @@ public final class AuditLogger {
     /**
      * Logs sanitized metadata about a user-search request.
      *
-     * @param requestId    the request ID
-     * @param userId       the authenticated user ID
-     * @param queryLength  query length after normalization
-     * @param queryHash    SHA-256 hash of normalized query
-     * @param limit        effective page size for this request
+     * @param requestId      the request ID
+     * @param userId         the authenticated user ID
+     * @param queryLength    query length after normalization
+     * @param queryHash      SHA-256 hash of normalized query
+     * @param limit          effective page size for this request
      * @param cursorSupplied true if request included a cursor
      */
     public void logSearchRequest(String requestId, String userId, int queryLength, String queryHash, int limit,

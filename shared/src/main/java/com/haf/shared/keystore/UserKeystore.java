@@ -255,6 +255,7 @@ public final class UserKeystore {
     /**
      * Loads the current private key (status==CURRENT or fallback as described).
      *
+     * @param passphrase passphrase used to decrypt the private key envelope
      * @return the private key
      * @throws Exception if loading fails
      */

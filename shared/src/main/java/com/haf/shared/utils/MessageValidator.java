@@ -9,6 +9,9 @@ import java.util.List;
 
 public final class MessageValidator {
 
+    /**
+     * Prevents instantiation of utility class.
+     */
     private MessageValidator() {
     }
 
@@ -84,6 +87,12 @@ public final class MessageValidator {
         return errors;
     }
 
+    /**
+     * Validates protocol-level header fields.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateHeader(EncryptedMessage m, List<ErrorCode> errors) {
         // Protocol version
         if (!MessageHeader.VERSION.equals(m.getVersion())) {
@@ -96,6 +105,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates sender and recipient identity fields.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateIdentities(EncryptedMessage m, List<ErrorCode> errors) {
         // Sender identity (minimum length)
         if (m.getSenderId() == null || m.getSenderId().length() < MessageHeader.MIN_SENDER_LEN) {
@@ -108,6 +123,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates metadata fields such as TTL, timestamp, content metadata, and AAD.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateMetadata(EncryptedMessage m, List<ErrorCode> errors) {
         // Time-to-live policy (TTL)
         if (m.getTtlSeconds() < MessageHeader.MIN_TTL_SECONDS || m.getTtlSeconds() > MessageHeader.MAX_TTL_SECONDS) {
@@ -136,6 +157,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates payload cryptographic components.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validatePayload(EncryptedMessage m, List<ErrorCode> errors) {
         validateIv(m, errors);
         validateCiphertext(m, errors);
@@ -143,6 +170,12 @@ public final class MessageValidator {
         validateEphemeralKey(m, errors);
     }
 
+    /**
+     * Validates the IV field presence and expected byte length.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateIv(EncryptedMessage m, List<ErrorCode> errors) {
         // IV (GCM nonce) – existence and length 12 bytes
         if (m.getIvB64() == null) {
@@ -155,6 +188,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates ciphertext presence, Base64 format, and size constraints.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateCiphertext(EncryptedMessage m, List<ErrorCode> errors) {
         // Ciphertext – existence, decoding, non-empty, below maximum threshold
         if (m.getCiphertextB64() == null) {
@@ -167,6 +206,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates the authentication tag presence and expected byte length.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateTag(EncryptedMessage m, List<ErrorCode> errors) {
         // GCM tag – existence and length 16 bytes
         if (m.getTagB64() == null) {
@@ -179,6 +224,12 @@ public final class MessageValidator {
         }
     }
 
+    /**
+     * Validates wrapped ephemeral key presence and minimum decoded size.
+     *
+     * @param m      encrypted message to inspect
+     * @param errors mutable list receiving validation errors
+     */
     private static void validateEphemeralKey(EncryptedMessage m, List<ErrorCode> errors) {
         // Ephemeral key (X25519) – existence and minimum length (32 bytes)
         if (m.getEphemeralPublicB64() == null) {

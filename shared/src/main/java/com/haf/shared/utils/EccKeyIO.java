@@ -5,6 +5,9 @@ import java.security.*;
 import java.security.spec.*;
 
 public final class EccKeyIO {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private EccKeyIO() {
     }
 

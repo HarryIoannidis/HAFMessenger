@@ -7,22 +7,39 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Default {@link ChatAttachmentService} that delegates to the active chat session.
+ * Default {@link ChatAttachmentService} that delegates to the active chat
+ * session.
  */
 public class DefaultChatAttachmentService implements ChatAttachmentService {
 
     @FunctionalInterface
     interface AttachmentGateway {
+        /**
+         * Sends an attachment through the active message pipeline.
+         *
+         * @param recipientId recipient identifier
+         * @param filePath    path to the file to send
+         * @param mimeType    MIME type hint for transport metadata
+         */
         void sendAttachment(String recipientId, Path filePath, String mimeType);
     }
 
     @FunctionalInterface
     interface AttachmentGatewayProvider {
+        /**
+         * Returns the currently available attachment gateway.
+         *
+         * @return gateway instance, or {@code null} when chat session is unavailable
+         */
         AttachmentGateway current();
     }
 
     private final AttachmentGatewayProvider attachmentGatewayProvider;
 
+    /**
+     * Creates a service bound to the current {@link ChatSession} message
+     * view-model.
+     */
     public DefaultChatAttachmentService() {
         this(() -> {
             MessageViewModel vm = ChatSession.get();
@@ -30,10 +47,23 @@ public class DefaultChatAttachmentService implements ChatAttachmentService {
         });
     }
 
+    /**
+     * Creates a service with an injected gateway provider (primarily for tests).
+     *
+     * @param attachmentGatewayProvider provider used to resolve the current send
+     *                                  gateway
+     */
     DefaultChatAttachmentService(AttachmentGatewayProvider attachmentGatewayProvider) {
         this.attachmentGatewayProvider = Objects.requireNonNull(attachmentGatewayProvider, "attachmentGatewayProvider");
     }
 
+    /**
+     * Sends a local file attachment to the provided recipient when both inputs are
+     * valid.
+     *
+     * @param recipientId recipient identifier
+     * @param filePath    local path of attachment to send
+     */
     @Override
     public void sendAttachment(String recipientId, Path filePath) {
         if (recipientId == null || recipientId.isBlank() || filePath == null) {
@@ -48,6 +78,12 @@ public class DefaultChatAttachmentService implements ChatAttachmentService {
         gateway.sendAttachment(recipientId, filePath, resolveMimeType(filePath));
     }
 
+    /**
+     * Derives a MIME type from attachment filename extension.
+     *
+     * @param path file path whose extension should be mapped
+     * @return known MIME type, or {@code null} when extension is unsupported
+     */
     static String resolveMimeType(Path path) {
         if (path == null || path.getFileName() == null) {
             return null;

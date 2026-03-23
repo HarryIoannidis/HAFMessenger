@@ -45,11 +45,26 @@ public class MessageViewModel {
 
     @FunctionalInterface
     public interface PresenceListener {
+        /**
+         * Receives a presence state transition for a user currently relevant to the
+         * chat screen.
+         *
+         * @param userId user id whose presence changed
+         * @param active {@code true} when the user is online/active, {@code false}
+         *               otherwise
+         */
         void onPresenceUpdate(String userId, boolean active);
     }
 
     @FunctionalInterface
     public interface IncomingMessageListener {
+        /**
+         * Receives an incoming message after it has been materialized into a UI message
+         * view-model.
+         *
+         * @param senderId normalized sender/contact id
+         * @param message  rendered message model to display in UI
+         */
         void onIncomingMessage(String senderId, MessageVM message);
     }
 
@@ -74,6 +89,16 @@ public class MessageViewModel {
         this.messageReceiver = messageReceiver;
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
+            /**
+             * Handles a decrypted inbound envelope and converts it into a message item for
+             * the sender timeline.
+             *
+             * @param plaintext        decrypted payload bytes
+             * @param senderId         backend sender id
+             * @param contentType      payload MIME/content type
+             * @param timestampEpochMs server timestamp in epoch milliseconds
+             * @param envelopeId       backend envelope id
+             */
             @Override
             public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
                     String envelopeId) {
@@ -98,11 +123,24 @@ public class MessageViewModel {
                 }
             }
 
+            /**
+             * Surfaces receiver-side pipeline failures to the status property on the UI
+             * thread.
+             *
+             * @param error failure raised by the receiver
+             */
             @Override
             public void onError(Throwable error) {
                 runOnUiThread(() -> status.set("Error: " + error.getMessage()));
             }
 
+            /**
+             * Forwards incoming presence updates to registered presence listeners on the UI
+             * thread.
+             *
+             * @param userId user whose presence changed
+             * @param active latest activity flag
+             */
             @Override
             public void onPresenceUpdate(String userId, boolean active) {
                 runOnUiThread(() -> notifyPresenceListeners(userId, active));
@@ -137,6 +175,17 @@ public class MessageViewModel {
         CompletableFuture.runAsync(() -> sendAttachmentInternal(contactId, filePath, mediaTypeHint));
     }
 
+    /**
+     * Validates, encodes and sends an attachment, then appends a local outgoing
+     * message bubble.
+     *
+     * This method chooses inline versus chunked transport according to backend
+     * messaging policy.
+     *
+     * @param contactId     normalized contact id of the recipient
+     * @param filePath      path to the attachment selected by the user
+     * @param mediaTypeHint optional MIME hint from file chooser/UI
+     */
     private void sendAttachmentInternal(String contactId, Path filePath, String mediaTypeHint) {
         try {
             if (filePath == null || !Files.exists(filePath)) {
@@ -224,30 +273,58 @@ public class MessageViewModel {
         return status;
     }
 
+    /**
+     * Registers a presence observer to receive online/offline transitions for
+     * contacts.
+     *
+     * @param listener listener to register; ignored when {@code null}
+     */
     public void addPresenceListener(PresenceListener listener) {
         if (listener != null) {
             presenceListeners.add(listener);
         }
     }
 
+    /**
+     * Unregisters a previously registered presence observer.
+     *
+     * @param listener listener to remove; ignored when {@code null}
+     */
     public void removePresenceListener(PresenceListener listener) {
         if (listener != null) {
             presenceListeners.remove(listener);
         }
     }
 
+    /**
+     * Registers a listener for newly materialized incoming messages.
+     *
+     * @param listener listener to register; ignored when {@code null}
+     */
     public void addIncomingMessageListener(IncomingMessageListener listener) {
         if (listener != null) {
             incomingMessageListeners.add(listener);
         }
     }
 
+    /**
+     * Unregisters a previously registered incoming-message listener.
+     *
+     * @param listener listener to remove; ignored when {@code null}
+     */
     public void removeIncomingMessageListener(IncomingMessageListener listener) {
         if (listener != null) {
             incomingMessageListeners.remove(listener);
         }
     }
 
+    /**
+     * Notifies all registered presence listeners while isolating failures per
+     * listener.
+     *
+     * @param userId user whose presence changed
+     * @param active latest active flag
+     */
     private void notifyPresenceListeners(String userId, boolean active) {
         for (PresenceListener listener : presenceListeners) {
             try {
@@ -258,6 +335,13 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Notifies all incoming-message listeners while preventing one faulty listener
+     * from blocking others.
+     *
+     * @param senderId sender/contact id associated with the message
+     * @param message  resolved message model to deliver
+     */
     private void notifyIncomingMessageListeners(String senderId, MessageVM message) {
         for (IncomingMessageListener listener : incomingMessageListeners) {
             try {
@@ -268,6 +352,14 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Executes a UI mutation either directly (already on FX thread) or via
+     * {@link Platform#runLater(Runnable)}.
+     *
+     * Falls back to direct execution when JavaFX toolkit checks are unavailable.
+     *
+     * @param action UI action to execute
+     */
     private static void runOnUiThread(Runnable action) {
         if (fxToolkitUnavailable) {
             action.run();
@@ -292,21 +384,49 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Normalizes contact identifiers used as message-bucket keys.
+     *
+     * @param contactId raw contact id from caller or transport
+     * @return trimmed id, or an empty string when input is {@code null}
+     */
     private static String normalizeContactId(String contactId) {
         return contactId == null ? "" : contactId.trim();
     }
 
+    /**
+     * Checks whether a content type belongs to the image family after MIME
+     * normalization.
+     *
+     * @param mediaType raw MIME/content type
+     * @return {@code true} when the media type is an image type
+     */
     private static boolean isImageMediaType(String mediaType) {
         String normalized = AttachmentConstants.normalizeMimeType(mediaType);
         return normalized != null && normalized.startsWith("image/");
     }
 
+    /**
+     * Converts a server epoch timestamp into the local JVM time-zone date-time.
+     *
+     * @param timestampEpochMs timestamp in epoch milliseconds
+     * @return localized timestamp for message display
+     */
     private static LocalDateTime toLocalTimestamp(long timestampEpochMs) {
         return Instant.ofEpochMilli(timestampEpochMs)
                 .atZone(ZoneId.systemDefault())
                 .toLocalDateTime();
     }
 
+    /**
+     * Resolves a reference-based image in the background while showing a loading
+     * placeholder in chat.
+     *
+     * @param senderId         sender/contact id whose timeline receives the image
+     * @param reference        reference payload pointing to uploaded attachment
+     *                         data
+     * @param timestampEpochMs envelope timestamp in epoch milliseconds
+     */
     private void receiveChunkedImageAsync(String senderId,
             AttachmentReferencePayload reference,
             long timestampEpochMs) {
@@ -330,6 +450,14 @@ public class MessageViewModel {
         });
     }
 
+    /**
+     * Replaces an in-place loading image bubble with the fully decoded image
+     * message.
+     *
+     * @param senderId  sender/contact id for status text
+     * @param loadingVm placeholder message currently shown in timeline
+     * @param loadedVm  final decoded image message
+     */
     private void replaceLoadingMessage(String senderId, MessageVM loadingVm, MessageVM loadedVm) {
         ObservableList<MessageVM> messages = getMessages(senderId);
         int index = messages.indexOf(loadingVm);
@@ -341,6 +469,15 @@ public class MessageViewModel {
         status.set("Image received from " + senderId);
     }
 
+    /**
+     * Replaces a loading image placeholder with a failure marker when async
+     * download/decrypt fails.
+     *
+     * @param senderId  sender/contact id for status text
+     * @param loadingVm placeholder message currently shown in timeline
+     * @param timestamp timestamp reused for the fallback failure bubble
+     * @param ex        failure that occurred while resolving the attachment
+     */
     private void replaceLoadingWithFailure(String senderId,
             MessageVM loadingVm,
             LocalDateTime timestamp,
@@ -356,6 +493,15 @@ public class MessageViewModel {
         status.set("Failed to load image: " + ex.getMessage());
     }
 
+    /**
+     * Sends an attachment inline inside a single message payload.
+     *
+     * @param recipientId recipient user/contact id
+     * @param fileName    original file name included in payload metadata
+     * @param mediaType   normalized MIME/content type of the attachment
+     * @param fileBytes   attachment bytes to embed as Base64
+     * @throws Exception when serialization or send operation fails
+     */
     private void sendInlineAttachment(String recipientId,
             String fileName,
             String mediaType,
@@ -374,6 +520,18 @@ public class MessageViewModel {
                 MessageHeader.MAX_TTL_SECONDS);
     }
 
+    /**
+     * Sends an attachment through the chunked upload flow and then emits a
+     * reference message envelope.
+     *
+     * @param recipientId recipient user/contact id
+     * @param fileName    original client-side file name
+     * @param mediaType   normalized MIME/content type
+     * @param fileBytes   plaintext attachment bytes
+     * @param policy      current messaging policy snapshot used for chunk sizing
+     * @throws Exception when encryption, upload, completion, reference send, or
+     *                   bind fails
+     */
     private void sendChunkedAttachment(String recipientId,
             String fileName,
             String mediaType,
@@ -444,6 +602,18 @@ public class MessageViewModel {
         ensureNoError(bindResponse.getError());
     }
 
+    /**
+     * Decodes an inbound payload into a UI message model according to its content
+     * type.
+     *
+     * @param plaintext        decrypted payload bytes
+     * @param senderId         normalized sender/contact id
+     * @param contentType      payload MIME/content type; defaults to
+     *                         {@code text/plain} when {@code null}
+     * @param timestampEpochMs server timestamp in epoch milliseconds
+     * @return message model ready for timeline rendering
+     * @throws Exception when attachment decoding or reference resolution fails
+     */
     private MessageVM decodeIncoming(byte[] plaintext,
             String senderId,
             String contentType,
@@ -483,7 +653,19 @@ public class MessageViewModel {
         return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
     }
 
-    private MessageVM decodeAttachmentReference(AttachmentReferencePayload ref, LocalDateTime timestamp) throws Exception {
+    /**
+     * Downloads and decrypts a referenced attachment, then converts it into a
+     * timeline message model.
+     *
+     * @param ref       reference payload carrying attachment id and display
+     *                  metadata
+     * @param timestamp timestamp to apply to the produced message model
+     * @return decoded attachment message model
+     * @throws Exception when download payload is invalid or decrypt/parse
+     *                   operations fail
+     */
+    private MessageVM decodeAttachmentReference(AttachmentReferencePayload ref, LocalDateTime timestamp)
+            throws Exception {
         AttachmentDownloadResponse downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
         ensureNoError(downloadResponse.getError());
         if (downloadResponse.getEncryptedBlobB64() == null || downloadResponse.getEncryptedBlobB64().isBlank()) {
@@ -498,6 +680,12 @@ public class MessageViewModel {
         return toAttachmentVm(false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);
     }
 
+    /**
+     * Returns cached messaging policy, loading it from backend once on first use.
+     *
+     * @return active messaging policy snapshot
+     * @throws IOException when policy cannot be loaded or backend reports an error
+     */
     private MessagingPolicyResponse getMessagingPolicy() throws IOException {
         MessagingPolicyResponse existing = cachedPolicy;
         if (existing != null) {
@@ -517,6 +705,16 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Validates attachment MIME type and size against the backend policy
+     * constraints.
+     *
+     * @param mediaType normalized MIME/content type to validate
+     * @param sizeBytes attachment size in bytes
+     * @param policy    policy snapshot with limits and allowlist
+     * @throws IllegalArgumentException when size exceeds maximum or MIME type is
+     *                                  disallowed
+     */
     private void validateAgainstPolicy(String mediaType, long sizeBytes, MessagingPolicyResponse policy) {
         if (sizeBytes > policy.getAttachmentMaxBytes()) {
             throw new IllegalArgumentException("Attachment exceeds maximum allowed size");
@@ -537,6 +735,15 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Normalizes attachment MIME type using explicit hint, OS probe, then extension
+     * fallback mapping.
+     *
+     * @param hint     optional caller-provided MIME hint
+     * @param filePath file path used for content probing and extension fallback
+     * @return normalized MIME/content type suitable for policy and transport
+     * @throws IllegalArgumentException when no supported MIME type can be inferred
+     */
     private static String normalizeMediaType(String hint, Path filePath) {
         String normalized = AttachmentConstants.normalizeMimeType(hint);
         if (normalized != null) {
@@ -578,6 +785,15 @@ public class MessageViewModel {
         throw new IllegalArgumentException("Unable to detect attachment MIME type");
     }
 
+    /**
+     * Sanitizes a user-provided attachment file name before embedding it in
+     * transport payloads.
+     *
+     * @param fileName raw file name
+     * @return safe file name
+     * @throws IllegalArgumentException when name is blank or includes path
+     *                                  separators
+     */
     private static String sanitizeFileName(String fileName) {
         if (fileName == null || fileName.isBlank()) {
             throw new IllegalArgumentException("Attachment filename is invalid");
@@ -588,12 +804,30 @@ public class MessageViewModel {
         return fileName;
     }
 
+    /**
+     * Raises transport errors returned by backend API operations.
+     *
+     * @param error backend-provided error text
+     * @throws IOException when error text is present
+     */
     private static void ensureNoError(String error) throws IOException {
         if (error != null && !error.isBlank()) {
             throw new IOException(error);
         }
     }
 
+    /**
+     * Converts attachment bytes and metadata into the appropriate image/file
+     * message model for UI rendering.
+     *
+     * @param outgoing  whether message should be marked as sent by current user
+     * @param fileBytes attachment payload bytes
+     * @param mediaType MIME/content type used to choose image versus generic file
+     *                  rendering
+     * @param fileName  display file name
+     * @param timestamp message timestamp
+     * @return attachment message view-model
+     */
     private static MessageVM toAttachmentVm(boolean outgoing,
             byte[] fileBytes,
             String mediaType,
@@ -607,9 +841,18 @@ public class MessageViewModel {
 
         String ext = extensionFor(mediaType);
         String localPath = writeTempFile(fileBytes, "haf-file-", ext);
-        return new MessageVM(outgoing, MessageType.FILE, null, localPath, fileName, formatSize(fileBytes.length), timestamp, false);
+        return new MessageVM(outgoing, MessageType.FILE, null, localPath, fileName, formatSize(fileBytes.length),
+                timestamp, false);
     }
 
+    /**
+     * Produces a safe image display name, defaulting to a synthetic value when the
+     * provided name is unsafe.
+     *
+     * @param fileName  candidate file name from payload metadata
+     * @param mediaType MIME type used to derive default extension
+     * @return sanitized image display name
+     */
     private static String sanitizeImageName(String fileName, String mediaType) {
         String extension = extensionFor(mediaType);
         if (fileName != null && !fileName.isBlank()) {
@@ -621,6 +864,16 @@ public class MessageViewModel {
         return "image" + extension;
     }
 
+    /**
+     * Persists bytes into a temporary local file and returns its URI for JavaFX
+     * media/image loaders.
+     *
+     * @param data   bytes to write
+     * @param prefix temporary-file prefix
+     * @param suffix temporary-file suffix/extension
+     * @return URI string to the temporary file, or {@code null} when temp file
+     *         creation fails
+     */
     private static String writeTempFile(byte[] data, String prefix, String suffix) {
         try {
             Path tmp = Files.createTempFile(prefix, suffix);
@@ -632,6 +885,13 @@ public class MessageViewModel {
         }
     }
 
+    /**
+     * Maps MIME/content types to file extensions used by temporary attachment
+     * files.
+     *
+     * @param contentType normalized MIME/content type
+     * @return preferred extension, or {@code .dat} for unknown types
+     */
     private static String extensionFor(String contentType) {
         return switch (contentType) {
             case "image/png" -> ".png";
@@ -647,6 +907,12 @@ public class MessageViewModel {
         };
     }
 
+    /**
+     * Formats attachment size in bytes into a compact human-readable string.
+     *
+     * @param bytes size in bytes
+     * @return formatted size in B, KB or MB
+     */
     private static String formatSize(long bytes) {
         if (bytes < 1024)
             return bytes + " B";

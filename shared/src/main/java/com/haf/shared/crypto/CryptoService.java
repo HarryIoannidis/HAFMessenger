@@ -11,6 +11,9 @@ import java.security.SecureRandom;
 public final class CryptoService {
     private static final SecureRandom secureRandom = new SecureRandom();
 
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private CryptoService() {} //
 
     /**
@@ -46,6 +49,8 @@ public final class CryptoService {
      * @param iv 12 bytes IV
      * @param aad authenticated additional data
      * @return encrypted bytes (ciphertext+tag)
+     * @throws GeneralSecurityException if AES-GCM initialization or encryption fails
+     * @throws IllegalArgumentException if {@code iv} is null or not 12 bytes
      */
     public static byte[] encryptAesGcm(byte[] plaintext, SecretKey key, byte[] iv, byte[] aad) throws GeneralSecurityException {
         if (iv == null || iv.length != CryptoConstants.GCM_IV_BYTES) {
@@ -71,6 +76,8 @@ public final class CryptoService {
      * @param iv 12 bytes IV
      * @param aad authenticated additional data (optional)
      * @return plaintext bytes
+     * @throws GeneralSecurityException if AES-GCM initialization or decryption fails
+     * @throws IllegalArgumentException if {@code iv} is null or not 12 bytes
      */
     public static byte[] decryptAesGcm(byte[] ciphertext, SecretKey key, byte[] iv, byte[] aad) throws GeneralSecurityException {
         if (iv == null || iv.length != CryptoConstants.GCM_IV_BYTES) {

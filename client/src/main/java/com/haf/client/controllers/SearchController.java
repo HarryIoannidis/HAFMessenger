@@ -50,6 +50,9 @@ public class SearchController {
     private final AtomicInteger renderGeneration = new AtomicInteger();
     private SearchContactActions contactActions = SearchContactActions.NO_OP;
 
+    /**
+     * Initializes bindings, infinite scroll behavior, and idle search state.
+     */
     @FXML
     public void initialize() {
         bindViewModel();
@@ -83,6 +86,9 @@ public class SearchController {
         viewModel.clearResults();
     }
 
+    /**
+     * Binds view-model state to search view components.
+     */
     private void bindViewModel() {
         statusText.textProperty().bind(viewModel.statusTextProperty());
 
@@ -93,6 +99,9 @@ public class SearchController {
         renderAllResults(viewModel.resultsProperty());
     }
 
+    /**
+     * Enables lazy pagination when scrolling near the bottom of result list.
+     */
     private void bindInfiniteScroll() {
         if (resultsScrollPane == null) {
             return;
@@ -105,6 +114,12 @@ public class SearchController {
         });
     }
 
+    /**
+     * Reacts to result-list mutations and decides whether to re-render all rows or
+     * append only additions.
+     *
+     * @param change change descriptor emitted by observable result list
+     */
     private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResultDTO> change) {
         boolean needsFullRender = false;
         List<UserSearchResultDTO> addedRows = null;
@@ -131,11 +146,22 @@ public class SearchController {
         }
     }
 
+    /**
+     * Toggles visibility of status placeholder and results pane.
+     *
+     * @param hasResults whether at least one search result exists
+     */
     private void updateResultsVisibility(boolean hasResults) {
         statusBox.setVisible(!hasResults);
         resultsPane.setVisible(hasResults);
     }
 
+    /**
+     * Renders the full result snapshot asynchronously and swaps card list when
+     * ready.
+     *
+     * @param results full result snapshot to render
+     */
     private void renderAllResults(List<UserSearchResultDTO> results) {
         int generation = renderGeneration.incrementAndGet();
 
@@ -168,6 +194,11 @@ public class SearchController {
         });
     }
 
+    /**
+     * Appends newly added result cards without rebuilding existing rendered cards.
+     *
+     * @param results newly added results
+     */
     private void appendResults(List<UserSearchResultDTO> results) {
         int generation = renderGeneration.get();
         if (results == null || results.isEmpty()) {
@@ -198,6 +229,11 @@ public class SearchController {
         });
     }
 
+    /**
+     * Injects contact/chat action callbacks used by search result buttons.
+     *
+     * @param contactActions action port used for add/remove/start-chat/open-profile operations
+     */
     public void setContactActions(SearchContactActions contactActions) {
         this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
     }
@@ -205,10 +241,11 @@ public class SearchController {
     /**
      * Fills in the fx:id nodes of a loaded search_result_item card.
      *
-     * <p>
      * We look up nodes by their {@code fx:id} rather than coupling to a
      * sub-controller, keeping the design simple.
-     * </p>
+     *
+     * @param card loaded result-card node
+     * @param result data object to render inside the card
      */
     private void populateCard(javafx.scene.Node card, UserSearchResultDTO result) {
         populateTextElements(card, result);
@@ -276,6 +313,12 @@ public class SearchController {
         setupStartChatButton(startChatButton, removeButton, result);
     }
 
+    /**
+     * Enables profile-open behavior when users click on non-action areas of a card.
+     *
+     * @param card result card node
+     * @param result represented user search result
+     */
     private void setupCardProfileOpen(javafx.scene.Node card, UserSearchResultDTO result) {
         if (card == null) {
             return;
@@ -295,6 +338,12 @@ public class SearchController {
         });
     }
 
+    /**
+     * Checks whether a clicked node belongs to an action button subtree.
+     *
+     * @param node clicked node from pick result
+     * @return {@code true} when click originated from remove/start-chat button hierarchy
+     */
     private boolean isWithinActionButton(Node node) {
         Node cursor = node;
         while (cursor != null) {
@@ -359,16 +408,34 @@ public class SearchController {
         removeButton.setText(resolveToggleLabel(userId));
     }
 
+    /**
+     * Resolves add/remove label text for a user based on current contact state.
+     *
+     * @param userId user identifier to evaluate
+     * @return UI label for toggle action button
+     */
     String resolveToggleLabel(String userId) {
         SearchViewModel.ContactToggleAction action = viewModel
                 .resolveContactToggleAction(contactActions.hasContact(userId));
         return viewModel.resolveContactToggleLabel(action);
     }
 
+    /**
+     * Toggles contact membership for a result without post-action callback.
+     *
+     * @param result search result whose contact state should be toggled
+     */
     void handleToggleContact(UserSearchResultDTO result) {
         handleToggleContact(result, null);
     }
 
+    /**
+     * Toggles contact membership for a result and invokes optional completion
+     * callback.
+     *
+     * @param result search result whose contact state should be toggled
+     * @param onActionCompleted callback invoked after toggle action completes
+     */
     private void handleToggleContact(UserSearchResultDTO result, Runnable onActionCompleted) {
         if (result == null) {
             return;
@@ -387,6 +454,13 @@ public class SearchController {
                 () -> confirmRemoveContact(result, onActionCompleted));
     }
 
+    /**
+     * Executes add/remove contact policy based on resolved toggle action.
+     *
+     * @param action resolved contact toggle action
+     * @param addContactAction callback for add-contact branch
+     * @param confirmRemoveContactAction callback for remove-contact branch
+     */
     static void applyContactToggleAction(
             SearchViewModel.ContactToggleAction action,
             Runnable addContactAction,
@@ -401,6 +475,12 @@ public class SearchController {
         }
     }
 
+    /**
+     * Displays a confirmation popup before removing an existing contact.
+     *
+     * @param result target contact represented as search result
+     * @param onActionCompleted callback invoked after removal
+     */
     private void confirmRemoveContact(UserSearchResultDTO result, Runnable onActionCompleted) {
         if (result == null || result.getUserId() == null || result.getUserId().isBlank()) {
             return;
@@ -421,6 +501,13 @@ public class SearchController {
                 .show();
     }
 
+    /**
+     * Resolves display name used in confirmation prompts.
+     *
+     * @param fullName full name candidate
+     * @param userId fallback user id
+     * @return best display label for the target contact
+     */
     private static String resolveContactDisplayName(String fullName, String userId) {
         if (fullName != null && !fullName.isBlank()) {
             return fullName.trim();
@@ -431,12 +518,22 @@ public class SearchController {
         return "this user";
     }
 
+    /**
+     * Executes callback only when non-null.
+     *
+     * @param action callback to execute
+     */
     private static void runIfPresent(Runnable action) {
         if (action != null) {
             action.run();
         }
     }
 
+    /**
+     * Delegates chat-start action to injected contact actions port.
+     *
+     * @param result selected search result
+     */
     void handleStartChat(UserSearchResultDTO result) {
         if (result == null) {
             return;
@@ -445,6 +542,11 @@ public class SearchController {
         contactActions.startChatWith(result);
     }
 
+    /**
+     * Delegates profile-open action to injected contact actions port.
+     *
+     * @param result selected search result
+     */
     void handleOpenProfile(UserSearchResultDTO result) {
         if (result == null) {
             return;
@@ -459,9 +561,18 @@ public class SearchController {
      */
     private static final class RankIconResolver {
 
+        /**
+         * Prevents instantiation of this static icon mapping utility.
+         */
         private RankIconResolver() {
         }
 
+        /**
+         * Maps a rank label to its corresponding icon path in {@link UiConstants}.
+         *
+         * @param rank rank label
+         * @return icon resource path for the provided rank (or default icon path)
+         */
         static String resolve(String rank) {
             return switch (rank) {
                 case UiConstants.RANK_YPOSMINIAS -> UiConstants.ICON_RANK_YPOSMINIAS;

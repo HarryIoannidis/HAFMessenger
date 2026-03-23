@@ -30,58 +30,128 @@ public class LoginViewModel {
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final BooleanProperty passwordVisible = new SimpleBooleanProperty(false);
 
+    /**
+     * Exposes the email input property used by the login form.
+     *
+     * @return observable email property
+     */
     public StringProperty emailProperty() {
         return email;
     }
 
+    /**
+     * Exposes the password input property used by the login form.
+     *
+     * @return observable password property
+     */
     public StringProperty passwordProperty() {
         return password;
     }
 
+    /**
+     * Exposes the remember-me toggle property.
+     *
+     * @return observable remember-credentials property
+     */
     public BooleanProperty rememberCredentialsProperty() {
         return rememberCredentials;
     }
 
+    /**
+     * Exposes the login error message shown in the UI.
+     *
+     * @return observable error message property
+     */
     public StringProperty errorMessageProperty() {
         return errorMessage;
     }
 
+    /**
+     * Exposes whether the email field is currently in an error state.
+     *
+     * @return observable email-error property
+     */
     public BooleanProperty emailErrorProperty() {
         return emailError;
     }
 
+    /**
+     * Exposes whether the password field is currently in an error state.
+     *
+     * @return observable password-error property
+     */
     public BooleanProperty passwordErrorProperty() {
         return passwordError;
     }
 
+    /**
+     * Exposes whether a login operation is in progress.
+     *
+     * @return observable loading property
+     */
     public BooleanProperty loadingProperty() {
         return loading;
     }
 
+    /**
+     * Exposes whether the password should be shown in plain text.
+     *
+     * @return observable password-visibility property
+     */
     public BooleanProperty passwordVisibleProperty() {
         return passwordVisible;
     }
 
+    /**
+     * Returns the current email value.
+     *
+     * @return email value entered by the user
+     */
     public String getEmail() {
         return email.get();
     }
 
+    /**
+     * Updates the email value.
+     *
+     * @param value new email value
+     */
     public void setEmail(String value) {
         email.set(value);
     }
 
+    /**
+     * Returns the current password value.
+     *
+     * @return password value entered by the user
+     */
     public String getPassword() {
         return password.get();
     }
 
+    /**
+     * Updates the password value.
+     *
+     * @param value new password value
+     */
     public void setPassword(String value) {
         password.set(value);
     }
 
+    /**
+     * Indicates whether remember-credentials is enabled.
+     *
+     * @return {@code true} when remember-me is selected
+     */
     public boolean isRememberCredentials() {
         return rememberCredentials.get();
     }
 
+    /**
+     * Returns the currently displayed error message.
+     *
+     * @return login error message text
+     */
     public String getErrorMessage() {
         return errorMessage.get();
     }

@@ -169,6 +169,20 @@ public class ViewRouter {
         return mainStage;
     }
 
+    /**
+     * Shows (or reuses) a keyed popup window and optionally configures its
+     * controller before display.
+     *
+     * @param popupKey            unique popup key used to cache/reuse stage
+     *                            instances
+     * @param fxmlPath            popup FXML path to load when the popup is first
+     *                            created
+     * @param controllerType      expected controller type for the loaded popup
+     * @param configureController optional callback to configure the popup
+     *                            controller before showing
+     * @param <T>                 concrete popup controller type
+     * @throws IllegalStateException if the main stage is not initialized
+     */
     public static <T> void showPopup(
             String popupKey,
             String fxmlPath,
@@ -212,6 +226,18 @@ public class ViewRouter {
         mainStage.close();
     }
 
+    /**
+     * Loads a popup FXML and creates a transparent popup stage bound to the main
+     * stage.
+     *
+     * @param fxmlPath       popup FXML resource path
+     * @param controllerType expected controller class
+     * @param <T>            concrete controller type
+     * @return popup stage + controller wrapper used by popup cache
+     * @throws UncheckedIOException  when the FXML cannot be loaded
+     * @throws IllegalStateException when loaded controller type does not match
+     *                               {@code controllerType}
+     */
     private static <T> PopupEntry loadPopupEntry(String fxmlPath, Class<T> controllerType) {
         try {
             var resource = ViewRouter.class.getResource(fxmlPath);
@@ -246,6 +272,11 @@ public class ViewRouter {
         }
     }
 
+    /**
+     * Centers a popup stage over the current main stage bounds.
+     *
+     * @param popupStage popup stage to reposition
+     */
     private static void centerPopupOverMainStage(Stage popupStage) {
         double popupWidth = popupStage.getWidth();
         double popupHeight = popupStage.getHeight();
@@ -262,6 +293,9 @@ public class ViewRouter {
         popupStage.setY(targetY);
     }
 
+    /**
+     * Closes all tracked popup stages and clears the popup cache.
+     */
     private static void closeAllPopups() {
         for (PopupEntry entry : popupEntries.values()) {
             Stage stage = entry.stage();

@@ -52,6 +52,9 @@ public class PreviewController {
     private String suggestedFileName;
     private boolean downloadAllowed;
 
+    /**
+     * Initializes window controls and download button wiring.
+     */
     @FXML
     public void initialize() {
         setupWindowControls();
@@ -60,6 +63,13 @@ public class PreviewController {
         }
     }
 
+    /**
+     * Displays an image preview and configures optional download support.
+     *
+     * @param imageUriOrPath image URI/path to preview
+     * @param suggestedFileName preferred filename shown in save dialog
+     * @param downloadAllowed whether downloading the previewed image is allowed
+     */
     public void showImage(String imageUriOrPath, String suggestedFileName, boolean downloadAllowed) {
         this.imageUriOrPath = imageUriOrPath;
         this.suggestedFileName = suggestedFileName;
@@ -69,6 +79,11 @@ public class PreviewController {
         loadPreviewImage(imageUriOrPath);
     }
 
+    /**
+     * Updates visibility and enabled state for the download button.
+     *
+     * @param allowed whether the current preview source can be downloaded
+     */
     private void configureDownloadButton(boolean allowed) {
         if (downloadButton == null) {
             return;
@@ -78,6 +93,11 @@ public class PreviewController {
         downloadButton.setDisable(!allowed);
     }
 
+    /**
+     * Loads an image into the preview component and tracks loading progress.
+     *
+     * @param source URI/path source to load into the preview image view
+     */
     private void loadPreviewImage(String source) {
         if (previewImageView == null) {
             return;
@@ -120,6 +140,9 @@ public class PreviewController {
         }
     }
 
+    /**
+     * Handles user-initiated image download from the preview popup.
+     */
     private void handleDownloadClick() {
         if (!downloadAllowed) {
             return;
@@ -154,6 +177,9 @@ public class PreviewController {
         }
     }
 
+    /**
+     * Configures drag/move/minimize/close behavior for the preview window.
+     */
     private void setupWindowControls() {
         Platform.runLater(() -> {
             Stage stage = resolveStage();
@@ -184,6 +210,11 @@ public class PreviewController {
         });
     }
 
+    /**
+     * Resolves the stage hosting this preview controller.
+     *
+     * @return host stage, or {@code null} when scene/window has not been attached
+     */
     private Stage resolveStage() {
         if (rootContainer == null || rootContainer.getScene() == null || rootContainer.getScene().getWindow() == null) {
             return null;
@@ -191,6 +222,11 @@ public class PreviewController {
         return (Stage) rootContainer.getScene().getWindow();
     }
 
+    /**
+     * Scales preview image dimensions to fit max bounds while preserving aspect ratio.
+     *
+     * @param image loaded image to size in the preview container
+     */
     private void applyImageDimensions(Image image) {
         if (image == null || image.isError()) {
             return;
@@ -209,6 +245,11 @@ public class PreviewController {
         }
     }
 
+    /**
+     * Shows or hides the loading spinner.
+     *
+     * @param visible whether spinner should be visible/managed
+     */
     private void setSpinnerVisible(boolean visible) {
         if (loadingSpinner == null) {
             return;
@@ -217,6 +258,11 @@ public class PreviewController {
         loadingSpinner.setManaged(visible);
     }
 
+    /**
+     * Displays an attachment-related error popup.
+     *
+     * @param message user-facing error message to display
+     */
     private void showAttachmentError(String message) {
         PopupMessageSpec spec = buildAttachmentErrorSpec(message);
         PopupMessageBuilder.create()
@@ -228,6 +274,12 @@ public class PreviewController {
                 .show();
     }
 
+    /**
+     * Builds a standardized popup spec for attachment preview/save failures.
+     *
+     * @param message error message to show, or blank for default fallback
+     * @return popup specification configured for attachment-error dialogs
+     */
     static PopupMessageSpec buildAttachmentErrorSpec(String message) {
         String resolved = message == null || message.isBlank() ? "Attachment operation failed." : message;
         return new PopupMessageSpec(

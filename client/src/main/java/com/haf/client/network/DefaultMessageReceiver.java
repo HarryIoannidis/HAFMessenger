@@ -99,60 +99,76 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param json the JSON string containing EncryptedMessage
      */
     private void handleIncomingMessage(String json) {
-        String envelopeId = null;
         try {
-            java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
-            Object type = envelope.get("type");
-            if ("presence".equals(type)) {
-                handlePresenceEvent(envelope);
-                return;
-            }
-            if (!"message".equals(type)) {
-                return;
-            }
-
-            // Deduplicate: skip messages we have already processed in this session.
-            Object envId = envelope.get("envelopeId");
-            envelopeId = envId != null ? String.valueOf(envId) : null;
-            if (envelopeId != null && !seenEnvelopeIds.add(envelopeId)) {
-                return;
-            }
-
-            Object payloadObj = envelope.get("payload");
-            if (payloadObj == null) {
-                return;
-            }
-
-            EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj),
-                    EncryptedMessage.class);
-
-            processEncryptedMessage(encryptedMessage, envelopeId);
+            parseAndProcessEnvelope(json);
         } catch (MessageTamperedException e) {
-            LOGGER.log(Level.WARNING, "Undecryptable envelope {0}; acknowledging to prevent endless retries.",
-                    envelopeId);
-            acknowledgeUndecryptableEnvelope(envelopeId);
-            if (messageListener != null) {
-                messageListener.onError(e);
-            }
+            LOGGER.log(Level.WARNING, "Undecryptable envelope; acknowledging to prevent endless retries.");
+            notifyError(e);
         } catch (KeystoreOperationException e) {
             LOGGER.log(Level.WARNING, "Keystore decryption failed: {0}", e.getMessage());
-            if (messageListener != null) {
-                messageListener.onError(
-                        new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
-            }
+            notifyError(new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
         } catch (MessageValidationException | MessageExpiredException e) {
-            LOGGER.log(Level.FINE, "Rejected incoming envelope {0}: {1}", new Object[] { envelopeId, e.getMessage() });
-            if (messageListener != null) {
-                messageListener.onError(e);
-            }
+            LOGGER.log(Level.FINE, "Rejected incoming envelope: {0}", e.getMessage());
+            notifyError(e);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to process inbound message: {0}", e.getMessage());
-            if (messageListener != null) {
-                messageListener.onError(new IOException("Failed to process message: " + e.getMessage(), e));
-            }
+            notifyError(new IOException("Failed to process message: " + e.getMessage(), e));
         }
     }
 
+    /**
+     * Parses the JSON envelope and dispatches the message for processing.
+     *
+     * @param json the raw JSON string from the WebSocket
+     * @return the envelope ID (may be {@code null})
+     * @throws Exception when parsing, validation, or decryption fails
+     */
+    private String parseAndProcessEnvelope(String json) throws Exception {
+        java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
+        Object type = envelope.get("type");
+        if ("presence".equals(type)) {
+            handlePresenceEvent(envelope);
+            return null;
+        }
+        if (!"message".equals(type)) {
+            return null;
+        }
+
+        // Deduplicate: skip messages we have already processed in this session.
+        Object envId = envelope.get("envelopeId");
+        String envelopeId = envId != null ? String.valueOf(envId) : null;
+        if (envelopeId != null && !seenEnvelopeIds.add(envelopeId)) {
+            return envelopeId;
+        }
+
+        Object payloadObj = envelope.get("payload");
+        if (payloadObj == null) {
+            return envelopeId;
+        }
+
+        EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj),
+                EncryptedMessage.class);
+
+        processEncryptedMessage(encryptedMessage, envelopeId);
+        return envelopeId;
+    }
+
+    /**
+     * Forwards an error to the message listener if one is registered.
+     *
+     * @param error the error to report
+     */
+    private void notifyError(Throwable error) {
+        if (messageListener != null) {
+            messageListener.onError(error);
+        }
+    }
+
+    /**
+     * Processes presence envelopes and forwards updates to the registered listener.
+     *
+     * @param envelope parsed envelope map containing presence fields
+     */
     private void handlePresenceEvent(java.util.Map<?, ?> envelope) {
         Object userIdRaw = envelope.get("userId");
         Object activeRaw = envelope.get("active");
@@ -165,6 +181,12 @@ public class DefaultMessageReceiver implements MessageReceiver {
         messageListener.onPresenceUpdate(userId, active);
     }
 
+    /**
+     * Coerces arbitrary envelope values into boolean flags.
+     *
+     * @param value raw presence value from parsed JSON
+     * @return boolean interpretation of the given value
+     */
     private boolean toBoolean(Object value) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -172,17 +194,13 @@ public class DefaultMessageReceiver implements MessageReceiver {
         return Boolean.parseBoolean(String.valueOf(value));
     }
 
-    private void acknowledgeUndecryptableEnvelope(String envelopeId) {
-        if (envelopeId == null || envelopeId.isBlank()) {
-            return;
-        }
-        try {
-            webSocketAdapter.sendText("{\"envelopeIds\":[\"" + envelopeId + "\"]}");
-        } catch (IOException ackError) {
-            LOGGER.log(Level.WARNING, ackError, () -> "Failed to acknowledge undecryptable envelope " + envelopeId);
-        }
-    }
-
+    /**
+     * Validates, decrypts, and dispatches a received encrypted envelope.
+     *
+     * @param encryptedMessage incoming encrypted payload
+     * @param envelopeId       server envelope id used for deferred ACK handling
+     * @throws Exception when validation or decryption fails
+     */
     private void processEncryptedMessage(EncryptedMessage encryptedMessage, String envelopeId) throws Exception {
         // Validate with MessageValidator
         List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
@@ -215,6 +233,15 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
     }
 
+    /**
+     * Attempts message decryption with current private key and falls back to older
+     * local keys when AEAD verification fails.
+     *
+     * @param encryptedMessage encrypted message to decrypt
+     * @param envelopeId       envelope id for diagnostic logging
+     * @return decrypted plaintext bytes
+     * @throws Exception when all decryption attempts fail
+     */
     private byte[] decryptWithFallbackKeys(EncryptedMessage encryptedMessage, String envelopeId) throws Exception {
         PrivateKey privateKey = loadLocalPrivateKey();
         MessageDecryptor decryptor = new MessageDecryptor(privateKey, clockProvider);
@@ -264,6 +291,13 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
     }
 
+    /**
+     * Loads key metadata and sorts it so fallback attempts prefer current/recent
+     * keys first.
+     *
+     * @param userKeyProvider key provider exposing keystore metadata
+     * @return sorted metadata list, or empty list when metadata cannot be loaded
+     */
     private List<KeyMetadata> loadSortedKeyMetadata(UserKeystoreKeyProvider userKeyProvider) {
         try {
             List<KeyMetadata> metadataList = new ArrayList<>(userKeyProvider.getKeyStore().listMetadata());
@@ -277,6 +311,12 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
     }
 
+    /**
+     * Verifies that a message has not expired based on timestamp + TTL.
+     *
+     * @param msg incoming encrypted message metadata
+     * @throws MessageExpiredException when message expiry time is in the past
+     */
     private void validateExpiry(EncryptedMessage msg) throws MessageExpiredException {
         long now = clockProvider.currentTimeMillis();
         long expiryTime = msg.getTimestampEpochMs() + msg.getTtlSeconds() * 1000L;
@@ -285,6 +325,14 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
     }
 
+    /**
+     * Decrypts a detached encrypted message without requiring websocket envelope
+     * context.
+     *
+     * @param encryptedMessage encrypted payload to decrypt
+     * @return decrypted plaintext bytes
+     * @throws Exception when validation/decryption fails
+     */
     @Override
     public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws Exception {
         if (encryptedMessage == null) {

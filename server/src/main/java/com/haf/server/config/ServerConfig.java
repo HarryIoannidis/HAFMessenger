@@ -318,6 +318,14 @@ public final class ServerConfig {
         }
     }
 
+    /**
+     * Parses a long value from a candidate string.
+     *
+     * @param candidate raw candidate value from environment input
+     * @param defaultValue fallback value used when candidate is blank
+     * @return parsed long value
+     * @throws ConfigurationException when candidate is non-blank but not a valid long
+     */
     private static long parseLong(String candidate, long defaultValue) {
         if (candidate == null || candidate.isBlank()) {
             return defaultValue;
@@ -329,6 +337,16 @@ public final class ServerConfig {
         }
     }
 
+    /**
+     * Parses and normalizes allowed attachment MIME types.
+     *
+     * Uses defaults when no value is provided, normalizes aliases, deduplicates entries, and validates that at
+     * least one type remains after normalization.
+     *
+     * @param candidate comma-separated MIME type string from configuration
+     * @return immutable list of normalized MIME types
+     * @throws ConfigurationException when no valid MIME types are configured
+     */
     private static List<String> parseAttachmentAllowedTypes(String candidate) {
         String source = candidate == null || candidate.isBlank()
                 ? String.join(",", AttachmentConstants.DEFAULT_ALLOWED_TYPES)
@@ -347,6 +365,11 @@ public final class ServerConfig {
         return List.copyOf(allowed);
     }
 
+    /**
+     * Validates search pagination/query configuration constraints.
+     *
+     * @throws ConfigurationException when configured search limits are inconsistent or out of range
+     */
     private void validateSearchConfig() {
         if (searchPageSize < 1) {
             throw new ConfigurationException("HAF_SEARCH_PAGE_SIZE must be >= 1");
@@ -365,6 +388,11 @@ public final class ServerConfig {
         }
     }
 
+    /**
+     * Validates attachment upload policy configuration constraints.
+     *
+     * @throws ConfigurationException when attachment limits or chunk sizing are invalid
+     */
     private void validateAttachmentConfig() {
         if (attachmentMaxBytes < 1) {
             throw new ConfigurationException("HAF_ATTACHMENT_MAX_BYTES must be >= 1");

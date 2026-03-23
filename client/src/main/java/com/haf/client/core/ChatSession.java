@@ -14,6 +14,9 @@ public final class ChatSession {
 
     private static MessageViewModel instance;
 
+    /**
+     * Prevents instantiation of this static session holder.
+     */
     private ChatSession() {
     }
 

@@ -47,6 +47,9 @@ public class SplashController {
 
     private final SplashViewModel viewModel = SplashViewModel.createDefault();
 
+    /**
+     * Initializes bindings and starts bootstrap flow.
+     */
     @FXML
     public void initialize() {
         bindViewModel();
@@ -99,6 +102,14 @@ public class SplashController {
                 .show();
     }
 
+    /**
+     * Creates a standardized startup-failure popup specification.
+     *
+     * @param error bootstrap error that should be presented
+     * @param onRetry callback executed when the user retries startup
+     * @param onExit callback executed when the user exits the app
+     * @return popup spec tailored to the failure category
+     */
     static PopupMessageSpec buildFailurePopupSpec(Throwable error, Runnable onRetry, Runnable onExit) {
         FailurePresentation presentation = classifyFailure(error);
         return new PopupMessageSpec(
@@ -113,6 +124,12 @@ public class SplashController {
                 onExit);
     }
 
+    /**
+     * Classifies startup failures into user-friendly categories/messages.
+     *
+     * @param error raw startup error
+     * @return title/message pair suitable for popup presentation
+     */
     static FailurePresentation classifyFailure(Throwable error) {
         Throwable root = rootCause(error);
         String details = root == null || root.getMessage() == null || root.getMessage().isBlank()
@@ -144,6 +161,13 @@ public class SplashController {
                 "Initialization could not complete. " + details);
     }
 
+    /**
+     * Determines whether a startup failure is network-related.
+     *
+     * @param root root throwable for type checks
+     * @param normalizedMessage lowercased error message text
+     * @return {@code true} when the failure appears to be connectivity-related
+     */
     private static boolean isNetworkFailure(Throwable root, String normalizedMessage) {
         if (root instanceof ConnectException
                 || root instanceof UnknownHostException
@@ -160,6 +184,12 @@ public class SplashController {
                 || normalizedMessage.contains("refused");
     }
 
+    /**
+     * Determines whether a startup failure indicates missing local resources.
+     *
+     * @param normalizedMessage lowercased error message text
+     * @return {@code true} when failure text indicates missing FXML/assets/resources
+     */
     private static boolean isResourceFailure(String normalizedMessage) {
         return normalizedMessage.contains("missing at")
                 || normalizedMessage.contains("resource")
@@ -168,6 +198,13 @@ public class SplashController {
                 || normalizedMessage.contains("/css/");
     }
 
+    /**
+     * Determines whether a startup failure indicates security/crypto setup issues.
+     *
+     * @param root root throwable for type checks
+     * @param normalizedMessage lowercased error message text
+     * @return {@code true} when failure appears security-related
+     */
     private static boolean isSecurityFailure(Throwable root, String normalizedMessage) {
         if (root instanceof GeneralSecurityException) {
             return true;
@@ -180,6 +217,12 @@ public class SplashController {
                 || normalizedMessage.contains("key agreement");
     }
 
+    /**
+     * Unwraps nested throwables to the deepest available cause.
+     *
+     * @param error throwable to inspect
+     * @return deepest cause, or {@code null} when input is {@code null}
+     */
     private static Throwable rootCause(Throwable error) {
         Throwable cause = error;
         while (cause != null && cause.getCause() != null) {

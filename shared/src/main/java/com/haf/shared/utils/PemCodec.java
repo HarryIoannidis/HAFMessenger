@@ -3,6 +3,9 @@ package com.haf.shared.utils;
 import java.util.Base64;
 
 public final class PemCodec {
+    /**
+     * Prevents instantiation of this utility class.
+     */
     private PemCodec() {
     }
 
@@ -24,6 +27,7 @@ public final class PemCodec {
      *
      * @param pem the PEM-encoded string
      * @return the DER-encoded byte array
+     * @throws IllegalArgumentException if the payload is not valid Base64
      */
     public static byte[] fromPem(String pem) {
         String b64 = pem.replaceAll("-----BEGIN [^-]+-----", "")
