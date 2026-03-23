@@ -249,6 +249,7 @@ public class SplashViewModel {
             requireResource(UiConstants.FXML_SEARCH_RESULT_ITEM, "Search result item view");
             requireResource(UiConstants.FXML_PROFILE, "Profile view");
             requireResource(UiConstants.FXML_PREVIEW, "Preview view");
+            requireResource(UiConstants.FXML_POPUP_MESSAGE, "Popup message view");
 
             // CSS resources
             requireResource(UiConstants.CSS_GLOBAL, "Global stylesheet");
@@ -260,6 +261,7 @@ public class SplashViewModel {
             requireResource(UiConstants.CSS_OPTIONS, "Options stylesheet");
             requireResource(UiConstants.CSS_PROFILE, "Profile stylesheet");
             requireResource(UiConstants.CSS_PREVIEW, "Preview stylesheet");
+            requireResource(UiConstants.CSS_POPUP, "Popup stylesheet");
 
             // Images
             requireResource(UiConstants.IMAGE_APP_LOGO, "Application logo");

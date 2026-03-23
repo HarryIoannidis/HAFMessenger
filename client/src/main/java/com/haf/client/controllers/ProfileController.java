@@ -1,10 +1,11 @@
 package com.haf.client.controllers;
 
 import com.haf.client.models.UserProfileInfo;
+import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
@@ -94,10 +95,13 @@ public class ProfileController {
 
     private void showStubDialog(String actionLabel) {
         LOGGER.log(Level.INFO, "{0} clicked.", actionLabel);
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setHeaderText(actionLabel);
-        alert.setContentText("This action is not implemented yet.");
-        alert.showAndWait();
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_PROFILE_STUB)
+                .title(actionLabel)
+                .message("This action is not implemented yet.")
+                .actionText("OK")
+                .singleAction(true)
+                .show();
     }
 
     private void setupWindowControls() {

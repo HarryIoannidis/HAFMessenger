@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.services.DefaultRegistrationService;
 import com.haf.client.services.RegistrationService;
+import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.RegisterViewModel;
@@ -812,10 +813,7 @@ public class RegisterController {
         }
 
         if (closeButton != null) {
-            closeButton.setOnAction(e -> {
-                javafx.application.Platform.exit();
-                System.exit(0);
-            });
+            closeButton.setOnAction(e -> confirmExitApplication());
         }
 
         // Enable window dragging via the title bar
@@ -951,5 +949,20 @@ public class RegisterController {
     // Get the selected rank
     public String getSelectedRank() {
         return rankComboBox.getValue();
+    }
+
+    private void confirmExitApplication() {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
+                .title("Exit application")
+                .message("Close HAF Messenger now?")
+                .actionText("Exit")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(() -> {
+                    javafx.application.Platform.exit();
+                    System.exit(0);
+                })
+                .show();
     }
 }

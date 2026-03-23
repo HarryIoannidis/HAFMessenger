@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.services.DefaultLoginService;
 import com.haf.client.services.LoginService;
+import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;
@@ -386,10 +387,7 @@ public class LoginController {
         }
 
         if (closeButton != null) {
-            closeButton.setOnAction(e -> {
-                javafx.application.Platform.exit();
-                System.exit(0);
-            });
+            closeButton.setOnAction(e -> confirmExitApplication());
         }
 
         // Enable window dragging via the title bar
@@ -433,5 +431,20 @@ public class LoginController {
         if (viewModel.passwordErrorProperty().get()) {
             shakeNode(passwordField.getParent());
         }
+    }
+
+    private void confirmExitApplication() {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
+                .title("Exit application")
+                .message("Close HAF Messenger now?")
+                .actionText("Exit")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(() -> {
+                    javafx.application.Platform.exit();
+                    System.exit(0);
+                })
+                .show();
     }
 }

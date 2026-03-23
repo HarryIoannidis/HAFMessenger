@@ -8,6 +8,7 @@ import com.haf.client.services.DefaultMainSessionService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ContextMenuBuilder;
+import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
@@ -140,7 +141,7 @@ public class MainController implements SearchContactActions {
 
     @FXML
     public void initialize() {
-        contentLoader = new MainContentLoader(contentPane, this);
+        contentLoader = new MainContentLoader(contentPane, this, this::handleViewLoadFailure);
         bindViewModel();
         bindSelectedContactProfileSync();
         setupWindowControls();
@@ -602,6 +603,23 @@ public class MainController implements SearchContactActions {
         }
     }
 
+    static void applyContactContextActionWithConfirmation(
+            ContactContextAction action,
+            Runnable openProfileAction,
+            Runnable confirmDeleteChatAction,
+            Runnable confirmRemoveContactAction) {
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(openProfileAction, "openProfileAction");
+        Objects.requireNonNull(confirmDeleteChatAction, "confirmDeleteChatAction");
+        Objects.requireNonNull(confirmRemoveContactAction, "confirmRemoveContactAction");
+
+        switch (action) {
+            case PROFILE -> openProfileAction.run();
+            case DELETE_CHAT -> confirmDeleteChatAction.run();
+            case REMOVE_CONTACT -> confirmRemoveContactAction.run();
+        }
+    }
+
     private void setupContactContextMenu() {
         contactContextMenu = ContextMenuBuilder.create()
                 .addOption(
@@ -681,11 +699,11 @@ public class MainController implements SearchContactActions {
             return;
         }
 
-        applyContactContextAction(
+        applyContactContextActionWithConfirmation(
                 action,
                 () -> openProfilePopup(UserProfileInfo.fromContact(target, false)),
-                () -> clearLocalChatHistory(target.id()),
-                () -> removeContact(target.id()));
+                () -> confirmDeleteChat(target),
+                () -> confirmRemoveContact(target));
     }
 
     private void clearLocalChatHistory(String contactId) {
@@ -727,10 +745,7 @@ public class MainController implements SearchContactActions {
             maximizeButton.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
         }
         if (closeButton != null) {
-            closeButton.setOnAction(e -> {
-                javafx.application.Platform.exit();
-                System.exit(0);
-            });
+            closeButton.setOnAction(e -> confirmExitApplication());
         }
 
         if (titleBar != null) {
@@ -759,7 +774,7 @@ public class MainController implements SearchContactActions {
                 .addOption("mdi2c-cog-outline", "Settings", () -> LOGGER.info("TODO: Settings clicked"))
                 .addOption("mdi2h-help-circle-outline", "Help", () -> LOGGER.info("TODO: Help clicked"))
                 .addSeparator()
-                .addOption("mdi2l-logout", "Log out", this::handleLogout)
+                .addOption("mdi2l-logout", "Log out", this::confirmLogout)
                 .build();
 
         dotsMenuButton.setOnAction(e -> {
@@ -794,6 +809,99 @@ public class MainController implements SearchContactActions {
             }
             Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
         });
+    }
+
+    private void confirmExitApplication() {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
+                .title("Exit application")
+                .message("Close HAF Messenger now?")
+                .actionText("Exit")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(this::exitApplication)
+                .show();
+    }
+
+    private void confirmDeleteChat(ContactInfo target) {
+        String contactName = target == null || target.name() == null || target.name().isBlank() ? "this contact"
+                : target.name();
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_DELETE_CHAT)
+                .title("Delete chat")
+                .message("Delete chat with " + contactName + "? This action is not recoverable.")
+                .actionText("Delete")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(() -> clearLocalChatHistory(target == null ? null : target.id()))
+                .show();
+    }
+
+    private void confirmRemoveContact(ContactInfo target) {
+        if (target == null || target.id() == null || target.id().isBlank()) {
+            return;
+        }
+        String contactName = resolveContactDisplayName(target.name(), target.id());
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_REMOVE_CONTACT)
+                .title("Remove contact")
+                .message("Remove contact with " + contactName + " from your contacts list?")
+                .actionText("Remove")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(() -> removeContact(target.id()))
+                .show();
+    }
+
+    private static String resolveContactDisplayName(String name, String id) {
+        if (name != null && !name.isBlank()) {
+            return name.trim();
+        }
+        if (id != null && !id.isBlank()) {
+            return "user " + id.trim();
+        }
+        return "this user";
+    }
+
+    private void confirmLogout() {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_LOGOUT)
+                .title("Log out")
+                .message("Do you want to log out now?")
+                .actionText("Log out")
+                .cancelText("Cancel")
+                .onAction(this::handleLogout)
+                .show();
+    }
+
+    private void exitApplication() {
+        Platform.exit();
+        System.exit(0);
+    }
+
+    private void handleViewLoadFailure(MainContentLoader.ViewKind viewKind, Throwable error, Runnable retryAction) {
+        String viewLabel = switch (viewKind) {
+            case PLACEHOLDER -> "placeholder";
+            case SEARCH -> "search";
+            case CHAT -> "chat";
+        };
+        String reason = error == null || error.getMessage() == null || error.getMessage().isBlank()
+                ? "Unknown error."
+                : error.getMessage();
+        Runnable task = () -> PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_VIEW_LOAD_ERROR)
+                .title("Failed to load view")
+                .message("Could not load " + viewLabel + " view. " + reason)
+                .actionText("Retry")
+                .cancelText("Cancel")
+                .onAction(retryAction)
+                .show();
+
+        if (Platform.isFxApplicationThread()) {
+            task.run();
+        } else {
+            Platform.runLater(task);
+        }
     }
 
     private void registerPresenceListener() {

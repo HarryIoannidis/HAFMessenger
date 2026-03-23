@@ -8,6 +8,8 @@ import com.haf.client.services.DefaultChatAttachmentService;
 import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.ImageSaveSupport;
 import com.haf.client.utils.MessageBubbleFactory;
+import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.ChatViewModel;
@@ -151,11 +153,14 @@ public class ChatController {
     }
 
     private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
-        List<MessageVM> addedMessages = new ArrayList<>();
+        List<MessageVM> addedMessages = null;
         boolean requiresFullRefresh = false;
 
         while (change.next()) {
             if (change.wasAdded() && !change.wasRemoved() && !change.wasPermutated() && !change.wasUpdated()) {
+                if (addedMessages == null) {
+                    addedMessages = new ArrayList<>();
+                }
                 addedMessages.addAll(change.getAddedSubList());
             } else {
                 requiresFullRefresh = true;
@@ -167,7 +172,7 @@ public class ChatController {
             return;
         }
 
-        if (!addedMessages.isEmpty()) {
+        if (addedMessages != null && !addedMessages.isEmpty()) {
             processAddedMessages(addedMessages, activeRecipient);
         }
     }
@@ -395,12 +400,14 @@ public class ChatController {
 
         String sourceReference = resolveDownloadSourceReference(message);
         if (sourceReference == null || sourceReference.isBlank()) {
+            showAttachmentError("Attachment source is unavailable.");
             return;
         }
 
         Path sourcePath = ImageSaveSupport.resolveLocalSourcePath(sourceReference);
         if (sourcePath == null || !Files.exists(sourcePath)) {
             LOGGER.warning("Attachment source path is unavailable for download.");
+            showAttachmentError("Attachment source file could not be found.");
             return;
         }
 
@@ -425,6 +432,7 @@ public class ChatController {
             Files.copy(sourcePath, destination, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Failed to save image download", ex);
+            showAttachmentError("Could not save attachment. Please try again.");
         }
     }
 
@@ -477,5 +485,30 @@ public class ChatController {
             return stage;
         }
         return null;
+    }
+
+    private void showAttachmentError(String message) {
+        PopupMessageSpec spec = buildAttachmentErrorSpec(message);
+        PopupMessageBuilder.create()
+                .popupKey(spec.popupKey())
+                .title(spec.title())
+                .message(spec.message())
+                .actionText(spec.actionText())
+                .singleAction(true)
+                .show();
+    }
+
+    static PopupMessageSpec buildAttachmentErrorSpec(String message) {
+        String resolved = message == null || message.isBlank() ? "Attachment operation failed." : message;
+        return new PopupMessageSpec(
+                UiConstants.POPUP_ATTACHMENT_ERROR,
+                "Attachment error",
+                resolved,
+                "OK",
+                "Cancel",
+                false,
+                false,
+                null,
+                null);
     }
 }

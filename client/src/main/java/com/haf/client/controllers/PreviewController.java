@@ -1,6 +1,9 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.ImageSaveSupport;
+import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.PopupMessageSpec;
+import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.WindowResizeHelper;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
@@ -114,6 +117,7 @@ public class PreviewController {
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Failed to load preview image", ex);
             setSpinnerVisible(false);
+            showAttachmentError("Could not load image preview.");
         }
     }
 
@@ -125,6 +129,7 @@ public class PreviewController {
         Path sourcePath = ImageSaveSupport.resolveLocalSourcePath(imageUriOrPath);
         if (sourcePath == null || !Files.exists(sourcePath)) {
             LOGGER.warning("Image source path is unavailable for download.");
+            showAttachmentError("Image source file could not be found.");
             return;
         }
 
@@ -146,6 +151,7 @@ public class PreviewController {
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Failed to save image preview download", ex);
+            showAttachmentError("Could not save image. Please try again.");
         }
     }
 
@@ -210,5 +216,30 @@ public class PreviewController {
         }
         loadingSpinner.setVisible(visible);
         loadingSpinner.setManaged(visible);
+    }
+
+    private void showAttachmentError(String message) {
+        PopupMessageSpec spec = buildAttachmentErrorSpec(message);
+        PopupMessageBuilder.create()
+                .popupKey(spec.popupKey())
+                .title(spec.title())
+                .message(spec.message())
+                .actionText(spec.actionText())
+                .singleAction(true)
+                .show();
+    }
+
+    static PopupMessageSpec buildAttachmentErrorSpec(String message) {
+        String resolved = message == null || message.isBlank() ? "Attachment operation failed." : message;
+        return new PopupMessageSpec(
+                UiConstants.POPUP_ATTACHMENT_ERROR,
+                "Attachment error",
+                resolved,
+                "OK",
+                "Cancel",
+                false,
+                false,
+                null,
+                null);
     }
 }

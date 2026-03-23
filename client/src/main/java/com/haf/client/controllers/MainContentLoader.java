@@ -20,23 +20,56 @@ import java.util.logging.Logger;
 final class MainContentLoader {
     private static final Logger LOGGER = Logger.getLogger(MainContentLoader.class.getName());
 
+    enum ViewKind {
+        PLACEHOLDER,
+        SEARCH,
+        CHAT
+    }
+
+    @FunctionalInterface
+    interface ViewLoadFailureHandler {
+        void onViewLoadFailure(ViewKind viewKind, Throwable error, Runnable retryAction);
+    }
+
+    @FunctionalInterface
+    interface ViewLoader {
+        LoadedView load(String fxmlPath) throws IOException;
+    }
+
+    record LoadedView(Parent view, Object controller) {
+    }
+
     private final StackPane contentPane;
     private final SearchContactActions searchContactActions;
+    private final ViewLoadFailureHandler viewLoadFailureHandler;
+    private final ViewLoader viewLoader;
 
     private SearchController searchController;
     private Parent currentChatView;
     private ChatController currentChatController;
     private String currentChatRecipientId;
 
-    private final CompletableFuture<Parent> placeholderFuture = new CompletableFuture<>();
-    private final CompletableFuture<Parent> searchFuture = new CompletableFuture<>();
+    private volatile CompletableFuture<Parent> placeholderFuture = new CompletableFuture<>();
+    private volatile CompletableFuture<Parent> searchFuture = new CompletableFuture<>();
     private final AtomicInteger chatLoadGeneration = new AtomicInteger();
     private final AtomicBoolean placeholderLoadingStarted = new AtomicBoolean(false);
     private final AtomicBoolean searchLoadingStarted = new AtomicBoolean(false);
 
-    MainContentLoader(StackPane contentPane, SearchContactActions searchContactActions) {
+    MainContentLoader(StackPane contentPane,
+            SearchContactActions searchContactActions,
+            ViewLoadFailureHandler viewLoadFailureHandler) {
+        this(contentPane, searchContactActions, viewLoadFailureHandler, MainContentLoader::loadFromFxml);
+    }
+
+    MainContentLoader(StackPane contentPane,
+            SearchContactActions searchContactActions,
+            ViewLoadFailureHandler viewLoadFailureHandler,
+            ViewLoader viewLoader) {
         this.contentPane = Objects.requireNonNull(contentPane, "contentPane");
         this.searchContactActions = Objects.requireNonNull(searchContactActions, "searchContactActions");
+        this.viewLoadFailureHandler = viewLoadFailureHandler == null ? (viewKind, error, retryAction) -> {
+        } : viewLoadFailureHandler;
+        this.viewLoader = Objects.requireNonNull(viewLoader, "viewLoader");
     }
 
     void triggerPreloading() {
@@ -47,14 +80,16 @@ final class MainContentLoader {
     }
 
     void showSearchView() {
-        searchFuture.thenAccept(view -> Platform.runLater(() -> contentPane.getChildren().setAll(view)));
+        CompletableFuture<Parent> future = ensureSearchFutureReady();
+        future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!searchLoadingStarted.get()) {
             ensureSearchLoaded();
         }
     }
 
     void showPlaceholder() {
-        placeholderFuture.thenAccept(view -> Platform.runLater(() -> contentPane.getChildren().setAll(view)));
+        CompletableFuture<Parent> future = ensurePlaceholderFutureReady();
+        future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!placeholderLoadingStarted.get()) {
             ensurePlaceholderLoaded();
         }
@@ -75,12 +110,13 @@ final class MainContentLoader {
 
         Runnable loadAction = () -> {
             try {
-                var resource = getClass().getResource(UiConstants.FXML_CHAT);
-                LOGGER.log(Level.INFO, "Loading chat FXML: {0}", resource);
-                FXMLLoader loader = new FXMLLoader(resource);
-                Parent view = loader.load();
+                LoadedView loaded = viewLoader.load(UiConstants.FXML_CHAT);
+                ChatController chatController = requireController(
+                        loaded.controller(),
+                        ChatController.class,
+                        UiConstants.FXML_CHAT);
+                Parent view = loaded.view();
 
-                ChatController chatController = loader.getController();
                 if (loadGeneration != chatLoadGeneration.get()) {
                     return;
                 }
@@ -92,14 +128,14 @@ final class MainContentLoader {
                 contentPane.getChildren().setAll(view);
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
+                notifyViewLoadFailure(
+                        ViewKind.CHAT,
+                        e,
+                        () -> retryShowChat(recipientId));
             }
         };
 
-        if (Platform.isFxApplicationThread()) {
-            loadAction.run();
-        } else {
-            Platform.runLater(loadAction);
-        }
+        runOnUiThread(loadAction);
     }
 
     SearchController getSearchController() {
@@ -127,24 +163,67 @@ final class MainContentLoader {
         }
     }
 
+    private void retryShowPlaceholder() {
+        resetPlaceholderCache();
+        showPlaceholder();
+    }
+
+    private void retryShowSearchView() {
+        resetSearchCache();
+        showSearchView();
+    }
+
+    private void retryShowChat(String recipientId) {
+        currentChatView = null;
+        currentChatController = null;
+        showChat(recipientId);
+    }
+
+    private synchronized void resetPlaceholderCache() {
+        placeholderFuture = new CompletableFuture<>();
+        placeholderLoadingStarted.set(false);
+    }
+
+    private synchronized void resetSearchCache() {
+        searchController = null;
+        searchFuture = new CompletableFuture<>();
+        searchLoadingStarted.set(false);
+    }
+
+    private synchronized CompletableFuture<Parent> ensurePlaceholderFutureReady() {
+        placeholderFuture = refreshFutureIfFailed(placeholderFuture, placeholderLoadingStarted.get());
+        return placeholderFuture;
+    }
+
+    private synchronized CompletableFuture<Parent> ensureSearchFutureReady() {
+        searchFuture = refreshFutureIfFailed(searchFuture, searchLoadingStarted.get());
+        return searchFuture;
+    }
+
     private void ensureSearchLoaded() {
         if (searchLoadingStarted.getAndSet(true)) {
             return;
         }
 
+        CompletableFuture<Parent> future = ensureSearchFutureReady();
         try {
-            var resource = getClass().getResource(UiConstants.FXML_SEARCH);
-            LOGGER.log(Level.INFO, "Loading search FXML: {0}", resource);
-            FXMLLoader loader = new FXMLLoader(resource);
-            Parent view = loader.load();
-            SearchController controller = loader.getController();
+            LoadedView loaded = viewLoader.load(UiConstants.FXML_SEARCH);
+            SearchController controller = requireController(
+                    loaded.controller(),
+                    SearchController.class,
+                    UiConstants.FXML_SEARCH);
             controller.setContactActions(searchContactActions);
 
             searchController = controller;
-            searchFuture.complete(view);
+            future.complete(loaded.view());
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
-            searchFuture.completeExceptionally(e);
+            future.completeExceptionally(e);
+            searchLoadingStarted.set(false);
+            notifyViewLoadFailure(
+                    ViewKind.SEARCH,
+                    e,
+                    this::retryShowSearchView);
         }
     }
 
@@ -153,15 +232,59 @@ final class MainContentLoader {
             return;
         }
 
+        CompletableFuture<Parent> future = ensurePlaceholderFutureReady();
         try {
-            var resource = getClass().getResource(UiConstants.FXML_PLACEHOLDER);
-            LOGGER.log(Level.INFO, "Loading placeholder FXML: {0}", resource);
-            FXMLLoader loader = new FXMLLoader(resource);
-            Parent view = loader.load();
-            placeholderFuture.complete(view);
+            LoadedView loaded = viewLoader.load(UiConstants.FXML_PLACEHOLDER);
+            future.complete(loaded.view());
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
-            placeholderFuture.completeExceptionally(e);
+            future.completeExceptionally(e);
+            placeholderLoadingStarted.set(false);
+            notifyViewLoadFailure(
+                    ViewKind.PLACEHOLDER,
+                    e,
+                    this::retryShowPlaceholder);
         }
+    }
+
+    private void notifyViewLoadFailure(ViewKind viewKind, Throwable error, Runnable retryAction) {
+        viewLoadFailureHandler.onViewLoadFailure(viewKind, error, retryAction);
+    }
+
+    private static <T> T requireController(Object controller, Class<T> expectedType, String fxmlPath) throws IOException {
+        if (!expectedType.isInstance(controller)) {
+            throw new IOException("Controller type mismatch for " + fxmlPath);
+        }
+        return expectedType.cast(controller);
+    }
+
+    private static LoadedView loadFromFxml(String fxmlPath) throws IOException {
+        var resource = MainContentLoader.class.getResource(fxmlPath);
+        LOGGER.log(Level.INFO, "Loading FXML: {0}", resource);
+        FXMLLoader loader = new FXMLLoader(resource);
+        Parent view = loader.load();
+        return new LoadedView(view, loader.getController());
+    }
+
+    private static void runOnUiThread(Runnable action) {
+        try {
+            if (Platform.isFxApplicationThread()) {
+                action.run();
+            } else {
+                Platform.runLater(action);
+            }
+        } catch (IllegalStateException ex) {
+            action.run();
+        }
+    }
+
+    static <T> CompletableFuture<T> refreshFutureIfFailed(CompletableFuture<T> future, boolean loadingStarted) {
+        if (future == null) {
+            return new CompletableFuture<>();
+        }
+        if (future.isCompletedExceptionally() && !loadingStarted) {
+            return new CompletableFuture<>();
+        }
+        return future;
     }
 }

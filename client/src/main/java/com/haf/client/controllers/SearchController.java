@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
@@ -322,8 +323,7 @@ public class SearchController {
         updateToggleButtonText(removeButton, result.getUserId());
 
         removeButton.setOnAction(e -> {
-            handleToggleContact(result);
-            updateToggleButtonText(removeButton, result.getUserId());
+            handleToggleContact(result, () -> updateToggleButtonText(removeButton, result.getUserId()));
         });
     }
 
@@ -367,6 +367,10 @@ public class SearchController {
     }
 
     void handleToggleContact(UserSearchResultDTO result) {
+        handleToggleContact(result, null);
+    }
+
+    private void handleToggleContact(UserSearchResultDTO result, Runnable onActionCompleted) {
         if (result == null) {
             return;
         }
@@ -374,15 +378,63 @@ public class SearchController {
         SearchViewModel.ContactToggleAction action = viewModel
                 .resolveContactToggleAction(contactActions.hasContact(result.getUserId()));
 
+        applyContactToggleAction(
+                action,
+                () -> {
+                    contactActions.addContact(result);
+                    LOGGER.log(Level.INFO, "Add contact requested for user: {0}", result.getUserId());
+                    runIfPresent(onActionCompleted);
+                },
+                () -> confirmRemoveContact(result, onActionCompleted));
+    }
+
+    static void applyContactToggleAction(
+            SearchViewModel.ContactToggleAction action,
+            Runnable addContactAction,
+            Runnable confirmRemoveContactAction) {
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(addContactAction, "addContactAction");
+        Objects.requireNonNull(confirmRemoveContactAction, "confirmRemoveContactAction");
+
         switch (action) {
-            case REMOVE_CONTACT -> {
-                contactActions.removeContact(result.getUserId());
-                LOGGER.log(Level.INFO, "Remove contact requested for user: {0}", result.getUserId());
-            }
-            case ADD_CONTACT -> {
-                contactActions.addContact(result);
-                LOGGER.log(Level.INFO, "Add contact requested for user: {0}", result.getUserId());
-            }
+            case ADD_CONTACT -> addContactAction.run();
+            case REMOVE_CONTACT -> confirmRemoveContactAction.run();
+        }
+    }
+
+    private void confirmRemoveContact(UserSearchResultDTO result, Runnable onActionCompleted) {
+        if (result == null || result.getUserId() == null || result.getUserId().isBlank()) {
+            return;
+        }
+        String displayName = resolveContactDisplayName(result.getFullName(), result.getUserId());
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONFIRM_REMOVE_CONTACT)
+                .title("Remove contact")
+                .message("Remove contact with " + displayName + " from your contacts list?")
+                .actionText("Remove")
+                .cancelText("Cancel")
+                .dangerAction(true)
+                .onAction(() -> {
+                    contactActions.removeContact(result.getUserId());
+                    LOGGER.log(Level.INFO, "Remove contact requested for user: {0}", result.getUserId());
+                    runIfPresent(onActionCompleted);
+                })
+                .show();
+    }
+
+    private static String resolveContactDisplayName(String fullName, String userId) {
+        if (fullName != null && !fullName.isBlank()) {
+            return fullName.trim();
+        }
+        if (userId != null && !userId.isBlank()) {
+            return "user " + userId.trim();
+        }
+        return "this user";
+    }
+
+    private static void runIfPresent(Runnable action) {
+        if (action != null) {
+            action.run();
         }
     }
 
