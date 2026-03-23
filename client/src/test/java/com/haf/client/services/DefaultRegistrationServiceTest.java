@@ -5,7 +5,6 @@ import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
-
 import javax.net.ssl.SSLSession;
 import java.io.File;
 import java.net.URI;
@@ -19,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;

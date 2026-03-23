@@ -4,8 +4,10 @@ import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import java.security.KeyPair;
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,13 +44,13 @@ class AadConsistencyIT {
         java.util.Map<String, Object> envelope = new java.util.HashMap<>();
         envelope.put("type", "message");
         envelope.put("payload", hydrated);
-        String json = com.haf.shared.utils.JsonCodec.toJson(envelope);
+        String json = JsonCodec.toJson(envelope);
 
         // Mimic client's DefaultMessageReceiver deserialization
-        java.util.Map<?, ?> clientEnvelope = com.haf.shared.utils.JsonCodec.fromJson(json, java.util.Map.class);
+        java.util.Map<?, ?> clientEnvelope = JsonCodec.fromJson(json, java.util.Map.class);
         Object payloadObj = clientEnvelope.get("payload");
-        EncryptedMessage fromJson = com.haf.shared.utils.JsonCodec.fromJson(
-                com.haf.shared.utils.JsonCodec.toJson(payloadObj),
+        EncryptedMessage fromJson = JsonCodec.fromJson(
+                JsonCodec.toJson(payloadObj),
                 EncryptedMessage.class);
 
         // Attempt decryption
@@ -74,11 +76,11 @@ class AadConsistencyIT {
                 m -> m.setRecipientId(m.getRecipientId().toUpperCase()));
     }
 
-    private void testTampering(java.security.PrivateKey key, com.haf.shared.utils.ClockProvider clock,
+    private void testTampering(java.security.PrivateKey key, ClockProvider clock,
             EncryptedMessage original, java.util.function.Consumer<EncryptedMessage> mutator) throws Exception {
         // Create a copy by serializing and deserializing
-        String json = com.haf.shared.utils.JsonCodec.toJson(original);
-        EncryptedMessage copy = com.haf.shared.utils.JsonCodec.fromJson(json, EncryptedMessage.class);
+        String json = JsonCodec.toJson(original);
+        EncryptedMessage copy = JsonCodec.fromJson(json, EncryptedMessage.class);
 
         mutator.accept(copy);
 

@@ -3,6 +3,7 @@ package com.haf.integration_test;
 import com.haf.server.db.EnvelopeDAO;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
+import com.haf.server.router.QueuedEnvelope;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
 import com.zaxxer.hikari.HikariConfig;
@@ -19,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @Disabled("Requires Docker/Testcontainers; disabled on local dev without Docker")
@@ -74,7 +74,7 @@ class EnvelopeDAOIT {
         assertNotNull(inserted);
         assertNotNull(inserted.envelopeId());
 
-        List<com.haf.server.router.QueuedEnvelope> fetched = dao.fetchForRecipient(message.getRecipientId(), 10);
+        List<QueuedEnvelope> fetched = dao.fetchForRecipient(message.getRecipientId(), 10);
         assertEquals(1, fetched.size());
         assertEquals(inserted.envelopeId(), fetched.get(0).envelopeId());
         assertEquals(message.getSenderId(), fetched.get(0).payload().getSenderId());
@@ -86,13 +86,13 @@ class EnvelopeDAOIT {
         EncryptedMessage message = createValidMessage();
         var inserted = dao.insert(message);
 
-        List<com.haf.server.router.QueuedEnvelope> before = dao.fetchForRecipient(message.getRecipientId(), 10);
+        List<QueuedEnvelope> before = dao.fetchForRecipient(message.getRecipientId(), 10);
         assertEquals(1, before.size());
 
         boolean marked = dao.markDelivered(List.of(inserted.envelopeId()));
         assertTrue(marked);
 
-        List<com.haf.server.router.QueuedEnvelope> after = dao.fetchForRecipient(message.getRecipientId(), 10);
+        List<QueuedEnvelope> after = dao.fetchForRecipient(message.getRecipientId(), 10);
         assertEquals(0, after.size());
     }
 
@@ -105,7 +105,7 @@ class EnvelopeDAOIT {
         int deleted = dao.deleteExpired();
         assertTrue(deleted >= 1);
 
-        List<com.haf.server.router.QueuedEnvelope> remaining = dao.fetchForRecipient(expired.getRecipientId(), 10);
+        List<QueuedEnvelope> remaining = dao.fetchForRecipient(expired.getRecipientId(), 10);
         assertEquals(0, remaining.size());
     }
 
@@ -121,7 +121,7 @@ class EnvelopeDAOIT {
 
         dao.markDelivered(List.of(env1.envelopeId()));
 
-        List<com.haf.server.router.QueuedEnvelope> fetched = dao.fetchForRecipient("recipient-1", 10);
+        List<QueuedEnvelope> fetched = dao.fetchForRecipient("recipient-1", 10);
         assertEquals(1, fetched.size());
         assertEquals(env2.envelopeId(), fetched.get(0).envelopeId());
     }

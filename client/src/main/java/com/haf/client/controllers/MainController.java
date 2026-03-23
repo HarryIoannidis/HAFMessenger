@@ -36,7 +36,6 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
-
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;

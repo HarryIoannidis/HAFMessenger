@@ -7,12 +7,10 @@ import com.haf.shared.utils.FilePerms;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /**

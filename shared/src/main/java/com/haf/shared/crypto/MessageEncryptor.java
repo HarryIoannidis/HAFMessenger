@@ -4,6 +4,7 @@ import com.haf.shared.exceptions.CryptoOperationException;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.utils.ClockProvider;
+import com.haf.shared.utils.EccKeyIO;
 import java.security.PublicKey;
 import java.util.Base64;
 import javax.crypto.SecretKey;
@@ -58,7 +59,7 @@ public class MessageEncryptor {
         }
 
         // 1. Generate an ephemeral X25519 keypair for this specific message
-        java.security.KeyPair ephemeralPair = com.haf.shared.utils.EccKeyIO.generate();
+        java.security.KeyPair ephemeralPair = EccKeyIO.generate();
 
         // 2. Derive the 256-bit AES session key using ECDH + SHA-256
         SecretKey aesKey = CryptoECC.generateAndDeriveAesKey(ephemeralPair.getPrivate(), recipientPublicKey);
@@ -70,7 +71,7 @@ public class MessageEncryptor {
         }
 
         // 4. Capture the ephemeral public key to send to the recipient
-        byte[] ephemeralPublicDer = com.haf.shared.utils.EccKeyIO.publicDer(ephemeralPair.getPublic());
+        byte[] ephemeralPublicDer = EccKeyIO.publicDer(ephemeralPair.getPublic());
 
         EncryptedMessage m = new EncryptedMessage();
         m.setVersion(MessageHeader.VERSION);

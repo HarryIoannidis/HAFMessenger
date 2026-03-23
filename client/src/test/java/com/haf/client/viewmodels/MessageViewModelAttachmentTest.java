@@ -22,7 +22,6 @@ import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.function.BooleanSupplier;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageViewModelAttachmentTest {

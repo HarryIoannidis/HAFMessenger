@@ -1,6 +1,7 @@
 package com.haf.shared.keystore;
 
 import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.Test;
 import java.security.KeyPair;
 import java.security.PublicKey;
@@ -36,7 +37,7 @@ class KeyProviderTest {
 
     @Test
     void getSenderId_returns_sender_id() throws Exception {
-        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
+        KeyPair kp = EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
 
         assertEquals("sender-123", provider.getSenderId());
@@ -44,7 +45,7 @@ class KeyProviderTest {
 
     @Test
     void getRecipientPublicKey_returns_key_for_known_recipient() throws Exception {
-        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
+        KeyPair kp = EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
 
         PublicKey recipientKey = provider.getRecipientPublicKey("known-recipient");
@@ -54,7 +55,7 @@ class KeyProviderTest {
 
     @Test
     void getRecipientPublicKey_throws_for_unknown_recipient() throws Exception {
-        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
+        KeyPair kp = EccKeyIO.generate();
         KeyProvider provider = new MockKeyProvider("sender-123", kp.getPublic());
 
         assertThrows(KeyNotFoundException.class, () -> {

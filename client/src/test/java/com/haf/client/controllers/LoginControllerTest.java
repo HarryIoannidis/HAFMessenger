@@ -3,9 +3,7 @@ package com.haf.client.controllers;
 import com.haf.client.services.LoginService;
 import com.haf.client.viewmodels.LoginViewModel;
 import org.junit.jupiter.api.Test;
-
 import java.lang.reflect.Field;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;

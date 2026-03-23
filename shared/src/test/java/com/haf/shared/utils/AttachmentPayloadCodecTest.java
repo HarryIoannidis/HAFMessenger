@@ -5,10 +5,8 @@ import com.haf.shared.dto.AttachmentInlinePayload;
 import com.haf.shared.dto.AttachmentReferencePayload;
 import com.haf.shared.exceptions.JsonCodecException;
 import org.junit.jupiter.api.Test;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class AttachmentPayloadCodecTest {

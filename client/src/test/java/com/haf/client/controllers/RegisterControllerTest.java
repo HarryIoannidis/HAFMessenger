@@ -3,10 +3,8 @@ package com.haf.client.controllers;
 import com.haf.client.services.RegistrationService;
 import com.haf.client.viewmodels.RegisterViewModel;
 import org.junit.jupiter.api.Test;
-
 import java.io.File;
 import java.lang.reflect.Field;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;

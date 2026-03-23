@@ -2,12 +2,10 @@ package com.haf.client.controllers;
 
 import com.haf.client.utils.PopupMessageSpec;
 import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.net.ConnectException;
 import java.security.GeneralSecurityException;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

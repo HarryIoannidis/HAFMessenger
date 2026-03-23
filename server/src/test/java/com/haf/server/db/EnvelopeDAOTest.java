@@ -21,7 +21,6 @@ import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -111,7 +110,7 @@ class EnvelopeDAOTest {
         when(rs.getTimestamp("created_at")).thenReturn(new Timestamp(System.currentTimeMillis()));
         when(rs.getTimestamp("expires_at")).thenReturn(new Timestamp(System.currentTimeMillis() + 3600000));
 
-        List<com.haf.server.router.QueuedEnvelope> result = dao.fetchForRecipient(recipientId, 10);
+        List<QueuedEnvelope> result = dao.fetchForRecipient(recipientId, 10);
 
         assertNotNull(result);
         verify(fetchStatement, times(1)).setString(1, recipientId);
@@ -219,7 +218,7 @@ class EnvelopeDAOTest {
 
     @Test
     void fetch_by_ids_returns_empty_map_for_empty_list() {
-        Map<String, com.haf.server.router.QueuedEnvelope> result = dao.fetchByIds(List.of());
+        Map<String, QueuedEnvelope> result = dao.fetchByIds(List.of());
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -227,7 +226,7 @@ class EnvelopeDAOTest {
 
     @Test
     void fetch_by_ids_returns_empty_map_for_null() {
-        Map<String, com.haf.server.router.QueuedEnvelope> result = dao.fetchByIds(null);
+        Map<String, QueuedEnvelope> result = dao.fetchByIds(null);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -258,7 +257,7 @@ class EnvelopeDAOTest {
         when(rs.getTimestamp("created_at")).thenReturn(new Timestamp(System.currentTimeMillis()));
         when(rs.getTimestamp("expires_at")).thenReturn(new Timestamp(System.currentTimeMillis() + 3600000));
 
-        Map<String, com.haf.server.router.QueuedEnvelope> result = dao.fetchByIds(envelopeIds);
+        Map<String, QueuedEnvelope> result = dao.fetchByIds(envelopeIds);
 
         assertNotNull(result);
         assertEquals(1, result.size());

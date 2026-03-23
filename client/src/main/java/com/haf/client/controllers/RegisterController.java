@@ -31,7 +31,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.kordamp.ikonli.javafx.FontIcon;
-
 import java.io.File;
 import java.util.List;
 import java.util.Objects;

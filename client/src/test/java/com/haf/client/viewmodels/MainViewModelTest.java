@@ -5,13 +5,11 @@ import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

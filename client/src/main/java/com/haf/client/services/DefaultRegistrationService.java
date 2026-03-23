@@ -13,7 +13,6 @@ import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
-
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.net.URI;

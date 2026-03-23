@@ -4,7 +4,9 @@ import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.utils.ClockProvider;
+import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FixedClockProvider;
+import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
@@ -96,7 +98,7 @@ class MessageSenderTest {
 
     @BeforeEach
     void setup() throws Exception {
-        KeyPair kp = com.haf.shared.utils.EccKeyIO.generate();
+        KeyPair kp = EccKeyIO.generate();
         keyProvider = new MockKeyProvider("sender-123", kp.getPublic());
         clockProvider = new FixedClockProvider(1000000L);
         webSocketAdapter = new MockWebSocketAdapter();
@@ -116,7 +118,7 @@ class MessageSenderTest {
 
         assertNotNull(webSocketAdapter.getLastSentMessage());
         // Verify it's valid JSON
-        com.haf.shared.utils.JsonCodec.fromJson(webSocketAdapter.getLastSentMessage(), EncryptedMessage.class);
+        JsonCodec.fromJson(webSocketAdapter.getLastSentMessage(), EncryptedMessage.class);
     }
 
     @Test

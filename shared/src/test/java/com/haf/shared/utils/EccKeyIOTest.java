@@ -1,11 +1,9 @@
 package com.haf.shared.utils;
 
 import org.junit.jupiter.api.Test;
-
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class EccKeyIOTest {

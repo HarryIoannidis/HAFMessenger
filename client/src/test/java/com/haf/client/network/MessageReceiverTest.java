@@ -5,6 +5,7 @@ import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageExpiredException;
+import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FixedClockProvider;
@@ -271,7 +272,7 @@ class MessageReceiverTest {
 
         assertEquals(0, receivedMessages.size());
         assertEquals(1, receivedErrors.size());
-        assertTrue(receivedErrors.get(0) instanceof com.haf.shared.exceptions.MessageTamperedException);
+        assertTrue(receivedErrors.get(0) instanceof MessageTamperedException);
 
         List<String> sent = webSocketAdapter.getSentMessages();
         assertEquals(1, sent.size());

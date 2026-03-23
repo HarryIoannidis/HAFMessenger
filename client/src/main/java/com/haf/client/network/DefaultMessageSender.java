@@ -18,7 +18,6 @@ import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
-
 import java.io.IOException;
 import java.security.PublicKey;
 import java.util.List;

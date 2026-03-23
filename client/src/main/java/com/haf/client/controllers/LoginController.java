@@ -18,7 +18,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
-
 import java.util.Objects;
 import java.util.prefs.Preferences;
 import java.util.logging.Level;

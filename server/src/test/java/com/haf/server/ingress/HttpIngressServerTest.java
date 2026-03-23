@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -35,7 +34,6 @@ import java.net.URI;
 import java.security.KeyStore;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -180,7 +178,7 @@ class HttpIngressServerTest {
     }
 
     private HttpHandler createLoginHandler() throws Exception {
-        Class<?> handlerClass = Class.forName("com.haf.server.ingress.HttpIngressServer$LoginHandler");
+        Class<?> handlerClass = Class.forName(HttpIngressServer.class.getName() + "$LoginHandler");
         Constructor<?> constructor = handlerClass.getDeclaredConstructor(HttpIngressServer.class);
         constructor.setAccessible(true);
         return (HttpHandler) constructor.newInstance(server);
