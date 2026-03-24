@@ -37,6 +37,9 @@ import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Controller for the Register view ({@code register.fxml}).
+ */
 public class RegisterController {
 
     private static final Logger LOGGER = Logger.getLogger(RegisterController.class.getName());

@@ -16,6 +16,9 @@ import java.net.UnknownHostException;
 import java.net.http.HttpTimeoutException;
 import java.security.GeneralSecurityException;
 
+/**
+ * Controller for the Splash view ({@code splash.fxml}).
+ */
 public class SplashController {
 
     record FailurePresentation(String title, String message) {
