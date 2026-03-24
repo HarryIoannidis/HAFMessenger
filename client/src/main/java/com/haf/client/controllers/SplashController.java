@@ -21,27 +21,23 @@ public class SplashController {
     record FailurePresentation(String title, String message) {
     }
 
+    // Splash container and branding
     @FXML
     private StackPane rootContainer;
-
     @FXML
     private ImageView logo;
-
     @FXML
     private Text title;
-
     @FXML
     private Text subtitle;
 
+    // Startup status indicators
     @FXML
     private Text status;
-
     @FXML
     private Text percentage;
-
     @FXML
     private Text version;
-
     @FXML
     private ProgressBar progressBar;
 

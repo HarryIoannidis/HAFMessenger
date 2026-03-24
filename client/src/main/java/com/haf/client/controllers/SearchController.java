@@ -34,15 +34,15 @@ public class SearchController {
 
     private static final Logger LOGGER = Logger.getLogger(SearchController.class.getName());
 
+    // Search results containers
     @FXML
     private FlowPane resultsPane;
-
     @FXML
     private ScrollPane resultsScrollPane;
 
+    // Search status placeholders
     @FXML
     private VBox statusBox;
-
     @FXML
     private Text statusText;
 

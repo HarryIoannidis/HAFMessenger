@@ -21,6 +21,7 @@ public class ProfileController {
     private static final Logger LOGGER = Logger.getLogger(ProfileController.class.getName());
     private static final String MISSING_VALUE = "\u2014";
 
+    // Popup window controls
     @FXML
     private BorderPane rootContainer;
     @FXML
@@ -29,6 +30,8 @@ public class ProfileController {
     private JFXButton minimizeButton;
     @FXML
     private JFXButton closeButton;
+
+    // Profile detail text nodes
     @FXML
     private Text userIdText;
     @FXML
@@ -43,6 +46,8 @@ public class ProfileController {
     private Text emailValueText;
     @FXML
     private Text telephoneValueText;
+
+    // Profile action buttons
     @FXML
     private JFXButton requestEditButton;
     @FXML

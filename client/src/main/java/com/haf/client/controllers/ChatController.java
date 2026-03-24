@@ -55,21 +55,19 @@ public class ChatController {
         DOWNLOAD
     }
 
+    // Message feed
     @FXML
     private ScrollPane chatScrollPane;
-
     @FXML
     private VBox chatBox;
 
+    // Composer controls
     @FXML
     private TextField messageField;
-
     @FXML
     private JFXButton sendButton;
-
     @FXML
     private JFXButton imageButton;
-
     @FXML
     private JFXButton fileButton;
 

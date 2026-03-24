@@ -15,12 +15,15 @@ public class PopupMessageController {
 
     private static final String DANGER_STYLE_CLASS = "button-action-danger";
 
+    // Popup window chrome
     @FXML
     private BorderPane rootContainer;
     @FXML
     private HBox titleBar;
     @FXML
     private JFXButton closeButton;
+
+    // Popup content and action buttons
     @FXML
     private Label titleText;
     @FXML

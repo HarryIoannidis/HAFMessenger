@@ -41,132 +41,99 @@ public class RegisterController {
 
     private static final Logger LOGGER = Logger.getLogger(RegisterController.class.getName());
 
+    // Window chrome and layout containers
     @FXML
     private BorderPane rootContainer;
-
     @FXML
     private HBox titleBar;
-
     @FXML
     private HBox ttileHBox;
-
     @FXML
     private HBox buttonsHBox;
-
     @FXML
     private StackPane leftPanel;
-
     @FXML
     private StackPane rightPanel;
 
+    // Registration form fields and toggles
     @FXML
     private TextField nameField;
-
     @FXML
     private TextField regNumField;
-
     @FXML
     private TextField idNumField;
-
     @FXML
     private TextField phoneNumField;
-
     @FXML
     private TextField emailField;
-
     @FXML
     private PasswordField passwordField;
-
     @FXML
     private PasswordField passwordConfField;
-
     @FXML
     private TextField passwordVisibleField;
-
     @FXML
     private TextField passwordConfVisibleField;
-
     @FXML
     private JFXButton togglePasswordButton;
-
     @FXML
     private FontIcon togglePasswordIcon;
-
     @FXML
     private JFXButton togglePasswordConfButton;
-
     @FXML
     private FontIcon togglePasswordConfIcon;
-
     @FXML
     private JFXButton registerButton;
-
     @FXML
     private JFXButton backButton;
-
     @FXML
     private StackPane registerButtonContainer;
-
     @FXML
     private Text gotoSignInButton;
-
     @FXML
     private Text errorText;
-
     @FXML
     private ComboBox<String> rankComboBox;
-
     @FXML
     private FontIcon dropDownButton;
 
+    // Step flow controls and status nodes
     @FXML
     private VBox credentialsVBox;
-
     @FXML
     private VBox photosVBox;
-
     @FXML
     private Text photoTitleText;
 
+    // Photo drop-zone preview and error states
     @FXML
     private StackPane dropZoneContainer;
-
     @FXML
     private VBox previewSateZoneId;
-
     @FXML
     private ImageView previewThumbnail;
-
     @FXML
     private Text previewNameText;
-
     @FXML
     private Text previewSizeText;
-
     @FXML
     private JFXButton previewReplaceButton;
-
     @FXML
     private JFXButton previewRemoveButton;
-
     @FXML
     private VBox emptyStateZoneSelfie;
-
     @FXML
     private VBox emptyStateZoneId;
-
     @FXML
     private VBox errorStateZoneId;
-
     @FXML
     private Text dropZoneErrorText;
 
+    // Window control buttons
     @FXML
     private Button minimizeButton;
-
     @FXML
     private Button maximizeButton;
-
     @FXML
     private Button closeButton;
 

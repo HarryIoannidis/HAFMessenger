@@ -31,6 +31,7 @@ public class PreviewController {
     private static final double MAX_PREVIEW_WIDTH = 400.0;
     private static final double MAX_PREVIEW_HEIGHT = 400.0;
 
+    // Popup window controls
     @FXML
     private BorderPane rootContainer;
     @FXML
@@ -39,6 +40,8 @@ public class PreviewController {
     private JFXButton minimizeButton;
     @FXML
     private JFXButton closeButton;
+
+    // Preview content and actions
     @FXML
     private ImageView previewImageView;
     @FXML

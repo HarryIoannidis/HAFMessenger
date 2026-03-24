@@ -99,11 +99,20 @@ public class ViewRouter {
             logger.log(Level.INFO, "Switching to transparent FXML: {0}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
-            Scene scene = new Scene(root);
-            scene.setFill(Color.TRANSPARENT);
-            scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
-
             boolean isSplash = fxmlPath.equals(UiConstants.FXML_SPLASH);
+
+            Parent sceneRoot = root;
+            if (isSplash) {
+                StackPane splashShell = new StackPane(root);
+                splashShell.setPadding(new Insets(14));
+                splashShell.setPickOnBounds(false);
+                splashShell.setStyle("-fx-background-color: transparent;");
+                sceneRoot = splashShell;
+            }
+
+            Scene scene = new Scene(sceneRoot);
+            scene.setFill(Color.TRANSPARENT);
+            scene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
 
             // Hide before changing a transparent stage's size on Linux to prevent rendering
             // artifacts (black borders)
@@ -119,11 +128,8 @@ public class ViewRouter {
             mainStage.setScene(scene);
 
             if (isSplash) {
-                // Splash: use its own FXML dimensions, no resizing
-                if (root instanceof javafx.scene.layout.Region region) {
-                    mainStage.setWidth(region.getPrefWidth());
-                    mainStage.setHeight(region.getPrefHeight());
-                }
+                // Splash: size to scene so shell padding leaves room for card shadow.
+                mainStage.sizeToScene();
                 mainStage.setResizable(false);
                 mainStage.centerOnScreen();
             } else {
