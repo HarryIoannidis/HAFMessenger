@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import javafx.application.Platform;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -13,19 +14,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SplashViewModelTest {
+    private static volatile boolean javaFxAvailable = true;
 
     @BeforeAll
-    static void initJavaFx() throws Exception {
+    static void initJavaFx() {
         // Initialize JavaFX toolkit once for all tests; ignore if already initialized
         try {
             Platform.startup(() -> {});
         } catch (IllegalStateException ignored) {
             // already started
+        } catch (Throwable ex) {
+            javaFxAvailable = false;
         }
+    }
+
+    private static void assumeJavaFxAvailable() {
+        Assumptions.assumeTrue(javaFxAvailable, "JavaFX toolkit unavailable in this environment");
     }
 
     @Test
     void bootstrap_runs_and_reaches_ready() throws Exception {
+        assumeJavaFxAvailable();
         CountDownLatch success = new CountDownLatch(1);
 
         SplashViewModel vm = new SplashViewModel(
@@ -46,6 +55,7 @@ class SplashViewModelTest {
 
     @Test
     void bootstrap_failure_invokes_error_handler() throws Exception {
+        assumeJavaFxAvailable();
         CountDownLatch failure = new CountDownLatch(1);
         AtomicBoolean successCalled = new AtomicBoolean(false);
 
@@ -65,6 +75,7 @@ class SplashViewModelTest {
 
     @Test
     void bootstrap_updates_messages_in_order() throws Exception {
+        assumeJavaFxAvailable();
         CountDownLatch success = new CountDownLatch(1);
         List<String> order = new CopyOnWriteArrayList<>();
 

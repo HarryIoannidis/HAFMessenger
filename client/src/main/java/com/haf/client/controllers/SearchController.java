@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +51,7 @@ public class SearchController {
     private final SearchViewModel viewModel = SearchViewModel.createDefault();
     private final AtomicInteger renderGeneration = new AtomicInteger();
     private SearchContactActions contactActions = SearchContactActions.NO_OP;
+    private Consumer<RuntimeIssue> runtimeIssueListener;
 
     /**
      * Initializes bindings, infinite scroll behavior, and idle search state.
@@ -236,6 +239,21 @@ public class SearchController {
      */
     public void setContactActions(SearchContactActions contactActions) {
         this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
+    }
+
+    /**
+     * Sets the runtime-issue listener for search failures.
+     *
+     * @param listener listener that should receive recoverable search runtime issues
+     */
+    public void setRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (runtimeIssueListener != null) {
+            viewModel.removeRuntimeIssueListener(runtimeIssueListener);
+        }
+        runtimeIssueListener = listener;
+        if (runtimeIssueListener != null) {
+            viewModel.addRuntimeIssueListener(runtimeIssueListener);
+        }
     }
 
     /**

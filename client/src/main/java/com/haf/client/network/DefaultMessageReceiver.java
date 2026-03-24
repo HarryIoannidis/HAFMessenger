@@ -102,6 +102,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             parseAndProcessEnvelope(json);
         } catch (MessageTamperedException e) {
+            acknowledgeTamperedEnvelope(json);
             LOGGER.log(Level.WARNING, "Undecryptable envelope; acknowledging to prevent endless retries.");
             notifyError(e);
         } catch (KeystoreOperationException e) {
@@ -356,14 +357,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
             return;
         }
         try {
-            StringBuilder sb = new StringBuilder("{\"envelopeIds\":[");
-            for (int i = 0; i < ids.size(); i++) {
-                if (i > 0)
-                    sb.append(',');
-                sb.append('\"').append(ids.get(i)).append('\"');
-            }
-            sb.append("]}");
-            webSocketAdapter.sendText(sb.toString());
+            sendAck(ids);
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, e, () -> "Failed to send ACK for sender " + senderId);
             // Put them back so we can try again later
@@ -411,5 +405,64 @@ public class DefaultMessageReceiver implements MessageReceiver {
             return userKeyProvider.getKeyStore().loadCurrentPrivate(passphrase);
         }
         throw new IllegalStateException("KeyProvider must be UserKeystoreKeyProvider to load private keys");
+    }
+
+    /**
+     * Sends an acknowledgement for all provided envelope IDs.
+     *
+     * @param envelopeIds envelope ids to acknowledge
+     * @throws IOException when websocket send fails
+     */
+    private void sendAck(List<String> envelopeIds) throws IOException {
+        if (envelopeIds == null || envelopeIds.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder("{\"envelopeIds\":[");
+        for (int i = 0; i < envelopeIds.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('\"').append(envelopeIds.get(i)).append('\"');
+        }
+        sb.append("]}");
+        webSocketAdapter.sendText(sb.toString());
+    }
+
+    /**
+     * Acknowledges tampered envelopes immediately so server-side retry queues do not
+     * replay them endlessly.
+     *
+     * @param rawEnvelopeJson raw websocket envelope JSON
+     */
+    private void acknowledgeTamperedEnvelope(String rawEnvelopeJson) {
+        String envelopeId = extractEnvelopeId(rawEnvelopeJson);
+        if (envelopeId == null || envelopeId.isBlank()) {
+            return;
+        }
+        try {
+            sendAck(List.of(envelopeId));
+        } catch (IOException ackError) {
+            LOGGER.log(Level.WARNING, ackError,
+                    () -> "Failed to acknowledge undecryptable envelope " + envelopeId);
+        }
+    }
+
+    /**
+     * Extracts the envelope id from raw websocket envelope JSON.
+     *
+     * @param rawEnvelopeJson websocket message payload
+     * @return envelope id or {@code null} when not available
+     */
+    private String extractEnvelopeId(String rawEnvelopeJson) {
+        if (rawEnvelopeJson == null || rawEnvelopeJson.isBlank()) {
+            return null;
+        }
+        try {
+            java.util.Map<?, ?> envelope = JsonCodec.fromJson(rawEnvelopeJson, java.util.Map.class);
+            Object envelopeId = envelope.get("envelopeId");
+            return envelopeId == null ? null : String.valueOf(envelopeId);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

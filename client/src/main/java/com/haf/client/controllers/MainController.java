@@ -9,6 +9,8 @@ import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.RuntimeIssue;
+import com.haf.client.utils.RuntimeIssuePopupGate;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
@@ -37,6 +39,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +52,7 @@ public class MainController implements SearchContactActions {
     private static final String NAV_ITEM_ICON = "nav-item-icon";
     private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
     private static final String PROFILE_POPUP_KEY = "profile-popup";
+    private static final long RUNTIME_ISSUE_POPUP_COOLDOWN_MS = 10_000L;
 
     // Window chrome
     @FXML
@@ -120,9 +124,13 @@ public class MainController implements SearchContactActions {
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
     private final MainViewModel viewModel = MainViewModel.createDefault();
+    private final RuntimeIssuePopupGate runtimeIssuePopupGate = new RuntimeIssuePopupGate(
+            RUNTIME_ISSUE_POPUP_COOLDOWN_MS);
     private final MainSessionService mainSessionService;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
+    private SearchController runtimeIssueSearchController;
+    private final Consumer<RuntimeIssue> runtimeIssueListener = this::handleRuntimeIssue;
 
     enum ContactContextAction {
         PROFILE,
@@ -165,6 +173,7 @@ public class MainController implements SearchContactActions {
         setupSearchFilterUi();
         setupSearchField();
         setupProfilePopupTrigger();
+        registerRuntimeIssueListeners();
         registerPresenceListener();
         registerIncomingMessageListener();
         startMessageReceiving();
@@ -325,6 +334,7 @@ public class MainController implements SearchContactActions {
      * @return {@code true} when a search controller is available and search is dispatched, otherwise {@code false}
      */
     private boolean executeSearchWithFilters(String query, SearchSortViewModel.SortOptions sortOptions) {
+        bindSearchRuntimeIssueListener();
         SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
         if (searchController == null) {
             return false;
@@ -409,6 +419,7 @@ public class MainController implements SearchContactActions {
         if (contentLoader != null) {
             contentLoader.showSearchView();
         }
+        bindSearchRuntimeIssueListener();
         if (searchFilterUi != null) {
             searchFilterUi.onSearchTabActivated();
         }
@@ -1137,6 +1148,83 @@ public class MainController implements SearchContactActions {
             task.run();
         } else {
             Platform.runLater(task);
+        }
+    }
+
+    /**
+     * Registers runtime-issue listeners from view-models participating in main app
+     * flows.
+     */
+    private void registerRuntimeIssueListeners() {
+        viewModel.addRuntimeIssueListener(runtimeIssueListener);
+
+        MessageViewModel chatViewModel = ChatSession.get();
+        if (chatViewModel != null) {
+            chatViewModel.addRuntimeIssueListener(runtimeIssueListener);
+        }
+
+        bindSearchRuntimeIssueListener();
+    }
+
+    /**
+     * Binds runtime-issue listener to the loaded search controller once available.
+     */
+    private void bindSearchRuntimeIssueListener() {
+        SearchController searchController = contentLoader == null ? null : contentLoader.getSearchController();
+        if (searchController == null || searchController == runtimeIssueSearchController) {
+            return;
+        }
+        if (runtimeIssueSearchController != null) {
+            runtimeIssueSearchController.setRuntimeIssueListener(null);
+        }
+        searchController.setRuntimeIssueListener(runtimeIssueListener);
+        runtimeIssueSearchController = searchController;
+    }
+
+    /**
+     * Presents runtime issues in popup UI with dedup cooldown and retry handling.
+     *
+     * @param issue recoverable runtime issue
+     */
+    private void handleRuntimeIssue(RuntimeIssue issue) {
+        if (issue == null) {
+            return;
+        }
+        Runnable task = () -> {
+            if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {
+                return;
+            }
+            PopupMessageBuilder.create()
+                    .popupKey(UiConstants.POPUP_RUNTIME_ISSUE)
+                    .title(issue.title())
+                    .message(issue.message())
+                    .actionText("Retry")
+                    .cancelText("Dismiss")
+                    .showCancel(true)
+                    .onAction(() -> runRuntimeIssueRetry(issue.retryAction()))
+                    .show();
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            task.run();
+        } else {
+            Platform.runLater(task);
+        }
+    }
+
+    /**
+     * Executes runtime issue retry callback with guarded error handling.
+     *
+     * @param retryAction retry callback
+     */
+    private void runRuntimeIssueRetry(Runnable retryAction) {
+        if (retryAction == null) {
+            return;
+        }
+        try {
+            retryAction.run();
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Runtime issue retry action failed", ex);
         }
     }
 

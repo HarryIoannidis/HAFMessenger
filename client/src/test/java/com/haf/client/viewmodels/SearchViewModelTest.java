@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
@@ -7,6 +8,7 @@ import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -226,6 +228,55 @@ class SearchViewModelTest {
 
         assertFalse(viewModel.hasResultsProperty().get());
         assertTrue(viewModel.resultsProperty().isEmpty());
+    }
+
+    @Test
+    void search_exception_emits_runtime_issue_and_retry_reexecutes_query() {
+        AtomicInteger calls = new AtomicInteger();
+        UserSearchResponse success = UserSearchResponse.success(List.of(
+                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+        SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
+            if (calls.getAndIncrement() == 0) {
+                throw new RuntimeException("boom");
+            }
+            return JsonCodec.toJson(success);
+        });
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.search("query");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("search.request.failed", issues.getFirst().dedupeKey());
+        issues.getFirst().retryAction().run();
+
+        awaitCondition(() -> viewModel.resultsProperty().size() == 1);
+        assertEquals(2, calls.get());
+    }
+
+    @Test
+    void search_error_response_emits_runtime_issue_and_retry_reexecutes_query() {
+        AtomicInteger calls = new AtomicInteger();
+        UserSearchResponse failure = UserSearchResponse.error("Server unavailable");
+        UserSearchResponse success = UserSearchResponse.success(List.of(
+                new UserSearchResultDTO("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)));
+        SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
+            if (calls.getAndIncrement() == 0) {
+                return JsonCodec.toJson(failure);
+            }
+            return JsonCodec.toJson(success);
+        });
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.search("query");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("search.response.error", issues.getFirst().dedupeKey());
+        issues.getFirst().retryAction().run();
+
+        awaitCondition(() -> viewModel.resultsProperty().size() == 1);
+        assertEquals(2, calls.get());
     }
 
     private static List<String> toUserIds(SearchViewModel viewModel) {

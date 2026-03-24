@@ -98,6 +98,7 @@ public final class UiConstants {
     public static final String POPUP_PROFILE_STUB = "popup-profile-stub";
     public static final String POPUP_ATTACHMENT_ERROR = "popup-attachment-error";
     public static final String POPUP_VIEW_LOAD_ERROR = "popup-view-load-error";
+    public static final String POPUP_RUNTIME_ISSUE = "popup-runtime-issue";
 
     // Stylesheets
     public static final String CSS_GLOBAL = "/css/global.css";
