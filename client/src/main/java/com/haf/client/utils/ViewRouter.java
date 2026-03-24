@@ -112,7 +112,13 @@ public class ViewRouter {
 
             Scene scene = new Scene(sceneRoot);
             scene.setFill(Color.TRANSPARENT);
-            scene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
+            if (isSplash) {
+                scene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
+            } else {
+                // Keep custom transparent stage chrome for non-splash views, but let the
+                // view's own CSS control panel/window backgrounds.
+                scene.getRoot().setStyle("-fx-font-smoothing-type: lcd;");
+            }
 
             // Hide before changing a transparent stage's size on Linux to prevent rendering
             // artifacts (black borders)
@@ -312,6 +318,13 @@ public class ViewRouter {
         popupEntries.clear();
     }
 
+    /**
+     * Checks if the main stage is currently showing a transparent window.
+     * This is used to determine if a full recreate-and-resize is needed.
+     *
+     * @return true if the main stage is showing a transparent window, false
+     *         otherwise
+     */
     private record PopupEntry(Stage stage, Object controller) {
     }
 }

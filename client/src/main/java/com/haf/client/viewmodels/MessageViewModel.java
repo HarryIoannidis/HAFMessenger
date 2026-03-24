@@ -17,6 +17,7 @@ import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.client.utils.RuntimeIssue;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -34,9 +35,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * ViewModel for the chat screen.
@@ -74,11 +77,13 @@ public class MessageViewModel {
     private final StringProperty status = new SimpleStringProperty("Ready");
     private final List<PresenceListener> presenceListeners = new CopyOnWriteArrayList<>();
     private final List<IncomingMessageListener> incomingMessageListeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
 
     private final Object policyLock = new Object();
     private volatile MessagingPolicyResponse cachedPolicy;
     private volatile boolean receivingStarted;
+    private final AtomicReference<Runnable> lastFailedSendRetryAction = new AtomicReference<>();
     private static volatile boolean fxToolkitUnavailable;
 
     /**
@@ -120,6 +125,11 @@ public class MessageViewModel {
                     });
                 } catch (Exception ex) {
                     runOnUiThread(() -> status.set("Failed to render message: " + ex.getMessage()));
+                    publishRuntimeIssue(
+                            "messaging.render.failed",
+                            "Message processing failed",
+                            "An incoming message could not be processed. " + resolveErrorMessage(ex, "Please retry."),
+                            MessageViewModel.this::retryLastFailedOperation);
                 }
             }
 
@@ -132,6 +142,12 @@ public class MessageViewModel {
             @Override
             public void onError(Throwable error) {
                 runOnUiThread(() -> status.set("Error: " + error.getMessage()));
+                publishRuntimeIssue(
+                        "messaging.receiver.error",
+                        "Connection issue",
+                        "The messaging channel reported an error. "
+                                + resolveErrorMessage(error, "Please retry."),
+                        MessageViewModel.this::retryLastFailedOperation);
             }
 
             /**
@@ -162,8 +178,16 @@ public class MessageViewModel {
                 getMessages(contactId).add(vm);
                 status.set("Message sent to " + contactId);
             });
+            clearFailedSendRetryAction();
         } catch (Exception e) {
+            String outgoingText = text;
+            captureFailedSendRetryAction(() -> sendTextMessage(contactId, outgoingText));
             runOnUiThread(() -> status.set("Failed to send: " + e.getMessage()));
+            publishRuntimeIssue(
+                    "messaging.send.failed",
+                    "Message could not be sent",
+                    "Could not send your message. " + resolveErrorMessage(e, "Please retry."),
+                    this::retryLastFailedOperation);
         }
     }
 
@@ -218,8 +242,16 @@ public class MessageViewModel {
                 getMessages(contactId).add(outgoing);
                 status.set("Attachment sent to " + contactId);
             });
+            clearFailedSendRetryAction();
         } catch (Exception ex) {
+            String retryMediaTypeHint = mediaTypeHint;
+            captureFailedSendRetryAction(() -> sendAttachment(contactId, filePath, retryMediaTypeHint));
             runOnUiThread(() -> status.set("Failed to send attachment: " + ex.getMessage()));
+            publishRuntimeIssue(
+                    "messaging.attachment.send.failed",
+                    "Attachment could not be sent",
+                    "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
+                    this::retryLastFailedOperation);
         }
     }
 
@@ -236,6 +268,11 @@ public class MessageViewModel {
             runOnUiThread(() -> status.set("Receiving messages…"));
         } catch (Exception e) {
             runOnUiThread(() -> status.set("Failed to start receiving: " + e.getMessage()));
+            publishRuntimeIssue(
+                    "messaging.receive.start.failed",
+                    "Connection issue",
+                    "Could not start message receiving. " + resolveErrorMessage(e, "Please retry."),
+                    this::retryLastFailedOperation);
         }
     }
 
@@ -319,6 +356,57 @@ public class MessageViewModel {
     }
 
     /**
+     * Registers a listener for recoverable runtime issues that should be surfaced
+     * in UI.
+     *
+     * @param listener runtime issue listener to register
+     */
+    public void addRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.add(listener);
+        }
+    }
+
+    /**
+     * Unregisters a previously registered runtime-issue listener.
+     *
+     * @param listener runtime issue listener to remove
+     */
+    public void removeRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.remove(listener);
+        }
+    }
+
+    /**
+     * Reconnects receiver transport and retries the last failed send operation when
+     * available.
+     *
+     * This method runs asynchronously and is intended to be used as a popup
+     * retry callback.
+     */
+    public void retryLastFailedOperation() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                reconnectReceiver();
+                Runnable retryAction = lastFailedSendRetryAction.get();
+                if (retryAction != null) {
+                    retryAction.run();
+                } else {
+                    runOnUiThread(() -> status.set("Connection restored"));
+                }
+            } catch (Exception ex) {
+                runOnUiThread(() -> status.set("Retry failed: " + resolveErrorMessage(ex, "Unknown error.")));
+                publishRuntimeIssue(
+                        "messaging.retry.failed",
+                        "Retry failed",
+                        "Could not restore messaging connection. " + resolveErrorMessage(ex, "Please retry."),
+                        this::retryLastFailedOperation);
+            }
+        });
+    }
+
+    /**
      * Notifies all registered presence listeners while isolating failures per
      * listener.
      *
@@ -350,6 +438,80 @@ public class MessageViewModel {
                 // A bad listener must not break dispatching for others.
             }
         }
+    }
+
+    /**
+     * Notifies registered runtime-issue listeners while isolating listener
+     * failures.
+     *
+     * @param issue issue payload to dispatch
+     */
+    private void notifyRuntimeIssueListeners(RuntimeIssue issue) {
+        for (Consumer<RuntimeIssue> listener : runtimeIssueListeners) {
+            try {
+                listener.accept(issue);
+            } catch (Exception ignored) {
+                // A bad listener must not break dispatching for others.
+            }
+        }
+    }
+
+    /**
+     * Publishes a recoverable runtime issue to registered listeners.
+     *
+     * @param dedupeKey stable dedupe key
+     * @param title popup title
+     * @param message popup message
+     * @param retryAction action to execute on retry
+     */
+    private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
+        notifyRuntimeIssueListeners(new RuntimeIssue(dedupeKey, title, message, retryAction));
+    }
+
+    /**
+     * Stores retry action used to re-run the last failed send operation.
+     *
+     * @param retryAction send retry action
+     */
+    private void captureFailedSendRetryAction(Runnable retryAction) {
+        lastFailedSendRetryAction.set(retryAction);
+    }
+
+    /**
+     * Clears the remembered send retry action after successful operations.
+     */
+    private void clearFailedSendRetryAction() {
+        lastFailedSendRetryAction.set(null);
+    }
+
+    /**
+     * Restarts receiver transport to force reconnection.
+     *
+     * @throws Exception when stop/start operations fail
+     */
+    private void reconnectReceiver() throws Exception {
+        messageReceiver.stop();
+        receivingStarted = false;
+        messageReceiver.start();
+        receivingStarted = true;
+    }
+
+    /**
+     * Extracts a user-facing message from a Throwable with fallback text.
+     *
+     * @param error throwable to inspect
+     * @param fallback fallback text when throwable message is empty
+     * @return resolved message text
+     */
+    private static String resolveErrorMessage(Throwable error, String fallback) {
+        if (error == null) {
+            return fallback;
+        }
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            return fallback;
+        }
+        return message;
     }
 
     /**

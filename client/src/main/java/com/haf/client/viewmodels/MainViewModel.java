@@ -2,6 +2,7 @@ package com.haf.client.viewmodels;
 
 import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
@@ -19,7 +20,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.IntUnaryOperator;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -79,6 +82,7 @@ public class MainViewModel {
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
+    private final CopyOnWriteArrayList<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ObjectProperty<MainTab> activeTab = new SimpleObjectProperty<>(MainTab.MESSAGES);
     private final BooleanProperty hasSearchResults = new SimpleBooleanProperty(false);
     private final ConcurrentHashMap<String, Long> presenceSignalByUser = new ConcurrentHashMap<>();
@@ -198,6 +202,28 @@ public class MainViewModel {
     }
 
     /**
+     * Registers a listener for recoverable runtime issues.
+     *
+     * @param listener runtime issue listener
+     */
+    public void addRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.add(listener);
+        }
+    }
+
+    /**
+     * Unregisters a previously registered runtime-issue listener.
+     *
+     * @param listener runtime issue listener
+     */
+    public void removeRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.remove(listener);
+        }
+    }
+
+    /**
      * Pure UI-state decision for contact click behavior on the Main screen.
      */
     public ContactSelectionAction resolveContactSelectionAction(MainTab currentTab,
@@ -219,6 +245,11 @@ public class MainViewModel {
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
                     LOGGER.log(Level.SEVERE, "Failed to load contacts", ex);
+                    publishRuntimeIssue(
+                            "contacts.fetch.failed",
+                            "Contacts could not be loaded",
+                            "Failed to load contacts from server. " + resolveErrorMessage(ex, "Please retry."),
+                            this::fetchContacts);
                     return null;
                 });
     }
@@ -370,17 +401,7 @@ public class MainViewModel {
 
         long baselinePresenceSignal = presenceSignalByUser.getOrDefault(userId, 0L);
         contacts.add(ContactInfo.unknown(userId, fullName, regNumber, rank, email, telephone, joinedDate));
-        contactsGateway.addContact(userId)
-                .thenAccept(ignored -> {
-                    // Hydrate optimistic rows (e.g. incoming unknown sender) with real
-                    // server-side contact profile fields as soon as add succeeds.
-                    fetchContacts();
-                    scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
-                })
-                .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
-                    return null;
-                });
+        syncAddContactWithServer(userId, baselinePresenceSignal);
     }
 
     /**
@@ -390,11 +411,7 @@ public class MainViewModel {
      */
     public void removeContact(String userId) {
         contacts.removeIf(info -> info.id().equals(userId));
-        contactsGateway.removeContact(userId)
-                .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to remove contact on server", ex);
-                    return null;
-                });
+        syncRemoveContactWithServer(userId);
     }
 
     /**
@@ -761,6 +778,90 @@ public class MainViewModel {
                         return null;
                     });
         });
+    }
+
+    /**
+     * Synchronizes optimistic add-contact operation with backend.
+     *
+     * @param userId target contact id
+     * @param baselinePresenceSignal presence signal snapshot for fallback logic
+     */
+    private void syncAddContactWithServer(String userId, long baselinePresenceSignal) {
+        contactsGateway.addContact(userId)
+                .thenAccept(ignored -> {
+                    // Hydrate optimistic rows (e.g. incoming unknown sender) with real
+                    // server-side contact profile fields as soon as add succeeds.
+                    fetchContacts();
+                    scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
+                })
+                .exceptionally(ex -> {
+                    LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
+                    publishRuntimeIssue(
+                            "contacts.add.failed",
+                            "Contact could not be added",
+                            "Failed to sync contact add with server. " + resolveErrorMessage(ex, "Please retry."),
+                            () -> syncAddContactWithServer(userId, baselinePresenceSignal));
+                    return null;
+                });
+    }
+
+    /**
+     * Synchronizes local contact removal with backend.
+     *
+     * @param userId target contact id
+     */
+    private void syncRemoveContactWithServer(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        contactsGateway.removeContact(userId)
+                .exceptionally(ex -> {
+                    LOGGER.log(Level.SEVERE, "Failed to remove contact on server", ex);
+                    publishRuntimeIssue(
+                            "contacts.remove.failed",
+                            "Contact removal failed",
+                            "Failed to sync contact removal with server. " + resolveErrorMessage(ex, "Please retry."),
+                            () -> syncRemoveContactWithServer(userId));
+                    return null;
+                });
+    }
+
+    /**
+     * Dispatches a runtime issue to registered listeners.
+     *
+     * @param dedupeKey issue dedupe key
+     * @param title issue title
+     * @param message issue message
+     * @param retryAction retry callback
+     */
+    private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
+        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction);
+        for (Consumer<RuntimeIssue> listener : runtimeIssueListeners) {
+            try {
+                listener.accept(issue);
+            } catch (Exception ignored) {
+                // Listener failures should not block others.
+            }
+        }
+    }
+
+    /**
+     * Resolves readable throwable message with fallback.
+     *
+     * @param error throwable
+     * @param fallback fallback text
+     * @return resolved message
+     */
+    private static String resolveErrorMessage(Throwable error, String fallback) {
+        if (error == null) {
+            return fallback;
+        }
+        Throwable cause = error.getCause() != null ? error.getCause() : error;
+        String message = cause.getMessage();
+        if (message == null || message.isBlank()) {
+            return fallback;
+        }
+        return message;
     }
 
     /**

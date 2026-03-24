@@ -1,14 +1,17 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.models.ContactInfo;
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -115,6 +118,87 @@ class MainViewModelTest {
 
         assertFalse(viewModel.hasContact("u-1"));
         assertEquals(1, removeCalls.get());
+    }
+
+    @Test
+    void fetch_contacts_failure_emits_runtime_issue_with_retry_action() {
+        AtomicInteger fetchCalls = new AtomicInteger();
+        AtomicBoolean failFetch = new AtomicBoolean(true);
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> {
+                    fetchCalls.incrementAndGet();
+                    if (failFetch.get()) {
+                        return CompletableFuture.failedFuture(new RuntimeException("server unreachable"));
+                    }
+                    return CompletableFuture.completedFuture(JsonCodec.toJson(ContactsResponse.success(List.of())));
+                }));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.fetchContacts();
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("contacts.fetch.failed", issues.getFirst().dedupeKey());
+        failFetch.set(false);
+        issues.getFirst().retryAction().run();
+
+        awaitCondition(() -> fetchCalls.get() >= 2);
+    }
+
+    @Test
+    void add_contact_failure_emits_runtime_issue_and_retry_does_not_duplicate_local_contact() {
+        AtomicInteger addCalls = new AtomicInteger();
+        AtomicBoolean failAdd = new AtomicBoolean(true);
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}"),
+                userId -> {
+                    addCalls.incrementAndGet();
+                    if (failAdd.get()) {
+                        return CompletableFuture.failedFuture(new RuntimeException("add failed"));
+                    }
+                    return CompletableFuture.completedFuture("{}");
+                },
+                userId -> CompletableFuture.completedFuture("{}")));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.addContact("u-1", "Jane", "100");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals(1, viewModel.contactsProperty().size());
+        assertEquals("contacts.add.failed", issues.getFirst().dedupeKey());
+        failAdd.set(false);
+        issues.getFirst().retryAction().run();
+
+        awaitCondition(() -> addCalls.get() >= 2);
+        assertEquals(1, viewModel.contactsProperty().size());
+    }
+
+    @Test
+    void remove_contact_failure_emits_runtime_issue_with_retry_action() {
+        AtomicInteger removeCalls = new AtomicInteger();
+        AtomicBoolean failRemove = new AtomicBoolean(true);
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}"),
+                userId -> CompletableFuture.completedFuture("{}"),
+                userId -> {
+                    removeCalls.incrementAndGet();
+                    if (failRemove.get()) {
+                        return CompletableFuture.failedFuture(new RuntimeException("remove failed"));
+                    }
+                    return CompletableFuture.completedFuture("{}");
+                }));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.ensureChatContact("u-1", "Jane", "100");
+        viewModel.removeContact("u-1");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("contacts.remove.failed", issues.getFirst().dedupeKey());
+        failRemove.set(false);
+        issues.getFirst().retryAction().run();
+        awaitCondition(() -> removeCalls.get() >= 2);
     }
 
     @Test

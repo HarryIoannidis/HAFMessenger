@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.core.NetworkSession;
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
@@ -24,8 +25,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,6 +69,7 @@ public class SearchViewModel {
     }
 
     private final SearchGateway searchGateway;
+    private final CopyOnWriteArrayList<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final AtomicInteger generation = new AtomicInteger();
     private final ObservableList<UserSearchResultDTO> results = FXCollections.observableArrayList();
     private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections
@@ -205,6 +209,17 @@ public class SearchViewModel {
     }
 
     /**
+     * Retries the most recent non-empty search query with current sort options.
+     */
+    public void retryLastSearch() {
+        String query = activeQuery == null ? "" : activeQuery.trim();
+        if (query.isEmpty()) {
+            return;
+        }
+        search(query, sortOptions);
+    }
+
+    /**
      * Clears results and restores the idle status prompt.
      */
     public void clearResults() {
@@ -257,6 +272,28 @@ public class SearchViewModel {
     }
 
     /**
+     * Registers a listener for recoverable runtime issues.
+     *
+     * @param listener runtime issue listener
+     */
+    public void addRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.add(listener);
+        }
+    }
+
+    /**
+     * Unregisters a previously registered runtime-issue listener.
+     *
+     * @param listener runtime issue listener
+     */
+    public void removeRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
+        if (listener != null) {
+            runtimeIssueListeners.remove(listener);
+        }
+    }
+
+    /**
      * Pure policy for contact toggle action.
      * 
      * @param alreadyInContacts whether the user is already in contacts
@@ -289,7 +326,7 @@ public class SearchViewModel {
             String json = searchGateway.searchUsers(query, UiConstants.SEARCH_PAGE_SIZE, cursor);
             UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
             runOnUiThread(() -> applyResponse(response, append, searchGeneration));
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Search request failed", ex);
             runOnUiThread(() -> {
                 if (searchGeneration != generation.get()) {
@@ -308,6 +345,13 @@ public class SearchViewModel {
                 results.clear();
                 statusText.set(STATUS_GENERIC_FAILURE);
             });
+            publishRuntimeIssue(
+                    append ? "search.load-more.request.failed" : "search.request.failed",
+                    append ? "Could not load more results" : "Search failed",
+                    append
+                            ? "Could not load more search results. " + resolveErrorMessage(ex, "Please retry.")
+                            : "Search request failed. " + resolveErrorMessage(ex, "Please retry."),
+                    append ? this::loadMore : this::retryLastSearch);
         }
     }
 
@@ -373,6 +417,12 @@ public class SearchViewModel {
             if (!append) {
                 setErrorStatus(STATUS_GENERIC_FAILURE);
             }
+            publishRuntimeIssue(
+                    append ? "search.load-more.response.empty" : "search.response.empty",
+                    append ? "Could not load more results" : "Search failed",
+                    append ? "Server returned an empty response while loading more results."
+                            : "Search response was empty.",
+                    append ? this::loadMore : this::retryLastSearch);
             return true;
         }
 
@@ -381,6 +431,11 @@ public class SearchViewModel {
             if (!append) {
                 setErrorStatus("Error: " + error);
             }
+            publishRuntimeIssue(
+                    append ? "search.load-more.response.error" : "search.response.error",
+                    append ? "Could not load more results" : "Search failed",
+                    error,
+                    append ? this::loadMore : this::retryLastSearch);
             return true;
         }
 
@@ -498,5 +553,43 @@ public class SearchViewModel {
         } catch (IllegalStateException ex) {
             action.run();
         }
+    }
+
+    /**
+     * Publishes a recoverable runtime issue to registered listeners.
+     *
+     * @param dedupeKey issue dedupe key
+     * @param title issue title
+     * @param message issue message
+     * @param retryAction retry callback
+     */
+    private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
+        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction);
+        for (Consumer<RuntimeIssue> listener : runtimeIssueListeners) {
+            try {
+                listener.accept(issue);
+            } catch (Exception ignored) {
+                // Listener failures should not block others.
+            }
+        }
+    }
+
+    /**
+     * Extracts readable throwable message with fallback text.
+     *
+     * @param error throwable to inspect
+     * @param fallback fallback text
+     * @return resolved message
+     */
+    private static String resolveErrorMessage(Throwable error, String fallback) {
+        if (error == null) {
+            return fallback;
+        }
+        Throwable cause = error.getCause() != null ? error.getCause() : error;
+        String message = cause.getMessage();
+        if (message == null || message.isBlank()) {
+            return fallback;
+        }
+        return message;
     }
 }
