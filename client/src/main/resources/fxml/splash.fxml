@@ -81,7 +81,4 @@
       <URL value="@../css/global.css" />
       <URL value="@../css/splash.css" />
    </stylesheets>
-   <effect>
-      <DropShadow />
-   </effect>
 </StackPane>

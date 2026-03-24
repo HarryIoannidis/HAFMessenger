@@ -1,5 +1,9 @@
 /* splash.css */
 
+.window-card {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 10, 0.2, 0, 0);
+}
+
 .progress-bar>.track {
     -fx-background-color: #dcdcdc;
     -fx-background-radius: 4;

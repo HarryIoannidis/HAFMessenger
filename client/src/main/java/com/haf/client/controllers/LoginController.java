@@ -36,57 +36,47 @@ public class LoginController {
     private static final String PREF_EMAIL = "remembered_email";
     private static final String PREF_REMEMBER = "remember_me";
 
+    // Window chrome and layout containers
     @FXML
     private BorderPane rootContainer;
-
     @FXML
     private HBox titleBar;
-
     @FXML
     private HBox ttileHBox;
-
     @FXML
     private HBox buttonsHBox;
-
     @FXML
     private StackPane leftPanel;
-
     @FXML
     private StackPane rightPanel;
 
+    // Login form controls
     @FXML
     private TextField emailField;
-
     @FXML
     private PasswordField passwordField;
-
     @FXML
     private TextField passwordVisibleField;
-
     @FXML
     private JFXCheckBox rememberCheckBox;
-
     @FXML
     private JFXButton signInButton;
-
     @FXML
     private JFXButton togglePasswordButton;
-
     @FXML
     private FontIcon togglePasswordIcon;
 
+    // Navigation and feedback
     @FXML
     private Text gotoRegisterButton;
-
     @FXML
     private Text errorText;
 
+    // Window control buttons
     @FXML
     private Button minimizeButton;
-
     @FXML
     private Button maximizeButton;
-
     @FXML
     private Button closeButton;
 
