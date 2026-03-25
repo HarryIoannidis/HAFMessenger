@@ -224,16 +224,22 @@ class MailboxRouterTest {
     }
 
     @Test
-    void ttl_cleanup_deletes_expired_and_logs() {
+    void ttl_cleanup_deletes_expired_and_logs() throws Exception {
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
 
-        // Access private method via reflection or test via start() scheduling
-        // For unit test, we verify the router can be created and components work
-        assertNotNull(router);
+        when(envelopeDAO.deleteExpired()).thenReturn(3);
+
+        var cleanupMethod = MailboxRouter.class.getDeclaredMethod("runTtlCleanup");
+        cleanupMethod.setAccessible(true);
+        cleanupMethod.invoke(router);
+
+        verify(envelopeDAO, times(1)).deleteExpired();
+        verify(auditLogger, times(1)).logCleanup(eq(3), anyLong());
+        assertEquals(2, metricsRegistry.snapshot().queueDepth());
     }
 
     private EncryptedMessage createValidMessage() {

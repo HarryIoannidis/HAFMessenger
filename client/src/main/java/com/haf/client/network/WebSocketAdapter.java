@@ -16,6 +16,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 import java.util.function.Consumer;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.exceptions.HttpCommunicationException;
@@ -63,6 +64,30 @@ public class WebSocketAdapter {
     private static final long MAX_RETRY_DELAY_MS = 5000;
     private int retryAttempts = 0;
 
+    @FunctionalInterface
+    interface AsyncRunner {
+        /**
+         * Executes asynchronous work.
+         *
+         * @param task task to execute
+         */
+        void run(Runnable task);
+    }
+
+    @FunctionalInterface
+    interface DelayStrategy {
+        /**
+         * Sleeps for the requested delay.
+         *
+         * @param millis delay in milliseconds
+         * @throws InterruptedException when interrupted while waiting
+         */
+        void sleep(long millis) throws InterruptedException;
+    }
+
+    private final AsyncRunner asyncRunner;
+    private final DelayStrategy delayStrategy;
+
     /**
      * Creates a WebSocketAdapter for the specified server URI.
      *
@@ -70,14 +95,52 @@ public class WebSocketAdapter {
      * @param sessionId the authentication session ID to be passed as a bearer token
      */
     public WebSocketAdapter(URI serverUri, String sessionId) {
-        this.serverUri = serverUri;
-        this.sessionId = sessionId;
+        this(serverUri, sessionId, createDefaultHttpClient(),
+                runnable -> CompletableFuture.runAsync(runnable),
+                Thread::sleep);
+    }
 
-        // Create HTTP client with TLS configuration
-        SSLContext sslContext = createSSLContext();
-        SSLParameters sslParameters = createSSLParameters();
+    /**
+     * Test seam constructor that accepts an externally created HTTP client.
+     *
+     * @param serverUri WebSocket server URI
+     * @param sessionId bearer session id
+     * @param httpClient injected HTTP client used by transport operations
+     */
+    WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient) {
+        this(serverUri, sessionId, httpClient,
+                runnable -> CompletableFuture.runAsync(runnable),
+                Thread::sleep);
+    }
 
-        this.httpClient = HttpClient.newBuilder()
+    /**
+     * Internal constructor with injectable async and delay strategies.
+     *
+     * @param serverUri WebSocket server URI
+     * @param sessionId bearer session id
+     * @param httpClient injected HTTP client
+     * @param asyncRunner async execution strategy for reconnect attempts
+     * @param delayStrategy delay strategy used by reconnect backoff
+     */
+    WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient,
+            AsyncRunner asyncRunner, DelayStrategy delayStrategy) {
+        this.serverUri = Objects.requireNonNull(serverUri, "serverUri");
+        this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        this.asyncRunner = Objects.requireNonNull(asyncRunner, "asyncRunner");
+        this.delayStrategy = Objects.requireNonNull(delayStrategy, "delayStrategy");
+    }
+
+    /**
+     * Creates the default TLS-configured HTTP client used by production
+     * constructor.
+     *
+     * @return configured HTTP client
+     */
+    private static HttpClient createDefaultHttpClient() {
+        SSLContext sslContext = createDefaultSslContext();
+        SSLParameters sslParameters = createDefaultSslParameters();
+        return HttpClient.newBuilder()
                 .sslContext(sslContext)
                 .sslParameters(sslParameters)
                 .connectTimeout(Duration.ofSeconds(CONNECTION_TIMEOUT_SECONDS))
@@ -90,7 +153,7 @@ public class WebSocketAdapter {
      *
      * @return the SSL context
      */
-    private SSLContext createSSLContext() {
+    private static SSLContext createDefaultSslContext() {
         try {
             return SslContextUtils.getTrustingSslContext();
         } catch (Exception e) {
@@ -104,7 +167,7 @@ public class WebSocketAdapter {
      *
      * @return the SSL parameters
      */
-    private SSLParameters createSSLParameters() {
+    private static SSLParameters createDefaultSslParameters() {
         SSLParameters params = new SSLParameters();
         params.setProtocols(new String[] { "TLSv1.3" });
         params.setCipherSuites(new String[] {
@@ -629,9 +692,9 @@ public class WebSocketAdapter {
             return;
         }
         long delay = getRetryDelayMs();
-        CompletableFuture.runAsync(() -> {
+        asyncRunner.run(() -> {
             try {
-                Thread.sleep(delay);
+                delayStrategy.sleep(delay);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 return;

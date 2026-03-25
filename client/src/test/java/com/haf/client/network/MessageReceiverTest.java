@@ -30,6 +30,8 @@ class MessageReceiverTest {
         private boolean connected = false;
 
         private final java.util.List<String> sentMessages = new java.util.ArrayList<>();
+        private boolean failNextSend;
+        private int closeCalls;
 
         MockWebSocketAdapter() {
             super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
@@ -44,6 +46,10 @@ class MessageReceiverTest {
 
         @Override
         public void sendText(String text) throws java.io.IOException {
+            if (failNextSend) {
+                failNextSend = false;
+                throw new java.io.IOException("forced send failure");
+            }
             sentMessages.add(text);
         }
 
@@ -55,6 +61,7 @@ class MessageReceiverTest {
         @Override
         public void close() {
             connected = false;
+            closeCalls++;
         }
 
         void simulateIncomingMessage(String json, String envelopeId) {
@@ -72,6 +79,14 @@ class MessageReceiverTest {
 
         java.util.List<String> getSentMessages() {
             return sentMessages;
+        }
+
+        void failNextSend() {
+            failNextSend = true;
+        }
+
+        int getCloseCalls() {
+            return closeCalls;
         }
     }
 
@@ -277,5 +292,60 @@ class MessageReceiverTest {
         List<String> sent = webSocketAdapter.getSentMessages();
         assertEquals(1, sent.size());
         assertEquals("{\"envelopeIds\":[\"env-bad-tag\"]}", sent.get(0));
+    }
+
+    @Test
+    void decrypt_detached_message_succeeds_for_valid_payload() throws Exception {
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt("detached".getBytes(StandardCharsets.UTF_8), "text/plain", 3600);
+
+        byte[] plaintext = messageReceiver.decryptDetachedMessage(encrypted);
+
+        assertArrayEquals("detached".getBytes(StandardCharsets.UTF_8), plaintext);
+    }
+
+    @Test
+    void duplicate_envelope_is_deduplicated() throws Exception {
+        messageReceiver.start();
+
+        byte[] payload = "dup".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+        String json = JsonCodec.toJson(encrypted);
+
+        webSocketAdapter.simulateIncomingMessage(json, "env-dup");
+        webSocketAdapter.simulateIncomingMessage(json, "env-dup");
+
+        assertEquals(1, receivedMessages.size(), "Same envelopeId should be processed once");
+    }
+
+    @Test
+    void acknowledge_requeues_on_send_failure() throws Exception {
+        messageReceiver.start();
+
+        byte[] payload = "retry".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+        webSocketAdapter.simulateIncomingMessage(JsonCodec.toJson(encrypted), "env-retry");
+
+        webSocketAdapter.failNextSend();
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+        assertTrue(webSocketAdapter.getSentMessages().isEmpty(), "First ACK send should fail");
+
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+        assertEquals(List.of("{\"envelopeIds\":[\"env-retry\"]}"), webSocketAdapter.getSentMessages());
+    }
+
+    @Test
+    void stop_closes_underlying_adapter() throws Exception {
+        messageReceiver.start();
+
+        messageReceiver.stop();
+
+        assertEquals(1, webSocketAdapter.getCloseCalls());
+        assertFalse(webSocketAdapter.isConnected());
     }
 }
