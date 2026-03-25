@@ -165,6 +165,65 @@ class UserDAOTest {
         verify(auditLogger, times(1)).logError(eq("db_find_user"), isNull(), eq("test@haf.gr"), any());
     }
 
+    @Test
+    void updatePhotoIds_updates_row_successfully() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("UPDATE users SET id_photo_id"))).thenReturn(existsStatement);
+
+        dao.updatePhotoIds("user-1", "id-photo-1", "selfie-1");
+
+        verify(existsStatement).setString(1, "id-photo-1");
+        verify(existsStatement).setString(2, "selfie-1");
+        verify(existsStatement).setString(3, "user-1");
+        verify(existsStatement).executeUpdate();
+    }
+
+    @Test
+    void updatePhotoIds_wraps_sql_errors() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("UPDATE users SET id_photo_id"))).thenReturn(existsStatement);
+        when(existsStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.updatePhotoIds("user-1", "id", "selfie"));
+        verify(auditLogger, times(1)).logError(eq("db_update_photos"), isNull(), eq("user-1"), any());
+    }
+
+    @Test
+    void getPublicKey_returns_record_when_found() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SELECT public_key_pem"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getString("public_key_pem")).thenReturn("PEM");
+        when(resultSet.getString("public_key_fingerprint")).thenReturn("fp-1");
+
+        UserDAO.PublicKeyRecord record = dao.getPublicKey("user-1");
+
+        assertNotNull(record);
+        assertEquals("PEM", record.publicKeyPem());
+        assertEquals("fp-1", record.fingerprint());
+    }
+
+    @Test
+    void getPublicKey_returns_null_when_not_found() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SELECT public_key_pem"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        assertNull(dao.getPublicKey("user-1"));
+    }
+
+    @Test
+    void getPublicKey_wraps_sql_errors() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SELECT public_key_pem"))).thenReturn(existsStatement);
+        when(existsStatement.executeQuery()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.getPublicKey("user-1"));
+        verify(auditLogger, times(1)).logError(eq("db_find_public_key"), isNull(), eq("user-1"), any());
+    }
+
     // ── searchUsers tests ────────────────────────────────────────────────
 
     @Test

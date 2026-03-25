@@ -74,7 +74,7 @@ public class ChatController {
     private final ChatAttachmentService chatAttachmentService;
     private ChatViewModel viewModel;
 
-    private ListChangeListener<MessageVM> messageListener;
+    private ListChangeListener<MessageVM> messageListenerAnchor;
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
 
@@ -149,9 +149,12 @@ public class ChatController {
      * Detaches the listener from the previously observed message list.
      */
     private void removeCurrentListener() {
-        if (currentObservedList != null && weakMessageListener != null) {
+        if (messageListenerAnchor != null && currentObservedList != null && weakMessageListener != null) {
             currentObservedList.removeListener(weakMessageListener);
         }
+        currentObservedList = null;
+        weakMessageListener = null;
+        messageListenerAnchor = null;
     }
 
     /**
@@ -168,9 +171,10 @@ public class ChatController {
      */
     private void setupMessageListener() {
         String activeRecipient = viewModel.getRecipientId();
-        messageListener = change -> handleMessageChange(change, activeRecipient);
+        ListChangeListener<MessageVM> messageListener = change -> handleMessageChange(change, activeRecipient);
+        messageListenerAnchor = messageListener;
         currentObservedList = viewModel.getActiveMessages();
-        weakMessageListener = new WeakListChangeListener<>(messageListener);
+        weakMessageListener = new WeakListChangeListener<>(messageListenerAnchor);
         currentObservedList.addListener(weakMessageListener);
     }
 

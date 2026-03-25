@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.exceptions.UiDispatchException;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
@@ -35,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -538,11 +540,40 @@ public class MessageViewModel {
             return;
         }
 
+        CountDownLatch completion = new CountDownLatch(1);
+        AtomicReference<Throwable> actionFailure = new AtomicReference<>();
         try {
-            Platform.runLater(action);
+            Platform.runLater(() -> {
+                try {
+                    action.run();
+                } catch (Throwable throwable) {
+                    actionFailure.set(throwable);
+                } finally {
+                    completion.countDown();
+                }
+            });
         } catch (Throwable ex) {
             fxToolkitUnavailable = true;
             action.run();
+            return;
+        }
+
+        try {
+            completion.await();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new UiDispatchException("Interrupted while dispatching UI action", ex);
+        }
+
+        Throwable failure = actionFailure.get();
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        if (failure != null) {
+            throw new UiDispatchException("Error during UI action execution", failure);
         }
     }
 

@@ -7,3 +7,4 @@
 {"@timestamp":"2026-03-25T11:30:58.415Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Start completed.","process.thread.name":"main","log.logger":"com.zaxxer.hikari.HikariDataSource"}
 {"@timestamp":"2026-03-25T11:30:59.682Z","ecs.version":"1.2.0","log.level":"INFO","message":"Servers started on HTTP 8443 / WS 8444","process.thread.name":"main","log.logger":"com.haf.server.core.Main"}
 {"@timestamp":"2026-03-25T11:35:59.675Z","ecs.version":"1.2.0","log.level":"INFO","message":"Attachment cleanup removed 2 expired uploads","process.thread.name":"haf-scheduler-1","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-25T12:23:37.639Z","ecs.version":"1.2.0","log.level":"INFO","message":"Shutdown initiated","process.thread.name":"Thread-7","log.logger":"com.haf.server.core.Main"}
