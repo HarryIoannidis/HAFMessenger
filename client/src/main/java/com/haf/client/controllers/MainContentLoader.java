@@ -53,7 +53,7 @@ final class MainContentLoader {
     }
 
     private final StackPane contentPane;
-    private final SearchContactActions searchContactActions;
+    private final SearchController.ContactActions searchContactActions;
     private final ViewLoadFailureHandler viewLoadFailureHandler;
     private final ViewLoader viewLoader;
 
@@ -77,7 +77,7 @@ final class MainContentLoader {
      * @throws NullPointerException when required dependencies are {@code null}
      */
     MainContentLoader(StackPane contentPane,
-            SearchContactActions searchContactActions,
+            SearchController.ContactActions searchContactActions,
             ViewLoadFailureHandler viewLoadFailureHandler) {
         this(contentPane, searchContactActions, viewLoadFailureHandler, MainContentLoader::loadFromFxml);
     }
@@ -92,7 +92,7 @@ final class MainContentLoader {
      * @throws NullPointerException when required dependencies are {@code null}
      */
     MainContentLoader(StackPane contentPane,
-            SearchContactActions searchContactActions,
+            SearchController.ContactActions searchContactActions,
             ViewLoadFailureHandler viewLoadFailureHandler,
             ViewLoader viewLoader) {
         this.contentPane = Objects.requireNonNull(contentPane, "contentPane");

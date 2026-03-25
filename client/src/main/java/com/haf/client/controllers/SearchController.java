@@ -34,6 +34,75 @@ import java.util.logging.Logger;
  */
 public class SearchController {
 
+    /**
+     * Port for Search screen actions that affect contacts/chat state.
+     */
+    public interface ContactActions {
+
+        ContactActions NO_OP = new ContactActions() {
+            @Override
+            public boolean hasContact(String userId) {
+                return false;
+            }
+
+            @Override
+            public void addContact(UserSearchResultDTO result) {
+                // Intentionally no-op: default port implementation when Search is not wired.
+            }
+
+            @Override
+            public void removeContact(String userId) {
+                // Intentionally no-op: default port implementation when Search is not wired.
+            }
+
+            @Override
+            public void startChatWith(UserSearchResultDTO result) {
+                // Intentionally no-op: default port implementation when Search is not wired.
+            }
+
+            @Override
+            public void openProfile(UserSearchResultDTO result) {
+                // Intentionally no-op: default port implementation when Search is not wired.
+            }
+        };
+
+        /**
+         * Checks whether the given user already exists in the local contacts list.
+         *
+         * @param userId user identifier to check
+         * @return {@code true} when the contact already exists, otherwise {@code false}
+         */
+        boolean hasContact(String userId);
+
+        /**
+         * Adds the selected search result to local contacts.
+         *
+         * @param result selected search result to add
+         */
+        void addContact(UserSearchResultDTO result);
+
+        /**
+         * Removes a user from local contacts by id.
+         *
+         * @param userId user identifier to remove
+         */
+        void removeContact(String userId);
+
+        /**
+         * Starts a chat flow for the selected search result.
+         *
+         * @param result selected user to start chatting with
+         */
+        void startChatWith(UserSearchResultDTO result);
+
+        /**
+         * Opens the profile popup for the selected search result.
+         *
+         * @param result selected user profile to display
+         */
+        void openProfile(UserSearchResultDTO result);
+    }
+
     private static final Logger LOGGER = Logger.getLogger(SearchController.class.getName());
 
     // Search results containers
@@ -50,7 +119,7 @@ public class SearchController {
 
     private final SearchViewModel viewModel = SearchViewModel.createDefault();
     private final AtomicInteger renderGeneration = new AtomicInteger();
-    private SearchContactActions contactActions = SearchContactActions.NO_OP;
+    private ContactActions contactActions = ContactActions.NO_OP;
     private Consumer<RuntimeIssue> runtimeIssueListener;
 
     /**
@@ -237,7 +306,7 @@ public class SearchController {
      *
      * @param contactActions action port used for add/remove/start-chat/open-profile operations
      */
-    public void setContactActions(SearchContactActions contactActions) {
+    public void setContactActions(ContactActions contactActions) {
         this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
     }
 
