@@ -46,7 +46,7 @@ import java.util.logging.Logger;
 /**
  * Controller for the Main application view ({@code main.fxml}).
  */
-public class MainController implements SearchContactActions {
+public class MainController implements SearchController.ContactActions {
 
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
     private static final String NAV_ITEM_ICON = "nav-item-icon";

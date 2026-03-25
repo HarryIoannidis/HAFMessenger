@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -75,6 +76,16 @@ class SearchControllerTest {
     }
 
     @Test
+    void default_no_op_contact_actions_are_safe_when_not_explicitly_wired() {
+        SearchController controller = new SearchController();
+
+        assertDoesNotThrow(() -> controller.resolveToggleLabel("u-1"));
+        assertDoesNotThrow(() -> controller.handleToggleContact(sampleUser()));
+        assertDoesNotThrow(() -> controller.handleStartChat(sampleUser()));
+        assertDoesNotThrow(() -> controller.handleOpenProfile(sampleUser()));
+    }
+
+    @Test
     void toggle_policy_methods_are_pure_and_deterministic() {
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> "{}");
 
@@ -103,7 +114,7 @@ class SearchControllerTest {
         return new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true);
     }
 
-    private static final class StubSearchContactActions implements SearchContactActions {
+    private static final class StubSearchContactActions implements SearchController.ContactActions {
         private final AtomicBoolean hasContact = new AtomicBoolean(false);
         private final AtomicInteger addCalls = new AtomicInteger();
         private final AtomicInteger removeCalls = new AtomicInteger();
