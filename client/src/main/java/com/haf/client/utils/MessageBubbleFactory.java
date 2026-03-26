@@ -96,12 +96,37 @@ public final class MessageBubbleFactory {
     private static Text buildText(MessageVM message, VBox bubble) {
         String body = message.content() == null ? "" : message.content();
         Text text = new Text(body);
+        double estimatedTextWidth = estimateLongestLineWidth(body);
         text.wrappingWidthProperty().bind(Bindings.createDoubleBinding(
-                () -> Math.max(80.0, bubble.getMaxWidth() - BUBBLE_HORIZONTAL_PADDING),
+                () -> {
+                    double availableWidth = Math.max(80.0, bubble.getMaxWidth() - BUBBLE_HORIZONTAL_PADDING);
+                    double desiredWidth = Math.max(56.0, estimatedTextWidth + 18.0);
+                    return Math.min(availableWidth, desiredWidth);
+                },
                 bubble.maxWidthProperty()));
         text.getStyleClass().add(
                 message.isOutgoing() ? "bubble-text-out" : "bubble-text-in");
         return text;
+    }
+
+    /**
+     * Estimates the width of the longest logical line so short messages keep
+     * compact bubbles without collapsing into per-character wrapping.
+     *
+     * @param body message body
+     * @return estimated pixel width for the longest line
+     */
+    private static double estimateLongestLineWidth(String body) {
+        if (body == null || body.isBlank()) {
+            return 0.0;
+        }
+        String[] lines = body.split("\\R", -1);
+        int longestLineChars = 0;
+        for (String line : lines) {
+            longestLineChars = Math.max(longestLineChars, line.length());
+        }
+        // 8px/ch keeps sizing stable for Manrope-like text at 16px.
+        return longestLineChars * 8.0;
     }
 
     /**
