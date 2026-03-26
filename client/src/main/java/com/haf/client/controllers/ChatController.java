@@ -28,6 +28,7 @@ import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -49,6 +50,7 @@ public class ChatController {
     private static final Logger LOGGER = Logger.getLogger(ChatController.class.getName());
     private static final String PREVIEW_POPUP_KEY = "message-image-preview-popup";
     private static final long MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L;
+    private static final String BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS = "bubble-ripple-overlay";
 
     enum MessageContextAction {
         COPY,
@@ -732,11 +734,34 @@ public class ChatController {
      * @param messageNode rendered message node
      * @return interaction target node
      */
-    private Node resolveInteractionTarget(Node messageNode) {
+    static Node resolveInteractionTarget(Node messageNode) {
         if (messageNode instanceof HBox row && !row.getChildren().isEmpty()) {
-            return row.getChildren().get(0);
+            Node firstChild = row.getChildren().get(0);
+            if (firstChild instanceof StackPane stackPane) {
+                Node rippleOverlay = findRippleOverlay(stackPane);
+                if (rippleOverlay != null) {
+                    return rippleOverlay;
+                }
+            }
+            return firstChild;
         }
         return messageNode;
+    }
+
+    /**
+     * Finds the message ripple overlay button inside a stack bubble wrapper.
+     *
+     * @param stackPane bubble wrapper node
+     * @return overlay button when present; otherwise {@code null}
+     */
+    private static Node findRippleOverlay(StackPane stackPane) {
+        for (Node child : stackPane.getChildren()) {
+            if (child instanceof JFXButton button
+                    && button.getStyleClass().contains(BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS)) {
+                return button;
+            }
+        }
+        return null;
     }
 
     /**

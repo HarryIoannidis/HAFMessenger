@@ -6,6 +6,7 @@ import com.haf.client.models.MessageVM;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -14,8 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatControllerTest {
+    private static final Path CONTROLLER_SOURCE = Path.of("src/main/java/com/haf/client/controllers/ChatController.java");
 
     @TempDir
     Path tempDir;
@@ -219,6 +222,32 @@ class ChatControllerTest {
 
         assertEquals(false, ChatController.isOverAttachmentLimit(exact10Mb));
         assertEquals(true, ChatController.isOverAttachmentLimit(above10Mb));
+    }
+
+    @Test
+    void resolve_interaction_target_uses_overlay_when_stack_wrapper_contains_ripple_button() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (firstChild instanceof StackPane stackPane)"));
+        assertTrue(source.contains("Node rippleOverlay = findRippleOverlay(stackPane);"));
+        assertTrue(source.contains("if (rippleOverlay != null) {"));
+        assertTrue(source.contains("return rippleOverlay;"));
+    }
+
+    @Test
+    void resolve_interaction_target_keeps_first_child_and_non_row_fallback_behavior() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("return firstChild;"));
+        assertTrue(source.contains("return messageNode;"));
+    }
+
+    @Test
+    void ripple_overlay_detection_requires_overlay_style_class() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS"));
+        assertTrue(source.contains("button.getStyleClass().contains(BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS)"));
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {
