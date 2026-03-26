@@ -18,7 +18,7 @@ class MessageViewModelPresenceTest {
     @Test
     void presence_listener_receives_updates() throws Exception {
         StubMessageReceiver receiver = new StubMessageReceiver();
-        MessageViewModel viewModel = new MessageViewModel(new NoopMessageSender(), receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopMessageSender(), receiver);
 
         List<String> updates = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(1);

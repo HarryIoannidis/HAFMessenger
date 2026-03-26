@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.RankIconResolver;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.viewmodels.SearchSortViewModel;
@@ -304,7 +305,8 @@ public class SearchController {
     /**
      * Injects contact/chat action callbacks used by search result buttons.
      *
-     * @param contactActions action port used for add/remove/start-chat/open-profile operations
+     * @param contactActions action port used for add/remove/start-chat/open-profile
+     *                       operations
      */
     public void setContactActions(ContactActions contactActions) {
         this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
@@ -313,7 +315,8 @@ public class SearchController {
     /**
      * Sets the runtime-issue listener for search failures.
      *
-     * @param listener listener that should receive recoverable search runtime issues
+     * @param listener listener that should receive recoverable search runtime
+     *                 issues
      */
     public void setRuntimeIssueListener(Consumer<RuntimeIssue> listener) {
         if (runtimeIssueListener != null) {
@@ -331,7 +334,7 @@ public class SearchController {
      * We look up nodes by their {@code fx:id} rather than coupling to a
      * sub-controller, keeping the design simple.
      *
-     * @param card loaded result-card node
+     * @param card   loaded result-card node
      * @param result data object to render inside the card
      */
     private void populateCard(javafx.scene.Node card, UserSearchResultDTO result) {
@@ -403,7 +406,7 @@ public class SearchController {
     /**
      * Enables profile-open behavior when users click on non-action areas of a card.
      *
-     * @param card result card node
+     * @param card   result card node
      * @param result represented user search result
      */
     private void setupCardProfileOpen(javafx.scene.Node card, UserSearchResultDTO result) {
@@ -429,7 +432,8 @@ public class SearchController {
      * Checks whether a clicked node belongs to an action button subtree.
      *
      * @param node clicked node from pick result
-     * @return {@code true} when click originated from remove/start-chat button hierarchy
+     * @return {@code true} when click originated from remove/start-chat button
+     *         hierarchy
      */
     private boolean isWithinActionButton(Node node) {
         Node cursor = node;
@@ -457,9 +461,8 @@ public class SearchController {
 
         updateToggleButtonText(removeButton, result.getUserId());
 
-        removeButton.setOnAction(e -> {
-            handleToggleContact(result, () -> updateToggleButtonText(removeButton, result.getUserId()));
-        });
+        removeButton.setOnAction(
+                e -> handleToggleContact(result, () -> updateToggleButtonText(removeButton, result.getUserId())));
     }
 
     /**
@@ -520,7 +523,7 @@ public class SearchController {
      * Toggles contact membership for a result and invokes optional completion
      * callback.
      *
-     * @param result search result whose contact state should be toggled
+     * @param result            search result whose contact state should be toggled
      * @param onActionCompleted callback invoked after toggle action completes
      */
     private void handleToggleContact(UserSearchResultDTO result, Runnable onActionCompleted) {
@@ -544,8 +547,8 @@ public class SearchController {
     /**
      * Executes add/remove contact policy based on resolved toggle action.
      *
-     * @param action resolved contact toggle action
-     * @param addContactAction callback for add-contact branch
+     * @param action                     resolved contact toggle action
+     * @param addContactAction           callback for add-contact branch
      * @param confirmRemoveContactAction callback for remove-contact branch
      */
     static void applyContactToggleAction(
@@ -556,16 +559,17 @@ public class SearchController {
         Objects.requireNonNull(addContactAction, "addContactAction");
         Objects.requireNonNull(confirmRemoveContactAction, "confirmRemoveContactAction");
 
-        switch (action) {
-            case ADD_CONTACT -> addContactAction.run();
-            case REMOVE_CONTACT -> confirmRemoveContactAction.run();
+        if (action == SearchViewModel.ContactToggleAction.ADD_CONTACT) {
+            addContactAction.run();
+        } else if (action == SearchViewModel.ContactToggleAction.REMOVE_CONTACT) {
+            confirmRemoveContactAction.run();
         }
     }
 
     /**
      * Displays a confirmation popup before removing an existing contact.
      *
-     * @param result target contact represented as search result
+     * @param result            target contact represented as search result
      * @param onActionCompleted callback invoked after removal
      */
     private void confirmRemoveContact(UserSearchResultDTO result, Runnable onActionCompleted) {
@@ -592,7 +596,7 @@ public class SearchController {
      * Resolves display name used in confirmation prompts.
      *
      * @param fullName full name candidate
-     * @param userId fallback user id
+     * @param userId   fallback user id
      * @return best display label for the target contact
      */
     private static String resolveContactDisplayName(String fullName, String userId) {
@@ -640,45 +644,6 @@ public class SearchController {
         }
         LOGGER.log(Level.INFO, "Open profile requested for user: {0}", result.getUserId());
         contactActions.openProfile(result);
-    }
-
-    /**
-     * Resolves a rank name to its icon resource path, following the existing
-     * mapping in {@link UiConstants}.
-     */
-    private static final class RankIconResolver {
-
-        /**
-         * Prevents instantiation of this static icon mapping utility.
-         */
-        private RankIconResolver() {
-        }
-
-        /**
-         * Maps a rank label to its corresponding icon path in {@link UiConstants}.
-         *
-         * @param rank rank label
-         * @return icon resource path for the provided rank (or default icon path)
-         */
-        static String resolve(String rank) {
-            return switch (rank) {
-                case UiConstants.RANK_YPOSMINIAS -> UiConstants.ICON_RANK_YPOSMINIAS;
-                case UiConstants.RANK_SMINIAS -> UiConstants.ICON_RANK_SMINIAS;
-                case UiConstants.RANK_EPISMINIAS -> UiConstants.ICON_RANK_EPISMINIAS;
-                case UiConstants.RANK_ARCHISMINIAS -> UiConstants.ICON_RANK_ARCHISMINIAS;
-                case UiConstants.RANK_ANTHYPASPISTIS -> UiConstants.ICON_RANK_ANTHYPASPISTIS;
-                case UiConstants.RANK_ANTHYPOSMINAGOS -> UiConstants.ICON_RANK_ANTHYPOSMINAGOS;
-                case UiConstants.RANK_YPOSMINAGOS -> UiConstants.ICON_RANK_YPOSMINAGOS;
-                case UiConstants.RANK_SMINAGOS -> UiConstants.ICON_RANK_SMINAGOS;
-                case UiConstants.RANK_EPISMINAGOS -> UiConstants.ICON_RANK_EPISMINAGOS;
-                case UiConstants.RANK_ANTISMINARCHOS -> UiConstants.ICON_RANK_ANTISMINARCHOS;
-                case UiConstants.RANK_SMINARCHOS -> UiConstants.ICON_RANK_SMINARCHOS;
-                case UiConstants.RANK_TAKSIARCOS -> UiConstants.ICON_RANK_TAKSIARCOS;
-                case UiConstants.RANK_YPOPTERARCHOS -> UiConstants.ICON_RANK_YPOPTERARCHOS;
-                case UiConstants.RANK_ANTIPTERARCHOS -> UiConstants.ICON_RANK_ANTIPTERARCHOS;
-                default -> UiConstants.ICON_RANK_DEFAULT;
-            };
-        }
     }
 
 }

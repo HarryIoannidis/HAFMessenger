@@ -58,6 +58,22 @@ public record MessageVM(
     }
 
     /**
+     * Convenience factory for incoming image placeholders while chunked payloads
+     * are downloading.
+     */
+    public static MessageVM incomingLoadingImage(String fileName, LocalDateTime timestamp) {
+        return new MessageVM(false, MessageType.IMAGE, null, null, fileName, null, timestamp, true);
+    }
+
+    /**
+     * Convenience factory for outgoing image placeholders while chunked payloads
+     * are uploading.
+     */
+    public static MessageVM outgoingLoadingImage(String fileName, LocalDateTime timestamp) {
+        return new MessageVM(true, MessageType.IMAGE, null, null, fileName, null, timestamp, true);
+    }
+
+    /**
      * Convenience factory for outgoing file messages (localPath = file:// path).
      */
     public static MessageVM outgoingFile(String localPath, String fileName, String fileSize, LocalDateTime timestamp) {
@@ -69,6 +85,22 @@ public record MessageVM(
      */
     public static MessageVM incomingFile(String localPath, String fileName, String fileSize, LocalDateTime timestamp) {
         return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
+    }
+
+    /**
+     * Convenience factory for incoming file placeholders while chunked payloads
+     * are downloading.
+     */
+    public static MessageVM incomingLoadingFile(String fileName, String fileSize, LocalDateTime timestamp) {
+        return new MessageVM(false, MessageType.FILE, null, null, fileName, fileSize, timestamp, true);
+    }
+
+    /**
+     * Convenience factory for outgoing file placeholders while chunked payloads
+     * are uploading.
+     */
+    public static MessageVM outgoingLoadingFile(String fileName, String fileSize, LocalDateTime timestamp) {
+        return new MessageVM(true, MessageType.FILE, null, null, fileName, fileSize, timestamp, true);
     }
 
     /** Alias so call-sites can use isOutgoing() or outgoing() interchangeably. */

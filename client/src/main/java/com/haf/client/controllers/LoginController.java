@@ -33,6 +33,7 @@ public class LoginController {
     private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
 
     private static final String SIGN_IN_TEXT = "Sign In";
+    private static final String LOADING_CHATS_TEXT = "Loading chats...";
     private static final String PREF_EMAIL = "remembered_email";
     private static final String PREF_REMEMBER = "remember_me";
 
@@ -137,12 +138,6 @@ public class LoginController {
         }
 
         rememberCheckBox.disableProperty().bind(viewModel.loadingProperty());
-        if (togglePasswordButton != null) {
-            togglePasswordButton.disableProperty().bind(viewModel.loadingProperty());
-        }
-        if (gotoRegisterButton != null) {
-            gotoRegisterButton.disableProperty().bind(viewModel.loadingProperty());
-        }
     }
 
     /**
@@ -337,12 +332,39 @@ public class LoginController {
      */
     private void handleLoginSuccess() {
         javafx.application.Platform.runLater(() -> {
-            viewModel.loadingProperty().set(false);
-            signInButton.setText(SIGN_IN_TEXT);
+            signInButton.setText(LOADING_CHATS_TEXT);
             savePreferences();
-            ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
-            LOGGER.log(Level.INFO, () -> "Login successful for: " + viewModel.getEmail() + ", Socket connected.");
+            // Queue the view switch on the next UI turn so the loading label can render.
+            javafx.application.Platform.runLater(() -> {
+                try {
+                    ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
+                    LOGGER.log(Level.INFO, () -> "Login successful for: " + viewModel.getEmail() + ", Socket connected.");
+                } catch (Exception ex) {
+                    viewModel.loadingProperty().set(false);
+                    signInButton.setText(SIGN_IN_TEXT);
+                    showMainLoadFailurePopup(ex);
+                }
+            });
         });
+    }
+
+    /**
+     * Displays a popup when main chat UI fails to load after successful authentication.
+     *
+     * @param error scene-load error
+     */
+    private void showMainLoadFailurePopup(Throwable error) {
+        String reason = error == null || error.getMessage() == null || error.getMessage().isBlank()
+                ? "Unknown error."
+                : error.getMessage();
+
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_VIEW_LOAD_ERROR)
+                .title("Failed to load chats")
+                .message("Login succeeded, but chat loading failed. " + reason)
+                .actionText("OK")
+                .singleAction(true)
+                .show();
     }
 
     /**

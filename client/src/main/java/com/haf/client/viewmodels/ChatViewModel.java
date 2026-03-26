@@ -11,16 +11,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * UI-oriented wrapper around {@link MessageViewModel} for chat screen state.
+ * UI-oriented wrapper around {@link MessagesViewModel} for chat screen state.
  *
  * Tracks active recipient, per-recipient drafts and send enablement while
- * message transport remains in {@link MessageViewModel}.
+ * message transport remains in {@link MessagesViewModel}.
  */
 public class ChatViewModel {
 
     private static final ObservableList<MessageVM> EMPTY_MESSAGES = FXCollections.observableArrayList();
 
-    private final MessageViewModel messageViewModel;
+    private final MessagesViewModel messageViewModel;
     private final Map<String, String> draftsByRecipient = new HashMap<>();
 
     private final StringProperty recipientId = new SimpleStringProperty("");
@@ -32,7 +32,7 @@ public class ChatViewModel {
      *
      * @param messageViewModel transport/state view-model backing message operations
      */
-    public ChatViewModel(MessageViewModel messageViewModel) {
+    public ChatViewModel(MessagesViewModel messageViewModel) {
         this.messageViewModel = messageViewModel;
         this.canSend = Bindings.createBooleanBinding(
                 () -> messageViewModel != null
@@ -45,7 +45,7 @@ public class ChatViewModel {
     /**
      * Indicates whether this chat view-model can interact with messaging services.
      *
-     * @return {@code true} when a backing {@link MessageViewModel} is available
+     * @return {@code true} when a backing {@link MessagesViewModel} is available
      */
     public boolean isReady() {
         return messageViewModel != null;

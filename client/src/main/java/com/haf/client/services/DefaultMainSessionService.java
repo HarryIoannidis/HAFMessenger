@@ -3,7 +3,7 @@ package com.haf.client.services;
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessagesViewModel;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +11,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Default {@link MainSessionService} implementation backed by session singletons.
+ * Default {@link MainSessionService} implementation backed by session
+ * singletons.
  */
 public class DefaultMainSessionService implements MainSessionService {
 
@@ -40,28 +41,28 @@ public class DefaultMainSessionService implements MainSessionService {
          *
          * @param listener listener to register
          */
-        void addPresenceListener(MessageViewModel.PresenceListener listener);
+        void addPresenceListener(MessagesViewModel.PresenceListener listener);
 
         /**
          * Unregisters presence listener from current chat session.
          *
          * @param listener listener to unregister
          */
-        void removePresenceListener(MessageViewModel.PresenceListener listener);
+        void removePresenceListener(MessagesViewModel.PresenceListener listener);
 
         /**
          * Registers incoming-message listener on current chat session.
          *
          * @param listener listener to register
          */
-        void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
+        void addIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener);
 
         /**
          * Unregisters incoming-message listener from current chat session.
          *
          * @param listener listener to unregister
          */
-        void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener);
+        void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener);
     }
 
     interface SessionContext {
@@ -101,7 +102,7 @@ public class DefaultMainSessionService implements MainSessionService {
          * Runs a named background task.
          *
          * @param taskName logical task name for diagnostics/thread naming
-         * @param task task logic to execute
+         * @param task     task logic to execute
          */
         void run(String taskName, Runnable task);
     }
@@ -110,8 +111,8 @@ public class DefaultMainSessionService implements MainSessionService {
     private final TaskRunner taskRunner;
 
     private SessionChannel activeSessionChannel;
-    private MessageViewModel.PresenceListener activePresenceListener;
-    private MessageViewModel.IncomingMessageListener activeIncomingMessageListener;
+    private MessagesViewModel.PresenceListener activePresenceListener;
+    private MessagesViewModel.IncomingMessageListener activeIncomingMessageListener;
 
     /**
      * Creates main-session service backed by default singleton session context.
@@ -124,7 +125,7 @@ public class DefaultMainSessionService implements MainSessionService {
      * Creates main-session service with injectable context/task runner.
      *
      * @param sessionContext abstraction over session singletons
-     * @param taskRunner background execution strategy
+     * @param taskRunner     background execution strategy
      */
     DefaultMainSessionService(SessionContext sessionContext, TaskRunner taskRunner) {
         this.sessionContext = Objects.requireNonNull(sessionContext, "sessionContext");
@@ -137,7 +138,7 @@ public class DefaultMainSessionService implements MainSessionService {
      * @param listener listener to register
      */
     @Override
-    public synchronized void registerPresenceListener(MessageViewModel.PresenceListener listener) {
+    public synchronized void registerPresenceListener(MessagesViewModel.PresenceListener listener) {
         Objects.requireNonNull(listener, "listener");
 
         unregisterPresenceListener();
@@ -170,7 +171,7 @@ public class DefaultMainSessionService implements MainSessionService {
      * @param listener listener to register
      */
     @Override
-    public synchronized void registerIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+    public synchronized void registerIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
         Objects.requireNonNull(listener, "listener");
 
         unregisterIncomingMessageListener();
@@ -260,7 +261,7 @@ public class DefaultMainSessionService implements MainSessionService {
      * Runs a named task on a virtual thread.
      *
      * @param taskName logical task name
-     * @param task task to execute
+     * @param task     task to execute
      */
     private static void runVirtualTask(String taskName, Runnable task) {
         Thread.ofVirtual().name(taskName).start(task);
@@ -308,7 +309,7 @@ public class DefaultMainSessionService implements MainSessionService {
          */
         @Override
         public SessionChannel sessionChannel() {
-            MessageViewModel messageViewModel = ChatSession.get();
+            MessagesViewModel messageViewModel = ChatSession.get();
             if (messageViewModel == null) {
                 return null;
             }
@@ -320,7 +321,7 @@ public class DefaultMainSessionService implements MainSessionService {
                  * @param listener listener to register
                  */
                 @Override
-                public void addPresenceListener(MessageViewModel.PresenceListener listener) {
+                public void addPresenceListener(MessagesViewModel.PresenceListener listener) {
                     messageViewModel.addPresenceListener(listener);
                 }
 
@@ -330,7 +331,7 @@ public class DefaultMainSessionService implements MainSessionService {
                  * @param listener listener to remove
                  */
                 @Override
-                public void removePresenceListener(MessageViewModel.PresenceListener listener) {
+                public void removePresenceListener(MessagesViewModel.PresenceListener listener) {
                     messageViewModel.removePresenceListener(listener);
                 }
 
@@ -340,7 +341,7 @@ public class DefaultMainSessionService implements MainSessionService {
                  * @param listener listener to register
                  */
                 @Override
-                public void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+                public void addIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
                     messageViewModel.addIncomingMessageListener(listener);
                 }
 
@@ -350,7 +351,7 @@ public class DefaultMainSessionService implements MainSessionService {
                  * @param listener listener to remove
                  */
                 @Override
-                public void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+                public void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
                     messageViewModel.removeIncomingMessageListener(listener);
                 }
             };

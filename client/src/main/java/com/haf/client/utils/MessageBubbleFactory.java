@@ -232,17 +232,35 @@ public final class MessageBubbleFactory {
         FontIcon icon = new FontIcon("mdi2f-file-pdf-box");
         icon.setIconSize(24);
 
-        String label = (message.fileName() != null ? message.fileName() : "File")
-                + (message.fileSize() != null ? "  •  " + message.fileSize() : "");
+        boolean loadingPlaceholder = message.isLoading()
+                && (message.localPath() == null || message.localPath().isBlank());
+
+        String label = (message.fileName() != null ? message.fileName() : "File");
+        if (message.fileSize() != null && !message.fileSize().isBlank()) {
+            label += "  •  " + message.fileSize();
+        }
+        if (loadingPlaceholder) {
+            label += "  •  Loading...";
+        }
 
         Text fileText = new Text(label);
         fileText.getStyleClass().add(
                 message.isOutgoing() ? "bubble-text-out" : "bubble-text-in");
 
         HBox fileRow = new HBox(8, icon, fileText);
+        if (loadingPlaceholder) {
+            ProgressIndicator spinner = new ProgressIndicator();
+            spinner.setPrefSize(18, 18);
+            spinner.setMaxSize(18, 18);
+            spinner.getStyleClass().add("bubble-image-spinner");
+            spinner.setMouseTransparent(true);
+            fileRow.getChildren().add(spinner);
+        }
         fileRow.setAlignment(Pos.CENTER_LEFT);
-        fileRow.getStyleClass().add("bubble-file-clickable");
-        fileRow.setCursor(Cursor.HAND);
+        if (!loadingPlaceholder) {
+            fileRow.getStyleClass().add("bubble-file-clickable");
+            fileRow.setCursor(Cursor.HAND);
+        }
         return fileRow;
     }
 

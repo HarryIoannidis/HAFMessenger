@@ -14,7 +14,7 @@ import com.haf.client.utils.RuntimeIssuePopupGate;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessagesViewModel;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.jfoenix.controls.JFXButton;
@@ -40,6 +40,8 @@ import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -55,6 +57,7 @@ public class MainController implements SearchController.ContactActions {
     private static final String PROFILE_POPUP_KEY = "profile-popup";
     private static final long RUNTIME_ISSUE_POPUP_COOLDOWN_MS = 10_000L;
     private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
+    private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final String MESSAGING_RUNTIME_ISSUE_PREFIX = "messaging.";
     private static final String MESSAGING_RETRY_FAILED_KEY = "messaging.retry.failed";
 
@@ -132,6 +135,7 @@ public class MainController implements SearchController.ContactActions {
             RUNTIME_ISSUE_POPUP_COOLDOWN_MS);
     private final RuntimeIssuePopupGate chatAutoRetryGate = new RuntimeIssuePopupGate(
             CHAT_AUTO_RETRY_COOLDOWN_MS);
+    private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
@@ -154,7 +158,8 @@ public class MainController implements SearchController.ContactActions {
     /**
      * Creates the controller with an explicit session service dependency.
      *
-     * @param mainSessionService service responsible for logout and event listener wiring
+     * @param mainSessionService service responsible for logout and event listener
+     *                           wiring
      * @throws NullPointerException when {@code mainSessionService} is {@code null}
      */
     MainController(MainSessionService mainSessionService) {
@@ -162,7 +167,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Initializes main view bindings, UI interactions, listeners, and initial content state.
+     * Initializes main view bindings, UI interactions, listeners, and initial
+     * content state.
      */
     @FXML
     public void initialize() {
@@ -195,14 +201,16 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Binds the contacts list view to the view-model observable contacts collection.
+     * Binds the contacts list view to the view-model observable contacts
+     * collection.
      */
     private void bindViewModel() {
         contactsList.setItems(viewModel.contactsProperty());
     }
 
     /**
-     * Keeps the profile strip synchronized when contact entries are replaced in the list.
+     * Keeps the profile strip synchronized when contact entries are replaced in the
+     * list.
      */
     private void bindSelectedContactProfileSync() {
         viewModel.contactsProperty().addListener((ListChangeListener<ContactInfo>) change -> {
@@ -219,7 +227,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Refreshes profile-strip data for the tracked/selected contact when contact model instances are replaced.
+     * Refreshes profile-strip data for the tracked/selected contact when contact
+     * model instances are replaced.
      */
     private void refreshProfilePanelForSelectedContact() {
         if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
@@ -245,9 +254,11 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Resolves the contact id currently tracked by the chat area or list selection state.
+     * Resolves the contact id currently tracked by the chat area or list selection
+     * state.
      *
-     * @return tracked contact id, or {@code null} when no contact is currently tracked
+     * @return tracked contact id, or {@code null} when no contact is currently
+     *         tracked
      */
     private String resolveTrackedContactId() {
         String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
@@ -256,7 +267,8 @@ public class MainController implements SearchController.ContactActions {
         }
 
         Object tracked = contactsList.getUserData();
-        if (tracked instanceof ContactInfo trackedContact && trackedContact.id() != null && !trackedContact.id().isBlank()) {
+        if (tracked instanceof ContactInfo trackedContact && trackedContact.id() != null
+                && !trackedContact.id().isBlank()) {
             return trackedContact.id();
         }
 
@@ -295,7 +307,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Creates and wires the search/filter orchestration controller used by toolbar actions.
+     * Creates and wires the search/filter orchestration controller used by toolbar
+     * actions.
      */
     private void setupSearchFilterUi() {
         searchFilterUi = new SearchFilterController(
@@ -310,7 +323,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Wires the profile button in the toolbar to open the selected-contact profile popup.
+     * Wires the profile button in the toolbar to open the selected-contact profile
+     * popup.
      */
     private void setupProfilePopupTrigger() {
         if (profilePopupButton == null) {
@@ -321,7 +335,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Triggers the search flow using the current toolbar query and active filter options.
+     * Triggers the search flow using the current toolbar query and active filter
+     * options.
      */
     private void triggerSearchFlow() {
         if (searchFilterUi == null) {
@@ -335,9 +350,10 @@ public class MainController implements SearchController.ContactActions {
     /**
      * Executes a search request through the loaded search content controller.
      *
-     * @param query raw search query text
+     * @param query       raw search query text
      * @param sortOptions selected sort/filter options to apply
-     * @return {@code true} when a search controller is available and search is dispatched, otherwise {@code false}
+     * @return {@code true} when a search controller is available and search is
+     *         dispatched, otherwise {@code false}
      */
     private boolean executeSearchWithFilters(String query, SearchSortViewModel.SortOptions sortOptions) {
         bindSearchRuntimeIssueListener();
@@ -350,7 +366,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Marks search state as populated and flips the toolbar action icon to the clear symbol.
+     * Marks search state as populated and flips the toolbar action icon to the
+     * clear symbol.
      */
     private void onSearchExecuted() {
         viewModel.setHasSearchResults(true);
@@ -379,7 +396,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Activates the messages tab, restores message-oriented panels, and opens current chat/placeholder content.
+     * Activates the messages tab, restores message-oriented panels, and opens
+     * current chat/placeholder content.
      */
     private void activateMessagesTab() {
         viewModel.setActiveTab(MainViewModel.MainTab.MESSAGES);
@@ -408,7 +426,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Activates the search tab and ensures search UI/content are visible and initialized.
+     * Activates the search tab and ensures search UI/content are visible and
+     * initialized.
      */
     private void activateSearchTab() {
         viewModel.setActiveTab(MainViewModel.MainTab.SEARCH);
@@ -432,7 +451,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Applies active/inactive CSS classes on navigation icons according to the active tab.
+     * Applies active/inactive CSS classes on navigation icons according to the
+     * active tab.
      *
      * @param messagesActive whether the messages tab is the active tab
      */
@@ -510,7 +530,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Opens a profile popup for the currently tracked or selected contact, if available.
+     * Opens a profile popup for the currently tracked or selected contact, if
+     * available.
      */
     private void openSelectedContactProfilePopup() {
         String trackedContactId = resolveTrackedContactId();
@@ -559,7 +580,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Configures contact list cells and wires click/context-menu callbacks for each row.
+     * Configures contact list cells and wires click/context-menu callbacks for each
+     * row.
      */
     private void setupContactList() {
         contactsList.setCellFactory(lv -> {
@@ -648,7 +670,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Wires mouse/selection interactions for contacts and maps them to view-model selection actions.
+     * Wires mouse/selection interactions for contacts and maps them to view-model
+     * selection actions.
      */
     private void setupContactSelection() {
         contactsList.setOnMouseClicked(event -> {
@@ -700,12 +723,16 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Executes contact-selection behavior for the action resolved by {@link MainViewModel}.
+     * Executes contact-selection behavior for the action resolved by
+     * {@link MainViewModel}.
      *
-     * @param action resolved action for the current click/selection state
-     * @param switchToMessagesAction callback for switching into messages tab
-     * @param deselectAndPlaceholderAction callback for deselecting contact and showing placeholder
-     * @param keepSelectionAction callback for keeping current selection intact
+     * @param action                       resolved action for the current
+     *                                     click/selection state
+     * @param switchToMessagesAction       callback for switching into messages tab
+     * @param deselectAndPlaceholderAction callback for deselecting contact and
+     *                                     showing placeholder
+     * @param keepSelectionAction          callback for keeping current selection
+     *                                     intact
      * @throws NullPointerException when any parameter is {@code null}
      */
     static void applyContactSelectionAction(
@@ -728,9 +755,9 @@ public class MainController implements SearchController.ContactActions {
     /**
      * Executes immediate contact-context menu actions.
      *
-     * @param action context action selected from the menu
-     * @param openProfileAction callback for opening profile
-     * @param deleteChatAction callback for deleting local chat history
+     * @param action              context action selected from the menu
+     * @param openProfileAction   callback for opening profile
+     * @param deleteChatAction    callback for deleting local chat history
      * @param removeContactAction callback for removing contact
      * @throws NullPointerException when any parameter is {@code null}
      */
@@ -752,12 +779,14 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Executes contact-context actions where destructive operations are confirmation-gated.
+     * Executes contact-context actions where destructive operations are
+     * confirmation-gated.
      *
-     * @param action context action selected from the menu
-     * @param openProfileAction callback for profile action
-     * @param confirmDeleteChatAction callback for delete-chat confirmation flow
-     * @param confirmRemoveContactAction callback for remove-contact confirmation flow
+     * @param action                     context action selected from the menu
+     * @param openProfileAction          callback for profile action
+     * @param confirmDeleteChatAction    callback for delete-chat confirmation flow
+     * @param confirmRemoveContactAction callback for remove-contact confirmation
+     *                                   flow
      * @throws NullPointerException when any parameter is {@code null}
      */
     static void applyContactContextActionWithConfirmation(
@@ -801,7 +830,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Installs scene-level outside-click handling so the contact context menu closes on external clicks.
+     * Installs scene-level outside-click handling so the contact context menu
+     * closes on external clicks.
      */
     private void setupContactContextMenuOutsideClickClose() {
         if (rootContainer == null) {
@@ -842,7 +872,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Hides the contact context menu when any scene mouse-press happens outside the popup.
+     * Hides the contact context menu when any scene mouse-press happens outside the
+     * popup.
      *
      * @param event scene mouse event
      */
@@ -851,12 +882,14 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
 
-        // ContextMenu lives in its own popup window, so scene clicks are outside clicks.
+        // ContextMenu lives in its own popup window, so scene clicks are outside
+        // clicks.
         contactContextMenu.hide();
     }
 
     /**
-     * Shows the contact context menu at a screen coordinate and syncs selection with the targeted contact.
+     * Shows the contact context menu at a screen coordinate and syncs selection
+     * with the targeted contact.
      *
      * @param contact contact row target
      * @param screenX popup anchor X coordinate in screen space
@@ -884,7 +917,8 @@ public class MainController implements SearchController.ContactActions {
      * @param action selected context-menu action
      */
     private void handleContactContextAction(ContactContextAction action) {
-        ContactInfo target = contactContextTarget != null ? contactContextTarget : contactsList.getSelectionModel().getSelectedItem();
+        ContactInfo target = contactContextTarget != null ? contactContextTarget
+                : contactsList.getSelectionModel().getSelectedItem();
         if (target == null) {
             return;
         }
@@ -897,7 +931,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Clears locally cached chat messages for a contact and refreshes the active chat view when necessary.
+     * Clears locally cached chat messages for a contact and refreshes the active
+     * chat view when necessary.
      *
      * @param contactId contact id whose local timeline should be cleared
      */
@@ -917,7 +952,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Selects a contact in the list, focuses its row, and opens the messages tab/chat.
+     * Selects a contact in the list, focuses its row, and opens the messages
+     * tab/chat.
      *
      * @param contact contact to select and open
      */
@@ -942,10 +978,14 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Wires window chrome actions (minimize/maximize/close and title-bar drag movement).
+     * Wires window chrome actions (minimize/maximize/close and title-bar drag
+     * movement).
      */
     private void setupWindowControls() {
         Stage stage = ViewRouter.getMainStage();
+        if (stage == null) {
+            return;
+        }
 
         if (minimizeButton != null) {
             minimizeButton.setOnAction(e -> stage.setIconified(true));
@@ -956,6 +996,17 @@ public class MainController implements SearchController.ContactActions {
         if (closeButton != null) {
             closeButton.setOnAction(e -> confirmExitApplication());
         }
+
+        stage.setOnCloseRequest(event -> {
+            if (shutdownInProgress.get()) {
+                return;
+            }
+            if (stage.getScene() == null || stage.getScene().getRoot() != rootContainer) {
+                return;
+            }
+            event.consume();
+            confirmExitApplication();
+        });
 
         if (titleBar != null) {
             titleBar.setOnMousePressed(event -> {
@@ -999,7 +1050,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Shows the dots menu aligned to the button's bottom-right corner when geometry is available.
+     * Shows the dots menu aligned to the button's bottom-right corner when geometry
+     * is available.
      *
      * @param menu menu instance to show
      */
@@ -1090,7 +1142,7 @@ public class MainController implements SearchController.ContactActions {
      * Resolves a human-readable contact display name for confirmation dialogs.
      *
      * @param name contact name candidate
-     * @param id contact id fallback
+     * @param id   contact id fallback
      * @return preferred display name string
      */
     private static String resolveContactDisplayName(String name, String id) {
@@ -1121,15 +1173,36 @@ public class MainController implements SearchController.ContactActions {
      * Terminates the JavaFX application and exits the JVM process.
      */
     private void exitApplication() {
-        Platform.exit();
-        System.exit(0);
+        if (!shutdownInProgress.compareAndSet(false, true)) {
+            return;
+        }
+
+        CompletableFuture<Void> logoutFuture;
+        try {
+            logoutFuture = mainSessionService.logout()
+                    .orTimeout(LOGOUT_ON_EXIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Failed to start logout on app exit; continuing shutdown.", ex);
+            logoutFuture = CompletableFuture.completedFuture(null);
+        }
+
+        logoutFuture.whenComplete((unused, throwable) -> {
+            if (throwable != null) {
+                LOGGER.log(Level.WARNING, "Logout on app exit completed with errors.", throwable);
+            }
+            Platform.runLater(() -> {
+                Platform.exit();
+                System.exit(0);
+            });
+        });
     }
 
     /**
-     * Handles content-view loading failures by showing a retry-capable popup message.
+     * Handles content-view loading failures by showing a retry-capable popup
+     * message.
      *
-     * @param viewKind failing view type
-     * @param error underlying error
+     * @param viewKind    failing view type
+     * @param error       underlying error
      * @param retryAction action invoked when user selects Retry
      */
     private void handleViewLoadFailure(MainContentLoader.ViewKind viewKind, Throwable error, Runnable retryAction) {
@@ -1164,7 +1237,7 @@ public class MainController implements SearchController.ContactActions {
     private void registerRuntimeIssueListeners() {
         viewModel.addRuntimeIssueListener(runtimeIssueListener);
 
-        MessageViewModel chatViewModel = ChatSession.get();
+        MessagesViewModel chatViewModel = ChatSession.get();
         if (chatViewModel != null) {
             chatViewModel.addRuntimeIssueListener(runtimeIssueListener);
         }
@@ -1287,14 +1360,16 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Registers the main presence listener bridge from session service to UI update handler.
+     * Registers the main presence listener bridge from session service to UI update
+     * handler.
      */
     private void registerPresenceListener() {
         mainSessionService.registerPresenceListener(this::applyPresenceUpdate);
     }
 
     /**
-     * Registers the main incoming-message listener bridge from session service to unread update handler.
+     * Registers the main incoming-message listener bridge from session service to
+     * unread update handler.
      */
     private void registerIncomingMessageListener() {
         mainSessionService.registerIncomingMessageListener(this::applyIncomingMessage);
@@ -1304,12 +1379,13 @@ public class MainController implements SearchController.ContactActions {
      * Starts chat message receiving if the chat session has been initialized.
      */
     private void startMessageReceiving() {
-        MessageViewModel chatViewModel = ChatSession.get();
+        MessagesViewModel chatViewModel = ChatSession.get();
         if (chatViewModel == null) {
             LOGGER.warning("Cannot start message receiving: chat session is not initialized.");
             return;
         }
-        chatViewModel.startReceiving();
+        // WebSocket connect can block briefly; start it off the JavaFX thread.
+        CompletableFuture.runAsync(chatViewModel::startReceiving);
     }
 
     /**
@@ -1326,7 +1402,8 @@ public class MainController implements SearchController.ContactActions {
      * Updates unread counters in response to an incoming message event.
      *
      * @param senderId sender/contact id
-     * @param message incoming message payload (unused here but included by listener contract)
+     * @param message  incoming message payload (unused here but included by
+     *                 listener contract)
      */
     private void applyIncomingMessage(String senderId, MessageVM message) {
         if (senderId == null || senderId.isBlank()) {
@@ -1368,7 +1445,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Applies unread-count update logic for a sender against the currently active chat recipient.
+     * Applies unread-count update logic for a sender against the currently active
+     * chat recipient.
      *
      * @param senderId sender/contact id of the incoming message
      */

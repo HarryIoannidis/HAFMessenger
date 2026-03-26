@@ -2,10 +2,13 @@ package com.haf.client.controllers;
 
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.utils.RankIconResolver;
 import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
@@ -38,6 +41,8 @@ public class ProfileController {
     private Text fullNameValueText;
     @FXML
     private Text rankValueText;
+    @FXML
+    private ImageView rankImageView;
     @FXML
     private Text regNumberValueText;
     @FXML
@@ -86,6 +91,7 @@ public class ProfileController {
         userIdText.setText(formatUserId(profile.userId()));
         fullNameValueText.setText(formatValue(profile.fullName()));
         rankValueText.setText(formatValue(profile.rank()));
+        applyRankIcon(profile.rank());
         regNumberValueText.setText(formatValue(profile.regNumber()));
         joinedDateValueText.setText(formatValue(profile.joinedDate()));
         emailValueText.setText(formatValue(profile.email()));
@@ -111,6 +117,30 @@ public class ProfileController {
             requestDeletionButton.setManaged(visible);
             requestDeletionButton.setOnAction(visible ? e -> showStubDialog("Request deletion") : null);
         }
+    }
+
+    /**
+     * Updates profile rank image using the rank-specific icon.
+     *
+     * @param rank rank label shown in profile details
+     */
+    private void applyRankIcon(String rank) {
+        if (rankImageView == null) {
+            return;
+        }
+
+        String iconPath = RankIconResolver.resolve(rank);
+        var resource = getClass().getResource(iconPath);
+        if (resource == null) {
+            resource = getClass().getResource(UiConstants.ICON_RANK_DEFAULT);
+        }
+
+        if (resource == null) {
+            rankImageView.setImage(null);
+            return;
+        }
+
+        rankImageView.setImage(new Image(resource.toExternalForm(), true));
     }
 
     /**

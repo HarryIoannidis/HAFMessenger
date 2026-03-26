@@ -46,7 +46,7 @@ import java.util.function.Consumer;
 /**
  * ViewModel for the chat screen.
  */
-public class MessageViewModel {
+public class MessagesViewModel {
 
     @FunctionalInterface
     public interface PresenceListener {
@@ -91,7 +91,7 @@ public class MessageViewModel {
     /**
      * Creates a MessageViewModel.
      */
-    public MessageViewModel(MessageSender messageSender, MessageReceiver messageReceiver) {
+    public MessagesViewModel(MessageSender messageSender, MessageReceiver messageReceiver) {
         this.messageSender = messageSender;
         this.messageReceiver = messageReceiver;
 
@@ -129,7 +129,7 @@ public class MessageViewModel {
                             "messaging.render.failed",
                             "Message processing failed",
                             "An incoming message could not be processed. " + resolveErrorMessage(ex, "Please retry."),
-                            MessageViewModel.this::retryLastFailedOperation);
+                            MessagesViewModel.this::retryLastFailedOperation);
                 }
             }
 
@@ -147,7 +147,7 @@ public class MessageViewModel {
                         "Connection issue",
                         "The messaging channel reported an error. "
                                 + resolveErrorMessage(error, "Please retry."),
-                        MessageViewModel.this::retryLastFailedOperation);
+                        MessagesViewModel.this::retryLastFailedOperation);
             }
 
             /**
@@ -480,9 +480,9 @@ public class MessageViewModel {
     /**
      * Publishes a recoverable runtime issue to registered listeners.
      *
-     * @param dedupeKey stable dedupe key
-     * @param title popup title
-     * @param message popup message
+     * @param dedupeKey   stable dedupe key
+     * @param title       popup title
+     * @param message     popup message
      * @param retryAction action to execute on retry
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
@@ -520,7 +520,7 @@ public class MessageViewModel {
     /**
      * Extracts a user-facing message from a Throwable with fallback text.
      *
-     * @param error throwable to inspect
+     * @param error    throwable to inspect
      * @param fallback fallback text when throwable message is empty
      * @return resolved message text
      */
@@ -674,7 +674,8 @@ public class MessageViewModel {
     }
 
     /**
-     * Replaces an in-place loading attachment bubble with its fully decoded message.
+     * Replaces an in-place loading attachment bubble with its fully decoded
+     * message.
      *
      * @param contactId      sender/contact id for the message bucket
      * @param loadingVm      placeholder message currently shown in timeline

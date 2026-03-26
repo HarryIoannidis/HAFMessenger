@@ -41,7 +41,7 @@ public class WebSocketAdapter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String HTTPS_PROTOCOL = "https";
-    private static final int CONNECTION_TIMEOUT_SECONDS = 10;
+    private static final int CONNECTION_TIMEOUT_SECONDS = 5;
 
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
