@@ -12,12 +12,14 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-class MessageViewModelRuntimeIssueTest {
+class MessageViewModelRuntimeTest {
 
     @Test
     void send_failure_emits_runtime_issue_and_retry_reconnects_and_resends() throws Exception {
@@ -61,11 +63,12 @@ class MessageViewModelRuntimeIssueTest {
 
     private static void awaitCondition(BooleanSupplier condition) throws InterruptedException {
         long timeoutAt = System.currentTimeMillis() + 2_500L;
+        CountDownLatch latch = new CountDownLatch(1);
         while (System.currentTimeMillis() < timeoutAt) {
             if (condition.getAsBoolean()) {
                 return;
             }
-            Thread.sleep(10);
+            latch.await(10, TimeUnit.MILLISECONDS);
         }
         fail("Condition not met within timeout");
     }
@@ -95,13 +98,12 @@ class MessageViewModelRuntimeIssueTest {
     }
 
     private static class CountingReceiver implements MessageReceiver {
-        private MessageListener listener;
         protected final AtomicInteger startCalls = new AtomicInteger();
         protected final AtomicInteger stopCalls = new AtomicInteger();
 
         @Override
         public void setMessageListener(MessageListener listener) {
-            this.listener = listener;
+            // no-op
         }
 
         @Override
