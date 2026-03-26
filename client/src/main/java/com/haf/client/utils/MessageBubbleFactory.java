@@ -1,7 +1,9 @@
 package com.haf.client.utils;
 
 import com.haf.client.models.MessageVM;
+import com.jfoenix.controls.JFXButton;
 import javafx.beans.binding.Bindings;
+import javafx.css.PseudoClass;
 import javafx.scene.Cursor;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -27,6 +29,8 @@ public final class MessageBubbleFactory {
     private static final double BUBBLE_MAX_WIDTH_RATIO = 0.72;
     private static final double BUBBLE_HORIZONTAL_PADDING = 28.0;
     private static final double IMAGE_BUBBLE_MAX_WIDTH = 280.0;
+    private static final PseudoClass HOVER_PSEUDO_CLASS = PseudoClass.getPseudoClass("hover");
+    private static final PseudoClass PRESSED_PSEUDO_CLASS = PseudoClass.getPseudoClass("pressed");
 
     /**
      * Prevents instantiation of this utility factory.
@@ -69,8 +73,46 @@ public final class MessageBubbleFactory {
         HBox timestampRow = buildTimestampRow(message);
         bubble.getChildren().add(timestampRow);
 
-        row.getChildren().add(bubble);
+        JFXButton rippleOverlay = buildRippleOverlayButton(message, bubble);
+        StackPane bubbleStack = new StackPane(bubble, rippleOverlay);
+        row.getChildren().add(bubbleStack);
         return row;
+    }
+
+    /**
+     * Creates an overlay button that provides ripple feedback while leaving
+     * the bubble visuals unchanged.
+     *
+     * @param message bubble message model
+     * @param bubble  visual bubble node rendered underneath
+     * @return transparent ripple button covering the bubble bounds
+     */
+    private static JFXButton buildRippleOverlayButton(MessageVM message, VBox bubble) {
+        JFXButton rippleOverlay = new JFXButton();
+        rippleOverlay.setFocusTraversable(false);
+        rippleOverlay.setText("");
+        rippleOverlay.setCursor(Cursor.HAND);
+        rippleOverlay.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        rippleOverlay.prefWidthProperty().bind(bubble.widthProperty());
+        rippleOverlay.prefHeightProperty().bind(bubble.heightProperty());
+        rippleOverlay.getStyleClass().add("bubble-ripple-overlay");
+        rippleOverlay.getStyleClass().add(message.isOutgoing() ? "bubble-ripple-out" : "bubble-ripple-in");
+        bridgeOverlayPseudoClasses(rippleOverlay, bubble);
+        return rippleOverlay;
+    }
+
+    /**
+     * Mirrors overlay hover/pressed states to the bubble node so existing
+     * bubble pseudo-class styling continues to apply.
+     *
+     * @param rippleOverlay transparent overlay button
+     * @param bubble        visual bubble under the overlay
+     */
+    private static void bridgeOverlayPseudoClasses(JFXButton rippleOverlay, VBox bubble) {
+        rippleOverlay.hoverProperty().addListener((obs, oldV, hovering) ->
+                bubble.pseudoClassStateChanged(HOVER_PSEUDO_CLASS, hovering));
+        rippleOverlay.pressedProperty().addListener((obs, oldV, pressed) ->
+                bubble.pseudoClassStateChanged(PRESSED_PSEUDO_CLASS, pressed));
     }
 
     /**
