@@ -4,7 +4,9 @@ import com.haf.client.services.ChatAttachmentService;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ChatControllerTest {
+
+    @TempDir
+    Path tempDir;
 
     @Test
     void constructor_rejects_null_attachment_service() {
@@ -174,6 +179,36 @@ class ChatControllerTest {
         assertEquals(
                 "Attachment error",
                 ChatController.buildAttachmentErrorSpec("x").title());
+    }
+
+    @Test
+    void oversize_attachment_spec_uses_image_wording_and_pick_another_action() {
+        var spec = ChatController.buildAttachmentTooLargeSpec(Path.of("photo.png"), () -> {
+        });
+
+        assertEquals("The image you are trying to send is over 10MB.", spec.message());
+        assertEquals("Pick Another", spec.actionText());
+        assertEquals("Cancel", spec.cancelText());
+    }
+
+    @Test
+    void oversize_attachment_spec_uses_file_wording_for_non_image() {
+        var spec = ChatController.buildAttachmentTooLargeSpec(Path.of("report.pdf"), () -> {
+        });
+
+        assertEquals("The file you are trying to send is over 10MB.", spec.message());
+    }
+
+    @Test
+    void over_attachment_limit_detects_files_larger_than_10mb() throws Exception {
+        Path exact10Mb = tempDir.resolve("exact.bin");
+        Path above10Mb = tempDir.resolve("above.bin");
+
+        Files.write(exact10Mb, new byte[10 * 1024 * 1024]);
+        Files.write(above10Mb, new byte[10 * 1024 * 1024 + 1]);
+
+        assertEquals(false, ChatController.isOverAttachmentLimit(exact10Mb));
+        assertEquals(true, ChatController.isOverAttachmentLimit(above10Mb));
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {

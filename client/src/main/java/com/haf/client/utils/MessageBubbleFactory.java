@@ -1,6 +1,7 @@
 package com.haf.client.utils;
 
 import com.haf.client.models.MessageVM;
+import javafx.beans.binding.Bindings;
 import javafx.scene.Cursor;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -22,6 +23,10 @@ import java.time.format.DateTimeFormatter;
 public final class MessageBubbleFactory {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final double BUBBLE_MAX_WIDTH = 360.0;
+    private static final double BUBBLE_MAX_WIDTH_RATIO = 0.72;
+    private static final double BUBBLE_HORIZONTAL_PADDING = 28.0;
+    private static final double IMAGE_BUBBLE_MAX_WIDTH = 280.0;
 
     /**
      * Prevents instantiation of this utility factory.
@@ -45,13 +50,19 @@ public final class MessageBubbleFactory {
 
         // Bubble VBox
         VBox bubble = new VBox(4);
-        bubble.setMaxWidth(320);
+        bubble.maxWidthProperty().bind(Bindings.createDoubleBinding(() -> {
+            double rowWidth = row.getWidth();
+            if (rowWidth <= 0) {
+                return BUBBLE_MAX_WIDTH;
+            }
+            return Math.min(BUBBLE_MAX_WIDTH, rowWidth * BUBBLE_MAX_WIDTH_RATIO);
+        }, row.widthProperty()));
         bubble.setPadding(new Insets(14));
         bubble.getStyleClass().add(message.isOutgoing() ? "bubble-out" : "bubble-in");
         bubble.setCursor(Cursor.HAND);
 
         // Message content
-        Node content = buildContent(message);
+        Node content = buildContent(message, bubble);
         bubble.getChildren().add(content);
 
         // Timestamp
@@ -68,10 +79,10 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the message content node
      */
-    private static Node buildContent(MessageVM message) {
+    private static Node buildContent(MessageVM message, VBox bubble) {
         return switch (message.type()) {
-            case TEXT -> buildText(message);
-            case IMAGE -> buildImage(message);
+            case TEXT -> buildText(message, bubble);
+            case IMAGE -> buildImage(message, bubble);
             case FILE -> buildFile(message);
         };
     }
@@ -82,10 +93,12 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the text content node
      */
-    private static Text buildText(MessageVM message) {
+    private static Text buildText(MessageVM message, VBox bubble) {
         String body = message.content() == null ? "" : message.content();
         Text text = new Text(body);
-        text.setWrappingWidth(280);
+        text.wrappingWidthProperty().bind(Bindings.createDoubleBinding(
+                () -> Math.max(80.0, bubble.getMaxWidth() - BUBBLE_HORIZONTAL_PADDING),
+                bubble.maxWidthProperty()));
         text.getStyleClass().add(
                 message.isOutgoing() ? "bubble-text-out" : "bubble-text-in");
         return text;
@@ -97,15 +110,20 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the image content node
      */
-    private static Node buildImage(MessageVM message) {
+    private static Node buildImage(MessageVM message, VBox bubble) {
+        var imageWidthBinding = Bindings.createDoubleBinding(
+                () -> Math.max(140.0,
+                        Math.min(IMAGE_BUBBLE_MAX_WIDTH, bubble.getMaxWidth() - BUBBLE_HORIZONTAL_PADDING)),
+                bubble.maxWidthProperty());
+
         StackPane imageContainer = new StackPane();
-        imageContainer.setPrefWidth(220);
-        imageContainer.setMaxWidth(220);
+        imageContainer.prefWidthProperty().bind(imageWidthBinding);
+        imageContainer.maxWidthProperty().bind(imageWidthBinding);
         imageContainer.getStyleClass().add("bubble-image-clickable");
         imageContainer.setCursor(Cursor.HAND);
 
         ImageView imageView = new ImageView();
-        imageView.setFitWidth(220);
+        imageView.fitWidthProperty().bind(imageWidthBinding);
         imageView.setPreserveRatio(true);
         imageView.getStyleClass().add("bubble-image");
         imageView.setCursor(Cursor.HAND);
@@ -121,7 +139,7 @@ public final class MessageBubbleFactory {
         boolean loadingPlaceholder = message.isLoading()
                 && (message.content() == null || message.content().isBlank());
         if (loadingPlaceholder) {
-            imageContainer.setMinHeight(140);
+            imageContainer.setMinHeight(160);
             setSpinnerVisible(spinner, true);
         } else {
             setSpinnerVisible(spinner, false);

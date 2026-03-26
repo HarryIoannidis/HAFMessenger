@@ -48,6 +48,7 @@ public class ChatController {
 
     private static final Logger LOGGER = Logger.getLogger(ChatController.class.getName());
     private static final String PREVIEW_POPUP_KEY = "message-image-preview-popup";
+    private static final long MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L;
 
     enum MessageContextAction {
         COPY,
@@ -298,7 +299,113 @@ public class ChatController {
         }
 
         File selected = chooser.showOpenDialog(resolveOwnerWindow());
-        dispatchSelectedAttachment(viewModel.getRecipientId(), selected);
+        validateAndDispatchSelectedAttachment(viewModel.getRecipientId(), chooser, selected);
+    }
+
+    /**
+     * Validates selected attachment size and either dispatches it or prompts the user
+     * to pick another file.
+     *
+     * @param recipientId target recipient id
+     * @param chooser chooser instance used to re-open selection flow
+     * @param selected selected file candidate
+     */
+    private void validateAndDispatchSelectedAttachment(String recipientId, FileChooser chooser, File selected) {
+        if (selected == null || recipientId == null || recipientId.isBlank()) {
+            return;
+        }
+
+        Path selectedPath = selected.toPath();
+        if (isOverAttachmentLimit(selectedPath)) {
+            showAttachmentTooLargeError(selectedPath, recipientId, chooser);
+            return;
+        }
+
+        dispatchSelectedAttachment(recipientId, selected);
+    }
+
+    /**
+     * Checks whether a file exceeds the 10MB attachment limit.
+     *
+     * @param filePath candidate attachment path
+     * @return {@code true} when file size is greater than 10MB
+     */
+    static boolean isOverAttachmentLimit(Path filePath) {
+        if (filePath == null) {
+            return false;
+        }
+        try {
+            return Files.size(filePath) > MAX_ATTACHMENT_BYTES;
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Could not read attachment size", ex);
+            return false;
+        }
+    }
+
+    /**
+     * Displays a two-action popup for oversize attachments and lets the user pick a
+     * new file immediately.
+     *
+     * @param selectedPath selected oversize file path
+     * @param recipientId active recipient id
+     * @param chooser chooser used for file selection
+     */
+    private void showAttachmentTooLargeError(Path selectedPath, String recipientId, FileChooser chooser) {
+        PopupMessageSpec spec = buildAttachmentTooLargeSpec(selectedPath, () -> {
+            File retrySelection = chooser.showOpenDialog(resolveOwnerWindow());
+            validateAndDispatchSelectedAttachment(recipientId, chooser, retrySelection);
+        });
+
+        PopupMessageBuilder.create()
+                .popupKey(spec.popupKey())
+                .title(spec.title())
+                .message(spec.message())
+                .actionText(spec.actionText())
+                .cancelText(spec.cancelText())
+                .showCancel(spec.showCancel())
+                .onAction(spec.onAction())
+                .onCancel(spec.onCancel())
+                .show();
+    }
+
+    /**
+     * Builds popup specification for oversize image/file selection.
+     *
+     * @param selectedPath selected path used to determine "image" vs "file"
+     * @param onPickAnother callback executed when user chooses "Pick Another"
+     * @return popup configuration object
+     */
+    static PopupMessageSpec buildAttachmentTooLargeSpec(Path selectedPath, Runnable onPickAnother) {
+        String targetType = isLikelyImage(selectedPath) ? "image" : "file";
+        String message = "The " + targetType + " you are trying to send is over 10MB.";
+        return new PopupMessageSpec(
+                UiConstants.POPUP_ATTACHMENT_ERROR,
+                "Attachment too large",
+                message,
+                "Pick Another",
+                "Cancel",
+                true,
+                false,
+                onPickAnother,
+                null);
+    }
+
+    /**
+     * Infers whether selected file path likely points to an image by extension.
+     *
+     * @param path file path candidate
+     * @return {@code true} for common image extensions
+     */
+    private static boolean isLikelyImage(Path path) {
+        if (path == null || path.getFileName() == null) {
+            return false;
+        }
+        String lower = path.getFileName().toString().toLowerCase();
+        return lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".gif")
+                || lower.endsWith(".webp");
     }
 
     /**
