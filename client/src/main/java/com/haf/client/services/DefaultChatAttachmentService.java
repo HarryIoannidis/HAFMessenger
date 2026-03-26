@@ -1,7 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.core.ChatSession;
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessagesViewModel;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
@@ -42,7 +42,7 @@ public class DefaultChatAttachmentService implements ChatAttachmentService {
      */
     public DefaultChatAttachmentService() {
         this(() -> {
-            MessageViewModel vm = ChatSession.get();
+            MessagesViewModel vm = ChatSession.get();
             return vm == null ? null : vm::sendAttachment;
         });
     }

@@ -19,7 +19,7 @@ class ChatViewModelTest {
     void switching_recipient_preserves_drafts_and_acknowledges_active_chat() {
         RecordingSender sender = new RecordingSender();
         AckRecordingReceiver receiver = new AckRecordingReceiver();
-        MessageViewModel messageViewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel messageViewModel = new MessagesViewModel(sender, receiver);
         ChatViewModel viewModel = new ChatViewModel(messageViewModel);
 
         viewModel.setRecipient("alice");
@@ -39,7 +39,7 @@ class ChatViewModelTest {
     void can_send_requires_non_blank_recipient_and_message() {
         RecordingSender sender = new RecordingSender();
         AckRecordingReceiver receiver = new AckRecordingReceiver();
-        MessageViewModel messageViewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel messageViewModel = new MessagesViewModel(sender, receiver);
         ChatViewModel viewModel = new ChatViewModel(messageViewModel);
 
         assertFalse(viewModel.canSendProperty().get());
@@ -61,7 +61,7 @@ class ChatViewModelTest {
     void send_current_draft_trims_sends_and_clears_draft() {
         RecordingSender sender = new RecordingSender();
         AckRecordingReceiver receiver = new AckRecordingReceiver();
-        MessageViewModel messageViewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel messageViewModel = new MessagesViewModel(sender, receiver);
         ChatViewModel viewModel = new ChatViewModel(messageViewModel);
 
         viewModel.setRecipient("alice");

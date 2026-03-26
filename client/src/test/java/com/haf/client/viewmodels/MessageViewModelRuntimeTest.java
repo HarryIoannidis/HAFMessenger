@@ -25,7 +25,7 @@ class MessageViewModelRuntimeTest {
     void send_failure_emits_runtime_issue_and_retry_reconnects_and_resends() throws Exception {
         FailOnceSender sender = new FailOnceSender();
         CountingReceiver receiver = new CountingReceiver();
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
         List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
         viewModel.addRuntimeIssueListener(issues::add);
 
@@ -50,7 +50,7 @@ class MessageViewModelRuntimeTest {
     @Test
     void start_receiving_failure_emits_runtime_issue() {
         FailStartReceiver receiver = new FailStartReceiver();
-        MessageViewModel viewModel = new MessageViewModel(new NoopSender(), receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
         List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
         viewModel.addRuntimeIssueListener(issues::add);
 

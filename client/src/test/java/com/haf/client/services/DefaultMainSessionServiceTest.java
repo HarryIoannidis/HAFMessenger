@@ -1,6 +1,6 @@
 package com.haf.client.services;
 
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessagesViewModel;
 import org.junit.jupiter.api.Test;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -59,7 +59,7 @@ class DefaultMainSessionServiceTest {
         StubSessionContext context = new StubSessionContext(null, sessionChannel);
         DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
 
-        MessageViewModel.PresenceListener listener = (userId, active) -> {
+        MessagesViewModel.PresenceListener listener = (userId, active) -> {
         };
         service.registerPresenceListener(listener);
         service.unregisterPresenceListener();
@@ -75,7 +75,7 @@ class DefaultMainSessionServiceTest {
         StubSessionContext context = new StubSessionContext(null, sessionChannel);
         DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
 
-        MessageViewModel.IncomingMessageListener listener = (senderId, message) -> {
+        MessagesViewModel.IncomingMessageListener listener = (senderId, message) -> {
         };
         service.registerIncomingMessageListener(listener);
         service.unregisterIncomingMessageListener();
@@ -105,33 +105,33 @@ class DefaultMainSessionServiceTest {
     private static final class StubSessionChannel implements DefaultMainSessionService.SessionChannel {
         private final AtomicInteger presenceAddCalls = new AtomicInteger();
         private final AtomicInteger presenceRemoveCalls = new AtomicInteger();
-        private final AtomicReference<MessageViewModel.PresenceListener> lastPresenceAdded = new AtomicReference<>();
-        private final AtomicReference<MessageViewModel.PresenceListener> lastPresenceRemoved = new AtomicReference<>();
+        private final AtomicReference<MessagesViewModel.PresenceListener> lastPresenceAdded = new AtomicReference<>();
+        private final AtomicReference<MessagesViewModel.PresenceListener> lastPresenceRemoved = new AtomicReference<>();
         private final AtomicInteger incomingAddCalls = new AtomicInteger();
         private final AtomicInteger incomingRemoveCalls = new AtomicInteger();
-        private final AtomicReference<MessageViewModel.IncomingMessageListener> lastIncomingAdded = new AtomicReference<>();
-        private final AtomicReference<MessageViewModel.IncomingMessageListener> lastIncomingRemoved = new AtomicReference<>();
+        private final AtomicReference<MessagesViewModel.IncomingMessageListener> lastIncomingAdded = new AtomicReference<>();
+        private final AtomicReference<MessagesViewModel.IncomingMessageListener> lastIncomingRemoved = new AtomicReference<>();
 
         @Override
-        public void addPresenceListener(MessageViewModel.PresenceListener listener) {
+        public void addPresenceListener(MessagesViewModel.PresenceListener listener) {
             presenceAddCalls.incrementAndGet();
             lastPresenceAdded.set(listener);
         }
 
         @Override
-        public void removePresenceListener(MessageViewModel.PresenceListener listener) {
+        public void removePresenceListener(MessagesViewModel.PresenceListener listener) {
             presenceRemoveCalls.incrementAndGet();
             lastPresenceRemoved.set(listener);
         }
 
         @Override
-        public void addIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+        public void addIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
             incomingAddCalls.incrementAndGet();
             lastIncomingAdded.set(listener);
         }
 
         @Override
-        public void removeIncomingMessageListener(MessageViewModel.IncomingMessageListener listener) {
+        public void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
             incomingRemoveCalls.incrementAndGet();
             lastIncomingRemoved.set(listener);
         }

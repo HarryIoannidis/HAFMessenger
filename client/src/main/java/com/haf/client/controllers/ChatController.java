@@ -13,7 +13,7 @@ import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.ChatViewModel;
-import com.haf.client.viewmodels.MessageViewModel;
+import com.haf.client.viewmodels.MessagesViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.collections.ListChangeListener;
 import javafx.collections.WeakListChangeListener;
@@ -90,7 +90,8 @@ public class ChatController {
      * Creates the chat controller with an explicit attachment service dependency.
      *
      * @param chatAttachmentService service responsible for attachment sending
-     * @throws NullPointerException when {@code chatAttachmentService} is {@code null}
+     * @throws NullPointerException when {@code chatAttachmentService} is
+     *                              {@code null}
      */
     ChatController(ChatAttachmentService chatAttachmentService) {
         this.chatAttachmentService = Objects.requireNonNull(chatAttachmentService, "chatAttachmentService");
@@ -101,7 +102,7 @@ public class ChatController {
      */
     @FXML
     public void initialize() {
-        MessageViewModel messageViewModel = ChatSession.get();
+        MessagesViewModel messageViewModel = ChatSession.get();
         viewModel = new ChatViewModel(messageViewModel);
         bindViewModel();
 
@@ -159,7 +160,8 @@ public class ChatController {
     }
 
     /**
-     * Renders already-existing messages for the active recipient into the chat container.
+     * Renders already-existing messages for the active recipient into the chat
+     * container.
      */
     private void loadInitialMessages() {
         for (MessageVM vm : viewModel.getActiveMessages()) {
@@ -180,9 +182,10 @@ public class ChatController {
     }
 
     /**
-     * Applies incremental UI updates for message-list changes and falls back to full refresh when needed.
+     * Applies incremental UI updates for message-list changes and falls back to
+     * full refresh when needed.
      *
-     * @param change list change descriptor from observable messages list
+     * @param change          list change descriptor from observable messages list
      * @param activeRecipient active recipient id used for acknowledgements
      */
     private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
@@ -211,7 +214,8 @@ public class ChatController {
     }
 
     /**
-     * Re-renders all messages from the currently observed list and scrolls to bottom.
+     * Re-renders all messages from the currently observed list and scrolls to
+     * bottom.
      */
     private void refreshRenderedMessages() {
         chatBox.getChildren().clear();
@@ -225,9 +229,10 @@ public class ChatController {
     }
 
     /**
-     * Renders newly added messages and acknowledges inbound messages for active recipient.
+     * Renders newly added messages and acknowledges inbound messages for active
+     * recipient.
      *
-     * @param addedMessages newly appended messages
+     * @param addedMessages   newly appended messages
      * @param activeRecipient active recipient id used for ack
      */
     private void processAddedMessages(List<? extends MessageVM> addedMessages, String activeRecipient) {
@@ -267,7 +272,8 @@ public class ChatController {
     }
 
     /**
-     * Opens file chooser restricted to supported image extensions and sends selected file.
+     * Opens file chooser restricted to supported image extensions and sends
+     * selected file.
      */
     private void chooseImageAttachment() {
         FileChooser chooser = new FileChooser();
@@ -278,7 +284,8 @@ public class ChatController {
     }
 
     /**
-     * Opens file chooser restricted to supported document extensions and sends selected file.
+     * Opens file chooser restricted to supported document extensions and sends
+     * selected file.
      */
     private void chooseDocumentAttachment() {
         FileChooser chooser = new FileChooser();
@@ -303,12 +310,13 @@ public class ChatController {
     }
 
     /**
-     * Validates selected attachment size and either dispatches it or prompts the user
+     * Validates selected attachment size and either dispatches it or prompts the
+     * user
      * to pick another file.
      *
      * @param recipientId target recipient id
-     * @param chooser chooser instance used to re-open selection flow
-     * @param selected selected file candidate
+     * @param chooser     chooser instance used to re-open selection flow
+     * @param selected    selected file candidate
      */
     private void validateAndDispatchSelectedAttachment(String recipientId, FileChooser chooser, File selected) {
         if (selected == null || recipientId == null || recipientId.isBlank()) {
@@ -347,8 +355,8 @@ public class ChatController {
      * new file immediately.
      *
      * @param selectedPath selected oversize file path
-     * @param recipientId active recipient id
-     * @param chooser chooser used for file selection
+     * @param recipientId  active recipient id
+     * @param chooser      chooser used for file selection
      */
     private void showAttachmentTooLargeError(Path selectedPath, String recipientId, FileChooser chooser) {
         PopupMessageSpec spec = buildAttachmentTooLargeSpec(selectedPath, () -> {
@@ -371,7 +379,7 @@ public class ChatController {
     /**
      * Builds popup specification for oversize image/file selection.
      *
-     * @param selectedPath selected path used to determine "image" vs "file"
+     * @param selectedPath  selected path used to determine "image" vs "file"
      * @param onPickAnother callback executed when user chooses "Pick Another"
      * @return popup configuration object
      */
@@ -412,7 +420,7 @@ public class ChatController {
      * Sends selected attachment file to recipient through attachment service.
      *
      * @param recipientId target recipient id
-     * @param selected selected file
+     * @param selected    selected file
      */
     void dispatchSelectedAttachment(String recipientId, File selected) {
         if (selected == null || recipientId == null || recipientId.isBlank()) {
@@ -436,7 +444,8 @@ public class ChatController {
     }
 
     /**
-     * Resolves context-menu actions available for a message based on type, direction, and available data.
+     * Resolves context-menu actions available for a message based on type,
+     * direction, and available data.
      *
      * @param message message candidate
      * @return immutable list of actions to expose
@@ -487,7 +496,8 @@ public class ChatController {
     }
 
     /**
-     * Resolves local source reference used for download/preview depending on message type.
+     * Resolves local source reference used for download/preview depending on
+     * message type.
      *
      * @param message message candidate
      * @return content/local-path source reference, or {@code null} when unavailable
@@ -509,7 +519,7 @@ public class ChatController {
      * Installs right-click context menu on the message interaction target.
      *
      * @param messageNode rendered message node
-     * @param message message model backing the node
+     * @param message     message model backing the node
      */
     private void installMessageContextMenu(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
@@ -597,7 +607,8 @@ public class ChatController {
     }
 
     /**
-     * Checks whether the message can be downloaded as an image from an existing local source path.
+     * Checks whether the message can be downloaded as an image from an existing
+     * local source path.
      *
      * @param message message candidate
      * @return {@code true} when download source exists locally
@@ -666,11 +677,18 @@ public class ChatController {
      * Installs primary-click handler for file messages to trigger download.
      *
      * @param messageNode rendered message node
-     * @param message backing file message
+     * @param message     backing file message
      */
     private void installFilePrimaryClickDownload(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
         if (interactionTarget == null || message == null || message.type() != MessageType.FILE) {
+            return;
+        }
+        if (message.isLoading()) {
+            return;
+        }
+        String sourceReference = resolveDownloadSourceReference(message);
+        if (sourceReference == null || sourceReference.isBlank()) {
             return;
         }
 
@@ -687,7 +705,7 @@ public class ChatController {
      * Installs primary-click handler for image messages to open preview.
      *
      * @param messageNode rendered message node
-     * @param message backing image message
+     * @param message     backing image message
      */
     private void installImagePrimaryClickPreview(Node messageNode, MessageVM message) {
         Node interactionTarget = resolveInteractionTarget(messageNode);
@@ -708,7 +726,8 @@ public class ChatController {
     }
 
     /**
-     * Resolves best interaction target node for event filters (bubble content for row wrappers).
+     * Resolves best interaction target node for event filters (bubble content for
+     * row wrappers).
      *
      * @param messageNode rendered message node
      * @return interaction target node

@@ -98,6 +98,15 @@ class ChatControllerTest {
                 "25 KB",
                 LocalDateTime.now(),
                 false);
+        MessageVM loadingFileMessage = new MessageVM(
+                false,
+                MessageType.FILE,
+                null,
+                null,
+                "report.pdf",
+                "25 KB",
+                LocalDateTime.now(),
+                true);
 
         assertEquals(List.of(ChatController.MessageContextAction.COPY), ChatController.resolveContextActions(outgoingText));
         assertEquals(List.of(ChatController.MessageContextAction.COPY), ChatController.resolveContextActions(incomingText));
@@ -106,6 +115,7 @@ class ChatControllerTest {
                 List.of(ChatController.MessageContextAction.PREVIEW, ChatController.MessageContextAction.DOWNLOAD),
                 ChatController.resolveContextActions(incomingImage));
         assertEquals(List.of(ChatController.MessageContextAction.DOWNLOAD), ChatController.resolveContextActions(fileMessage));
+        assertEquals(List.of(), ChatController.resolveContextActions(loadingFileMessage));
     }
 
     @Test

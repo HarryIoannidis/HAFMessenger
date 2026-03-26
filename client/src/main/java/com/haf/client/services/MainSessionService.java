@@ -1,7 +1,7 @@
 package com.haf.client.services;
 
-import com.haf.client.viewmodels.MessageViewModel.IncomingMessageListener;
-import com.haf.client.viewmodels.MessageViewModel.PresenceListener;
+import com.haf.client.viewmodels.MessagesViewModel.IncomingMessageListener;
+import com.haf.client.viewmodels.MessagesViewModel.PresenceListener;
 import java.util.concurrent.CompletableFuture;
 
 /**

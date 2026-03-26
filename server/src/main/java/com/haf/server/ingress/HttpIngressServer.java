@@ -62,6 +62,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -821,12 +822,35 @@ public final class HttpIngressServer {
                 }
 
                 sessionDAO.revokeSession(sessionId);
+                closeActivePresenceConnections(callerId, requestId);
                 sendPlain(exchange, 200, "{\"success\":true}");
             } catch (Exception ex) {
                 auditLogger.logError("logout_error", requestId, null, ex);
                 sendPlain(exchange, 500, JSON_ERROR_PREFIX + INTERNAL_SERVER_ERROR + JSON_ERROR_SUFFIX);
             } finally {
                 exchange.close();
+            }
+        }
+
+        /**
+         * Closes all active websocket connections for the logging-out user so
+         * presence transitions to offline immediately.
+         *
+         * @param callerId user id that just logged out
+         * @param requestId request id for structured error logs
+         */
+        private void closeActivePresenceConnections(String callerId, String requestId) {
+            if (callerId == null || callerId.isBlank()) {
+                return;
+            }
+
+            Set<WebSocket> activeConnections = presenceRegistry.getActiveConnections(callerId);
+            for (WebSocket connection : activeConnections) {
+                try {
+                    connection.closeConnection(1000, "logout");
+                } catch (Exception ex) {
+                    auditLogger.logError("logout_ws_close_error", requestId, callerId, ex);
+                }
             }
         }
 

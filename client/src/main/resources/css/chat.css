@@ -84,6 +84,7 @@
 
 .bubble-out:hover {
     -fx-background-color: #176EA9;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.15, 0, 2);
 }
 
 .bubble-out:pressed {
@@ -99,6 +100,7 @@
 
 .bubble-in:hover {
     -fx-background-color: #DEDEDE;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.15, 0, 2);
 }
 
 .bubble-in:pressed {

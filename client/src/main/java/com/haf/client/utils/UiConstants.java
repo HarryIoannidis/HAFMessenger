@@ -61,7 +61,7 @@ public final class UiConstants {
     public static final String ICON_RANK_YPOPTERARCHOS = "/images/ranks/ypopterarxos.png";
     public static final String ICON_RANK_ANTIPTERARCHOS = "/images/ranks/antipterarxos.png";
     public static final String ICON_RANK_PTERARCHOS = "/images/ranks/pterarxos.png";
-    public static final String ICON_RANK_DEFAULT = "/images/ranks/sminias.png";
+    public static final String ICON_RANK_DEFAULT = "/images/ranks/anthiposminagos.png";
 
     // Rank Cell Icons
     public static final String ICON_RANK_ANTHYPASPISTIS_CELL = "/images/ranks/anthipaspistis_cell.png";

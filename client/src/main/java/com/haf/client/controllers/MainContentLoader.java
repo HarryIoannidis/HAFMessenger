@@ -119,7 +119,7 @@ final class MainContentLoader {
         CompletableFuture<Parent> future = ensureSearchFutureReady();
         future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!searchLoadingStarted.get()) {
-            ensureSearchLoaded();
+            Thread.ofVirtual().name("search-view-loader").start(this::ensureSearchLoaded);
         }
     }
 
@@ -130,7 +130,7 @@ final class MainContentLoader {
         CompletableFuture<Parent> future = ensurePlaceholderFutureReady();
         future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!placeholderLoadingStarted.get()) {
-            ensurePlaceholderLoaded();
+            Thread.ofVirtual().name("placeholder-view-loader").start(this::ensurePlaceholderLoaded);
         }
     }
 

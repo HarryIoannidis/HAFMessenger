@@ -18,7 +18,7 @@ class MessageViewModelIncomingListenerTest {
     @Test
     void incoming_message_listener_is_notified_for_incoming_messages() {
         StubMessageReceiver receiver = new StubMessageReceiver();
-        MessageViewModel viewModel = new MessageViewModel(new NoopMessageSender(), receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopMessageSender(), receiver);
         List<String> senders = new CopyOnWriteArrayList<>();
 
         viewModel.addIncomingMessageListener((senderId, message) -> senders.add(senderId + ":" + message.type()));
@@ -31,7 +31,7 @@ class MessageViewModelIncomingListenerTest {
     @Test
     void incoming_message_listener_is_not_notified_for_outgoing_messages() {
         StubMessageReceiver receiver = new StubMessageReceiver();
-        MessageViewModel viewModel = new MessageViewModel(new NoopMessageSender(), receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopMessageSender(), receiver);
         List<MessageVM> seen = new CopyOnWriteArrayList<>();
 
         viewModel.addIncomingMessageListener((senderId, message) -> seen.add(message));

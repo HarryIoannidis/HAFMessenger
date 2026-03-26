@@ -43,7 +43,7 @@ class MessageViewModelAttachmentTest {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(1_024, 512, 256);
         StubReceiver receiver = new StubReceiver();
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("image.png");
         Files.write(file, new byte[256]);
@@ -62,7 +62,7 @@ class MessageViewModelAttachmentTest {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(8_192, 512, 256);
         StubReceiver receiver = new StubReceiver();
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("report.pdf");
         Files.write(file, new byte[2_048]);
@@ -81,13 +81,75 @@ class MessageViewModelAttachmentTest {
     }
 
     @Test
+    void outgoing_chunked_file_shows_loading_then_swaps_to_file() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(8_192, 512, 256);
+        sender.chunkUploadDelayMs = 35L;
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("report.pdf");
+        Files.write(file, new byte[2_048]);
+
+        viewModel.sendAttachment("bob", file, "application/pdf");
+
+        awaitCondition(() -> !viewModel.getMessages("bob").isEmpty());
+        MessageVM first = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.FILE, first.type());
+        assertTrue(first.isLoading());
+        assertNull(first.localPath());
+
+        awaitCondition(() -> {
+            MessageVM message = viewModel.getMessages("bob").getFirst();
+            return message.type() == MessageType.FILE && !message.isLoading() && message.localPath() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("bob").getFirst();
+        assertFalse(resolved.isLoading());
+        assertEquals(MessageType.FILE, resolved.type());
+        assertNotNull(resolved.localPath());
+        assertEquals("report.pdf", resolved.fileName());
+    }
+
+    @Test
+    void outgoing_chunked_image_shows_loading_then_swaps_to_image() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(8_192, 512, 256);
+        sender.chunkUploadDelayMs = 35L;
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("photo.png");
+        Files.write(file, new byte[2_048]);
+
+        viewModel.sendAttachment("bob", file, "image/png");
+
+        awaitCondition(() -> !viewModel.getMessages("bob").isEmpty());
+        MessageVM first = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.IMAGE, first.type());
+        assertTrue(first.isLoading());
+        assertNull(first.content());
+
+        awaitCondition(() -> {
+            MessageVM message = viewModel.getMessages("bob").getFirst();
+            return message.type() == MessageType.IMAGE && !message.isLoading() && message.content() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("bob").getFirst();
+        assertFalse(resolved.isLoading());
+        assertEquals(MessageType.IMAGE, resolved.type());
+        assertNotNull(resolved.content());
+        assertEquals("photo.png", resolved.fileName());
+    }
+
+    @Test
     void disallowed_mime_is_blocked_before_send() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(2_048, 512, 256);
         sender.policy.setAttachmentAllowedTypes(List.of("image/png"));
 
         StubReceiver receiver = new StubReceiver();
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("doc.pdf");
         Files.write(file, new byte[200]);
@@ -108,7 +170,7 @@ class MessageViewModelAttachmentTest {
         StubReceiver receiver = new StubReceiver();
         receiver.detachedDecryptResult = "pdf-content".getBytes(StandardCharsets.UTF_8);
 
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
         sender.downloadResponse = AttachmentDownloadResponse.success(
@@ -146,7 +208,7 @@ class MessageViewModelAttachmentTest {
 
         StubReceiver receiver = new StubReceiver();
         receiver.detachedDecryptResult = new byte[] { 1, 2, 3, 4 };
-        MessageViewModel viewModel = new MessageViewModel(sender, receiver);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
         sender.downloadResponse = AttachmentDownloadResponse.success(
@@ -185,6 +247,57 @@ class MessageViewModelAttachmentTest {
         assertFalse(resolved.isLoading());
         assertNotNull(resolved.content());
         assertEquals("photo.png", resolved.fileName());
+    }
+
+    @Test
+    void chunked_file_reference_shows_loading_then_swaps_to_file() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(8_192, 512, 256);
+        sender.downloadDelayMs = 120L;
+
+        StubReceiver receiver = new StubReceiver();
+        receiver.detachedDecryptResult = "pdf-content".getBytes(StandardCharsets.UTF_8);
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
+        sender.downloadResponse = AttachmentDownloadResponse.success(
+                "att-file-1",
+                "alice",
+                "me",
+                AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB,
+                fakeEncryptedBlob.length,
+                2,
+                Base64.getEncoder().encodeToString(fakeEncryptedBlob));
+
+        AttachmentReferencePayload ref = new AttachmentReferencePayload();
+        ref.setAttachmentId("att-file-1");
+        ref.setFileName("report.pdf");
+        ref.setMediaType("application/pdf");
+        ref.setSizeBytes(11);
+
+        receiver.emitMessage(
+                AttachmentPayloadCodec.toReferenceJson(ref).getBytes(StandardCharsets.UTF_8),
+                "alice",
+                AttachmentConstants.CONTENT_TYPE_REFERENCE,
+                Instant.now().toEpochMilli(),
+                "env-3");
+
+        assertEquals(1, viewModel.getMessages("alice").size());
+        MessageVM first = viewModel.getMessages("alice").getFirst();
+        assertEquals(MessageType.FILE, first.type());
+        assertTrue(first.isLoading());
+        assertNull(first.localPath());
+
+        awaitCondition(() -> {
+            MessageVM message = viewModel.getMessages("alice").getFirst();
+            return message.type() == MessageType.FILE && !message.isLoading() && message.localPath() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("alice").getFirst();
+        assertEquals(MessageType.FILE, resolved.type());
+        assertFalse(resolved.isLoading());
+        assertNotNull(resolved.localPath());
+        assertEquals("report.pdf", resolved.fileName());
     }
 
     private static MessagingPolicyResponse policy(long max, long inlineMax, int chunk) {
@@ -235,6 +348,7 @@ class MessageViewModelAttachmentTest {
         private MessagingPolicyResponse policy;
         private AttachmentDownloadResponse downloadResponse;
         private long downloadDelayMs;
+        private long chunkUploadDelayMs;
 
         private int sendCalls;
         private int sendWithResultCalls;
@@ -253,14 +367,16 @@ class MessageViewModelAttachmentTest {
         }
 
         @Override
-        public SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType, long ttlSeconds) {
+        public SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType,
+                long ttlSeconds) {
             sendWithResultCalls++;
             lastSendWithResultContentType = contentType;
             return new SendResult("env-123", System.currentTimeMillis() + 60_000);
         }
 
         @Override
-        public EncryptedMessage encryptMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds) {
+        public EncryptedMessage encryptMessage(byte[] payload, String recipientId, String contentType,
+                long ttlSeconds) {
             EncryptedMessage m = new EncryptedMessage();
             m.setVersion(MessageHeader.VERSION);
             m.setAlgorithm(MessageHeader.ALGO_AEAD);
@@ -285,38 +401,48 @@ class MessageViewModelAttachmentTest {
         @Override
         public AttachmentInitResponse initAttachmentUpload(AttachmentInitRequest request) {
             initCalls++;
-            return AttachmentInitResponse.success("att-1", policy.getAttachmentChunkBytes(), System.currentTimeMillis() + 60_000);
+            return AttachmentInitResponse.success("att-1", policy.getAttachmentChunkBytes(),
+                    System.currentTimeMillis() + 60_000);
         }
 
         @Override
         public AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, AttachmentChunkRequest request) {
+            sleepQuietly(chunkUploadDelayMs);
             chunkCalls++;
             return AttachmentChunkResponse.success(attachmentId, request.getChunkIndex(), true);
         }
 
         @Override
-        public AttachmentCompleteResponse completeAttachmentUpload(String attachmentId, AttachmentCompleteRequest request) {
+        public AttachmentCompleteResponse completeAttachmentUpload(String attachmentId,
+                AttachmentCompleteRequest request) {
             completeCalls++;
-            return AttachmentCompleteResponse.success(attachmentId, request.getExpectedChunks(), request.getEncryptedSizeBytes(), "COMPLETE");
+            return AttachmentCompleteResponse.success(attachmentId, request.getExpectedChunks(),
+                    request.getEncryptedSizeBytes(), "COMPLETE");
         }
 
         @Override
         public AttachmentBindResponse bindAttachmentUpload(String attachmentId, AttachmentBindRequest request) {
             bindCalls++;
-            return AttachmentBindResponse.success(attachmentId, request.getEnvelopeId(), System.currentTimeMillis() + 60_000);
+            return AttachmentBindResponse.success(attachmentId, request.getEnvelopeId(),
+                    System.currentTimeMillis() + 60_000);
         }
 
         @Override
         public AttachmentDownloadResponse downloadAttachment(String attachmentId) {
-            if (downloadDelayMs > 0) {
-                try {
-                    Thread.sleep(downloadDelayMs);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
-                }
-            }
+            sleepQuietly(downloadDelayMs);
             return downloadResponse;
+        }
+
+        private void sleepQuietly(long delayMs) {
+            if (delayMs <= 0) {
+                return;
+            }
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
         }
     }
 
