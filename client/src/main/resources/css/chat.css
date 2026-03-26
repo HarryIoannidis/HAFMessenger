@@ -79,7 +79,7 @@
     -fx-background-color: #1A7CC5;
     -fx-background-radius: 12px 12px 2px 12px;
     -fx-padding: 14px;
-    -fx-max-width: 320px;
+    -fx-max-width: 360px;
 }
 
 .bubble-out:hover {
@@ -94,7 +94,7 @@
     -fx-background-color: #E8E8E8;
     -fx-background-radius: 12px 12px 12px 2px;
     -fx-padding: 14px;
-    -fx-max-width: 320px;
+    -fx-max-width: 360px;
 }
 
 .bubble-in:hover {

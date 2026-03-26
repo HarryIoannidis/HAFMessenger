@@ -39,6 +39,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +54,9 @@ public class MainController implements SearchController.ContactActions {
     private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
     private static final String PROFILE_POPUP_KEY = "profile-popup";
     private static final long RUNTIME_ISSUE_POPUP_COOLDOWN_MS = 10_000L;
+    private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
+    private static final String MESSAGING_RUNTIME_ISSUE_PREFIX = "messaging.";
+    private static final String MESSAGING_RETRY_FAILED_KEY = "messaging.retry.failed";
 
     // Window chrome
     @FXML
@@ -126,6 +130,8 @@ public class MainController implements SearchController.ContactActions {
     private final MainViewModel viewModel = MainViewModel.createDefault();
     private final RuntimeIssuePopupGate runtimeIssuePopupGate = new RuntimeIssuePopupGate(
             RUNTIME_ISSUE_POPUP_COOLDOWN_MS);
+    private final RuntimeIssuePopupGate chatAutoRetryGate = new RuntimeIssuePopupGate(
+            CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final MainSessionService mainSessionService;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
@@ -1191,6 +1197,10 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
         Runnable task = () -> {
+            if (isMessagingRuntimeIssue(issue)) {
+                handleMessagingRuntimeIssue(issue);
+                return;
+            }
             if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {
                 return;
             }
@@ -1210,6 +1220,54 @@ public class MainController implements SearchController.ContactActions {
         } else {
             Platform.runLater(task);
         }
+    }
+
+    /**
+     * Logs chat runtime issues and performs silent automatic retries without
+     * showing popup UI.
+     *
+     * @param issue runtime issue originating from messaging/chat flows
+     */
+    private void handleMessagingRuntimeIssue(RuntimeIssue issue) {
+        LOGGER.log(
+                Level.WARNING,
+                "Chat runtime issue: key={0}, message={1}",
+                new Object[] { issue.dedupeKey(), issue.message() });
+
+        if (!shouldAutoRetryMessagingIssue(issue)) {
+            return;
+        }
+
+        String autoRetryKey = issue.dedupeKey() + ".auto-retry";
+        if (!chatAutoRetryGate.shouldShow(autoRetryKey)) {
+            LOGGER.log(Level.FINE, "Skipping duplicate chat auto-retry for key: {0}", issue.dedupeKey());
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> runRuntimeIssueRetry(issue.retryAction()));
+    }
+
+    /**
+     * Checks whether the provided issue originates from chat messaging workflows.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when issue key belongs to messaging namespace
+     */
+    static boolean isMessagingRuntimeIssue(RuntimeIssue issue) {
+        if (issue == null || issue.dedupeKey() == null) {
+            return false;
+        }
+        return issue.dedupeKey().startsWith(MESSAGING_RUNTIME_ISSUE_PREFIX);
+    }
+
+    /**
+     * Determines whether a chat runtime issue should trigger automatic retry.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when automatic retry should run
+     */
+    static boolean shouldAutoRetryMessagingIssue(RuntimeIssue issue) {
+        return isMessagingRuntimeIssue(issue) && !MESSAGING_RETRY_FAILED_KEY.equals(issue.dedupeKey());
     }
 
     /**

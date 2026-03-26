@@ -28,8 +28,8 @@ import java.util.logging.Logger;
 public class PreviewController {
 
     private static final Logger LOGGER = Logger.getLogger(PreviewController.class.getName());
-    private static final double MAX_PREVIEW_WIDTH = 400.0;
-    private static final double MAX_PREVIEW_HEIGHT = 400.0;
+    private static final double MAX_PREVIEW_WIDTH = 460.0;
+    private static final double MAX_PREVIEW_HEIGHT = 460.0;
 
     // Popup window controls
     @FXML

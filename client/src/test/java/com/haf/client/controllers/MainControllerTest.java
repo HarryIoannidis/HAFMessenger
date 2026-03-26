@@ -1,11 +1,14 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.viewmodels.MainViewModel;
 import org.junit.jupiter.api.Test;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MainControllerTest {
 
@@ -128,6 +131,29 @@ class MainControllerTest {
         assertEquals(1, profileCalls.get());
         assertEquals(1, confirmDeleteCalls.get());
         assertEquals(1, confirmRemoveCalls.get());
+    }
+
+    @Test
+    void messaging_runtime_issue_detection_matches_expected_namespace() {
+        RuntimeIssue messagingIssue = new RuntimeIssue("messaging.send.failed", "x", "y", () -> {
+        });
+        RuntimeIssue searchIssue = new RuntimeIssue("search.request.failed", "x", "y", () -> {
+        });
+
+        assertTrue(MainController.isMessagingRuntimeIssue(messagingIssue));
+        assertFalse(MainController.isMessagingRuntimeIssue(searchIssue));
+        assertFalse(MainController.isMessagingRuntimeIssue(null));
+    }
+
+    @Test
+    void auto_retry_excludes_retry_failed_issue_key() {
+        RuntimeIssue sendIssue = new RuntimeIssue("messaging.send.failed", "x", "y", () -> {
+        });
+        RuntimeIssue retryFailedIssue = new RuntimeIssue("messaging.retry.failed", "x", "y", () -> {
+        });
+
+        assertTrue(MainController.shouldAutoRetryMessagingIssue(sendIssue));
+        assertFalse(MainController.shouldAutoRetryMessagingIssue(retryFailedIssue));
     }
 
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
