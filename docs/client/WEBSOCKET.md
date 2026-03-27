@@ -19,7 +19,8 @@
 ### Connection behavior
 - Connects to `wss://...` URI with `Authorization: Bearer <sessionId>` header.
 - Incoming text frames are reassembled across fragments.
-- Max inbound message size: 2 MB; oversized frames emit `IOException("Inbound message too large")`.
+- Max inbound message size: 4 MB by default (`haf.ws.maxInboundBytes` system-property override).
+- Oversized frames emit `IOException("Inbound message too large")`, and remaining fragments of that same oversized message are discarded until the final fragment.
 
 ### Heartbeat and liveness
 - Sends ping every 5 seconds.

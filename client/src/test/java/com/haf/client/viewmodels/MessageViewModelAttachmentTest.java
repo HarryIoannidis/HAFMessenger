@@ -81,6 +81,29 @@ class MessageViewModelAttachmentTest {
     }
 
     @Test
+    void chunked_path_is_used_when_inline_would_exceed_websocket_budget() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(10_000_000, 10_000_000, 1_048_576);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("large-photo.png");
+        Files.write(file, new byte[2_600_000]);
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.bindCalls == 1 && viewModel.getMessages("bob").size() == 1);
+
+        assertEquals(0, sender.sendCalls);
+        assertEquals(1, sender.initCalls);
+        assertTrue(sender.chunkCalls > 0);
+        assertEquals(1, sender.completeCalls);
+        assertEquals(1, sender.bindCalls);
+        assertEquals(1, sender.sendWithResultCalls);
+        assertEquals(AttachmentConstants.CONTENT_TYPE_REFERENCE, sender.lastSendWithResultContentType);
+        assertEquals(MessageType.IMAGE, viewModel.getMessages("bob").getFirst().type());
+    }
+
+    @Test
     void outgoing_chunked_file_shows_loading_then_swaps_to_file() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(8_192, 512, 256);

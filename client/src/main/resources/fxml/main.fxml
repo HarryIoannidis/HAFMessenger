@@ -211,14 +211,14 @@
       <URL value="@../css/options.css" />
    </stylesheets>
    <center>
-      <SplitPane dividerPositions="0.233" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
+      <SplitPane styleClass="split-pane" dividerPositions="0.233" prefHeight="160.0" prefWidth="200.0" BorderPane.alignment="CENTER">
         <items>
-            <VBox maxWidth="278.0" minWidth="70.0" prefWidth="278.0">
+            <VBox styleClass="left-panel" SplitPane.resizableWithParent="false" maxWidth="278.0" minWidth="70.0" prefWidth="278.0">
                <children>
                   <ListView fx:id="contactsList" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefWidth="280.0" VBox.vgrow="ALWAYS" />
                </children>
             </VBox>
-            <StackPane fx:id="contentPane" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" />
+            <StackPane fx:id="contentPane" styleClass="right-panel" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" />
         </items>
       </SplitPane>
    </center>

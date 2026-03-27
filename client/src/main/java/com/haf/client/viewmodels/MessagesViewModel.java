@@ -87,6 +87,10 @@ public class MessagesViewModel {
     private volatile boolean receivingStarted;
     private final AtomicReference<Runnable> lastFailedSendRetryAction = new AtomicReference<>();
     private static volatile boolean fxToolkitUnavailable;
+    private static final int DEFAULT_WS_INBOUND_MESSAGE_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_WS_INBOUND_MESSAGE_BYTES = resolveWsInboundMessageBytes();
+    private static final int INLINE_WIRE_HEADROOM_BYTES = 16 * 1024;
+    private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
 
     /**
      * Creates a MessageViewModel.
@@ -233,7 +237,9 @@ public class MessagesViewModel {
             }
 
             LocalDateTime timestamp = LocalDateTime.now();
-            if (fileBytes.length <= policy.getAttachmentInlineMaxBytes()) {
+            boolean canInline = fileBytes.length <= policy.getAttachmentInlineMaxBytes()
+                    && canSendInlineWithinWsBudget(fileName, mediaType, fileBytes.length);
+            if (canInline) {
                 sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
                 MessageVM outgoing = toAttachmentVm(true, fileBytes, mediaType, fileName, timestamp);
                 runOnUiThread(() -> {
@@ -274,6 +280,85 @@ public class MessagesViewModel {
                     "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
                     this::retryLastFailedOperation);
         }
+    }
+
+    /**
+     * Determines whether an inline attachment is expected to fit comfortably within
+     * the websocket inbound frame budget after JSON + crypto/Base64 expansion.
+     *
+     * @param fileName attachment filename metadata
+     * @param mediaType normalized MIME type metadata
+     * @param fileBytesLen plaintext attachment byte length
+     * @return {@code true} when inline transport is expected to fit safely
+     */
+    private boolean canSendInlineWithinWsBudget(String fileName, String mediaType, int fileBytesLen) {
+        long estimatedInlinePayloadBytes = estimateInlinePayloadBytes(fileName, mediaType, fileBytesLen);
+        long estimatedWireBytes = estimateEncryptedEnvelopeWireBytes(estimatedInlinePayloadBytes);
+        long budget = Math.max(1L, MAX_WS_INBOUND_MESSAGE_BYTES - INLINE_WIRE_HEADROOM_BYTES);
+        return estimatedWireBytes <= budget;
+    }
+
+    /**
+     * Estimates the UTF-8 byte size of the inline attachment JSON payload before
+     * encryption.
+     *
+     * @param fileName attachment filename metadata
+     * @param mediaType normalized MIME type metadata
+     * @param fileBytesLen plaintext attachment byte length
+     * @return estimated payload bytes
+     */
+    private long estimateInlinePayloadBytes(String fileName, String mediaType, int fileBytesLen) {
+        long dataB64Bytes = base64EncodedLength(Math.max(0L, fileBytesLen));
+        int fileNameLen = fileName == null ? 0 : fileName.length();
+        int mediaTypeLen = mediaType == null ? 0 : mediaType.length();
+        int sizeDigits = String.valueOf(Math.max(0, fileBytesLen)).length();
+        return dataB64Bytes + fileNameLen + mediaTypeLen + sizeDigits + 96L;
+    }
+
+    /**
+     * Estimates serialized websocket envelope size for an encrypted payload.
+     *
+     * @param inlinePayloadBytes plaintext inline payload size in bytes
+     * @return estimated websocket message bytes
+     */
+    private long estimateEncryptedEnvelopeWireBytes(long inlinePayloadBytes) {
+        long ciphertextB64Bytes = base64EncodedLength(Math.max(0L, inlinePayloadBytes));
+        return ciphertextB64Bytes + INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES;
+    }
+
+    /**
+     * Returns the Base64 output length for a given input byte length.
+     *
+     * @param inputBytes byte length before Base64 encoding
+     * @return encoded length in characters/bytes
+     */
+    private static long base64EncodedLength(long inputBytes) {
+        if (inputBytes <= 0) {
+            return 0L;
+        }
+        return ((inputBytes + 2L) / 3L) * 4L;
+    }
+
+    /**
+     * Resolves websocket inbound size budget from the same system property used by
+     * transport layer.
+     *
+     * @return max websocket inbound bytes budget used for inline decisioning
+     */
+    private static int resolveWsInboundMessageBytes() {
+        String configured = System.getProperty("haf.ws.maxInboundBytes");
+        if (configured == null || configured.isBlank()) {
+            return DEFAULT_WS_INBOUND_MESSAGE_BYTES;
+        }
+        try {
+            int parsed = Integer.parseInt(configured.trim());
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+            // Fall through to default.
+        }
+        return DEFAULT_WS_INBOUND_MESSAGE_BYTES;
     }
 
     /**

@@ -1,5 +1,9 @@
 /* chat.css */
 
+.root {
+    -fx-background-radius: 0 0 4 0;
+}
+
 .bottom-bar {
     -fx-background-color: #d9d9d9;
     -fx-background-radius: 18px;

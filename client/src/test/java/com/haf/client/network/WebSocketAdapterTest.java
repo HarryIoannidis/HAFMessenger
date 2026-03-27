@@ -153,12 +153,40 @@ class WebSocketAdapterTest {
         }, error::set);
 
         client.webSocketBuilder.lastListener.onOpen(ws);
-        String huge = "x".repeat((2 * 1024 * 1024) + 10);
+        int maxInbound = getStaticIntField(WebSocketAdapter.class, "MAX_INBOUND_MESSAGE_BYTES");
+        String huge = "x".repeat(maxInbound + 10);
         client.webSocketBuilder.lastListener.onText(ws, huge, true);
 
         assertNotNull(error.get());
         assertInstanceOf(IOException.class, error.get());
         assertTrue(error.get().getMessage().contains("too large"));
+    }
+
+    @Test
+    void oversized_fragmented_message_discards_tail_until_last_and_recovers() throws Exception {
+        FakeHttpClient client = new FakeHttpClient();
+        FakeWebSocket ws = new FakeWebSocket();
+        client.webSocketBuilder.nextWebSocketFuture = CompletableFuture.completedFuture(ws);
+
+        AtomicReference<String> received = new AtomicReference<>();
+        AtomicInteger errors = new AtomicInteger();
+        WebSocketAdapter adapter = new WebSocketAdapter(SERVER_URI, "session-over-frag", client);
+        adapter.connect(received::set, err -> errors.incrementAndGet());
+
+        client.webSocketBuilder.lastListener.onOpen(ws);
+        int maxInbound = getStaticIntField(WebSocketAdapter.class, "MAX_INBOUND_MESSAGE_BYTES");
+        String nearLimit = "x".repeat(Math.max(1, maxInbound - 5));
+
+        client.webSocketBuilder.lastListener.onText(ws, nearLimit, false);
+        client.webSocketBuilder.lastListener.onText(ws, "overflow-fragment", false);
+        client.webSocketBuilder.lastListener.onText(ws, "ignored-tail", true);
+
+        assertEquals(1, errors.get());
+        assertEquals(null, received.get());
+
+        client.webSocketBuilder.lastListener.onText(ws, "ok", true);
+        assertEquals("ok", received.get());
+        assertEquals(1, errors.get());
     }
 
     @Test
@@ -279,6 +307,17 @@ class WebSocketAdapterTest {
             method.invoke(target);
         } catch (Exception e) {
             fail("Failed to invoke method '" + methodName + "': " + e.getMessage(), e);
+        }
+    }
+
+    private static int getStaticIntField(Class<?> target, String fieldName) {
+        try {
+            var field = target.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.getInt(null);
+        } catch (Exception e) {
+            fail("Failed to read static int field '" + fieldName + "': " + e.getMessage(), e);
+            return -1;
         }
     }
 
