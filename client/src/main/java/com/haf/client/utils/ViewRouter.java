@@ -208,11 +208,7 @@ public class ViewRouter {
             throw new IllegalStateException("Main stage is not initialized.");
         }
 
-        PopupEntry entry = popupEntries.get(popupKey);
-        if (entry == null || entry.stage() == null || entry.stage().getOwner() != mainStage) {
-            entry = loadPopupEntry(fxmlPath, controllerType);
-            popupEntries.put(popupKey, entry);
-        }
+        PopupEntry entry = getOrCreatePopupEntry(popupKey, fxmlPath, controllerType);
 
         T controller = controllerType.cast(entry.controller());
         if (configureController != null) {
@@ -228,6 +224,54 @@ public class ViewRouter {
         }
         popupStage.toFront();
         popupStage.requestFocus();
+    }
+
+    /**
+     * Preloads and caches a popup window so the first visible open is instant.
+     *
+     * @param popupKey       unique popup key used to cache/reuse stage instances
+     * @param fxmlPath       popup FXML path to load if missing from cache
+     * @param controllerType expected controller type for the loaded popup
+     * @param <T>            concrete popup controller type
+     */
+    public static <T> void preloadPopup(
+            String popupKey,
+            String fxmlPath,
+            Class<T> controllerType) {
+        preloadPopup(popupKey, fxmlPath, controllerType, null);
+    }
+
+    /**
+     * Preloads and caches a popup window and optionally configures its
+     * controller after load.
+     *
+     * @param popupKey            unique popup key used to cache/reuse stage
+     *                            instances
+     * @param fxmlPath            popup FXML path to load if missing from cache
+     * @param controllerType      expected controller type for the loaded popup
+     * @param configureController optional callback to configure the controller
+     * @param <T>                 concrete popup controller type
+     */
+    public static <T> void preloadPopup(
+            String popupKey,
+            String fxmlPath,
+            Class<T> controllerType,
+            Consumer<T> configureController) {
+        Objects.requireNonNull(popupKey, "popupKey");
+        Objects.requireNonNull(fxmlPath, "fxmlPath");
+        Objects.requireNonNull(controllerType, "controllerType");
+
+        if (mainStage == null) {
+            logger.warning("Skipping popup preload because main stage is not initialized.");
+            return;
+        }
+
+        PopupEntry entry = getOrCreatePopupEntry(popupKey, fxmlPath, controllerType);
+        if (configureController != null) {
+            T controller = controllerType.cast(entry.controller());
+            configureController.accept(controller);
+        }
+        warmPopupEntry(entry);
     }
 
     /**
@@ -281,6 +325,67 @@ public class ViewRouter {
             return new PopupEntry(popupStage, controller);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to load popup FXML: " + fxmlPath, e);
+        }
+    }
+
+    /**
+     * Returns an existing popup cache entry or creates one when absent/invalid.
+     *
+     * @param popupKey       unique popup key
+     * @param fxmlPath       popup FXML path
+     * @param controllerType expected controller type
+     * @param <T>            concrete controller type
+     * @return cached or newly created popup entry
+     */
+    private static synchronized <T> PopupEntry getOrCreatePopupEntry(
+            String popupKey,
+            String fxmlPath,
+            Class<T> controllerType) {
+        PopupEntry entry = popupEntries.get(popupKey);
+        if (entry == null || entry.stage() == null || entry.stage().getOwner() != mainStage) {
+            entry = loadPopupEntry(fxmlPath, controllerType);
+            popupEntries.put(popupKey, entry);
+        }
+        return entry;
+    }
+
+    /**
+     * Prepares popup scene CSS/layout/render pipeline ahead of first visible show.
+     *
+     * @param entry cached popup entry to warm
+     */
+    private static void warmPopupEntry(PopupEntry entry) {
+        if (entry == null || entry.stage() == null || entry.stage().getScene() == null
+                || entry.stage().getScene().getRoot() == null) {
+            return;
+        }
+
+        Stage popupStage = entry.stage();
+        Parent root = popupStage.getScene().getRoot();
+        popupStage.sizeToScene();
+        root.applyCss();
+        root.layout();
+        try {
+            root.snapshot(null, null);
+        } catch (RuntimeException ex) {
+            logger.log(Level.FINEST, "Popup warmup snapshot skipped: {0}", ex.getMessage());
+        }
+
+        if (!popupStage.isShowing()) {
+            double previousOpacity = popupStage.getOpacity();
+            try {
+                popupStage.setOpacity(0.0);
+                centerPopupOverMainStage(popupStage);
+                popupStage.show();
+                popupStage.hide();
+            } catch (RuntimeException ex) {
+                logger.log(Level.FINEST, "Popup invisible show/hide warmup skipped: {0}", ex.getMessage());
+            } finally {
+                popupStage.setOpacity(previousOpacity);
+                if (mainStage != null) {
+                    mainStage.requestFocus();
+                }
+            }
         }
     }
 

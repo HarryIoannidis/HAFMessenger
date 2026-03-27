@@ -13,6 +13,9 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.io.File;
@@ -28,8 +31,9 @@ import java.util.logging.Logger;
 public class PreviewController {
 
     private static final Logger LOGGER = Logger.getLogger(PreviewController.class.getName());
-    private static final double MAX_PREVIEW_WIDTH = 460.0;
-    private static final double MAX_PREVIEW_HEIGHT = 460.0;
+    private static final double MAX_PREVIEW_WIDTH = 500.0;
+    private static final double MAX_PREVIEW_HEIGHT = 500.0;
+    private static final double HOVER_ZOOM_SCALE = 1.15;
 
     // Popup window controls
     @FXML
@@ -42,6 +46,8 @@ public class PreviewController {
     private JFXButton closeButton;
 
     // Preview content and actions
+    @FXML
+    private StackPane previewImageContainer;
     @FXML
     private ImageView previewImageView;
     @FXML
@@ -61,6 +67,7 @@ public class PreviewController {
     @FXML
     public void initialize() {
         setupWindowControls();
+        setupPreviewHoverZoom();
         if (downloadButton != null) {
             downloadButton.setOnAction(e -> handleDownloadClick());
         }
@@ -109,6 +116,7 @@ public class PreviewController {
         previewImageView.setImage(null);
         previewImageView.setFitWidth(0);
         previewImageView.setFitHeight(0);
+        resetHoverZoom();
         if (source == null || source.isBlank()) {
             setSpinnerVisible(false);
             return;
@@ -141,6 +149,27 @@ public class PreviewController {
             setSpinnerVisible(false);
             showAttachmentError("Could not load image preview.");
         }
+    }
+
+    /**
+     * Configures subtle hover zoom behavior with cursor-follow panning.
+     */
+    private void setupPreviewHoverZoom() {
+        if (previewImageView == null) {
+            return;
+        }
+
+        if (previewImageContainer != null) {
+            Rectangle clip = new Rectangle();
+            clip.widthProperty().bind(previewImageContainer.widthProperty());
+            clip.heightProperty().bind(previewImageContainer.heightProperty());
+            previewImageContainer.setClip(clip);
+        }
+
+        previewImageView.setOnMouseEntered(this::updateHoverZoom);
+        previewImageView.setOnMouseMoved(this::updateHoverZoom);
+        previewImageView.setOnMouseDragged(this::updateHoverZoom);
+        previewImageView.setOnMouseExited(event -> resetHoverZoom());
     }
 
     /**
@@ -246,6 +275,64 @@ public class PreviewController {
         if (stage != null) {
             stage.sizeToScene();
         }
+    }
+
+    /**
+     * Applies zoom/pan transform so the zoomed region follows cursor position.
+     *
+     * @param event pointer event within the image view
+     */
+    private void updateHoverZoom(MouseEvent event) {
+        if (event == null || previewImageView == null || previewImageView.getImage() == null) {
+            return;
+        }
+
+        double width = previewImageView.getFitWidth();
+        double height = previewImageView.getFitHeight();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        previewImageView.setScaleX(HOVER_ZOOM_SCALE);
+        previewImageView.setScaleY(HOVER_ZOOM_SCALE);
+
+        double xRatio = clamp(event.getX() / width);
+        double yRatio = clamp(event.getY() / height);
+
+        double maxTranslateX = (width * HOVER_ZOOM_SCALE - width) / 2.0;
+        double maxTranslateY = (height * HOVER_ZOOM_SCALE - height) / 2.0;
+
+        previewImageView.setTranslateX((0.5 - xRatio) * maxTranslateX * 2.0);
+        previewImageView.setTranslateY((0.5 - yRatio) * maxTranslateY * 2.0);
+    }
+
+    /**
+     * Resets preview transforms to the default non-zoomed state.
+     */
+    private void resetHoverZoom() {
+        if (previewImageView == null) {
+            return;
+        }
+        previewImageView.setScaleX(1.0);
+        previewImageView.setScaleY(1.0);
+        previewImageView.setTranslateX(0.0);
+        previewImageView.setTranslateY(0.0);
+    }
+
+    /**
+     * Clamps a ratio to [0, 1].
+     *
+     * @param value raw ratio
+     * @return clamped ratio
+     */
+    private static double clamp(double value) {
+        if (value < 0.0) {
+            return 0.0;
+        }
+        if (value > 1.0) {
+            return 1.0;
+        }
+        return value;
     }
 
     /**

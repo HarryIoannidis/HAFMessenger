@@ -2,10 +2,10 @@ module client {
     requires transitive shared;
     requires transitive javafx.graphics;
     requires transitive javafx.controls;
+    requires transitive com.jfoenix;
     requires javafx.fxml;
     requires java.net.http;
     requires java.logging;
-    requires com.jfoenix;
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.materialdesign2;
     requires java.prefs;

@@ -192,6 +192,7 @@ public class MainController implements SearchController.ContactActions {
 
         // Trigger pre-loading immediately
         contentLoader.triggerPreloading();
+        scheduleSettingsPopupPreload();
 
         // Fetch contacts from server
         viewModel.fetchContacts();
@@ -577,6 +578,34 @@ public class MainController implements SearchController.ContactActions {
                 UiConstants.FXML_PROFILE,
                 ProfileController.class,
                 controller -> controller.showProfile(profile));
+    }
+
+    /**
+     * Opens the settings popup window.
+     */
+    private void openSettingsPopup() {
+        ViewRouter.showPopup(
+                UiConstants.POPUP_SETTINGS,
+                UiConstants.FXML_SETTINGS,
+                SettingsController.class,
+                null);
+    }
+
+    /**
+     * Preloads the Settings popup shortly after main-view startup so first open
+     * is instant.
+     */
+    private void scheduleSettingsPopupPreload() {
+        Platform.runLater(() -> {
+            try {
+                ViewRouter.preloadPopup(
+                        UiConstants.POPUP_SETTINGS,
+                        UiConstants.FXML_SETTINGS,
+                        SettingsController.class);
+            } catch (RuntimeException ex) {
+                LOGGER.log(Level.FINE, "Settings popup preload skipped: {0}", ex.getMessage());
+            }
+        });
     }
 
     /**
@@ -1034,7 +1063,7 @@ public class MainController implements SearchController.ContactActions {
         ContextMenu menu = ContextMenuBuilder.create()
                 .addOption("mdi2a-account-circle-outline", "Profile", this::openSelfProfilePopup)
                 .addSeparator()
-                .addOption("mdi2c-cog-outline", "Settings", () -> LOGGER.info("TODO: Settings clicked"))
+                .addOption("mdi2c-cog-outline", "Settings", this::openSettingsPopup)
                 .addOption("mdi2h-help-circle-outline", "Help", () -> LOGGER.info("TODO: Help clicked"))
                 .addSeparator()
                 .addOption("mdi2l-logout", "Log out", this::confirmLogout)

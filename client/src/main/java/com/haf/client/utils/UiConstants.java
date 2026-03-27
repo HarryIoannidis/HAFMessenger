@@ -17,6 +17,8 @@ public final class UiConstants {
     public static final String FXML_SEARCH_RESULT_ITEM = "/fxml/search_result_item.fxml";
     public static final String FXML_PROFILE = "/fxml/profile.fxml";
     public static final String FXML_PREVIEW = "/fxml/preview.fxml";
+    public static final String FXML_SETTINGS = "/fxml/settings.fxml";
+    public static final String FXML_SETTINGS_ITEM_CELL = "/fxml/settings_item_cell.fxml";
     public static final String FXML_POPUP_MESSAGE = "/fxml/popup_message.fxml";
 
     // Images
@@ -99,6 +101,7 @@ public final class UiConstants {
     public static final String POPUP_ATTACHMENT_ERROR = "popup-attachment-error";
     public static final String POPUP_VIEW_LOAD_ERROR = "popup-view-load-error";
     public static final String POPUP_RUNTIME_ISSUE = "popup-runtime-issue";
+    public static final String POPUP_SETTINGS = "popup-settings";
 
     // Stylesheets
     public static final String CSS_GLOBAL = "/css/global.css";
