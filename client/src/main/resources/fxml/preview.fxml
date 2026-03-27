@@ -48,7 +48,7 @@
    <center>
       <VBox alignment="CENTER" spacing="10.0" BorderPane.alignment="CENTER">
          <children>
-            <StackPane>
+            <StackPane fx:id="previewImageContainer">
                <children>
                   <ImageView fx:id="previewImageView" pickOnBounds="true" preserveRatio="true" />
                   <ProgressIndicator fx:id="loadingSpinner" managed="false" maxHeight="46.0" maxWidth="46.0" prefHeight="46.0" prefWidth="46.0" visible="false" />

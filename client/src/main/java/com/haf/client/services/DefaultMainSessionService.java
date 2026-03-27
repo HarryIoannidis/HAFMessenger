@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 public class DefaultMainSessionService implements MainSessionService {
 
     private static final Logger LOGGER = Logger.getLogger(DefaultMainSessionService.class.getName());
-    static final int LOGOUT_TIMEOUT_SECONDS = 3;
+    static final int LOGOUT_TIMEOUT_SECONDS = 5;
 
     interface NetworkGateway {
         /**
