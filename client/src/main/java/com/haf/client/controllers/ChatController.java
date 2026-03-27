@@ -15,6 +15,7 @@ import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.ChatViewModel;
 import com.haf.client.viewmodels.MessagesViewModel;
 import com.jfoenix.controls.JFXButton;
+import javafx.animation.PauseTransition;
 import javafx.collections.ListChangeListener;
 import javafx.collections.WeakListChangeListener;
 import javafx.fxml.FXML;
@@ -32,6 +33,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,6 +53,7 @@ public class ChatController {
     private static final String PREVIEW_POPUP_KEY = "message-image-preview-popup";
     private static final long MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L;
     private static final String BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS = "bubble-ripple-overlay";
+    private static final double MESSAGE_CONTEXT_MENU_DELAY_MS = 170.0;
 
     enum MessageContextAction {
         COPY,
@@ -531,15 +534,33 @@ public class ChatController {
         }
 
         ContextMenu menu = buildMessageContextMenu(message, actions);
+        final PauseTransition[] contextMenuDelay = new PauseTransition[1];
         interactionTarget.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
+            final double screenX = event.getScreenX();
+            final double screenY = event.getScreenY();
             if (menu.isShowing()) {
                 menu.hide();
             }
-            menu.show(interactionTarget, event.getScreenX(), event.getScreenY());
+            if (interactionTarget instanceof JFXButton button) {
+                button.fire();
+            }
+            if (contextMenuDelay[0] != null) {
+                contextMenuDelay[0].stop();
+            }
+            contextMenuDelay[0] = new PauseTransition(Duration.millis(MESSAGE_CONTEXT_MENU_DELAY_MS));
+            contextMenuDelay[0].setOnFinished(ignored -> {
+                if (interactionTarget.getScene() != null) {
+                    menu.show(interactionTarget, screenX, screenY);
+                }
+            });
+            contextMenuDelay[0].playFromStart();
             event.consume();
         });
 
         interactionTarget.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            if (contextMenuDelay[0] != null) {
+                contextMenuDelay[0].stop();
+            }
             if (menu.isShowing() && event.getButton() != MouseButton.SECONDARY) {
                 menu.hide();
             }

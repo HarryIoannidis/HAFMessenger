@@ -321,10 +321,8 @@ public class ViewRouter {
     /**
      * Checks if the main stage is currently showing a transparent window.
      * This is used to determine if a full recreate-and-resize is needed.
-     *
-     * @return true if the main stage is showing a transparent window, false
-     *         otherwise
      */
     private record PopupEntry(Stage stage, Object controller) {
+        // no-op
     }
 }

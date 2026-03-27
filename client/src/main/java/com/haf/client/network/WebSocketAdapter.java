@@ -45,7 +45,9 @@ public class WebSocketAdapter {
 
     // Inbound text accumulation (handle fragmented frames)
     private final StringBuilder inboundBuffer = new StringBuilder();
-    private static final int MAX_INBOUND_MESSAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+    private static final int DEFAULT_MAX_INBOUND_MESSAGE_BYTES = 4 * 1024 * 1024; // 4 MB
+    private static final int MAX_INBOUND_MESSAGE_BYTES = resolveMaxInboundMessageBytes();
+    private boolean droppingOversizeInboundMessage;
 
     // Heartbeat (ping/pong)
     private ScheduledExecutorService scheduler;
@@ -87,6 +89,32 @@ public class WebSocketAdapter {
 
     private final AsyncRunner asyncRunner;
     private final DelayStrategy delayStrategy;
+
+    /**
+     * Resolves max inbound message size from system property override.
+     *
+     * Property: {@code haf.ws.maxInboundBytes}
+     *
+     * @return validated max inbound message bytes
+     */
+    private static int resolveMaxInboundMessageBytes() {
+        String configured = System.getProperty("haf.ws.maxInboundBytes");
+        if (configured == null || configured.isBlank()) {
+            return DEFAULT_MAX_INBOUND_MESSAGE_BYTES;
+        }
+        try {
+            int parsed = Integer.parseInt(configured.trim());
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+            // Fall through to default.
+        }
+        LOGGER.log(Level.WARNING,
+                "Invalid value for system property haf.ws.maxInboundBytes: {0}. Falling back to default: {1}",
+                new Object[] { configured, DEFAULT_MAX_INBOUND_MESSAGE_BYTES });
+        return DEFAULT_MAX_INBOUND_MESSAGE_BYTES;
+    }
 
     /**
      * Creates a WebSocketAdapter for the specified server URI.
@@ -377,6 +405,8 @@ public class WebSocketAdapter {
             public void onOpen(WebSocket webSocket) {
                 isConnected = true;
                 retryAttempts = 0;
+                inboundBuffer.setLength(0);
+                droppingOversizeInboundMessage = false;
                 WebSocket.Listener.super.onOpen(webSocket);
                 // Request next message
                 webSocket.request(1);
@@ -454,9 +484,15 @@ public class WebSocketAdapter {
      */
     private void handleIncomingText(WebSocket webSocket, CharSequence data, boolean last) {
         try {
+            if (droppingOversizeInboundMessage) {
+                if (last) {
+                    droppingOversizeInboundMessage = false;
+                }
+                return;
+            }
             if (data != null) {
                 if (isMessageOversize(data)) {
-                    handleOversizeError();
+                    handleOversizeError(last);
                     return;
                 }
                 inboundBuffer.append(data);
@@ -483,8 +519,9 @@ public class WebSocketAdapter {
      * Handles oversize inbound messages by clearing state and notifying error
      * callback.
      */
-    private void handleOversizeError() {
+    private void handleOversizeError(boolean lastFragment) {
         inboundBuffer.setLength(0);
+        droppingOversizeInboundMessage = !lastFragment;
         if (errorConsumer != null) {
             errorConsumer.accept(new IOException("Inbound message too large"));
         }
@@ -548,6 +585,8 @@ public class WebSocketAdapter {
     public void close() {
         userClosed = true;
         stopHeartbeat();
+        inboundBuffer.setLength(0);
+        droppingOversizeInboundMessage = false;
         WebSocket ws = this.webSocket;
         this.webSocket = null;
         if (ws != null) {
