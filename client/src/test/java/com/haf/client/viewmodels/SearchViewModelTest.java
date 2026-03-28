@@ -47,7 +47,11 @@ class SearchViewModelTest {
             return "{}";
         });
 
-        viewModel.search("ab");
+        if (UiConstants.SEARCH_MIN_QUERY_LENGTH <= 1) {
+            fail("SEARCH_MIN_QUERY_LENGTH must be greater than 1 for short-query validation tests.");
+        }
+        String shortQuery = "x".repeat(UiConstants.SEARCH_MIN_QUERY_LENGTH - 1);
+        viewModel.search(shortQuery);
 
         assertFalse(called.get());
         assertEquals(SearchViewModel.STATUS_MIN_QUERY, viewModel.statusTextProperty().get());

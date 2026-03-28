@@ -314,6 +314,7 @@ public class ViewRouter {
             StackPane popupShell = new StackPane(root);
             popupShell.setPadding(new Insets(14));
             popupShell.setPickOnBounds(false);
+            popupShell.setMinSize(UiConstants.POPUP_MIN_WIDTH, UiConstants.POPUP_MIN_HEIGHT);
             popupShell.setStyle("-fx-background-color: transparent;");
 
             Scene popupScene = new Scene(popupShell);

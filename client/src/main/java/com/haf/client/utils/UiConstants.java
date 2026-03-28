@@ -127,6 +127,8 @@ public final class UiConstants {
 
     // Common Dimensions
     public static final double RANK_ICON_SIZE = 32.0;
+    public static final double POPUP_MIN_WIDTH = 430.0;
+    public static final double POPUP_MIN_HEIGHT = 280.0;
 
     // Search
     public static final int SEARCH_PAGE_SIZE = 20;
