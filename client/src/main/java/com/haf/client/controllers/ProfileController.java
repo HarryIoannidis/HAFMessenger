@@ -13,16 +13,15 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for profile popup window.
  */
 public class ProfileController {
 
-    private static final Logger LOGGER = Logger.getLogger(ProfileController.class.getName());
-    private static final String MISSING_VALUE = "\u2014";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProfileController.class);
 
     // Popup window controls
     @FXML
@@ -149,7 +148,7 @@ public class ProfileController {
      * @param actionLabel action name displayed in popup/log output
      */
     private void showStubDialog(String actionLabel) {
-        LOGGER.log(Level.INFO, "{0} clicked.", actionLabel);
+        LOGGER.info( "{} clicked.", actionLabel);
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_PROFILE_STUB)
                 .title(actionLabel)
@@ -208,7 +207,7 @@ public class ProfileController {
      */
     private static String formatUserId(String value) {
         if (value == null || value.isBlank()) {
-            return MISSING_VALUE;
+            return "\u2014";
         }
         return "#" + value;
     }
@@ -221,7 +220,7 @@ public class ProfileController {
      */
     private static String formatValue(String value) {
         if (value == null || value.isBlank()) {
-            return MISSING_VALUE;
+            return "\u2014";
         }
         return value;
     }

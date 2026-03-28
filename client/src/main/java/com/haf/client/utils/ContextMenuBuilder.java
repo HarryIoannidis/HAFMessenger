@@ -13,9 +13,6 @@ import org.kordamp.ikonli.javafx.FontIcon;
  */
 public final class ContextMenuBuilder {
 
-    private static final String DEFAULT_MENU_STYLE = "dropdown-menu";
-    private static final String DEFAULT_ITEM_STYLE = "dropdown-menu-item";
-    private static final String DEFAULT_TEXT_STYLE = "dropdown-menu-option-text";
     private static final int DEFAULT_ICON_SIZE = 22;
 
     private final ContextMenu menu;
@@ -25,7 +22,7 @@ public final class ContextMenuBuilder {
      */
     private ContextMenuBuilder() {
         this.menu = new ContextMenu();
-        this.menu.getStyleClass().add(DEFAULT_MENU_STYLE);
+        this.menu.getStyleClass().add("dropdown-menu");
     }
 
     /**
@@ -129,14 +126,14 @@ public final class ContextMenuBuilder {
         icon.setIconSize(DEFAULT_ICON_SIZE);
 
         Text optionText = new Text(text == null ? "" : text);
-        optionText.getStyleClass().add(DEFAULT_TEXT_STYLE);
+        optionText.getStyleClass().add("dropdown-menu-option-text");
 
         HBox row = new HBox(12, icon, optionText);
         row.setAlignment(Pos.CENTER_LEFT);
 
         MenuItem item = new MenuItem();
         item.setGraphic(row);
-        item.getStyleClass().add(DEFAULT_ITEM_STYLE);
+        item.getStyleClass().add("dropdown-menu-item");
         return item;
     }
 }

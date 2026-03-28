@@ -5,6 +5,7 @@ import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.services.ChatAttachmentService;
 import com.haf.client.services.DefaultChatAttachmentService;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.ImageSaveSupport;
 import com.haf.client.utils.MessageBubbleFactory;
@@ -16,6 +17,7 @@ import com.haf.client.viewmodels.ChatViewModel;
 import com.haf.client.viewmodels.MessagesViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.collections.WeakListChangeListener;
 import javafx.fxml.FXML;
@@ -41,18 +43,16 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for {@code chat.fxml}.
  */
 public class ChatController {
 
-    private static final Logger LOGGER = Logger.getLogger(ChatController.class.getName());
-    private static final String PREVIEW_POPUP_KEY = "message-image-preview-popup";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChatController.class);
     private static final long MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L;
-    private static final String BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS = "bubble-ripple-overlay";
     private static final double MESSAGE_CONTEXT_MENU_DELAY_MS = 170.0;
 
     enum MessageContextAction {
@@ -79,6 +79,8 @@ public class ChatController {
 
     private final ChatAttachmentService chatAttachmentService;
     private ChatViewModel viewModel;
+    private ClientSettings settings = ClientSettings.defaults();
+    private ClientSettings.Listener settingsListener;
 
     private ListChangeListener<MessageVM> messageListenerAnchor;
     private WeakListChangeListener<MessageVM> weakMessageListener;
@@ -103,6 +105,25 @@ public class ChatController {
     }
 
     /**
+     * Injects active client settings used by chat interactions and rendering.
+     *
+     * @param settings active settings instance
+     */
+    public void setSettings(ClientSettings settings) {
+        if (this.settingsListener != null) {
+            this.settings.removeListener(this.settingsListener);
+        }
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
+        this.settingsListener = key -> {
+            if (key == ClientSettings.Key.CHAT_SHOW_MESSAGE_TIMESTAMPS
+                    || key == ClientSettings.Key.CHAT_AUTO_SCROLL_TO_LATEST) {
+                Platform.runLater(this::refreshRenderedMessages);
+            }
+        };
+        this.settings.addListener(this.settingsListener);
+    }
+
+    /**
      * Initializes chat view bindings and UI action handlers.
      */
     @FXML
@@ -116,7 +137,11 @@ public class ChatController {
         }
 
         sendButton.setOnAction(e -> sendMessage());
-        messageField.setOnAction(e -> sendMessage());
+        messageField.setOnAction(e -> {
+            if (settings.isChatSendOnEnter()) {
+                sendMessage();
+            }
+        });
         if (imageButton != null) {
             imageButton.setOnAction(e -> chooseImageAttachment());
         }
@@ -230,7 +255,9 @@ public class ChatController {
             }
         }
         chatScrollPane.layout();
-        chatScrollPane.setVvalue(1.0);
+        if (settings.isChatAutoScrollToLatest()) {
+            chatScrollPane.setVvalue(1.0);
+        }
     }
 
     /**
@@ -249,7 +276,9 @@ public class ChatController {
             }
         }
         chatScrollPane.layout();
-        chatScrollPane.setVvalue(1.0);
+        if (settings.isChatAutoScrollToLatest()) {
+            chatScrollPane.setVvalue(1.0);
+        }
 
         if (hasIncomingMessages) {
             viewModel.acknowledgeRecipient(activeRecipient);
@@ -350,7 +379,7 @@ public class ChatController {
         try {
             return Files.size(filePath) > MAX_ATTACHMENT_BYTES;
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Could not read attachment size", ex);
+            LOGGER.warn( "Could not read attachment size", ex);
             return false;
         }
     }
@@ -441,7 +470,7 @@ public class ChatController {
      * @return rendered node for the message
      */
     private Node createMessageNode(MessageVM message) {
-        Node node = MessageBubbleFactory.create(message);
+        Node node = MessageBubbleFactory.create(message, settings.isChatShowMessageTimestamps());
         installMessageContextMenu(node, message);
         installImagePrimaryClickPreview(node, message);
         installFilePrimaryClickDownload(node, message);
@@ -535,36 +564,60 @@ public class ChatController {
 
         ContextMenu menu = buildMessageContextMenu(message, actions);
         final PauseTransition[] contextMenuDelay = new PauseTransition[1];
-        interactionTarget.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
-            final double screenX = event.getScreenX();
-            final double screenY = event.getScreenY();
-            if (menu.isShowing()) {
-                menu.hide();
-            }
-            if (interactionTarget instanceof JFXButton button) {
-                button.fire();
-            }
-            if (contextMenuDelay[0] != null) {
-                contextMenuDelay[0].stop();
-            }
-            contextMenuDelay[0] = new PauseTransition(Duration.millis(MESSAGE_CONTEXT_MENU_DELAY_MS));
-            contextMenuDelay[0].setOnFinished(ignored -> {
-                if (interactionTarget.getScene() != null) {
-                    menu.show(interactionTarget, screenX, screenY);
-                }
-            });
-            contextMenuDelay[0].playFromStart();
-            event.consume();
-        });
+        interactionTarget.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED,
+                event -> handleContextMenuRequested(event, interactionTarget, menu, contextMenuDelay));
+        interactionTarget.addEventFilter(MouseEvent.MOUSE_PRESSED,
+                event -> handleMousePressedForContextMenu(event, menu, contextMenuDelay));
+    }
 
-        interactionTarget.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
-            if (contextMenuDelay[0] != null) {
-                contextMenuDelay[0].stop();
-            }
-            if (menu.isShowing() && event.getButton() != MouseButton.SECONDARY) {
-                menu.hide();
+    /**
+     * Handles context-menu-requested events by firing the interaction target,
+     * then scheduling a delayed context menu display.
+     *
+     * @param event              context menu event
+     * @param interactionTarget  node that owns the context menu
+     * @param menu               context menu to show
+     * @param contextMenuDelay   shared delay holder for cancellation support
+     */
+    private void handleContextMenuRequested(ContextMenuEvent event, Node interactionTarget,
+                                            ContextMenu menu, PauseTransition[] contextMenuDelay) {
+        final double screenX = event.getScreenX();
+        final double screenY = event.getScreenY();
+        if (menu.isShowing()) {
+            menu.hide();
+        }
+        if (interactionTarget instanceof JFXButton button) {
+            button.fire();
+        }
+        if (contextMenuDelay[0] != null) {
+            contextMenuDelay[0].stop();
+        }
+        contextMenuDelay[0] = new PauseTransition(Duration.millis(MESSAGE_CONTEXT_MENU_DELAY_MS));
+        contextMenuDelay[0].setOnFinished(ignored -> {
+            if (interactionTarget.getScene() != null) {
+                menu.show(interactionTarget, screenX, screenY);
             }
         });
+        contextMenuDelay[0].playFromStart();
+        event.consume();
+    }
+
+    /**
+     * Handles mouse-pressed events by cancelling any pending context-menu delay
+     * and hiding the menu on non-secondary clicks.
+     *
+     * @param event            mouse event
+     * @param menu             context menu to dismiss
+     * @param contextMenuDelay shared delay holder for cancellation support
+     */
+    private void handleMousePressedForContextMenu(MouseEvent event, ContextMenu menu,
+                                                  PauseTransition[] contextMenuDelay) {
+        if (contextMenuDelay[0] != null) {
+            contextMenuDelay[0].stop();
+        }
+        if (menu.isShowing() && event.getButton() != MouseButton.SECONDARY) {
+            menu.hide();
+        }
     }
 
     /**
@@ -617,16 +670,26 @@ public class ChatController {
      * @param message image message to preview
      */
     private void openImagePreview(MessageVM message) {
+        runWithAttachmentOpenConfirmation(
+                "Open preview",
+                "Open this attachment preview?",
+                () -> openImagePreviewNow(message));
+    }
+
+    private void openImagePreviewNow(MessageVM message) {
         if (message == null || message.content() == null || message.content().isBlank()) {
             return;
         }
         String suggestedName = resolveSuggestedDownloadFileName(message);
         boolean downloadAllowed = isImageDownloadAvailable(message);
         ViewRouter.showPopup(
-                PREVIEW_POPUP_KEY,
+                "message-image-preview-popup",
                 UiConstants.FXML_PREVIEW,
                 PreviewController.class,
-                controller -> controller.showImage(message.content(), suggestedName, downloadAllowed));
+                controller -> {
+                    controller.setSettings(settings);
+                    controller.showImage(message.content(), suggestedName, downloadAllowed);
+                });
     }
 
     /**
@@ -654,6 +717,13 @@ public class ChatController {
      * @param message message containing downloadable source
      */
     private void downloadImageFromMessage(MessageVM message) {
+        runWithAttachmentOpenConfirmation(
+                "Open attachment",
+                "Open or download this attachment?",
+                () -> downloadImageFromMessageNow(message));
+    }
+
+    private void downloadImageFromMessageNow(MessageVM message) {
         if (message == null) {
             return;
         }
@@ -666,7 +736,7 @@ public class ChatController {
 
         Path sourcePath = ImageSaveSupport.resolveLocalSourcePath(sourceReference);
         if (sourcePath == null || !Files.exists(sourcePath)) {
-            LOGGER.warning("Attachment source path is unavailable for download.");
+            LOGGER.warn("Attachment source path is unavailable for download.");
             showAttachmentError("Attachment source file could not be found.");
             return;
         }
@@ -691,9 +761,28 @@ public class ChatController {
             }
             Files.copy(sourcePath, destination, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Failed to save image download", ex);
+            LOGGER.warn( "Failed to save image download", ex);
             showAttachmentError("Could not save attachment. Please try again.");
         }
+    }
+
+    private void runWithAttachmentOpenConfirmation(String title, String message, Runnable action) {
+        if (action == null) {
+            return;
+        }
+        if (!settings.isPrivacyConfirmAttachmentOpen()) {
+            action.run();
+            return;
+        }
+        PopupMessageBuilder.create()
+                .popupKey("popup-confirm-attachment-open")
+                .title(title)
+                .message(message)
+                .actionText("Continue")
+                .cancelText("Cancel")
+                .showCancel(true)
+                .onAction(action)
+                .show();
     }
 
     /**
@@ -743,6 +832,9 @@ public class ChatController {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1) {
                 return;
             }
+            if (!settings.isMediaOpenPreviewOnImageClick()) {
+                return;
+            }
             openImagePreview(message);
             event.consume();
         });
@@ -778,7 +870,7 @@ public class ChatController {
     private static Node findRippleOverlay(StackPane stackPane) {
         for (Node child : stackPane.getChildren()) {
             if (child instanceof JFXButton button
-                    && button.getStyleClass().contains(BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS)) {
+                    && button.getStyleClass().contains("bubble-ripple-overlay")) {
                 return button;
             }
         }

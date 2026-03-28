@@ -23,8 +23,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the main screen.
@@ -75,10 +75,8 @@ public class MainViewModel {
         CompletableFuture<String> removeContact(String userId);
     }
 
-    private static final Logger LOGGER = Logger.getLogger(MainViewModel.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(MainViewModel.class);
     private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
-    private static final String UNKNOWN_CONTACT_NAME_PLACEHOLDER = "Unknown Contact";
-    private static final String UNKNOWN_CONTACT_REG_PLACEHOLDER = "";
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
@@ -244,7 +242,7 @@ public class MainViewModel {
         contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to load contacts", ex);
+                    LOGGER.error( "Failed to load contacts", ex);
                     publishRuntimeIssue(
                             "contacts.fetch.failed",
                             "Contacts could not be loaded",
@@ -494,15 +492,15 @@ public class MainViewModel {
 
         addContact(
                 senderId,
-                UNKNOWN_CONTACT_NAME_PLACEHOLDER,
-                UNKNOWN_CONTACT_REG_PLACEHOLDER);
+                "Unknown Contact",
+                "");
 
         ContactInfo created = getContactById(senderId);
         if (created == null) {
             created = ensureChatContact(
                     senderId,
-                    UNKNOWN_CONTACT_NAME_PLACEHOLDER,
-                    UNKNOWN_CONTACT_REG_PLACEHOLDER);
+                    "Unknown Contact",
+                    "");
         }
         return created;
     }
@@ -774,7 +772,7 @@ public class MainViewModel {
             contactsGateway.fetchContacts()
                     .thenAccept(this::applyContactsSnapshot)
                     .exceptionally(ex -> {
-                        LOGGER.log(Level.FINE, "Presence fallback refresh failed", ex);
+                        LOGGER.debug( "Presence fallback refresh failed", ex);
                         return null;
                     });
         });
@@ -795,7 +793,7 @@ public class MainViewModel {
                     scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
                 })
                 .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to add contact on server", ex);
+                    LOGGER.error( "Failed to add contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.add.failed",
                             "Contact could not be added",
@@ -816,7 +814,7 @@ public class MainViewModel {
         }
         contactsGateway.removeContact(userId)
                 .exceptionally(ex -> {
-                    LOGGER.log(Level.SEVERE, "Failed to remove contact on server", ex);
+                    LOGGER.error( "Failed to remove contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.remove.failed",
                             "Contact removal failed",

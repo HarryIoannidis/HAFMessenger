@@ -126,7 +126,7 @@ class DefaultRegistrationServiceTest {
 
         RegistrationService.RegistrationResult.Failure failure = assertInstanceOf(
                 RegistrationService.RegistrationResult.Failure.class, result);
-        assertEquals(DefaultRegistrationService.CONNECTION_FAILED_MESSAGE, failure.message());
+        assertEquals("Connection failed. Please try again.", failure.message());
     }
 
     private static RegistrationService.RegistrationCommand command(File idPhoto, File selfiePhoto) {

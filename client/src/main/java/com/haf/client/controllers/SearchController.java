@@ -4,6 +4,7 @@ import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.RankIconResolver;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
 import com.haf.shared.dto.UserSearchResultDTO;
@@ -24,8 +25,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the search view ({@code search.fxml}).
@@ -104,7 +105,7 @@ public class SearchController {
         void openProfile(UserSearchResultDTO result);
     }
 
-    private static final Logger LOGGER = Logger.getLogger(SearchController.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(SearchController.class);
 
     // Search results containers
     @FXML
@@ -122,12 +123,14 @@ public class SearchController {
     private final AtomicInteger renderGeneration = new AtomicInteger();
     private ContactActions contactActions = ContactActions.NO_OP;
     private Consumer<RuntimeIssue> runtimeIssueListener;
+    private ClientSettings settings = ClientSettings.defaults();
 
     /**
      * Initializes bindings, infinite scroll behavior, and idle search state.
      */
     @FXML
     public void initialize() {
+        viewModel.setPageSize(settings.getSearchResultsPerPage());
         bindViewModel();
         bindInfiniteScroll();
         viewModel.clearResults();
@@ -139,6 +142,7 @@ public class SearchController {
      * @param query the search term (name or reg number)
      */
     public void search(String query) {
+        viewModel.setPageSize(settings.getSearchResultsPerPage());
         viewModel.search(query);
     }
 
@@ -149,6 +153,7 @@ public class SearchController {
      * @param sortOptions selected sort field + direction
      */
     public void search(String query, SearchSortViewModel.SortOptions sortOptions) {
+        viewModel.setPageSize(settings.getSearchResultsPerPage());
         viewModel.search(query, sortOptions);
     }
 
@@ -181,6 +186,9 @@ public class SearchController {
         }
 
         resultsScrollPane.vvalueProperty().addListener((obs, oldValue, newValue) -> {
+            if (!settings.isSearchInfiniteScroll()) {
+                return;
+            }
             if (newValue != null && newValue.doubleValue() >= UiConstants.SEARCH_SCROLL_LOAD_THRESHOLD) {
                 viewModel.loadMore();
             }
@@ -254,7 +262,7 @@ public class SearchController {
                     populateCard(card, result);
                     loadedCards.add(card);
                 } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Could not load search_result_item.fxml", e);
+                    LOGGER.error( "Could not load search_result_item.fxml", e);
                 }
             }
 
@@ -289,7 +297,7 @@ public class SearchController {
                     populateCard(card, result);
                     loadedCards.add(card);
                 } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Could not load search_result_item.fxml", e);
+                    LOGGER.error( "Could not load search_result_item.fxml", e);
                 }
             }
 
@@ -310,6 +318,16 @@ public class SearchController {
      */
     public void setContactActions(ContactActions contactActions) {
         this.contactActions = Objects.requireNonNull(contactActions, "contactActions");
+    }
+
+    /**
+     * Injects active client settings for search behavior and paging.
+     *
+     * @param settings active settings instance
+     */
+    public void setSettings(ClientSettings settings) {
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
+        viewModel.setPageSize(this.settings.getSearchResultsPerPage());
     }
 
     /**
@@ -538,7 +556,7 @@ public class SearchController {
                 action,
                 () -> {
                     contactActions.addContact(result);
-                    LOGGER.log(Level.INFO, "Add contact requested for user: {0}", result.getUserId());
+                    LOGGER.info( "Add contact requested for user: {}", result.getUserId());
                     runIfPresent(onActionCompleted);
                 },
                 () -> confirmRemoveContact(result, onActionCompleted));
@@ -586,7 +604,7 @@ public class SearchController {
                 .dangerAction(true)
                 .onAction(() -> {
                     contactActions.removeContact(result.getUserId());
-                    LOGGER.log(Level.INFO, "Remove contact requested for user: {0}", result.getUserId());
+                    LOGGER.info( "Remove contact requested for user: {}", result.getUserId());
                     runIfPresent(onActionCompleted);
                 })
                 .show();
@@ -629,7 +647,7 @@ public class SearchController {
         if (result == null) {
             return;
         }
-        LOGGER.log(Level.INFO, "Start chat requested for user: {0}", result.getUserId());
+        LOGGER.info( "Start chat requested for user: {}", result.getUserId());
         contactActions.startChatWith(result);
     }
 
@@ -642,7 +660,7 @@ public class SearchController {
         if (result == null) {
             return;
         }
-        LOGGER.log(Level.INFO, "Open profile requested for user: {0}", result.getUserId());
+        LOGGER.info( "Open profile requested for user: {}", result.getUserId());
         contactActions.openProfile(result);
     }
 

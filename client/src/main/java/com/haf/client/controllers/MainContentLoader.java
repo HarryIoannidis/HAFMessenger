@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.UiConstants;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -10,14 +11,14 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Owns lazy loading/caching of main-content views (placeholder, search, chat).
  */
 final class MainContentLoader {
-    private static final Logger LOGGER = Logger.getLogger(MainContentLoader.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(MainContentLoader.class);
 
     enum ViewKind {
         PLACEHOLDER,
@@ -56,17 +57,21 @@ final class MainContentLoader {
     private final SearchController.ContactActions searchContactActions;
     private final ViewLoadFailureHandler viewLoadFailureHandler;
     private final ViewLoader viewLoader;
+    private final ClientSettings settings;
 
     private SearchController searchController;
     private Parent currentChatView;
     private ChatController currentChatController;
     private String currentChatRecipientId;
 
-    private volatile CompletableFuture<Parent> placeholderFuture = new CompletableFuture<>();
-    private volatile CompletableFuture<Parent> searchFuture = new CompletableFuture<>();
+    // Guarded by synchronized reset/ensure methods.
+    private CompletableFuture<Parent> placeholderFuture = new CompletableFuture<>();
+    private CompletableFuture<Parent> searchFuture = new CompletableFuture<>();
+    private CompletableFuture<LoadedView> chatFuture = new CompletableFuture<>();
     private final AtomicInteger chatLoadGeneration = new AtomicInteger();
     private final AtomicBoolean placeholderLoadingStarted = new AtomicBoolean(false);
     private final AtomicBoolean searchLoadingStarted = new AtomicBoolean(false);
+    private final AtomicBoolean chatLoadingStarted = new AtomicBoolean(false);
 
     /**
      * Creates a content loader using the default FXML loader strategy.
@@ -79,7 +84,14 @@ final class MainContentLoader {
     MainContentLoader(StackPane contentPane,
             SearchController.ContactActions searchContactActions,
             ViewLoadFailureHandler viewLoadFailureHandler) {
-        this(contentPane, searchContactActions, viewLoadFailureHandler, MainContentLoader::loadFromFxml);
+        this(contentPane, searchContactActions, viewLoadFailureHandler, ClientSettings.defaults(), MainContentLoader::loadFromFxml);
+    }
+
+    MainContentLoader(StackPane contentPane,
+            SearchController.ContactActions searchContactActions,
+            ViewLoadFailureHandler viewLoadFailureHandler,
+            ClientSettings settings) {
+        this(contentPane, searchContactActions, viewLoadFailureHandler, settings, MainContentLoader::loadFromFxml);
     }
 
     /**
@@ -94,11 +106,13 @@ final class MainContentLoader {
     MainContentLoader(StackPane contentPane,
             SearchController.ContactActions searchContactActions,
             ViewLoadFailureHandler viewLoadFailureHandler,
+            ClientSettings settings,
             ViewLoader viewLoader) {
         this.contentPane = Objects.requireNonNull(contentPane, "contentPane");
         this.searchContactActions = Objects.requireNonNull(searchContactActions, "searchContactActions");
         this.viewLoadFailureHandler = viewLoadFailureHandler == null ? (viewKind, error, retryAction) -> {
         } : viewLoadFailureHandler;
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
         this.viewLoader = Objects.requireNonNull(viewLoader, "viewLoader");
     }
 
@@ -106,9 +120,10 @@ final class MainContentLoader {
      * Starts background preloading for placeholder and search views.
      */
     void triggerPreloading() {
-        Thread.ofVirtual().name("view-preloader").start(() -> {
+        Thread.ofPlatform().daemon().name("view-preloader").start(() -> {
             ensurePlaceholderLoaded();
             ensureSearchLoaded();
+            ensureChatLoaded();
         });
     }
 
@@ -119,7 +134,7 @@ final class MainContentLoader {
         CompletableFuture<Parent> future = ensureSearchFutureReady();
         future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!searchLoadingStarted.get()) {
-            Thread.ofVirtual().name("search-view-loader").start(this::ensureSearchLoaded);
+            Thread.ofPlatform().daemon().name("search-view-loader").start(this::ensureSearchLoaded);
         }
     }
 
@@ -130,7 +145,7 @@ final class MainContentLoader {
         CompletableFuture<Parent> future = ensurePlaceholderFutureReady();
         future.thenAccept(view -> runOnUiThread(() -> contentPane.getChildren().setAll(view)));
         if (!placeholderLoadingStarted.get()) {
-            Thread.ofVirtual().name("placeholder-view-loader").start(this::ensurePlaceholderLoaded);
+            Thread.ofPlatform().daemon().name("placeholder-view-loader").start(this::ensurePlaceholderLoaded);
         }
     }
 
@@ -152,34 +167,28 @@ final class MainContentLoader {
             return;
         }
 
-        Runnable loadAction = () -> {
-            try {
-                LoadedView loaded = viewLoader.load(UiConstants.FXML_CHAT);
-                ChatController chatController = requireController(
-                        loaded.controller(),
-                        ChatController.class,
-                        UiConstants.FXML_CHAT);
-                Parent view = loaded.view();
-
+        CompletableFuture<LoadedView> future = ensureChatFutureReady();
+        future.thenAccept(loaded -> runOnUiThread(() -> applyLoadedChatView(recipientId, loadGeneration, loaded)));
+        future.exceptionally(error -> {
+            Throwable cause = error instanceof java.util.concurrent.CompletionException ce && ce.getCause() != null
+                    ? ce.getCause()
+                    : error;
+            runOnUiThread(() -> {
                 if (loadGeneration != chatLoadGeneration.get()) {
                     return;
                 }
-
-                chatController.setRecipient(recipientId);
-                currentChatView = view;
-                currentChatController = chatController;
-                currentChatRecipientId = recipientId;
-                contentPane.getChildren().setAll(view);
-            } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Could not load chat FXML", e);
+                LOGGER.error("Could not load chat FXML", cause);
                 notifyViewLoadFailure(
                         ViewKind.CHAT,
-                        e,
+                        cause,
                         () -> retryShowChat(recipientId));
-            }
-        };
+            });
+            return null;
+        });
 
-        runOnUiThread(loadAction);
+        if (!chatLoadingStarted.get()) {
+            Thread.ofPlatform().daemon().name("chat-view-loader").start(this::ensureChatLoaded);
+        }
     }
 
     /**
@@ -252,8 +261,7 @@ final class MainContentLoader {
      * @param recipientId recipient id to reopen
      */
     private void retryShowChat(String recipientId) {
-        currentChatView = null;
-        currentChatController = null;
+        resetChatCache();
         showChat(recipientId);
     }
 
@@ -272,6 +280,17 @@ final class MainContentLoader {
         searchController = null;
         searchFuture = new CompletableFuture<>();
         searchLoadingStarted.set(false);
+    }
+
+    /**
+     * Resets chat loading cache/controller and state flags.
+     */
+    private synchronized void resetChatCache() {
+        currentChatView = null;
+        currentChatController = null;
+        currentChatRecipientId = null;
+        chatFuture = new CompletableFuture<>();
+        chatLoadingStarted.set(false);
     }
 
     /**
@@ -295,6 +314,17 @@ final class MainContentLoader {
     }
 
     /**
+     * Ensures chat future is usable, recreating it when previous load failed and is
+     * idle.
+     *
+     * @return chat future ready for listeners/completion
+     */
+    private synchronized CompletableFuture<LoadedView> ensureChatFutureReady() {
+        chatFuture = refreshFutureIfFailed(chatFuture, chatLoadingStarted.get());
+        return chatFuture;
+    }
+
+    /**
      * Loads search view/controller once and completes the shared search future.
      */
     private void ensureSearchLoaded() {
@@ -310,11 +340,12 @@ final class MainContentLoader {
                     SearchController.class,
                     UiConstants.FXML_SEARCH);
             controller.setContactActions(searchContactActions);
+            controller.setSettings(settings);
 
             searchController = controller;
             future.complete(loaded.view());
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Could not load search FXML", e);
+            LOGGER.error( "Could not load search FXML", e);
             future.completeExceptionally(e);
             searchLoadingStarted.set(false);
             notifyViewLoadFailure(
@@ -337,7 +368,7 @@ final class MainContentLoader {
             LoadedView loaded = viewLoader.load(UiConstants.FXML_PLACEHOLDER);
             future.complete(loaded.view());
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Could not load placeholder FXML", e);
+            LOGGER.warn( "Could not load placeholder FXML", e);
             future.completeExceptionally(e);
             placeholderLoadingStarted.set(false);
             notifyViewLoadFailure(
@@ -345,6 +376,55 @@ final class MainContentLoader {
                     e,
                     this::retryShowPlaceholder);
         }
+    }
+
+    /**
+     * Loads chat view/controller once and completes the shared chat future.
+     */
+    private void ensureChatLoaded() {
+        if (chatLoadingStarted.getAndSet(true)) {
+            return;
+        }
+
+        CompletableFuture<LoadedView> future = ensureChatFutureReady();
+        try {
+            LoadedView loaded = viewLoader.load(UiConstants.FXML_CHAT);
+            ChatController controller = requireController(
+                    loaded.controller(),
+                    ChatController.class,
+                    UiConstants.FXML_CHAT);
+            controller.setSettings(settings);
+            future.complete(new LoadedView(loaded.view(), controller));
+        } catch (IOException e) {
+            future.completeExceptionally(e);
+            chatLoadingStarted.set(false);
+        }
+    }
+
+    /**
+     * Applies the loaded chat view/controller to the UI for the requested recipient.
+     *
+     * @param recipientId recipient id to activate
+     * @param loadGeneration generation token guarding stale loads
+     * @param loaded loaded chat view/controller tuple
+     */
+    private void applyLoadedChatView(String recipientId, int loadGeneration, LoadedView loaded) {
+        if (loadGeneration != chatLoadGeneration.get()) {
+            return;
+        }
+
+        ChatController chatController = requireControllerUnchecked(
+                loaded.controller(),
+                ChatController.class,
+                UiConstants.FXML_CHAT);
+        Parent view = loaded.view();
+
+        chatController.setSettings(settings);
+        chatController.setRecipient(recipientId);
+        currentChatView = view;
+        currentChatController = chatController;
+        currentChatRecipientId = recipientId;
+        contentPane.getChildren().setAll(view);
     }
 
     /**
@@ -376,6 +456,17 @@ final class MainContentLoader {
     }
 
     /**
+     * Runtime variant of {@link #requireController(Object, Class, String)} for
+     * already-loaded views.
+     */
+    private static <T> T requireControllerUnchecked(Object controller, Class<T> expectedType, String fxmlPath) {
+        if (!expectedType.isInstance(controller)) {
+            throw new IllegalStateException("Controller type mismatch for " + fxmlPath);
+        }
+        return expectedType.cast(controller);
+    }
+
+    /**
      * Loads an FXML file from classpath and returns its root and controller.
      *
      * @param fxmlPath classpath FXML path
@@ -384,7 +475,7 @@ final class MainContentLoader {
      */
     private static LoadedView loadFromFxml(String fxmlPath) throws IOException {
         var resource = MainContentLoader.class.getResource(fxmlPath);
-        LOGGER.log(Level.INFO, "Loading FXML: {0}", resource);
+        LOGGER.info( "Loading FXML: {}", resource);
         FXMLLoader loader = new FXMLLoader(resource);
         Parent view = loader.load();
         return new LoadedView(view, loader.getController());

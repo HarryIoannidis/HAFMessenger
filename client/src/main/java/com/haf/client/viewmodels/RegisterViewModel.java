@@ -11,7 +11,6 @@ import java.io.File;
 public class RegisterViewModel {
 
     // Allowed email domain
-    private static final String ALLOWED_DOMAIN = "@haf.gr";
     private static final int MIN_PASSWORD_LENGTH = 6;
 
     // Error messages
@@ -465,7 +464,7 @@ public class RegisterViewModel {
         if (!isValidEmailFormat(emailVal)) {
             return setFieldError(emailError, ERROR_EMAIL_INVALID_FORMAT);
         }
-        if (!emailVal.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+        if (!emailVal.toLowerCase().endsWith("@haf.gr")) {
             return setFieldError(emailError, ERROR_EMAIL_WRONG_DOMAIN);
         }
         return true;

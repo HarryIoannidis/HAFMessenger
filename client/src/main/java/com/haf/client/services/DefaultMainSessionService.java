@@ -6,9 +6,11 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.viewmodels.MessagesViewModel;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Default {@link MainSessionService} implementation backed by session
@@ -16,7 +18,7 @@ import java.util.logging.Logger;
  */
 public class DefaultMainSessionService implements MainSessionService {
 
-    private static final Logger LOGGER = Logger.getLogger(DefaultMainSessionService.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMainSessionService.class);
     static final int LOGOUT_TIMEOUT_SECONDS = 5;
 
     interface NetworkGateway {
@@ -29,10 +31,8 @@ public class DefaultMainSessionService implements MainSessionService {
 
         /**
          * Closes network transport resources.
-         *
-         * @throws Exception when close operation fails
          */
-        void close() throws Exception;
+        void close();
     }
 
     interface SessionChannel {
@@ -211,12 +211,12 @@ public class DefaultMainSessionService implements MainSessionService {
                 try {
                     performLogout();
                     completion.complete(null);
-                } catch (Throwable throwable) {
-                    completion.completeExceptionally(throwable);
+                } catch (Exception ex) {
+                    completion.completeExceptionally(ex);
                 }
             });
-        } catch (Throwable throwable) {
-            completion.completeExceptionally(throwable);
+        } catch (Exception ex) {
+            completion.completeExceptionally(ex);
         }
         return completion;
     }
@@ -230,14 +230,17 @@ public class DefaultMainSessionService implements MainSessionService {
         if (gateway != null) {
             try {
                 gateway.revokeSession().get(LOGOUT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Logout API call failed; continuing with local logout", ex);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                LOGGER.warn( "Logout API call interrupted; continuing with local logout", ex);
+            } catch (ExecutionException | TimeoutException ex) {
+                LOGGER.warn( "Logout API call failed; continuing with local logout", ex);
             }
 
             try {
                 gateway.close();
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error closing WebSocket on logout", ex);
+            } catch (RuntimeException ex) {
+                LOGGER.warn( "Error closing WebSocket on logout", ex);
             }
         }
 

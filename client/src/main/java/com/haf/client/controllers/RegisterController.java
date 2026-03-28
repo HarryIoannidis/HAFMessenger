@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.services.DefaultRegistrationService;
 import com.haf.client.services.RegistrationService;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
@@ -34,15 +35,15 @@ import org.kordamp.ikonli.javafx.FontIcon;
 import java.io.File;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Register view ({@code register.fxml}).
  */
 public class RegisterController {
 
-    private static final Logger LOGGER = Logger.getLogger(RegisterController.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(RegisterController.class);
 
     // Window chrome and layout containers
     @FXML
@@ -570,7 +571,7 @@ public class RegisterController {
             registerButton.setText(originalText);
 
             if (result instanceof RegistrationService.RegistrationResult.Success) {
-                LOGGER.log(Level.INFO, "Registration successful for: {0}", viewModel.getEmail());
+                LOGGER.info( "Registration successful for: {}", viewModel.getEmail());
                 navigateToLogin();
                 return;
             }
@@ -724,7 +725,7 @@ public class RegisterController {
             Image image = new Image(file.toURI().toString());
             previewThumbnail.setImage(image);
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to load image preview", e);
+            LOGGER.error( "Failed to load image preview", e);
         }
     }
 
@@ -1017,6 +1018,11 @@ public class RegisterController {
      * Shows exit confirmation popup and terminates process on confirmation.
      */
     private void confirmExitApplication() {
+        if (!ClientSettings.forCurrentUserOrDefaults().isGeneralConfirmExit()) {
+            javafx.application.Platform.exit();
+            System.exit(0);
+            return;
+        }
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
                 .title("Exit application")

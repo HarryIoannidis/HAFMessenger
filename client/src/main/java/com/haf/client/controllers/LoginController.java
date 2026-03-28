@@ -2,6 +2,7 @@ package com.haf.client.controllers;
 
 import com.haf.client.services.DefaultLoginService;
 import com.haf.client.services.LoginService;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
@@ -20,8 +21,8 @@ import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
 import java.util.prefs.Preferences;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the Login view.
@@ -30,12 +31,11 @@ import java.util.logging.Logger;
  */
 public class LoginController {
 
-    private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoginController.class);
     private static final String SIGN_IN_TEXT = "Sign In";
-    private static final String LOADING_CHATS_TEXT = "Loading chats...";
-    private static final String PREF_EMAIL = "remembered_email";
-    private static final String PREF_REMEMBER = "remember_me";
+    private static final String SIGNING_IN_TEXT = "Signing in...";
+    private static final String LOADING_COMPONENTS_TEXT = "Loading components...";
+
 
     // Window chrome and layout containers
     @FXML
@@ -282,7 +282,7 @@ public class LoginController {
 
         // Validation passed — attempt login
         viewModel.loadingProperty().set(true);
-        signInButton.setText("Signing in...");
+        signInButton.setText(SIGNING_IN_TEXT);
 
         Thread loginThread = new Thread(this::performLoginTask, "login-thread");
         loginThread.setDaemon(true);
@@ -332,19 +332,24 @@ public class LoginController {
      */
     private void handleLoginSuccess() {
         javafx.application.Platform.runLater(() -> {
-            signInButton.setText(LOADING_CHATS_TEXT);
+            signInButton.setText(LOADING_COMPONENTS_TEXT);
+            signInButton.applyCss();
+            signInButton.layout();
             savePreferences();
-            // Queue the view switch on the next UI turn so the loading label can render.
-            javafx.application.Platform.runLater(() -> {
+            // Allow one UI pulse so the loading label paints before heavy main-view load.
+            javafx.animation.PauseTransition switchDelay =
+                    new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+            switchDelay.setOnFinished(event -> {
                 try {
                     ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
-                    LOGGER.log(Level.INFO, () -> "Login successful for: " + viewModel.getEmail() + ", Socket connected.");
+                    LOGGER.info("Login successful for: {}, Socket connected.", viewModel.getEmail());
                 } catch (Exception ex) {
                     viewModel.loadingProperty().set(false);
                     signInButton.setText(SIGN_IN_TEXT);
                     showMainLoadFailurePopup(ex);
                 }
             });
+            switchDelay.play();
         });
     }
 
@@ -413,9 +418,9 @@ public class LoginController {
      */
     private void loadPreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
-        boolean remember = prefs.getBoolean(PREF_REMEMBER, false);
+        boolean remember = prefs.getBoolean("remember_me", false);
         if (remember) {
-            String savedEmail = prefs.get(PREF_EMAIL, "");
+            String savedEmail = prefs.get("remembered_email", "");
             viewModel.setEmail(savedEmail);
             viewModel.rememberCredentialsProperty().set(true);
             javafx.application.Platform.runLater(passwordField::requestFocus);
@@ -428,11 +433,11 @@ public class LoginController {
     private void savePreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
         if (viewModel.isRememberCredentials()) {
-            prefs.put(PREF_EMAIL, viewModel.getEmail());
-            prefs.putBoolean(PREF_REMEMBER, true);
+            prefs.put("remembered_email", viewModel.getEmail());
+            prefs.putBoolean("remember_me", true);
         } else {
-            prefs.remove(PREF_EMAIL);
-            prefs.putBoolean(PREF_REMEMBER, false);
+            prefs.remove("remembered_email");
+            prefs.putBoolean("remember_me", false);
         }
     }
 
@@ -525,6 +530,11 @@ public class LoginController {
      * Shows an exit confirmation popup and terminates the process on confirm.
      */
     private void confirmExitApplication() {
+        if (!ClientSettings.forCurrentUserOrDefaults().isGeneralConfirmExit()) {
+            javafx.application.Platform.exit();
+            System.exit(0);
+            return;
+        }
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
                 .title("Exit application")

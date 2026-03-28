@@ -3,8 +3,8 @@ package com.haf.client.network;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -27,7 +27,7 @@ import com.haf.client.exceptions.SslConfigurationException;
  * Features implement exponential backoff and certificate pinning.
  */
 public class WebSocketAdapter {
-    private static final Logger LOGGER = Logger.getLogger(WebSocketAdapter.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketAdapter.class);
 
     private final URI serverUri;
     private final String sessionId;
@@ -38,9 +38,6 @@ public class WebSocketAdapter {
     private volatile boolean isConnected = false;
 
     // HTTP constants
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String HTTPS_PROTOCOL = "https";
     private static final int CONNECTION_TIMEOUT_SECONDS = 5;
 
     // Inbound text accumulation (handle fragmented frames)
@@ -110,8 +107,8 @@ public class WebSocketAdapter {
         } catch (NumberFormatException ignored) {
             // Fall through to default.
         }
-        LOGGER.log(Level.WARNING,
-                "Invalid value for system property haf.ws.maxInboundBytes: {0}. Falling back to default: {1}",
+        LOGGER.warn(
+                "Invalid value for system property haf.ws.maxInboundBytes: {}. Falling back to default: {}",
                 new Object[] { configured, DEFAULT_MAX_INBOUND_MESSAGE_BYTES });
         return DEFAULT_MAX_INBOUND_MESSAGE_BYTES;
     }
@@ -124,7 +121,7 @@ public class WebSocketAdapter {
      */
     public WebSocketAdapter(URI serverUri, String sessionId) {
         this(serverUri, sessionId, createDefaultHttpClient(),
-                runnable -> CompletableFuture.runAsync(runnable),
+                CompletableFuture::runAsync,
                 Thread::sleep);
     }
 
@@ -137,7 +134,7 @@ public class WebSocketAdapter {
      */
     WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient) {
         this(serverUri, sessionId, httpClient,
-                runnable -> CompletableFuture.runAsync(runnable),
+                CompletableFuture::runAsync,
                 Thread::sleep);
     }
 
@@ -222,7 +219,7 @@ public class WebSocketAdapter {
 
         try {
             CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
-                    .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
+                    .header("Authorization", "Bearer " + sessionId)
                     .buildAsync(serverUri, listener);
 
             // Wait for connection to complete (bounded by configured timeout)
@@ -261,7 +258,7 @@ public class WebSocketAdapter {
         // Must rewrite scheme from wss to https for standard HTTP calls
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
                     requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
@@ -270,7 +267,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
+                .header("Authorization", "Bearer " + sessionId)
                 .GET()
                 .build();
 
@@ -288,7 +285,7 @@ public class WebSocketAdapter {
     public CompletableFuture<String> postAuthenticated(String path, String body) {
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
                     requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
@@ -297,7 +294,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
+                .header("Authorization", "Bearer " + sessionId)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -316,7 +313,7 @@ public class WebSocketAdapter {
     public CompletableFuture<String> deleteAuthenticated(String path) {
         URI requestUri = serverUri.resolve(path);
         try {
-            requestUri = new URI(HTTPS_PROTOCOL, requestUri.getUserInfo(), requestUri.getHost(), 8443,
+            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
                     requestUri.getPath(),
                     requestUri.getQuery(), requestUri.getFragment());
         } catch (java.net.URISyntaxException e) {
@@ -325,7 +322,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionId)
+                .header("Authorization", "Bearer " + sessionId)
                 .DELETE()
                 .build();
 
@@ -343,7 +340,7 @@ public class WebSocketAdapter {
                 .thenApply(response -> validateResponse(response, method))
                 .exceptionallyCompose(error -> {
                     if (isConnectionError(error)) {
-                        LOGGER.log(Level.WARNING, "HTTP {0} failed with connection error, retrying once", method);
+                        LOGGER.warn( "HTTP {} failed with connection error, retrying once", method);
                         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                                 .thenApply(response -> validateResponse(response, method));
                     }

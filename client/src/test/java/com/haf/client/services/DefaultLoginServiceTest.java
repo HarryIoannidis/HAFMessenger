@@ -89,7 +89,7 @@ class DefaultLoginServiceTest {
         LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
 
         LoginService.LoginResult.Failure failure = assertInstanceOf(LoginService.LoginResult.Failure.class, result);
-        assertEquals(DefaultLoginService.CONNECTION_FAILED_MESSAGE, failure.message());
+        assertEquals("Connection failed. Please try again.", failure.message());
         assertEquals(DefaultLoginService.MAX_LOGIN_ATTEMPTS, attempts.get());
         assertEquals(DefaultLoginService.MAX_LOGIN_ATTEMPTS - 1, sleepCalls.get());
     }
@@ -114,7 +114,7 @@ class DefaultLoginServiceTest {
         LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
 
         LoginService.LoginResult.Failure failure = assertInstanceOf(LoginService.LoginResult.Failure.class, result);
-        assertEquals(DefaultLoginService.SECURE_SESSION_FAILED_MESSAGE, failure.message());
+        assertEquals("Failed to initialize secure session locally.", failure.message());
         assertEquals(DefaultLoginService.MAX_LOGIN_ATTEMPTS, attempts.get());
         assertEquals(DefaultLoginService.MAX_LOGIN_ATTEMPTS, bootstrapCalls.get());
         assertEquals(DefaultLoginService.MAX_LOGIN_ATTEMPTS - 1, sleepCalls.get());

@@ -24,16 +24,13 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.Base64;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultRegistrationService implements RegistrationService {
 
-    private static final Logger LOGGER = Logger.getLogger(DefaultRegistrationService.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRegistrationService.class);
 
-    static final String REGISTRATION_INTERRUPTED_MESSAGE = "Registration interrupted.";
-    static final String CONNECTION_FAILED_MESSAGE = "Connection failed. Please try again.";
-    static final String REGISTRATION_FAILED_MESSAGE = "Registration failed.";
 
     private static final URI ADMIN_KEY_URI = URI.create("https://localhost:8443/api/v1/config/admin-key");
     private static final URI REGISTER_URI = URI.create("https://localhost:8443/api/v1/register");
@@ -167,7 +164,7 @@ public class DefaultRegistrationService implements RegistrationService {
     @Override
     public RegistrationResult register(RegistrationCommand command) {
         if (command == null) {
-            return new RegistrationResult.Failure(CONNECTION_FAILED_MESSAGE);
+            return new RegistrationResult.Failure("Connection failed. Please try again.");
         }
         try {
             KeyPair registrationKeyPair = keyPairProvider.generate();
@@ -188,13 +185,13 @@ public class DefaultRegistrationService implements RegistrationService {
             return new RegistrationResult.Rejected(resolveRejectedMessage(response));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new RegistrationResult.Failure(REGISTRATION_INTERRUPTED_MESSAGE);
+            return new RegistrationResult.Failure("Registration interrupted.");
         } catch (RegistrationFlowException e) {
-            LOGGER.log(Level.SEVERE, "Registration failed", e);
-            return new RegistrationResult.Failure(CONNECTION_FAILED_MESSAGE);
+            LOGGER.error( "Registration failed", e);
+            return new RegistrationResult.Failure("Connection failed. Please try again.");
         } catch (RuntimeException e) {
-            LOGGER.log(Level.SEVERE, "Registration failed", e);
-            return new RegistrationResult.Failure(CONNECTION_FAILED_MESSAGE);
+            LOGGER.error( "Registration failed", e);
+            return new RegistrationResult.Failure("Connection failed. Please try again.");
         }
     }
 
@@ -211,10 +208,10 @@ public class DefaultRegistrationService implements RegistrationService {
         } catch (InterruptedException interruptedException) {
             throw interruptedException;
         } catch (RegistrationFlowException ex) {
-            LOGGER.log(Level.WARNING, "Failed to fetch admin public key", ex);
+            LOGGER.warn( "Failed to fetch admin public key", ex);
             return null;
         } catch (RuntimeException ex) {
-            LOGGER.log(Level.WARNING, "Failed to fetch admin public key", ex);
+            LOGGER.warn( "Failed to fetch admin public key", ex);
             return null;
         }
     }
@@ -254,7 +251,7 @@ public class DefaultRegistrationService implements RegistrationService {
             char[] passphrase = password == null ? new char[0] : password.toCharArray();
             keystoreSaver.save(registrationKeyPair, userId, passphrase);
         } catch (RegistrationFlowException e) {
-            LOGGER.log(Level.SEVERE, "Failed to save Keystore after successful registration", e);
+            LOGGER.error( "Failed to save Keystore after successful registration", e);
         }
     }
 
@@ -301,7 +298,7 @@ public class DefaultRegistrationService implements RegistrationService {
         if (response != null && response.getError() != null) {
             return response.getError();
         }
-        return REGISTRATION_FAILED_MESSAGE;
+        return "Registration failed.";
     }
 
     /**

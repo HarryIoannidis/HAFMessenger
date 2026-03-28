@@ -2,11 +2,13 @@ package com.haf.client.controllers;
 
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
+import com.haf.client.core.Launcher;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.models.MessageVM;
 import com.haf.client.services.DefaultMainSessionService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.RuntimeIssue;
@@ -23,12 +25,14 @@ import javafx.fxml.FXML;
 import javafx.geometry.Bounds;
 import javafx.collections.ListChangeListener;
 import javafx.event.EventHandler;
+import javafx.animation.PauseTransition;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListView;
 import javafx.scene.Scene;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.effect.GaussianBlur;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -39,27 +43,25 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
+import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import javafx.util.Duration;
 
 /**
  * Controller for the Main application view ({@code main.fxml}).
  */
 public class MainController implements SearchController.ContactActions {
 
-    private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
-    private static final String NAV_ITEM_ICON = "nav-item-icon";
-    private static final String NAV_ITEM_ICON_ACTIVE = "nav-item-icon-active";
-    private static final String PROFILE_POPUP_KEY = "profile-popup";
+    private static final Logger LOGGER = LoggerFactory.getLogger(MainController.class);
     private static final long RUNTIME_ISSUE_POPUP_COOLDOWN_MS = 10_000L;
     private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
-    private static final String MESSAGING_RUNTIME_ISSUE_PREFIX = "messaging.";
-    private static final String MESSAGING_RETRY_FAILED_KEY = "messaging.retry.failed";
+    private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
 
     // Window chrome
     @FXML
@@ -137,6 +139,9 @@ public class MainController implements SearchController.ContactActions {
             CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
+    private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
+    private PauseTransition instantSearchDebounce;
+    private final GaussianBlur privacyBlurEffect = new GaussianBlur();
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
     private SearchController runtimeIssueSearchController;
@@ -172,7 +177,7 @@ public class MainController implements SearchController.ContactActions {
      */
     @FXML
     public void initialize() {
-        contentLoader = new MainContentLoader(contentPane, this, this::handleViewLoadFailure);
+        contentLoader = new MainContentLoader(contentPane, this, this::handleViewLoadFailure, settings);
         bindViewModel();
         bindSelectedContactProfileSync();
         setupWindowControls();
@@ -185,6 +190,8 @@ public class MainController implements SearchController.ContactActions {
         setupSearchFilterUi();
         setupSearchField();
         setupProfilePopupTrigger();
+        applyImmediateSettings();
+        registerSettingsListener();
         registerRuntimeIssueListeners();
         registerPresenceListener();
         registerIncomingMessageListener();
@@ -197,8 +204,12 @@ public class MainController implements SearchController.ContactActions {
         // Fetch contacts from server
         viewModel.fetchContacts();
 
-        // Messages tab is active by default
-        activateMessagesTab();
+        // Restore tab based on settings policy.
+        if (settings.isGeneralRestoreLastTab() && "search".equals(settings.getLastActiveTab())) {
+            activateSearchTab();
+        } else {
+            activateMessagesTab();
+        }
     }
 
     /**
@@ -295,16 +306,70 @@ public class MainController implements SearchController.ContactActions {
         // Enter key triggers search flow through the filter UI state machine.
         toolbarSearchField.setOnAction(e -> triggerSearchFlow());
 
-        // Action button: search or clear depending on state
-        if (searchActionButton != null) {
-            searchActionButton.setOnAction(e -> {
-                if (viewModel.hasSearchResultsProperty().get()) {
-                    clearSearch();
-                } else {
-                    triggerSearchFlow();
-                }
-            });
+        setupSearchActionButton();
+
+        toolbarSearchField.textProperty().addListener((obs, oldValue, newValue) ->
+                handleSearchFieldTextChanged(newValue));
+    }
+
+    /**
+     * Wires the search action button to toggle between search and clear actions
+     * based on current search state.
+     */
+    private void setupSearchActionButton() {
+        if (searchActionButton == null) {
+            return;
         }
+        searchActionButton.setOnAction(e -> {
+            if (viewModel.hasSearchResultsProperty().get()) {
+                clearSearch();
+            } else {
+                triggerSearchFlow();
+            }
+        });
+    }
+
+    /**
+     * Handles text changes in the search field by scheduling a debounced instant
+     * search when the feature is enabled and the search tab is active.
+     *
+     * @param newValue updated search field text
+     */
+    private void handleSearchFieldTextChanged(String newValue) {
+        if (!settings.isSearchInstantOnType()
+                || viewModel.activeTabProperty().get() != MainViewModel.MainTab.SEARCH) {
+            return;
+        }
+
+        PauseTransition debounce = getInstantSearchDebounce();
+        debounce.stop();
+        debounce.setOnFinished(event -> handleInstantSearchDebounceFinished(newValue));
+        debounce.playFromStart();
+    }
+
+    /**
+     * Executes the instant search or clears results when the debounce timer fires.
+     *
+     * @param text search field text at the time the debounce was scheduled
+     */
+    private void handleInstantSearchDebounceFinished(String text) {
+        if (!settings.isSearchInstantOnType()
+                || viewModel.activeTabProperty().get() != MainViewModel.MainTab.SEARCH) {
+            return;
+        }
+        String normalized = text == null ? "" : text.trim();
+        if (normalized.isBlank()) {
+            clearSearch();
+            return;
+        }
+        triggerSearchFlow();
+    }
+
+    private PauseTransition getInstantSearchDebounce() {
+        if (instantSearchDebounce == null) {
+            instantSearchDebounce = new PauseTransition(Duration.millis(SEARCH_INSTANT_DEBOUNCE_MS));
+        }
+        return instantSearchDebounce;
     }
 
     /**
@@ -401,7 +466,12 @@ public class MainController implements SearchController.ContactActions {
      * current chat/placeholder content.
      */
     private void activateMessagesTab() {
+        MainViewModel.MainTab previousTab = viewModel.activeTabProperty().get();
+        if (previousTab == MainViewModel.MainTab.SEARCH && !settings.isSearchPreserveLastQuery()) {
+            clearSearch();
+        }
         viewModel.setActiveTab(MainViewModel.MainTab.MESSAGES);
+        settings.setLastActiveTab("messages");
         indicatorMessages.setVisible(true);
         indicatorSearch.setVisible(false);
 
@@ -432,6 +502,7 @@ public class MainController implements SearchController.ContactActions {
      */
     private void activateSearchTab() {
         viewModel.setActiveTab(MainViewModel.MainTab.SEARCH);
+        settings.setLastActiveTab("search");
         indicatorMessages.setVisible(false);
         indicatorSearch.setVisible(true);
 
@@ -459,22 +530,22 @@ public class MainController implements SearchController.ContactActions {
      */
     private void updateNavStyles(boolean messagesActive) {
         if (messagesActive) {
-            iconMessages.getStyleClass().remove(NAV_ITEM_ICON);
-            if (!iconMessages.getStyleClass().contains(NAV_ITEM_ICON_ACTIVE)) {
-                iconMessages.getStyleClass().add(NAV_ITEM_ICON_ACTIVE);
+            iconMessages.getStyleClass().remove("nav-item-icon");
+            if (!iconMessages.getStyleClass().contains("nav-item-icon-active")) {
+                iconMessages.getStyleClass().add("nav-item-icon-active");
             }
-            iconSearch.getStyleClass().remove(NAV_ITEM_ICON_ACTIVE);
-            if (!iconSearch.getStyleClass().contains(NAV_ITEM_ICON)) {
-                iconSearch.getStyleClass().add(NAV_ITEM_ICON);
+            iconSearch.getStyleClass().remove("nav-item-icon-active");
+            if (!iconSearch.getStyleClass().contains("nav-item-icon")) {
+                iconSearch.getStyleClass().add("nav-item-icon");
             }
         } else {
-            iconSearch.getStyleClass().remove(NAV_ITEM_ICON);
-            if (!iconSearch.getStyleClass().contains(NAV_ITEM_ICON_ACTIVE)) {
-                iconSearch.getStyleClass().add(NAV_ITEM_ICON_ACTIVE);
+            iconSearch.getStyleClass().remove("nav-item-icon");
+            if (!iconSearch.getStyleClass().contains("nav-item-icon-active")) {
+                iconSearch.getStyleClass().add("nav-item-icon-active");
             }
-            iconMessages.getStyleClass().remove(NAV_ITEM_ICON_ACTIVE);
-            if (!iconMessages.getStyleClass().contains(NAV_ITEM_ICON)) {
-                iconMessages.getStyleClass().add(NAV_ITEM_ICON);
+            iconMessages.getStyleClass().remove("nav-item-icon-active");
+            if (!iconMessages.getStyleClass().contains("nav-item-icon")) {
+                iconMessages.getStyleClass().add("nav-item-icon");
             }
         }
     }
@@ -488,7 +559,7 @@ public class MainController implements SearchController.ContactActions {
         profileNameText.setText(contact.name());
         String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
         profileActivenessText.setText(activenessLabel);
-        boolean hasActivenessLabel = !activenessLabel.isEmpty();
+        boolean hasActivenessLabel = !settings.isPrivacyHidePresenceIndicators() && !activenessLabel.isEmpty();
         profileActivenessText.setVisible(hasActivenessLabel);
         profileActivenessText.setManaged(hasActivenessLabel);
         profileActivenessCircle.setVisible(hasActivenessLabel);
@@ -557,7 +628,7 @@ public class MainController implements SearchController.ContactActions {
     private void openSelfProfilePopup() {
         UserProfileInfo profile = CurrentUserSession.get();
         if (profile == null) {
-            LOGGER.warning("Self profile is not available in session.");
+            LOGGER.warn("Self profile is not available in session.");
             return;
         }
         openProfilePopup(profile.asSelfProfile(true));
@@ -574,7 +645,7 @@ public class MainController implements SearchController.ContactActions {
         }
 
         ViewRouter.showPopup(
-                PROFILE_POPUP_KEY,
+                "profile-popup",
                 UiConstants.FXML_PROFILE,
                 ProfileController.class,
                 controller -> controller.showProfile(profile));
@@ -588,7 +659,10 @@ public class MainController implements SearchController.ContactActions {
                 UiConstants.POPUP_SETTINGS,
                 UiConstants.FXML_SETTINGS,
                 SettingsController.class,
-                null);
+                controller -> {
+                    controller.setSettings(settings);
+                    controller.setRestartRequestHandler(this::requestAppRestart);
+                });
     }
 
     /**
@@ -601,9 +675,13 @@ public class MainController implements SearchController.ContactActions {
                 ViewRouter.preloadPopup(
                         UiConstants.POPUP_SETTINGS,
                         UiConstants.FXML_SETTINGS,
-                        SettingsController.class);
+                        SettingsController.class,
+                        controller -> {
+                            controller.setSettings(settings);
+                            controller.setRestartRequestHandler(this::requestAppRestart);
+                        });
             } catch (RuntimeException ex) {
-                LOGGER.log(Level.FINE, "Settings popup preload skipped: {0}", ex.getMessage());
+                LOGGER.debug( "Settings popup preload skipped: {}", ex.getMessage());
             }
         });
     }
@@ -1016,6 +1094,10 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
 
+        if (settings.isGeneralRememberWindowState()) {
+            restoreWindowState(stage);
+        }
+
         if (minimizeButton != null) {
             minimizeButton.setOnAction(e -> stage.setIconified(true));
         }
@@ -1050,6 +1132,79 @@ public class MainController implements SearchController.ContactActions {
                 stage.setY(event.getScreenY() - yOffset);
             });
         }
+
+        stage.focusedProperty().addListener((obs, oldFocused, newFocused) -> applyPrivacyBlur(Boolean.TRUE.equals(newFocused)));
+        applyPrivacyBlur(stage.isFocused());
+    }
+
+    private void applyImmediateSettings() {
+        applyContactCellSettings();
+        applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
+    }
+
+    private void registerSettingsListener() {
+        settings.addListener(key -> Platform.runLater(() -> {
+            switch (key) {
+                case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP, PRIVACY_HIDE_PRESENCE_INDICATORS ->
+                        applyContactCellSettings();
+                case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
+                    Stage stage = ViewRouter.getMainStage();
+                    applyPrivacyBlur(stage == null || stage.isFocused());
+                }
+                default -> {
+                    // Other settings are read lazily by their owning controllers.
+                }
+            }
+        }));
+    }
+
+    private void applyContactCellSettings() {
+        ContactCell.setShowUnreadBadges(settings.isNotificationsShowUnreadBadges());
+        ContactCell.setUnreadBadgeCap(settings.getNotificationsBadgeCap());
+        ContactCell.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators());
+        if (contactsList != null) {
+            contactsList.refresh();
+        }
+        refreshProfilePanelForSelectedContact();
+    }
+
+    private void applyPrivacyBlur(boolean focused) {
+        if (rootContainer == null) {
+            return;
+        }
+        if (!focused && settings.isPrivacyBlurOnFocusLoss()) {
+            privacyBlurEffect.setRadius(Math.max(1.0, settings.getPrivacyBlurStrength() * 2.0));
+            rootContainer.setEffect(privacyBlurEffect);
+            return;
+        }
+        rootContainer.setEffect(null);
+    }
+
+    private void restoreWindowState(Stage stage) {
+        ClientSettings.WindowState state = settings.readWindowState();
+        if (stage == null || state == null) {
+            return;
+        }
+        if (state.width() > 0) {
+            stage.setWidth(state.width());
+        }
+        if (state.height() > 0) {
+            stage.setHeight(state.height());
+        }
+        if (!Double.isNaN(state.x())) {
+            stage.setX(state.x());
+        }
+        if (!Double.isNaN(state.y())) {
+            stage.setY(state.y());
+        }
+        stage.setMaximized(state.maximized());
+    }
+
+    private void persistWindowState(Stage stage) {
+        if (stage == null || !settings.isGeneralRememberWindowState()) {
+            return;
+        }
+        settings.writeWindowState(stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight(), stage.isMaximized());
     }
 
     /**
@@ -1104,18 +1259,75 @@ public class MainController implements SearchController.ContactActions {
      */
     private void handleLogout() {
         LOGGER.info("Logging out...");
+        persistWindowState(ViewRouter.getMainStage());
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                LOGGER.log(Level.WARNING, "Logout completed with errors", throwable);
+                LOGGER.warn( "Logout completed with errors", throwable);
             }
             Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
         });
+    }
+
+    private void requestAppRestart() {
+        if (!shutdownInProgress.compareAndSet(false, true)) {
+            return;
+        }
+        persistWindowState(ViewRouter.getMainStage());
+
+        mainSessionService.logout().whenComplete((unused, throwable) -> {
+            if (throwable != null) {
+                LOGGER.warn( "Logout before restart completed with errors.", throwable);
+            }
+
+            boolean relaunched = relaunchClientProcess();
+            if (!relaunched) {
+                shutdownInProgress.set(false);
+                Platform.runLater(this::showRestartFailurePopup);
+                return;
+            }
+
+            Platform.runLater(() -> {
+                Platform.exit();
+                System.exit(0);
+            });
+        });
+    }
+
+    private boolean relaunchClientProcess() {
+        try {
+            String javaBin = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+            String classpath = System.getProperty("java.class.path");
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    javaBin,
+                    "-cp",
+                    classpath,
+                    Launcher.class.getName());
+            processBuilder.start();
+            return true;
+        } catch (Exception ex) {
+            LOGGER.warn( "Failed to relaunch client process.", ex);
+            return false;
+        }
+    }
+
+    private void showRestartFailurePopup() {
+        PopupMessageBuilder.create()
+                .popupKey("popup-restart-failed")
+                .title("Restart failed")
+                .message("Could not restart the app automatically. Please restart it manually.")
+                .actionText("OK")
+                .singleAction(true)
+                .show();
     }
 
     /**
      * Displays confirmation popup before terminating the application.
      */
     private void confirmExitApplication() {
+        if (!settings.isGeneralConfirmExit()) {
+            exitApplication();
+            return;
+        }
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_EXIT_APP)
                 .title("Exit application")
@@ -1205,19 +1417,20 @@ public class MainController implements SearchController.ContactActions {
         if (!shutdownInProgress.compareAndSet(false, true)) {
             return;
         }
+        persistWindowState(ViewRouter.getMainStage());
 
         CompletableFuture<Void> logoutFuture;
         try {
             logoutFuture = mainSessionService.logout()
                     .orTimeout(LOGOUT_ON_EXIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Failed to start logout on app exit; continuing shutdown.", ex);
+            LOGGER.warn( "Failed to start logout on app exit; continuing shutdown.", ex);
             logoutFuture = CompletableFuture.completedFuture(null);
         }
 
         logoutFuture.whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                LOGGER.log(Level.WARNING, "Logout on app exit completed with errors.", throwable);
+                LOGGER.warn( "Logout on app exit completed with errors.", throwable);
             }
             Platform.runLater(() -> {
                 Platform.exit();
@@ -1303,6 +1516,9 @@ public class MainController implements SearchController.ContactActions {
                 handleMessagingRuntimeIssue(issue);
                 return;
             }
+            if (!settings.isNotificationsShowRuntimePopups()) {
+                return;
+            }
             if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {
                 return;
             }
@@ -1331,10 +1547,7 @@ public class MainController implements SearchController.ContactActions {
      * @param issue runtime issue originating from messaging/chat flows
      */
     private void handleMessagingRuntimeIssue(RuntimeIssue issue) {
-        LOGGER.log(
-                Level.WARNING,
-                "Chat runtime issue: key={0}, message={1}",
-                new Object[] { issue.dedupeKey(), issue.message() });
+        LOGGER.warn("Chat runtime issue: key={}, message={}", issue.dedupeKey(), issue.message());
 
         if (!shouldAutoRetryMessagingIssue(issue)) {
             return;
@@ -1342,7 +1555,7 @@ public class MainController implements SearchController.ContactActions {
 
         String autoRetryKey = issue.dedupeKey() + ".auto-retry";
         if (!chatAutoRetryGate.shouldShow(autoRetryKey)) {
-            LOGGER.log(Level.FINE, "Skipping duplicate chat auto-retry for key: {0}", issue.dedupeKey());
+            LOGGER.debug( "Skipping duplicate chat auto-retry for key: {}", issue.dedupeKey());
             return;
         }
 
@@ -1359,7 +1572,7 @@ public class MainController implements SearchController.ContactActions {
         if (issue == null || issue.dedupeKey() == null) {
             return false;
         }
-        return issue.dedupeKey().startsWith(MESSAGING_RUNTIME_ISSUE_PREFIX);
+        return issue.dedupeKey().startsWith("messaging.");
     }
 
     /**
@@ -1369,7 +1582,7 @@ public class MainController implements SearchController.ContactActions {
      * @return {@code true} when automatic retry should run
      */
     static boolean shouldAutoRetryMessagingIssue(RuntimeIssue issue) {
-        return isMessagingRuntimeIssue(issue) && !MESSAGING_RETRY_FAILED_KEY.equals(issue.dedupeKey());
+        return isMessagingRuntimeIssue(issue) && !"messaging.retry.failed".equals(issue.dedupeKey());
     }
 
     /**
@@ -1384,7 +1597,7 @@ public class MainController implements SearchController.ContactActions {
         try {
             retryAction.run();
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Runtime issue retry action failed", ex);
+            LOGGER.warn( "Runtime issue retry action failed", ex);
         }
     }
 
@@ -1410,7 +1623,7 @@ public class MainController implements SearchController.ContactActions {
     private void startMessageReceiving() {
         MessagesViewModel chatViewModel = ChatSession.get();
         if (chatViewModel == null) {
-            LOGGER.warning("Cannot start message receiving: chat session is not initialized.");
+            LOGGER.warn("Cannot start message receiving: chat session is not initialized.");
             return;
         }
         // WebSocket connect can block briefly; start it off the JavaFX thread.

@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ImageSaveSupport;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.PopupMessageSpec;
@@ -22,18 +23,17 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for image preview popup window.
  */
 public class PreviewController {
 
-    private static final Logger LOGGER = Logger.getLogger(PreviewController.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(PreviewController.class);
     private static final double MAX_PREVIEW_WIDTH = 500.0;
     private static final double MAX_PREVIEW_HEIGHT = 500.0;
-    private static final double HOVER_ZOOM_SCALE = 1.15;
 
     // Popup window controls
     @FXML
@@ -60,6 +60,7 @@ public class PreviewController {
     private String imageUriOrPath;
     private String suggestedFileName;
     private boolean downloadAllowed;
+    private ClientSettings settings = ClientSettings.defaults();
 
     /**
      * Initializes window controls and download button wiring.
@@ -90,6 +91,15 @@ public class PreviewController {
     }
 
     /**
+     * Injects active settings for media preview behavior.
+     *
+     * @param settings active settings instance
+     */
+    public void setSettings(ClientSettings settings) {
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
+    }
+
+    /**
      * Updates visibility and enabled state for the download button.
      *
      * @param allowed whether the current preview source can be downloaded
@@ -98,9 +108,10 @@ public class PreviewController {
         if (downloadButton == null) {
             return;
         }
-        downloadButton.setVisible(true);
-        downloadButton.setManaged(true);
-        downloadButton.setDisable(!allowed);
+        boolean visible = settings.isMediaShowDownloadButton();
+        downloadButton.setVisible(visible);
+        downloadButton.setManaged(visible);
+        downloadButton.setDisable(!allowed || !visible);
     }
 
     /**
@@ -145,7 +156,7 @@ public class PreviewController {
                 }
             });
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Failed to load preview image", ex);
+            LOGGER.warn( "Failed to load preview image", ex);
             setSpinnerVisible(false);
             showAttachmentError("Could not load image preview.");
         }
@@ -176,13 +187,29 @@ public class PreviewController {
      * Handles user-initiated image download from the preview popup.
      */
     private void handleDownloadClick() {
+        if (settings.isPrivacyConfirmAttachmentOpen()) {
+            PopupMessageBuilder.create()
+                    .popupKey("popup-confirm-attachment-open")
+                    .title("Open attachment")
+                    .message("Open or download this attachment?")
+                    .actionText("Continue")
+                    .cancelText("Cancel")
+                    .showCancel(true)
+                    .onAction(this::handleDownloadClickNow)
+                    .show();
+            return;
+        }
+        handleDownloadClickNow();
+    }
+
+    private void handleDownloadClickNow() {
         if (!downloadAllowed) {
             return;
         }
 
         Path sourcePath = ImageSaveSupport.resolveLocalSourcePath(imageUriOrPath);
         if (sourcePath == null || !Files.exists(sourcePath)) {
-            LOGGER.warning("Image source path is unavailable for download.");
+            LOGGER.warn("Image source path is unavailable for download.");
             showAttachmentError("Image source file could not be found.");
             return;
         }
@@ -204,7 +231,7 @@ public class PreviewController {
             }
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Failed to save image preview download", ex);
+            LOGGER.warn( "Failed to save image preview download", ex);
             showAttachmentError("Could not save image. Please try again.");
         }
     }
@@ -286,6 +313,10 @@ public class PreviewController {
         if (event == null || previewImageView == null || previewImageView.getImage() == null) {
             return;
         }
+        if (!settings.isMediaHoverZoom()) {
+            resetHoverZoom();
+            return;
+        }
 
         double width = previewImageView.getFitWidth();
         double height = previewImageView.getFitHeight();
@@ -293,14 +324,15 @@ public class PreviewController {
             return;
         }
 
-        previewImageView.setScaleX(HOVER_ZOOM_SCALE);
-        previewImageView.setScaleY(HOVER_ZOOM_SCALE);
+        double hoverZoomScale = settings.getMediaHoverZoomScale();
+        previewImageView.setScaleX(hoverZoomScale);
+        previewImageView.setScaleY(hoverZoomScale);
 
         double xRatio = clamp(event.getX() / width);
         double yRatio = clamp(event.getY() / height);
 
-        double maxTranslateX = (width * HOVER_ZOOM_SCALE - width) / 2.0;
-        double maxTranslateY = (height * HOVER_ZOOM_SCALE - height) / 2.0;
+        double maxTranslateX = (width * hoverZoomScale - width) / 2.0;
+        double maxTranslateY = (height * hoverZoomScale - height) / 2.0;
 
         previewImageView.setTranslateX((0.5 - xRatio) * maxTranslateX * 2.0);
         previewImageView.setTranslateY((0.5 - yRatio) * maxTranslateY * 2.0);

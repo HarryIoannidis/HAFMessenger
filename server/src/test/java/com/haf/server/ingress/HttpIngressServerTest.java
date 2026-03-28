@@ -60,7 +60,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -120,7 +119,8 @@ class HttpIngressServerTest {
         presenceRegistry = new PresenceRegistry();
 
         when(config.getHttpPort()).thenReturn(0);
-        lenient().when(config.getAdminPublicKeyPem()).thenReturn("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----");
+        lenient().when(config.getAdminPublicKeyPem())
+                .thenReturn("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----");
 
         lenient().when(config.getSearchPageSize()).thenReturn(20);
         lenient().when(config.getSearchMaxPageSize()).thenReturn(50);
@@ -587,7 +587,8 @@ class HttpIngressServerTest {
         authenticate(exchange, "sess-contacts", "caller");
 
         when(contactDAO.getContacts("caller")).thenReturn(List.of(
-                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002", "2026-01-01")));
+                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
+                        "2026-01-01")));
 
         handler.handle(exchange.exchange());
 
@@ -741,7 +742,8 @@ class HttpIngressServerTest {
 
         ExchangeHarness initExchange = newExchange("POST", "/api/v1/attachments/init", JsonCodec.toJson(initReq));
         authenticate(initExchange, "sess-attach", "caller");
-        when(attachmentDAO.initUpload("caller", "recipient-1", "application/vnd.haf.encrypted-message+json", 1024L, 2, 1800L))
+        when(attachmentDAO.initUpload("caller", "recipient-1", "application/vnd.haf.encrypted-message+json", 1024L, 2,
+                1800L))
                 .thenReturn(new AttachmentDAO.UploadInitResult("att-1", 12345L));
 
         handler.handle(initExchange.exchange());
@@ -752,7 +754,8 @@ class HttpIngressServerTest {
         AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
         chunkReq.setChunkIndex(0);
         chunkReq.setChunkDataB64(Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 }));
-        ExchangeHarness chunkExchange = newExchange("POST", "/api/v1/attachments/att-1/chunk", JsonCodec.toJson(chunkReq));
+        ExchangeHarness chunkExchange = newExchange("POST", "/api/v1/attachments/att-1/chunk",
+                JsonCodec.toJson(chunkReq));
         authenticate(chunkExchange, "sess-attach", "caller");
         when(attachmentDAO.storeChunk(eq("caller"), eq("att-1"), eq(0), any(byte[].class)))
                 .thenReturn(new AttachmentDAO.ChunkStoreResult(0, true));
@@ -873,7 +876,8 @@ class HttpIngressServerTest {
         lenient().when(exchange.getRequestURI()).thenReturn(URI.create(path));
         lenient().when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
         lenient().when(exchange.getResponseHeaders()).thenReturn(responseHeaders);
-        lenient().when(exchange.getRequestBody()).thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
+        lenient().when(exchange.getRequestBody())
+                .thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
         lenient().when(exchange.getResponseBody()).thenReturn(responseBody);
         org.mockito.Mockito.doAnswer(invocation -> {
             statusCode.set(invocation.getArgument(0, Integer.class));

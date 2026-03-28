@@ -11,7 +11,6 @@ import java.util.Locale;
  */
 public final class ImageSaveSupport {
 
-    private static final String DEFAULT_IMAGE_NAME = "image-preview.png";
 
     /**
      * Prevents instantiation of this utility class.
@@ -41,7 +40,7 @@ public final class ImageSaveSupport {
             return fromPath;
         }
 
-        return DEFAULT_IMAGE_NAME;
+        return "image-preview.png";
     }
 
     /**

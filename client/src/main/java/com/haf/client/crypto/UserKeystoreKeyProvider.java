@@ -5,8 +5,11 @@ import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.keystore.KeystoreBootstrap;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.utils.EccKeyIO;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -32,9 +35,11 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      * @param keystoreRoot the root directory of the keystore
      * @param senderId     sender identifier associated with the local keystore
      * @param passphrase   the passphrase for unlocking private keys
-     * @throws Exception if keystore initialization fails
+     * @throws IOException              when keystore I/O fails
+     * @throws GeneralSecurityException when cryptographic initialization fails
      */
-    public UserKeystoreKeyProvider(Path keystoreRoot, String senderId, char[] passphrase) throws Exception {
+    public UserKeystoreKeyProvider(Path keystoreRoot, String senderId, char[] passphrase)
+            throws IOException, GeneralSecurityException {
         this.keyStore = new UserKeystore(keystoreRoot);
         this.senderId = senderId;
         this.passphrase = passphrase != null ? passphrase.clone() : null;
@@ -45,10 +50,25 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      *
      * @param senderId   sender identifier associated with the local keystore
      * @param passphrase the passphrase for unlocking private keys
-     * @throws Exception if keystore initialization fails
+     * @throws IOException              when keystore I/O fails
+     * @throws GeneralSecurityException when cryptographic initialization fails
      */
-    public UserKeystoreKeyProvider(String senderId, char[] passphrase) throws Exception {
-        this(KeystoreBootstrap.run(senderId, passphrase), senderId, passphrase);
+    public UserKeystoreKeyProvider(String senderId, char[] passphrase) throws IOException, GeneralSecurityException {
+        this(bootstrapKeystore(senderId, passphrase), senderId, passphrase);
+    }
+
+    /**
+     * Runs keystore bootstrap, wrapping any checked exception in
+     * {@link KeystoreOperationException}.
+     */
+    private static Path bootstrapKeystore(String senderId, char[] passphrase) {
+        try {
+            return KeystoreBootstrap.run(senderId, passphrase);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new KeystoreOperationException("Keystore bootstrap failed for user: " + senderId, e);
+        }
     }
 
     /**
