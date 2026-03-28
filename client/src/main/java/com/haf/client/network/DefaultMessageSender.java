@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.CompletionException;
 
 public class DefaultMessageSender implements MessageSender {
-    private static final String ATTACHMENTS_API_PATH = "/api/v1/attachments/";
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
@@ -194,7 +193,7 @@ public class DefaultMessageSender implements MessageSender {
     @Override
     public AttachmentInitResponse initAttachmentUpload(AttachmentInitRequest request) throws IOException {
         String body = JsonCodec.toJson(request);
-        return decodeResponse(webSocketAdapter.postAuthenticated(ATTACHMENTS_API_PATH + "init", body),
+        return decodeResponse(webSocketAdapter.postAuthenticated("/api/v1/attachments/" + "init", body),
                 AttachmentInitResponse.class);
     }
 
@@ -211,7 +210,7 @@ public class DefaultMessageSender implements MessageSender {
             throws IOException {
         String body = JsonCodec.toJson(request);
         return decodeResponse(
-                webSocketAdapter.postAuthenticated(ATTACHMENTS_API_PATH + attachmentId + "/chunk", body),
+                webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/chunk", body),
                 AttachmentChunkResponse.class);
     }
 
@@ -228,7 +227,7 @@ public class DefaultMessageSender implements MessageSender {
             throws IOException {
         String body = JsonCodec.toJson(request);
         return decodeResponse(
-                webSocketAdapter.postAuthenticated(ATTACHMENTS_API_PATH + attachmentId + "/complete", body),
+                webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/complete", body),
                 AttachmentCompleteResponse.class);
     }
 
@@ -244,7 +243,7 @@ public class DefaultMessageSender implements MessageSender {
     public AttachmentBindResponse bindAttachmentUpload(String attachmentId, AttachmentBindRequest request)
             throws IOException {
         String body = JsonCodec.toJson(request);
-        return decodeResponse(webSocketAdapter.postAuthenticated(ATTACHMENTS_API_PATH + attachmentId + "/bind", body),
+        return decodeResponse(webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/bind", body),
                 AttachmentBindResponse.class);
     }
 
@@ -257,7 +256,7 @@ public class DefaultMessageSender implements MessageSender {
      */
     @Override
     public AttachmentDownloadResponse downloadAttachment(String attachmentId) throws IOException {
-        return decodeResponse(webSocketAdapter.getAuthenticated(ATTACHMENTS_API_PATH + attachmentId),
+        return decodeResponse(webSocketAdapter.getAuthenticated("/api/v1/attachments/" + attachmentId),
                 AttachmentDownloadResponse.class);
     }
 

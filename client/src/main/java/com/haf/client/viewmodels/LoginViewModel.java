@@ -8,7 +8,6 @@ import javafx.beans.property.StringProperty;
 public class LoginViewModel {
 
     // Allowed email domain
-    private static final String ALLOWED_DOMAIN = "@haf.gr";
     private static final int MIN_PASSWORD_LENGTH = 6;
 
     public static final String ERROR_EMAIL_EMPTY = "Please enter your email.";
@@ -201,7 +200,7 @@ public class LoginViewModel {
         }
 
         // Email domain validation — must end with @haf.gr
-        if (!emailValue.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+        if (!emailValue.toLowerCase().endsWith("@haf.gr")) {
             emailError.set(true);
             errorMessage.set(ERROR_EMAIL_WRONG_DOMAIN);
             return false;

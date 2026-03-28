@@ -10,4 +10,5 @@ module shared {
 
     requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.annotation;
+    requires org.slf4j;
 }

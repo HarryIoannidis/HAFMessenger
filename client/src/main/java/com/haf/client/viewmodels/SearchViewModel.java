@@ -29,8 +29,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ViewModel for the search screen.
@@ -47,7 +47,7 @@ public class SearchViewModel {
             + UiConstants.SEARCH_MIN_QUERY_LENGTH + " characters to search.";
     public static final String STATUS_GENERIC_FAILURE = "Search failed. Please try again.";
 
-    private static final Logger LOGGER = Logger.getLogger(SearchViewModel.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(SearchViewModel.class);
 
     public interface SearchGateway {
 
@@ -82,6 +82,7 @@ public class SearchViewModel {
     private boolean hasMore;
     private String nextCursor;
     private SearchSortViewModel.SortOptions sortOptions = SearchSortViewModel.SortOptions.DEFAULT;
+    private volatile int pageSize = UiConstants.SEARCH_PAGE_SIZE;
 
     /**
      * Creates search view-model with an injected gateway implementation.
@@ -168,7 +169,7 @@ public class SearchViewModel {
             results.clear();
         });
 
-        Thread.ofVirtual().name("search-query").start(() -> runSearch(normalized, null, false, searchGeneration));
+        Thread.ofPlatform().name("search-query").start(() -> runSearch(normalized, null, false, searchGeneration));
     }
 
     /**
@@ -191,6 +192,15 @@ public class SearchViewModel {
     }
 
     /**
+     * Sets runtime search page size used for primary and pagination requests.
+     *
+     * @param pageSize requested page size
+     */
+    public void setPageSize(int pageSize) {
+        this.pageSize = Math.clamp(pageSize, 10, 100);
+    }
+
+    /**
      * Loads the next page for the current query, if available.
      */
     public void loadMore() {
@@ -203,7 +213,7 @@ public class SearchViewModel {
         String cursor = nextCursor;
 
         runOnUiThread(() -> loadingMore.set(true));
-        Thread.ofVirtual()
+        Thread.ofPlatform()
                 .name("search-load-more")
                 .start(() -> runSearch(query, cursor, true, searchGeneration));
     }
@@ -323,11 +333,11 @@ public class SearchViewModel {
      */
     private void runSearch(String query, String cursor, boolean append, int searchGeneration) {
         try {
-            String json = searchGateway.searchUsers(query, UiConstants.SEARCH_PAGE_SIZE, cursor);
+            String json = searchGateway.searchUsers(query, pageSize, cursor);
             UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
             runOnUiThread(() -> applyResponse(response, append, searchGeneration));
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Search request failed", ex);
+            LOGGER.warn( "Search request failed", ex);
             runOnUiThread(() -> {
                 if (searchGeneration != generation.get()) {
                     return;
@@ -414,32 +424,54 @@ public class SearchViewModel {
      */
     private boolean shouldStopAfterError(UserSearchResponse response, boolean append) {
         if (response == null) {
-            if (!append) {
-                setErrorStatus(STATUS_GENERIC_FAILURE);
-            }
-            publishRuntimeIssue(
-                    append ? "search.load-more.response.empty" : "search.response.empty",
-                    append ? "Could not load more results" : "Search failed",
-                    append ? "Server returned an empty response while loading more results."
-                            : "Search response was empty.",
-                    append ? this::loadMore : this::retryLastSearch);
-            return true;
+            return handleNullResponse(append);
         }
 
         String error = response.getError();
         if (error != null) {
-            if (!append) {
-                setErrorStatus("Error: " + error);
-            }
-            publishRuntimeIssue(
-                    append ? "search.load-more.response.error" : "search.response.error",
-                    append ? "Could not load more results" : "Search failed",
-                    error,
-                    append ? this::loadMore : this::retryLastSearch);
-            return true;
+            return handleErrorResponse(error, append);
         }
 
         return false;
+    }
+
+    /**
+     * Handles a null response by setting error status and publishing a runtime issue.
+     *
+     * @param append whether this was a pagination append request
+     * @return always {@code true}, indicating processing should stop
+     */
+    private boolean handleNullResponse(boolean append) {
+        if (!append) {
+            setErrorStatus(STATUS_GENERIC_FAILURE);
+        }
+        publishRuntimeIssue(
+                append ? "search.load-more.response.empty" : "search.response.empty",
+                append ? "Could not load more results" : "Search failed",
+                append ? "Server returned an empty response while loading more results."
+                        : "Search response was empty.",
+                append ? this::loadMore : this::retryLastSearch);
+        return true;
+    }
+
+    /**
+     * Handles an error present in the response by setting error status and publishing
+     * a runtime issue.
+     *
+     * @param error  error message from the server response
+     * @param append whether this was a pagination append request
+     * @return always {@code true}, indicating processing should stop
+     */
+    private boolean handleErrorResponse(String error, boolean append) {
+        if (!append) {
+            setErrorStatus("Error: " + error);
+        }
+        publishRuntimeIssue(
+                append ? "search.load-more.response.error" : "search.response.error",
+                append ? "Could not load more results" : "Search failed",
+                error,
+                append ? this::loadMore : this::retryLastSearch);
+        return true;
     }
 
     /**

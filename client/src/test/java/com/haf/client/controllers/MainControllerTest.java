@@ -3,6 +3,9 @@ package com.haf.client.controllers;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.viewmodels.MainViewModel;
 import org.junit.jupiter.api.Test;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MainControllerTest {
+    private static final Path CONTROLLER_SOURCE = Path.of("src/main/java/com/haf/client/controllers/MainController.java");
 
     @Test
     void constructor_rejects_null_session_service() {
@@ -154,6 +158,25 @@ class MainControllerTest {
 
         assertTrue(MainController.shouldAutoRetryMessagingIssue(sendIssue));
         assertFalse(MainController.shouldAutoRetryMessagingIssue(retryFailedIssue));
+    }
+
+    @Test
+    void runtime_popup_flow_is_gated_by_settings_toggle() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (!settings.isNotificationsShowRuntimePopups()) {"));
+        assertTrue(source.contains("if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {"));
+    }
+
+    @Test
+    void restart_request_flow_logs_out_then_relaunches_launcher_process() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("private void requestAppRestart() {"));
+        assertTrue(source.contains("mainSessionService.logout().whenComplete"));
+        assertTrue(source.contains("boolean relaunched = relaunchClientProcess();"));
+        assertTrue(source.contains("Launcher.class.getName()"));
+        assertTrue(source.contains("Platform.exit();"));
     }
 
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {

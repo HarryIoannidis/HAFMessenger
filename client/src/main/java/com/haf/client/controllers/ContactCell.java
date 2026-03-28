@@ -13,8 +13,8 @@ import javafx.scene.text.Text;
 import javafx.util.Duration;
 import java.io.IOException;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link ListCell} that renders each contact using {@code contact_cell.fxml}.
@@ -22,7 +22,10 @@ import java.util.logging.Logger;
  */
 public class ContactCell extends ListCell<ContactInfo> {
 
-    private static final Logger LOGGER = Logger.getLogger(ContactCell.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(ContactCell.class);
+    private static volatile boolean showUnreadBadges = true;
+    private static volatile int unreadBadgeCap = 9;
+    private static volatile boolean hidePresenceIndicators;
 
     private static byte[] cachedFXMLBytes;
     private StackPane cellRoot;
@@ -33,6 +36,18 @@ public class ContactCell extends ListCell<ContactInfo> {
     private Text unreadBadgeText;
     private JFXButton overlayButton;
     private PauseTransition contextMenuDelay;
+
+    public static void setShowUnreadBadges(boolean showUnreadBadges) {
+        ContactCell.showUnreadBadges = showUnreadBadges;
+    }
+
+    public static void setUnreadBadgeCap(int unreadBadgeCap) {
+        ContactCell.unreadBadgeCap = Math.max(1, unreadBadgeCap);
+    }
+
+    public static void setHidePresenceIndicators(boolean hidePresenceIndicators) {
+        ContactCell.hidePresenceIndicators = hidePresenceIndicators;
+    }
 
     @FunctionalInterface
     public interface ContextMenuRequestHandler {
@@ -84,13 +99,13 @@ public class ContactCell extends ListCell<ContactInfo> {
 
         try {
             var resource = getClass().getResource(UiConstants.FXML_CONTACT_CELL);
-            LOGGER.log(Level.INFO, "Loading contact cell FXML: {0}", resource);
+            LOGGER.info( "Loading contact cell FXML: {}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
 
             loadFXML(loader);
             bindReferences(loader);
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Could not load contact_cell.fxml", e);
+            LOGGER.error( "Could not load contact_cell.fxml", e);
         }
     }
 
@@ -320,6 +335,11 @@ public class ContactCell extends ListCell<ContactInfo> {
         if (activenessCircle == null) {
             return;
         }
+        if (hidePresenceIndicators) {
+            activenessCircle.setVisible(false);
+            activenessCircle.setManaged(false);
+            return;
+        }
         String activenessLabel = normalizeActivenessLabel(contact.activenessLabel());
         boolean hasActivenessLabel = !activenessLabel.isEmpty();
         activenessCircle.setVisible(hasActivenessLabel);
@@ -362,11 +382,11 @@ public class ContactCell extends ListCell<ContactInfo> {
             return;
         }
         int unreadCount = Math.max(0, contact.unreadCount());
-        boolean showUnreadBadge = shouldShowUnreadBadge(unreadCount);
+        boolean showUnreadBadge = showUnreadBadges && shouldShowUnreadBadge(unreadCount);
         unreadBadge.setVisible(showUnreadBadge);
         unreadBadge.setManaged(showUnreadBadge);
         if (showUnreadBadge) {
-            unreadBadgeText.setText(formatUnreadBadgeText(unreadCount));
+            unreadBadgeText.setText(formatUnreadBadgeText(unreadCount, unreadBadgeCap));
         }
     }
 
@@ -423,10 +443,11 @@ public class ContactCell extends ListCell<ContactInfo> {
      * @param unreadCount unread count value
      * @return badge label text
      */
-    private static String formatUnreadBadgeText(int unreadCount) {
+    private static String formatUnreadBadgeText(int unreadCount, int badgeCap) {
         int normalized = Math.max(0, unreadCount);
-        if (normalized > 9) {
-            return "9+";
+        int cap = Math.max(1, badgeCap);
+        if (normalized > cap) {
+            return cap + "+";
         }
         return Integer.toString(normalized);
     }

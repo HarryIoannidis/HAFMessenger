@@ -46,6 +46,17 @@ public final class MessageBubbleFactory {
      * @return a JavaFX {@link Node} ready to be appended to the chat list
      */
     public static Node create(MessageVM message) {
+        return create(message, true);
+    }
+
+    /**
+     * Creates a full-width row bubble with optional timestamp row.
+     *
+     * @param message message to render
+     * @param showTimestamp whether to render timestamp metadata
+     * @return rendered row node
+     */
+    public static Node create(MessageVM message, boolean showTimestamp) {
         // Outer row
         HBox row = new HBox();
         row.setMaxWidth(Double.MAX_VALUE);
@@ -70,8 +81,10 @@ public final class MessageBubbleFactory {
         bubble.getChildren().add(content);
 
         // Timestamp
-        HBox timestampRow = buildTimestampRow(message);
-        bubble.getChildren().add(timestampRow);
+        if (showTimestamp) {
+            HBox timestampRow = buildTimestampRow(message);
+            bubble.getChildren().add(timestampRow);
+        }
 
         JFXButton rippleOverlay = buildRippleOverlayButton(message, bubble);
         StackPane bubbleStack = new StackPane(bubble, rippleOverlay);

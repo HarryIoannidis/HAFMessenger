@@ -3,6 +3,7 @@ package com.haf.client.controllers;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,5 +24,16 @@ class ContactCellTest {
         assertTrue(fxml.contains("fx:id=\"unreadBadge\""));
         assertTrue(fxml.contains("fx:id=\"unreadBadgeText\""));
         assertTrue(fxml.contains("fx:id=\"overlayButton\""));
+    }
+
+    @Test
+    void unread_badge_text_uses_dynamic_cap_format() throws Exception {
+        String source = java.nio.file.Files
+                .readString(java.nio.file.Path.of("src/main/java/com/haf/client/controllers/ContactCell.java"));
+
+        assertTrue(source.contains("formatUnreadBadgeText(unreadCount, unreadBadgeCap)"));
+        assertTrue(source.contains("if (normalized > cap) {"));
+        assertTrue(source.contains("return cap + \"+\";"));
+        assertEquals(true, source.contains("showUnreadBadges && shouldShowUnreadBadge(unreadCount)"));
     }
 }

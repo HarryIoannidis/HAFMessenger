@@ -246,8 +246,24 @@ class ChatControllerTest {
     void ripple_overlay_detection_requires_overlay_style_class() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS"));
-        assertTrue(source.contains("button.getStyleClass().contains(BUBBLE_RIPPLE_OVERLAY_STYLE_CLASS)"));
+        assertTrue(source.contains("\"bubble-ripple-overlay\""));
+        assertTrue(source.contains("button.getStyleClass().contains(\"bubble-ripple-overlay\")"));
+    }
+
+    @Test
+    void enter_send_and_auto_scroll_behaviors_are_gated_by_settings() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (settings.isChatSendOnEnter()) {"));
+        assertTrue(source.contains("if (settings.isChatAutoScrollToLatest()) {"));
+    }
+
+    @Test
+    void image_preview_opening_respects_media_and_privacy_settings() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (!settings.isMediaOpenPreviewOnImageClick()) {"));
+        assertTrue(source.contains("if (!settings.isPrivacyConfirmAttachmentOpen()) {"));
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {

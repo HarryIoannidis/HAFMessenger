@@ -18,26 +18,24 @@ import com.haf.shared.responses.PublicKeyResponse;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.SystemClockProvider;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultLoginService implements LoginService {
 
-    private static final Logger LOGGER = Logger.getLogger(DefaultLoginService.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginService.class);
 
     static final int MAX_LOGIN_ATTEMPTS = 3;
     static final int LOGIN_HTTP_TIMEOUT_SECONDS = 10;
     static final int LOGIN_RETRY_DELAY_MS = 400;
-    static final String LOGIN_FAILED_MESSAGE = "Login failed.";
-    static final String CONNECTION_INTERRUPTED_MESSAGE = "Connection was interrupted.";
-    static final String CONNECTION_FAILED_MESSAGE = "Connection failed. Please try again.";
-    static final String SECURE_SESSION_FAILED_MESSAGE = "Failed to initialize secure session locally.";
 
     private static final URI LOGIN_URI = URI.create("https://localhost:8443/api/v1/login");
     private static final URI WEBSOCKET_URI = URI.create("wss://localhost:8444/");
@@ -49,9 +47,10 @@ public class DefaultLoginService implements LoginService {
          *
          * @param command login command containing credentials
          * @return HTTP response containing login payload
-         * @throws Exception when transport fails
+         * @throws IOException          when transport I/O fails
+         * @throws InterruptedException when the calling thread is interrupted
          */
-        HttpResponse<String> send(LoginCommand command) throws Exception;
+        HttpResponse<String> send(LoginCommand command) throws IOException, InterruptedException;
     }
 
     @FunctionalInterface
@@ -62,9 +61,10 @@ public class DefaultLoginService implements LoginService {
          * @param userId     authenticated user identifier
          * @param sessionId  authenticated server session id
          * @param passphrase passphrase used to unlock local key material
-         * @throws Exception when secure session bootstrap fails
+         * @throws IOException              when key-store or network I/O fails
+         * @throws CryptoOperationException when cryptographic setup fails
          */
-        void initialize(String userId, String sessionId, String passphrase) throws Exception;
+        void initialize(String userId, String sessionId, String passphrase) throws IOException, CryptoOperationException;
     }
 
     @FunctionalInterface
@@ -113,7 +113,7 @@ public class DefaultLoginService implements LoginService {
     public LoginResult login(LoginCommand command) {
         CurrentUserSession.clear();
         if (command == null) {
-            return new LoginResult.Failure(CONNECTION_FAILED_MESSAGE);
+            return new LoginResult.Failure("Connection failed. Please try again.");
         }
 
         LoginCommand normalizedCommand = normalize(command);
@@ -124,7 +124,7 @@ public class DefaultLoginService implements LoginService {
                 return attemptResult;
             }
         }
-        return new LoginResult.Failure(CONNECTION_FAILED_MESSAGE);
+        return new LoginResult.Failure("Connection failed. Please try again.");
     }
 
     /**
@@ -146,7 +146,7 @@ public class DefaultLoginService implements LoginService {
             return initializeSessionOrRetry(response, command, attempt);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new LoginResult.Failure(CONNECTION_INTERRUPTED_MESSAGE);
+            return new LoginResult.Failure("Connection was interrupted.");
         } catch (Exception e) {
             return handleRequestFailure(attempt, e);
         }
@@ -175,11 +175,11 @@ public class DefaultLoginService implements LoginService {
             return new LoginResult.Success();
         } catch (Exception ex) {
             if (isLastAttempt(attempt)) {
-                LOGGER.log(Level.SEVERE, "Failed to initialize WebSocket session", ex);
-                return new LoginResult.Failure(SECURE_SESSION_FAILED_MESSAGE);
+                LOGGER.error( "Failed to initialize WebSocket session", ex);
+                return new LoginResult.Failure("Failed to initialize secure session locally.");
             }
-            LOGGER.log(Level.WARNING, ex, () -> "Secure session initialization failed on attempt "
-                    + attempt + "/" + MAX_LOGIN_ATTEMPTS + ", retrying...");
+            LOGGER.warn("Secure session initialization failed on attempt {}/{}, retrying...",
+                    attempt, MAX_LOGIN_ATTEMPTS, ex);
             return waitBeforeRetry();
         }
     }
@@ -193,11 +193,10 @@ public class DefaultLoginService implements LoginService {
      */
     private LoginResult handleRequestFailure(int attempt, Exception error) {
         if (isLastAttempt(attempt)) {
-            LOGGER.log(Level.SEVERE, "Login failed", error);
-            return new LoginResult.Failure(CONNECTION_FAILED_MESSAGE);
+            LOGGER.error( "Login failed", error);
+            return new LoginResult.Failure("Connection failed. Please try again.");
         }
-        LOGGER.log(Level.WARNING, error,
-                () -> "Login attempt " + attempt + "/" + MAX_LOGIN_ATTEMPTS + " failed, retrying...");
+        LOGGER.warn("Login attempt {}/{} failed, retrying...", attempt, MAX_LOGIN_ATTEMPTS, error);
         return waitBeforeRetry();
     }
 
@@ -213,7 +212,7 @@ public class DefaultLoginService implements LoginService {
             return null;
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
-            return new LoginResult.Failure(CONNECTION_INTERRUPTED_MESSAGE);
+            return new LoginResult.Failure("Connection was interrupted.");
         }
     }
 
@@ -251,7 +250,7 @@ public class DefaultLoginService implements LoginService {
         if (response != null && response.getError() != null) {
             return response.getError();
         }
-        return LOGIN_FAILED_MESSAGE;
+        return "Login failed.";
     }
 
     /**
@@ -269,10 +268,11 @@ public class DefaultLoginService implements LoginService {
      *
      * @param command normalized login command
      * @return HTTP response containing login payload
-     * @throws Exception when request construction, SSL, serialization, or transport
-     *                   fails
+     * @throws IOException          when request construction or transport fails
+     * @throws InterruptedException when the calling thread is interrupted
      */
-    private static HttpResponse<String> sendLoginRequest(LoginCommand command) throws Exception {
+    private static HttpResponse<String> sendLoginRequest(LoginCommand command)
+            throws IOException, InterruptedException {
         LoginRequest request = new LoginRequest();
         request.setEmail(command.email());
         request.setPassword(command.password());
@@ -297,23 +297,28 @@ public class DefaultLoginService implements LoginService {
      * @param userId        authenticated user identifier
      * @param sessionId     authenticated websocket session id
      * @param passphraseStr passphrase used to unlock local keys
-     * @throws Exception when key/bootstrap/session setup fails
+     * @throws IOException              when key-store or network I/O fails
+     * @throws CryptoOperationException when cryptographic setup fails
      */
     private static void initializeSecureSession(String userId, String sessionId, String passphraseStr)
-            throws Exception {
+            throws IOException, CryptoOperationException {
         ClockProvider clockProvider = SystemClockProvider.getInstance();
         char[] passphrase = passphraseStr.toCharArray();
-        UserKeystoreKeyProvider keyProvider = new UserKeystoreKeyProvider(userId, passphrase);
+        try {
+            UserKeystoreKeyProvider keyProvider = new UserKeystoreKeyProvider(userId, passphrase);
 
-        WebSocketAdapter wsAdapter = new WebSocketAdapter(WEBSOCKET_URI, sessionId);
-        keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));
+            WebSocketAdapter wsAdapter = new WebSocketAdapter(WEBSOCKET_URI, sessionId);
+            keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));
 
-        DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, wsAdapter);
-        DefaultMessageReceiver receiver = new DefaultMessageReceiver(keyProvider, clockProvider, wsAdapter,
-                keyProvider.getSenderId());
+            DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, wsAdapter);
+            DefaultMessageReceiver receiver = new DefaultMessageReceiver(keyProvider, clockProvider, wsAdapter,
+                    keyProvider.getSenderId());
 
-        NetworkSession.set(wsAdapter);
-        ChatSession.set(new MessagesViewModel(sender, receiver));
+            NetworkSession.set(wsAdapter);
+            ChatSession.set(new MessagesViewModel(sender, receiver));
+        } catch (GeneralSecurityException e) {
+            throw new CryptoOperationException("Keystore initialization failed", e);
+        }
     }
 
     /**

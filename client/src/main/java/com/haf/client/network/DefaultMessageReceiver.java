@@ -20,11 +20,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultMessageReceiver implements MessageReceiver {
-    private static final Logger LOGGER = Logger.getLogger(DefaultMessageReceiver.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageReceiver.class);
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
@@ -103,16 +103,16 @@ public class DefaultMessageReceiver implements MessageReceiver {
             parseAndProcessEnvelope(json);
         } catch (MessageTamperedException e) {
             acknowledgeTamperedEnvelope(json);
-            LOGGER.log(Level.WARNING, "Undecryptable envelope; acknowledging to prevent endless retries.");
+            LOGGER.warn( "Undecryptable envelope; acknowledging to prevent endless retries.");
             notifyError(e);
         } catch (KeystoreOperationException e) {
-            LOGGER.log(Level.WARNING, "Keystore decryption failed: {0}", e.getMessage());
+            LOGGER.warn( "Keystore decryption failed: {}", e.getMessage());
             notifyError(new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
         } catch (MessageValidationException | MessageExpiredException e) {
-            LOGGER.log(Level.FINE, "Rejected incoming envelope: {0}", e.getMessage());
+            LOGGER.debug( "Rejected incoming envelope: {}", e.getMessage());
             notifyError(e);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Failed to process inbound message: {0}", e.getMessage());
+            LOGGER.warn( "Failed to process inbound message: {}", e.getMessage());
             notifyError(new IOException("Failed to process message: " + e.getMessage(), e));
         }
     }
@@ -265,21 +265,21 @@ public class DefaultMessageReceiver implements MessageReceiver {
                             .loadPrivate(metadata.keyId(), userKeyProvider.getPassphrase());
                     MessageDecryptor candidateDecryptor = new MessageDecryptor(candidate, clockProvider);
                     byte[] plaintext = candidateDecryptor.decryptMessage(encryptedMessage);
-                    LOGGER.log(Level.WARNING,
-                            "Envelope {0} decrypted with fallback key {1} ({2}). Current key likely does not match message keying material.",
+                    LOGGER.warn(
+                            "Envelope {} decrypted with fallback key {} ({}). Current key likely does not match message keying material.",
                             new Object[] { envelopeId, metadata.keyId(), metadata.status() });
                     return plaintext;
                 } catch (MessageTamperedException ignored) {
                     // Keep trying other local keys.
                 } catch (Exception keyLoadOrDecryptError) {
-                    LOGGER.log(Level.FINE,
-                            "Skipping fallback key {0} while decrypting envelope {1}: {2}",
+                    LOGGER.debug(
+                            "Skipping fallback key {} while decrypting envelope {}: {}",
                             new Object[] { metadata.keyId(), envelopeId, keyLoadOrDecryptError.getMessage() });
                 }
             }
 
-            LOGGER.log(Level.WARNING,
-                    "AEAD verification failed for envelope {0}. Tried current key plus {1} fallback keys. sender={2}, recipient={3}, timestamp={4}, ttl={5}",
+            LOGGER.warn(
+                    "AEAD verification failed for envelope {}. Tried current key plus {} fallback keys. sender={}, recipient={}, timestamp={}, ttl={}",
                     new Object[] {
                             envelopeId,
                             fallbackAttempts,
@@ -307,7 +307,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
                     .thenComparing(Comparator.comparingLong(KeyMetadata::createdAtEpochSec).reversed()));
             return metadataList;
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Unable to enumerate fallback keys: {0}", e.getMessage());
+            LOGGER.debug( "Unable to enumerate fallback keys: {}", e.getMessage());
             return List.of();
         }
     }
@@ -359,7 +359,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             sendAck(ids);
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, e, () -> "Failed to send ACK for sender " + senderId);
+            LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
             // Put them back so we can try again later
             pendingAcks.computeIfAbsent(senderId, k -> new ArrayList<>()).addAll(ids);
         }
@@ -387,7 +387,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param error the error that occurred
      */
     private void handleError(Throwable error) {
-        LOGGER.log(Level.WARNING, "WebSocket receiver error: {0}", error.getMessage());
+        LOGGER.warn( "WebSocket receiver error: {}", error.getMessage());
         if (messageListener != null) {
             messageListener.onError(error);
         }
@@ -442,8 +442,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             sendAck(List.of(envelopeId));
         } catch (IOException ackError) {
-            LOGGER.log(Level.WARNING, ackError,
-                    () -> "Failed to acknowledge undecryptable envelope " + envelopeId);
+            LOGGER.warn("Failed to acknowledge undecryptable envelope {}", envelopeId, ackError);
         }
     }
 

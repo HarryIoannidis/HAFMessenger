@@ -1,0 +1,501 @@
+package com.haf.client.utils;
+
+import com.haf.client.core.CurrentUserSession;
+import com.haf.client.models.UserProfileInfo;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.prefs.Preferences;
+
+/**
+ * Per-user client settings backed by {@link Preferences}.
+ */
+public final class ClientSettings {
+
+    /**
+     * Apply policy for a setting key.
+     */
+    public enum ApplyMode {
+        IMMEDIATE,
+        RESTART_REQUIRED
+    }
+
+    /**
+     * Setting key metadata (type/default/apply-mode).
+     */
+    public enum Key {
+        GENERAL_CONFIRM_EXIT("general.confirm_exit", true, ApplyMode.IMMEDIATE),
+        GENERAL_REMEMBER_WINDOW_STATE("general.remember_window_state", true, ApplyMode.RESTART_REQUIRED),
+        GENERAL_RESTORE_LAST_TAB("general.restore_last_tab", true, ApplyMode.RESTART_REQUIRED),
+
+        SEARCH_INSTANT_ON_TYPE("search.instant_on_type", false, ApplyMode.IMMEDIATE),
+        SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
+        SEARCH_RESULTS_PER_PAGE("search.results_per_page", 20, ApplyMode.IMMEDIATE),
+        SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", false, ApplyMode.IMMEDIATE),
+
+        MEDIA_HOVER_ZOOM("media.hover_zoom", true, ApplyMode.IMMEDIATE),
+        MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 1.15, ApplyMode.IMMEDIATE),
+        MEDIA_SHOW_DOWNLOAD_BUTTON("media.show_download_button", true, ApplyMode.IMMEDIATE),
+        MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK("media.open_preview_on_image_click", true, ApplyMode.IMMEDIATE),
+
+        CHAT_SEND_ON_ENTER("chat.send_on_enter", true, ApplyMode.IMMEDIATE),
+        CHAT_AUTO_SCROLL_TO_LATEST("chat.auto_scroll_to_latest", true, ApplyMode.IMMEDIATE),
+        CHAT_SHOW_MESSAGE_TIMESTAMPS("chat.show_message_timestamps", true, ApplyMode.IMMEDIATE),
+
+        NOTIFICATIONS_SHOW_UNREAD_BADGES("notifications.show_unread_badges", true, ApplyMode.IMMEDIATE),
+        NOTIFICATIONS_BADGE_CAP("notifications.badge_cap", 9, ApplyMode.IMMEDIATE),
+        NOTIFICATIONS_SHOW_RUNTIME_POPUPS("notifications.show_runtime_popups", true, ApplyMode.IMMEDIATE),
+
+        PRIVACY_BLUR_ON_FOCUS_LOSS("privacy.blur_on_focus_loss", false, ApplyMode.IMMEDIATE),
+        PRIVACY_BLUR_STRENGTH("privacy.blur_strength", 4.0, ApplyMode.IMMEDIATE),
+        PRIVACY_CONFIRM_ATTACHMENT_OPEN("privacy.confirm_attachment_open", false, ApplyMode.IMMEDIATE),
+        PRIVACY_HIDE_PRESENCE_INDICATORS("privacy.hide_presence_indicators", false, ApplyMode.IMMEDIATE);
+
+        private final String preferenceKey;
+        private final Object defaultValue;
+        private final ApplyMode applyMode;
+
+        Key(String preferenceKey, Object defaultValue, ApplyMode applyMode) {
+            this.preferenceKey = preferenceKey;
+            this.defaultValue = defaultValue;
+            this.applyMode = applyMode;
+        }
+
+        public String preferenceKey() {
+            return preferenceKey;
+        }
+
+        public Object defaultValue() {
+            return defaultValue;
+        }
+
+        public ApplyMode applyMode() {
+            return applyMode;
+        }
+    }
+
+    /**
+     * Listener notified when a setting changes.
+     */
+    @FunctionalInterface
+    public interface Listener {
+        void onSettingChanged(Key key);
+    }
+
+    /**
+     * Persisted window state values.
+     */
+    public record WindowState(double x, double y, double width, double height, boolean maximized) {
+    }
+
+
+    private final Preferences prefs;
+    private final boolean persistent;
+    private final Map<Key, Object> values = new EnumMap<>(Key.class);
+    private final Map<Key, Object> restartBaseline = new EnumMap<>(Key.class);
+    private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
+
+    private volatile boolean restartRequiredDirty;
+
+    private ClientSettings(String userId) {
+        if (userId == null || userId.isBlank()) {
+            this.prefs = null;
+            this.persistent = false;
+        } else {
+            this.prefs = Preferences.userNodeForPackage(ClientSettings.class)
+                    .node("client-settings")
+                    .node("users")
+                    .node(sanitizeNode(userId));
+            this.persistent = true;
+        }
+
+        for (Key key : Key.values()) {
+            Object loaded = loadValue(key);
+            values.put(key, loaded);
+            if (key.applyMode() == ApplyMode.RESTART_REQUIRED) {
+                restartBaseline.put(key, loaded);
+            }
+        }
+        this.restartRequiredDirty = false;
+    }
+
+    public static ClientSettings defaults() {
+        return new ClientSettings(null);
+    }
+
+    public static ClientSettings forUser(String userId) {
+        return new ClientSettings(userId);
+    }
+
+    /**
+     * Resolves settings for current session user, or defaults when not logged in.
+     */
+    public static ClientSettings forCurrentUserOrDefaults() {
+        UserProfileInfo profile = CurrentUserSession.get();
+        if (profile == null || profile.userId() == null || profile.userId().isBlank()) {
+            return defaults();
+        }
+        return forUser(profile.userId());
+    }
+
+    public void addListener(Listener listener) {
+        if (listener != null) {
+            listeners.add(listener);
+        }
+    }
+
+    public void removeListener(Listener listener) {
+        if (listener != null) {
+            listeners.remove(listener);
+        }
+    }
+
+    public boolean isRestartRequiredDirty() {
+        return restartRequiredDirty;
+    }
+
+    public void clearRestartRequiredDirty() {
+        for (Key key : Key.values()) {
+            if (key.applyMode() == ApplyMode.RESTART_REQUIRED) {
+                restartBaseline.put(key, values.get(key));
+            }
+        }
+        restartRequiredDirty = false;
+    }
+
+    public boolean isGeneralConfirmExit() {
+        return getBoolean(Key.GENERAL_CONFIRM_EXIT);
+    }
+
+    public void setGeneralConfirmExit(boolean enabled) {
+        setBoolean(Key.GENERAL_CONFIRM_EXIT, enabled);
+    }
+
+    public boolean isGeneralRememberWindowState() {
+        return getBoolean(Key.GENERAL_REMEMBER_WINDOW_STATE);
+    }
+
+    public void setGeneralRememberWindowState(boolean enabled) {
+        setBoolean(Key.GENERAL_REMEMBER_WINDOW_STATE, enabled);
+    }
+
+    public boolean isGeneralRestoreLastTab() {
+        return getBoolean(Key.GENERAL_RESTORE_LAST_TAB);
+    }
+
+    public void setGeneralRestoreLastTab(boolean enabled) {
+        setBoolean(Key.GENERAL_RESTORE_LAST_TAB, enabled);
+    }
+
+    public boolean isSearchInstantOnType() {
+        return getBoolean(Key.SEARCH_INSTANT_ON_TYPE);
+    }
+
+    public void setSearchInstantOnType(boolean enabled) {
+        setBoolean(Key.SEARCH_INSTANT_ON_TYPE, enabled);
+    }
+
+    public boolean isSearchInfiniteScroll() {
+        return getBoolean(Key.SEARCH_INFINITE_SCROLL);
+    }
+
+    public void setSearchInfiniteScroll(boolean enabled) {
+        setBoolean(Key.SEARCH_INFINITE_SCROLL, enabled);
+    }
+
+    public int getSearchResultsPerPage() {
+        return getInt(Key.SEARCH_RESULTS_PER_PAGE);
+    }
+
+    public void setSearchResultsPerPage(double value) {
+        setInt(Key.SEARCH_RESULTS_PER_PAGE, clampToStep(value, 10, 100, 10));
+    }
+
+    public boolean isSearchPreserveLastQuery() {
+        return getBoolean(Key.SEARCH_PRESERVE_LAST_QUERY);
+    }
+
+    public void setSearchPreserveLastQuery(boolean enabled) {
+        setBoolean(Key.SEARCH_PRESERVE_LAST_QUERY, enabled);
+    }
+
+    public boolean isMediaHoverZoom() {
+        return getBoolean(Key.MEDIA_HOVER_ZOOM);
+    }
+
+    public void setMediaHoverZoom(boolean enabled) {
+        setBoolean(Key.MEDIA_HOVER_ZOOM, enabled);
+    }
+
+    public double getMediaHoverZoomScale() {
+        return getDouble(Key.MEDIA_HOVER_ZOOM_SCALE);
+    }
+
+    public void setMediaHoverZoomScale(double value) {
+        setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 1.50, 0.05));
+    }
+
+    public boolean isMediaShowDownloadButton() {
+        return getBoolean(Key.MEDIA_SHOW_DOWNLOAD_BUTTON);
+    }
+
+    public void setMediaShowDownloadButton(boolean enabled) {
+        setBoolean(Key.MEDIA_SHOW_DOWNLOAD_BUTTON, enabled);
+    }
+
+    public boolean isMediaOpenPreviewOnImageClick() {
+        return getBoolean(Key.MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK);
+    }
+
+    public void setMediaOpenPreviewOnImageClick(boolean enabled) {
+        setBoolean(Key.MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK, enabled);
+    }
+
+    public boolean isChatSendOnEnter() {
+        return getBoolean(Key.CHAT_SEND_ON_ENTER);
+    }
+
+    public void setChatSendOnEnter(boolean enabled) {
+        setBoolean(Key.CHAT_SEND_ON_ENTER, enabled);
+    }
+
+    public boolean isChatAutoScrollToLatest() {
+        return getBoolean(Key.CHAT_AUTO_SCROLL_TO_LATEST);
+    }
+
+    public void setChatAutoScrollToLatest(boolean enabled) {
+        setBoolean(Key.CHAT_AUTO_SCROLL_TO_LATEST, enabled);
+    }
+
+    public boolean isChatShowMessageTimestamps() {
+        return getBoolean(Key.CHAT_SHOW_MESSAGE_TIMESTAMPS);
+    }
+
+    public void setChatShowMessageTimestamps(boolean enabled) {
+        setBoolean(Key.CHAT_SHOW_MESSAGE_TIMESTAMPS, enabled);
+    }
+
+    public boolean isNotificationsShowUnreadBadges() {
+        return getBoolean(Key.NOTIFICATIONS_SHOW_UNREAD_BADGES);
+    }
+
+    public void setNotificationsShowUnreadBadges(boolean enabled) {
+        setBoolean(Key.NOTIFICATIONS_SHOW_UNREAD_BADGES, enabled);
+    }
+
+    public int getNotificationsBadgeCap() {
+        return getInt(Key.NOTIFICATIONS_BADGE_CAP);
+    }
+
+    public void setNotificationsBadgeCap(double value) {
+        setInt(Key.NOTIFICATIONS_BADGE_CAP, clampToStep(value, 9, 99, 9));
+    }
+
+    public boolean isNotificationsShowRuntimePopups() {
+        return getBoolean(Key.NOTIFICATIONS_SHOW_RUNTIME_POPUPS);
+    }
+
+    public void setNotificationsShowRuntimePopups(boolean enabled) {
+        setBoolean(Key.NOTIFICATIONS_SHOW_RUNTIME_POPUPS, enabled);
+    }
+
+    public boolean isPrivacyBlurOnFocusLoss() {
+        return getBoolean(Key.PRIVACY_BLUR_ON_FOCUS_LOSS);
+    }
+
+    public void setPrivacyBlurOnFocusLoss(boolean enabled) {
+        setBoolean(Key.PRIVACY_BLUR_ON_FOCUS_LOSS, enabled);
+    }
+
+    public double getPrivacyBlurStrength() {
+        return getDouble(Key.PRIVACY_BLUR_STRENGTH);
+    }
+
+    public void setPrivacyBlurStrength(double value) {
+        setDouble(Key.PRIVACY_BLUR_STRENGTH, clampDecimal(value, 1.0, 10.0, 1.0));
+    }
+
+    public boolean isPrivacyConfirmAttachmentOpen() {
+        return getBoolean(Key.PRIVACY_CONFIRM_ATTACHMENT_OPEN);
+    }
+
+    public void setPrivacyConfirmAttachmentOpen(boolean enabled) {
+        setBoolean(Key.PRIVACY_CONFIRM_ATTACHMENT_OPEN, enabled);
+    }
+
+    public boolean isPrivacyHidePresenceIndicators() {
+        return getBoolean(Key.PRIVACY_HIDE_PRESENCE_INDICATORS);
+    }
+
+    public void setPrivacyHidePresenceIndicators(boolean enabled) {
+        setBoolean(Key.PRIVACY_HIDE_PRESENCE_INDICATORS, enabled);
+    }
+
+    public WindowState readWindowState() {
+        if (!persistent) {
+            return null;
+        }
+        double x = prefs.getDouble("window.x", Double.NaN);
+        double y = prefs.getDouble("window.y", Double.NaN);
+        double width = prefs.getDouble("window.width", Double.NaN);
+        double height = prefs.getDouble("window.height", Double.NaN);
+        boolean maximized = prefs.getBoolean("window.maximized", false);
+        if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(width) || Double.isNaN(height)) {
+            return null;
+        }
+        return new WindowState(x, y, width, height, maximized);
+    }
+
+    public void writeWindowState(double x, double y, double width, double height, boolean maximized) {
+        if (!persistent) {
+            return;
+        }
+        prefs.putDouble("window.x", x);
+        prefs.putDouble("window.y", y);
+        prefs.putDouble("window.width", width);
+        prefs.putDouble("window.height", height);
+        prefs.putBoolean("window.maximized", maximized);
+    }
+
+    public String getLastActiveTab() {
+        if (!persistent) {
+            return "messages";
+        }
+        String stored = prefs.get("main.last_active_tab", "messages");
+        return normalizeTab(stored);
+    }
+
+    public void setLastActiveTab(String tab) {
+        if (!persistent) {
+            return;
+        }
+        prefs.put("main.last_active_tab", normalizeTab(tab));
+    }
+
+    private static String normalizeTab(String tab) {
+        if (Objects.equals("search", tab)) {
+            return "search";
+        }
+        return "messages";
+    }
+
+    private boolean getBoolean(Key key) {
+        Object value = values.get(key);
+        return value instanceof Boolean b ? b : (Boolean) key.defaultValue();
+    }
+
+    private int getInt(Key key) {
+        Object value = values.get(key);
+        return value instanceof Integer i ? i : (Integer) key.defaultValue();
+    }
+
+    private double getDouble(Key key) {
+        Object value = values.get(key);
+        return value instanceof Double d ? d : (Double) key.defaultValue();
+    }
+
+    private void setBoolean(Key key, boolean value) {
+        setValue(key, value);
+    }
+
+    private void setInt(Key key, int value) {
+        setValue(key, value);
+    }
+
+    private void setDouble(Key key, double value) {
+        setValue(key, value);
+    }
+
+    private void setValue(Key key, Object value) {
+        Object previous = values.put(key, value);
+        if (Objects.equals(previous, value)) {
+            return;
+        }
+
+        persistValue(key, value);
+        refreshRestartDirtyFlag();
+        notifyListeners(key);
+    }
+
+    private void refreshRestartDirtyFlag() {
+        for (Key key : Key.values()) {
+            if (key.applyMode() != ApplyMode.RESTART_REQUIRED) {
+                continue;
+            }
+            if (!Objects.equals(restartBaseline.get(key), values.get(key))) {
+                restartRequiredDirty = true;
+                return;
+            }
+        }
+        restartRequiredDirty = false;
+    }
+
+    private Object loadValue(Key key) {
+        if (!persistent) {
+            return key.defaultValue();
+        }
+
+        Object defaultValue = key.defaultValue();
+        if (defaultValue instanceof Boolean boolDefault) {
+            return prefs.getBoolean(key.preferenceKey(), boolDefault);
+        }
+        if (defaultValue instanceof Integer intDefault) {
+            return prefs.getInt(key.preferenceKey(), intDefault);
+        }
+        if (defaultValue instanceof Double doubleDefault) {
+            return prefs.getDouble(key.preferenceKey(), doubleDefault);
+        }
+        return defaultValue;
+    }
+
+    private void persistValue(Key key, Object value) {
+        if (!persistent) {
+            return;
+        }
+
+        if (value instanceof Boolean boolValue) {
+            prefs.putBoolean(key.preferenceKey(), boolValue);
+            return;
+        }
+        if (value instanceof Integer intValue) {
+            prefs.putInt(key.preferenceKey(), intValue);
+            return;
+        }
+        if (value instanceof Double doubleValue) {
+            prefs.putDouble(key.preferenceKey(), doubleValue);
+        }
+    }
+
+    private void notifyListeners(Key key) {
+        for (Listener listener : listeners) {
+            try {
+                listener.onSettingChanged(key);
+            } catch (Exception ignored) {
+                // Listener failures must not affect setting writes.
+            }
+        }
+    }
+
+    private static int clampToStep(double value, int min, int max, int step) {
+        int rounded = (int) Math.round(value);
+        int clamped = Math.clamp(rounded, min, max);
+        int steps = Math.round((clamped - min) / (float) step);
+        return min + (steps * step);
+    }
+
+    private static double clampDecimal(double value, double min, double max, double step) {
+        double clamped = Math.clamp(value, min, max);
+        double steps = Math.round((clamped - min) / step);
+        double result = min + (steps * step);
+        return Math.clamp(result, min, max);
+    }
+
+    private static String sanitizeNode(String userId) {
+        String sanitized = userId.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (sanitized.isBlank()) {
+            return "user";
+        }
+        return sanitized;
+    }
+}

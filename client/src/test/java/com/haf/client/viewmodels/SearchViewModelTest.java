@@ -81,6 +81,27 @@ class SearchViewModelTest {
     }
 
     @Test
+    void runtime_page_size_is_clamped_between_ten_and_hundred() {
+        AtomicReference<Integer> receivedLimit = new AtomicReference<>();
+        UserSearchResponse response = UserSearchResponse.success(List.of(
+                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+        SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
+            receivedLimit.set(limit);
+            return JsonCodec.toJson(response);
+        });
+
+        viewModel.setPageSize(500);
+        viewModel.search("Jane");
+        awaitCondition(() -> !viewModel.loadingProperty().get());
+        assertEquals(100, receivedLimit.get());
+
+        viewModel.setPageSize(1);
+        viewModel.search("Jane");
+        awaitCondition(() -> !viewModel.loadingProperty().get());
+        assertEquals(10, receivedLimit.get());
+    }
+
+    @Test
     void loadMore_appends_next_page() {
         AtomicInteger calls = new AtomicInteger();
         AtomicReference<String> secondCursor = new AtomicReference<>();

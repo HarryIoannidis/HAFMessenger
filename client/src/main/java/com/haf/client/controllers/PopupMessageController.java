@@ -13,7 +13,6 @@ import javafx.stage.Stage;
  */
 public class PopupMessageController {
 
-    private static final String DANGER_STYLE_CLASS = "button-action-danger";
 
     // Popup window chrome
     @FXML
@@ -87,9 +86,9 @@ public class PopupMessageController {
         }
         if (actionButton != null) {
             actionButton.setText(spec.actionText());
-            actionButton.getStyleClass().remove(DANGER_STYLE_CLASS);
-            if (spec.dangerAction() && !actionButton.getStyleClass().contains(DANGER_STYLE_CLASS)) {
-                actionButton.getStyleClass().add(DANGER_STYLE_CLASS);
+            actionButton.getStyleClass().remove("button-action-danger");
+            if (spec.dangerAction() && !actionButton.getStyleClass().contains("button-action-danger")) {
+                actionButton.getStyleClass().add("button-action-danger");
             }
         }
         if (cancelButton != null) {

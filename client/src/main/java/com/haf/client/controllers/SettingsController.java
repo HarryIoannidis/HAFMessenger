@@ -1,13 +1,20 @@
 package com.haf.client.controllers;
 
 import com.haf.client.models.SettingsMenuItem;
+import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.SettingsRowBuilder;
+import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
+import com.jfoenix.controls.JFXCheckBox;
+import com.jfoenix.controls.JFXSlider;
+import com.jfoenix.controls.JFXToggleButton;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
@@ -22,15 +29,16 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Controller for the settings popup window.
  */
 public class SettingsController {
 
-    private static final Logger LOGGER = Logger.getLogger(SettingsController.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(SettingsController.class);
 
     // Popup window controls
     @FXML
@@ -80,6 +88,11 @@ public class SettingsController {
 
     private double xOffset;
     private double yOffset;
+    private boolean closingStage;
+
+    private ClientSettings settings = ClientSettings.defaults();
+    private Runnable restartRequestHandler = () -> {
+    };
 
     private final Map<String, VBox> panesById = new LinkedHashMap<>();
     private final List<SettingsMenuItem> menuItems = List.of(
@@ -98,7 +111,31 @@ public class SettingsController {
         setupWindowControls();
         registerPanes();
         buildRows();
+        wireSettingControls();
         setupMenuList();
+    }
+
+    /**
+     * Injects active per-user settings and rebuilds row state.
+     *
+     * @param settings active settings instance
+     */
+    public void setSettings(ClientSettings settings) {
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
+        if (rootContainer != null) {
+            buildRows();
+            wireSettingControls();
+        }
+    }
+
+    /**
+     * Injects restart callback used by the restart-required close popup.
+     *
+     * @param restartRequestHandler callback invoked for "Restart now"
+     */
+    public void setRestartRequestHandler(Runnable restartRequestHandler) {
+        this.restartRequestHandler = restartRequestHandler == null ? () -> {
+        } : restartRequestHandler;
     }
 
     /**
@@ -167,19 +204,19 @@ public class SettingsController {
                             "generalConfirmExitToggle",
                             "Confirm Before Exit",
                             "Show a confirmation dialog before closing the app window.",
-                            true),
+                            settings.isGeneralConfirmExit()),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalRememberWindowStateRow",
                             "generalRememberWindowStateToggle",
                             "Remember Window State",
                             "Restore the previous window size and position when reopening the app.",
-                            true),
+                            settings.isGeneralRememberWindowState()),
                     SettingsRowBuilder.buildCheckboxRow(
                             "generalRestoreLastTabRow",
                             "generalRestoreLastTabCheck",
                             "Restore Last Tab",
                             "Open the last active toolbar tab after startup.",
-                            true));
+                            settings.isGeneralRestoreLastTab()));
         }
 
         if (searchRowsContainer != null) {
@@ -189,13 +226,13 @@ public class SettingsController {
                             "searchInstantOnTypeToggle",
                             "Instant Search While Typing",
                             "Run user search automatically as query text changes.",
-                            false),
+                            settings.isSearchInstantOnType()),
                     SettingsRowBuilder.buildSwitchRow(
                             "searchInfiniteScrollRow",
                             "searchInfiniteScrollToggle",
                             "Enable Infinite Scroll",
                             "Load additional results when reaching the bottom of the results area.",
-                            true),
+                            settings.isSearchInfiniteScroll()),
                     SettingsRowBuilder.buildSliderRow(
                             "searchResultsPerPageRow",
                             "searchResultsPerPageSlider",
@@ -203,7 +240,7 @@ public class SettingsController {
                             "Set how many search results are requested per page.",
                             10.0,
                             100.0,
-                            20.0,
+                            settings.getSearchResultsPerPage(),
                             10.0,
                             true,
                             true),
@@ -212,7 +249,7 @@ public class SettingsController {
                             "searchPreserveLastQueryCheck",
                             "Preserve Last Query",
                             "Keep the last search text when returning to the Search tab.",
-                            false));
+                            settings.isSearchPreserveLastQuery()));
         }
 
         if (mediaRowsContainer != null) {
@@ -222,7 +259,7 @@ public class SettingsController {
                             "mediaHoverZoomToggle",
                             "Enable Hover Zoom",
                             "Apply subtle zoom and cursor-based panning inside image preview.",
-                            true),
+                            settings.isMediaHoverZoom()),
                     SettingsRowBuilder.buildSliderRow(
                             "mediaHoverZoomScaleRow",
                             "mediaHoverZoomScaleSlider",
@@ -230,7 +267,7 @@ public class SettingsController {
                             "Control how strong the preview zoom effect should be.",
                             1.05,
                             1.50,
-                            1.15,
+                            settings.getMediaHoverZoomScale(),
                             0.05,
                             true,
                             true),
@@ -239,13 +276,13 @@ public class SettingsController {
                             "mediaShowDownloadButtonToggle",
                             "Show Download Button",
                             "Display the download action in the preview popup toolbar.",
-                            true),
+                            settings.isMediaShowDownloadButton()),
                     SettingsRowBuilder.buildCheckboxRow(
                             "mediaOpenPreviewOnImageClickRow",
                             "mediaOpenPreviewOnImageClickCheck",
                             "Open Preview On Image Click",
                             "Open the image preview popup when clicking image messages.",
-                            true));
+                            settings.isMediaOpenPreviewOnImageClick()));
         }
 
         if (chatRowsContainer != null) {
@@ -255,19 +292,19 @@ public class SettingsController {
                             "chatSendOnEnterToggle",
                             "Send On Enter",
                             "Send the current draft when pressing Enter in the message field.",
-                            true),
+                            settings.isChatSendOnEnter()),
                     SettingsRowBuilder.buildSwitchRow(
                             "chatAutoScrollToLatestRow",
                             "chatAutoScrollToLatestToggle",
                             "Auto Scroll To Latest",
                             "Keep the message view anchored to the newest message.",
-                            true),
+                            settings.isChatAutoScrollToLatest()),
                     SettingsRowBuilder.buildCheckboxRow(
                             "chatShowMessageTimestampsRow",
                             "chatShowMessageTimestampsCheck",
                             "Show Message Timestamps",
                             "Render sent/received times on each chat bubble.",
-                            true));
+                            settings.isChatShowMessageTimestamps()));
         }
 
         if (notificationsRowsContainer != null) {
@@ -277,7 +314,7 @@ public class SettingsController {
                             "notificationsShowUnreadBadgesToggle",
                             "Show Unread Badges",
                             "Display unread counters on contact rows in the left list.",
-                            true),
+                            settings.isNotificationsShowUnreadBadges()),
                     SettingsRowBuilder.buildSliderRow(
                             "notificationsBadgeCapRow",
                             "notificationsBadgeCapSlider",
@@ -285,7 +322,7 @@ public class SettingsController {
                             "Set the maximum count displayed before switching to a capped badge value.",
                             9.0,
                             99.0,
-                            9.0,
+                            settings.getNotificationsBadgeCap(),
                             9.0,
                             true,
                             true),
@@ -294,7 +331,7 @@ public class SettingsController {
                             "notificationsShowRuntimePopupsCheck",
                             "Show Runtime Popups",
                             "Show runtime issue popup dialogs for recoverable application errors.",
-                            true));
+                            settings.isNotificationsShowRuntimePopups()));
         }
 
         if (privacyRowsContainer != null) {
@@ -304,7 +341,7 @@ public class SettingsController {
                             "privacyBlurOnFocusLossToggle",
                             "Blur On Focus Loss",
                             "Blur sensitive content when the main window loses focus.",
-                            false),
+                            settings.isPrivacyBlurOnFocusLoss()),
                     SettingsRowBuilder.buildSliderRow(
                             "privacyBlurStrengthRow",
                             "privacyBlurStrengthSlider",
@@ -312,7 +349,7 @@ public class SettingsController {
                             "Control the intensity of the privacy blur overlay.",
                             1.0,
                             10.0,
-                            4.0,
+                            settings.getPrivacyBlurStrength(),
                             1.0,
                             true,
                             true),
@@ -321,14 +358,132 @@ public class SettingsController {
                             "privacyConfirmAttachmentOpenCheck",
                             "Confirm Attachment Open",
                             "Ask for confirmation before opening or downloading attachments.",
-                            false),
+                            settings.isPrivacyConfirmAttachmentOpen()),
                     SettingsRowBuilder.buildSwitchRow(
                             "privacyHidePresenceIndicatorsRow",
                             "privacyHidePresenceIndicatorsToggle",
                             "Hide Presence Indicators",
                             "Hide online/offline indicators and related activity status badges.",
-                            false));
+                            settings.isPrivacyHidePresenceIndicators()));
         }
+    }
+
+    /**
+     * Wires row controls directly into the active {@link ClientSettings} instance.
+     */
+    private void wireSettingControls() {
+        wireSwitch("generalConfirmExitRow", "generalConfirmExitToggle", settings::setGeneralConfirmExit);
+        wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
+                settings::setGeneralRememberWindowState);
+        wireCheckbox("generalRestoreLastTabRow", "generalRestoreLastTabCheck", settings::setGeneralRestoreLastTab);
+
+        wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
+        wireSwitch("searchInfiniteScrollRow", "searchInfiniteScrollToggle", settings::setSearchInfiniteScroll);
+        wireSlider("searchResultsPerPageSlider", settings::setSearchResultsPerPage);
+        wireCheckbox("searchPreserveLastQueryRow", "searchPreserveLastQueryCheck", settings::setSearchPreserveLastQuery);
+
+        wireSwitch("mediaHoverZoomRow", "mediaHoverZoomToggle", settings::setMediaHoverZoom);
+        wireSlider("mediaHoverZoomScaleSlider", settings::setMediaHoverZoomScale);
+        wireSwitch("mediaShowDownloadButtonRow", "mediaShowDownloadButtonToggle", settings::setMediaShowDownloadButton);
+        wireCheckbox("mediaOpenPreviewOnImageClickRow", "mediaOpenPreviewOnImageClickCheck",
+                settings::setMediaOpenPreviewOnImageClick);
+
+        wireSwitch("chatSendOnEnterRow", "chatSendOnEnterToggle", settings::setChatSendOnEnter);
+        wireSwitch("chatAutoScrollToLatestRow", "chatAutoScrollToLatestToggle", settings::setChatAutoScrollToLatest);
+        wireCheckbox("chatShowMessageTimestampsRow", "chatShowMessageTimestampsCheck",
+                settings::setChatShowMessageTimestamps);
+
+        wireSwitch("notificationsShowUnreadBadgesRow", "notificationsShowUnreadBadgesToggle",
+                settings::setNotificationsShowUnreadBadges);
+        wireSlider("notificationsBadgeCapSlider", settings::setNotificationsBadgeCap);
+        wireCheckbox("notificationsShowRuntimePopupsRow", "notificationsShowRuntimePopupsCheck",
+                settings::setNotificationsShowRuntimePopups);
+
+        wireSwitch("privacyBlurOnFocusLossRow", "privacyBlurOnFocusLossToggle", settings::setPrivacyBlurOnFocusLoss);
+        wireSlider("privacyBlurStrengthSlider", settings::setPrivacyBlurStrength);
+        wireCheckbox("privacyConfirmAttachmentOpenRow", "privacyConfirmAttachmentOpenCheck",
+                settings::setPrivacyConfirmAttachmentOpen);
+        wireSwitch("privacyHidePresenceIndicatorsRow", "privacyHidePresenceIndicatorsToggle",
+                settings::setPrivacyHidePresenceIndicators);
+    }
+
+    private void wireSwitch(String rowId, String controlId, Consumer<Boolean> sink) {
+        JFXToggleButton toggle = findById(controlId, JFXToggleButton.class);
+        if (toggle == null) {
+            return;
+        }
+        toggle.selectedProperty().addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
+        wireOverlayRowToggle(rowId, () -> toggle.setSelected(!toggle.isSelected()));
+    }
+
+    private void wireCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
+        JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
+        if (checkBox == null) {
+            return;
+        }
+        checkBox.selectedProperty().addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
+        wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
+    }
+
+    private void wireSlider(String controlId, Consumer<Double> sink) {
+        JFXSlider slider = findById(controlId, JFXSlider.class);
+        if (slider == null) {
+            return;
+        }
+        slider.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null) {
+                sink.accept(newValue.doubleValue());
+            }
+        });
+    }
+
+    private void wireOverlayRowToggle(String rowId, Runnable toggleAction) {
+        Node rowNode = findById(rowId, Node.class);
+        if (!(rowNode instanceof Parent parent)) {
+            return;
+        }
+        JFXButton overlayButton = findRowOverlayButton(parent);
+        if (overlayButton != null) {
+            overlayButton.setOnAction(event -> toggleAction.run());
+        }
+    }
+
+    private JFXButton findRowOverlayButton(Parent root) {
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof JFXButton button
+                    && button.getStyleClass().contains("settings-row-overlay-button")) {
+                return button;
+            }
+            if (child instanceof Parent childParent) {
+                JFXButton nested = findRowOverlayButton(childParent);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
+    }
+
+    private <T extends Node> T findById(String nodeId, Class<T> nodeType) {
+        if (nodeId == null || nodeType == null || rootContainer == null) {
+            return null;
+        }
+        return findByIdRecursive(rootContainer, nodeId, nodeType);
+    }
+
+    private static <T extends Node> T findByIdRecursive(Node node, String nodeId, Class<T> nodeType) {
+        if (nodeId.equals(node.getId()) && nodeType.isInstance(node)) {
+            return nodeType.cast(node);
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                T found = findByIdRecursive(child, nodeId, nodeType);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -387,8 +542,15 @@ public class SettingsController {
                 minimizeButton.setOnAction(e -> stage.setIconified(true));
             }
             if (closeButton != null) {
-                closeButton.setOnAction(e -> stage.hide());
+                closeButton.setOnAction(e -> requestClose(stage));
             }
+            stage.setOnCloseRequest(event -> {
+                if (closingStage) {
+                    return;
+                }
+                event.consume();
+                requestClose(stage);
+            });
             if (titleBar != null) {
                 titleBar.setOnMousePressed(event -> {
                     xOffset = event.getSceneX();
@@ -400,6 +562,39 @@ public class SettingsController {
                 });
             }
         });
+    }
+
+    private void requestClose(Stage stage) {
+        if (stage == null) {
+            return;
+        }
+        if (!settings.isRestartRequiredDirty()) {
+            hideStage(stage);
+            return;
+        }
+
+        PopupMessageBuilder.create()
+                .popupKey("popup-settings-restart-required")
+                .title("Restart required")
+                .message("Some changes will apply after restart. Restart now?")
+                .actionText("Restart now")
+                .cancelText("Later")
+                .showCancel(true)
+                .onAction(() -> {
+                    restartRequestHandler.run();
+                    hideStage(stage);
+                })
+                .onCancel(() -> hideStage(stage))
+                .show();
+    }
+
+    private void hideStage(Stage stage) {
+        closingStage = true;
+        try {
+            stage.hide();
+        } finally {
+            closingStage = false;
+        }
     }
 
     /**
@@ -450,7 +645,7 @@ public class SettingsController {
                     overlayButton = button;
                 }
             } catch (IOException ex) {
-                LOGGER.log(Level.SEVERE, "Could not load settings_item_cell.fxml", ex);
+                LOGGER.error( "Could not load settings_item_cell.fxml", ex);
             }
         }
 

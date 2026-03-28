@@ -6,12 +6,12 @@ import javafx.application.Application;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import java.util.Objects;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ClientApp extends Application {
 
-    private static final Logger LOGGER = Logger.getLogger(ClientApp.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientApp.class);
 
     /**
      * Starts the JavaFX application.
@@ -31,7 +31,7 @@ public class ClientApp extends Application {
             primaryStage.getIcons()
                     .add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(UiConstants.IMAGE_APP_LOGO))));
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Warning: App icon not found.", e);
+            LOGGER.warn( "Warning: App icon not found.", e);
         }
 
         // 3. Set the Title

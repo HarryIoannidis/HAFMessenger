@@ -6,11 +6,12 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class WindowResizeHelper {
 
-    private static final Logger LOGGER = Logger.getLogger(WindowResizeHelper.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(WindowResizeHelper.class);
 
     // How many pixels from the edge count as "resize zone".
     private static final int BORDER = 8;
@@ -52,7 +53,7 @@ public final class WindowResizeHelper {
     public static void enableResizing(Stage stage) {
         Scene scene = stage.getScene();
         if (scene == null) {
-            LOGGER.warning("WindowResizeHelper: Scene is null, cannot enable resizing.");
+            LOGGER.warn("WindowResizeHelper: Scene is null, cannot enable resizing.");
             return;
         }
 
