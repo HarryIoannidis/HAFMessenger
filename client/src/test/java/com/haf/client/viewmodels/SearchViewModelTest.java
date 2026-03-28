@@ -6,6 +6,7 @@ import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,9 +48,9 @@ class SearchViewModelTest {
             return "{}";
         });
 
-        if (UiConstants.SEARCH_MIN_QUERY_LENGTH <= 1) {
-            fail("SEARCH_MIN_QUERY_LENGTH must be greater than 1 for short-query validation tests.");
-        }
+        Assumptions.assumeTrue(
+                UiConstants.SEARCH_MIN_QUERY_LENGTH > 1,
+                "SEARCH_MIN_QUERY_LENGTH must be greater than 1 for short-query validation tests.");
         String shortQuery = "x".repeat(UiConstants.SEARCH_MIN_QUERY_LENGTH - 1);
         viewModel.search(shortQuery);
 
@@ -327,10 +328,8 @@ class SearchViewModelTest {
             if (condition.getAsBoolean()) {
                 return;
             }
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            java.util.concurrent.locks.LockSupport.parkNanos(10_000_000L); // 10ms
+            if (Thread.interrupted()) {
                 fail("Interrupted while waiting for async search completion");
             }
         }

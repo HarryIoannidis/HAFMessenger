@@ -17,7 +17,7 @@
 - `Text nameText`: contact display name.
 - `Text regNumberText`: contact registration number.
 - `Circle activenessCircle`: contact presence indicator.
-- `StackPane unreadBadge` + `Text unreadBadgeText`: unread count badge (`9+` cap).
+- `StackPane unreadBadge` + `Text unreadBadgeText`: unread count badge (default cap `10`, configurable up to `100+`).
 - `JFXButton overlayButton`: captures row click/context-menu gestures.
 
 ### Flow

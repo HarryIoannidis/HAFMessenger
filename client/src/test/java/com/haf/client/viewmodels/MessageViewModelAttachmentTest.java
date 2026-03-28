@@ -356,13 +356,16 @@ class MessageViewModelAttachmentTest {
         return JsonCodec.toJson(m).getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void awaitCondition(BooleanSupplier condition) throws InterruptedException {
-        long timeoutAt = System.currentTimeMillis() + 2_000L;
-        while (System.currentTimeMillis() < timeoutAt) {
+    private static void awaitCondition(BooleanSupplier condition) {
+        long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadlineNanos) {
             if (condition.getAsBoolean()) {
                 return;
             }
-            Thread.sleep(10);
+            java.util.concurrent.locks.LockSupport.parkNanos(10_000_000L); // 10ms
+            if (Thread.interrupted()) {
+                fail("Interrupted while waiting for condition");
+            }
         }
         fail("Condition not met within timeout");
     }
@@ -460,11 +463,10 @@ class MessageViewModelAttachmentTest {
             if (delayMs <= 0) {
                 return;
             }
-            try {
-                Thread.sleep(delayMs);
-            } catch (InterruptedException e) {
+            java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(delayMs));
+            if (Thread.interrupted()) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+                throw new RuntimeException(new InterruptedException());
             }
         }
     }

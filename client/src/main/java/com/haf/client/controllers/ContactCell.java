@@ -24,7 +24,7 @@ public class ContactCell extends ListCell<ContactInfo> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ContactCell.class);
     private static volatile boolean showUnreadBadges = true;
-    private static volatile int unreadBadgeCap = 9;
+    private static volatile int unreadBadgeCap = 10;
     private static volatile boolean hidePresenceIndicators;
 
     private static byte[] cachedFXMLBytes;
@@ -62,9 +62,11 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Registers a click callback for the overlay button that covers the cell content.
+     * Registers a click callback for the overlay button that covers the cell
+     * content.
      *
-     * @param clickCallback callback invoked after selection is updated; may be {@code null}
+     * @param clickCallback callback invoked after selection is updated; may be
+     *                      {@code null}
      */
     public void setOnClick(Runnable clickCallback) {
         ensureLoaded();
@@ -72,7 +74,8 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Registers a context-menu callback for right-click requests on the cell overlay.
+     * Registers a context-menu callback for right-click requests on the cell
+     * overlay.
      *
      * @param handler handler invoked with contact and screen coordinates
      */
@@ -82,7 +85,8 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Creates a contact cell. FXML is loaded lazily on first render to reduce eager startup cost.
+     * Creates a contact cell. FXML is loaded lazily on first render to reduce eager
+     * startup cost.
      */
     public ContactCell() {
         // We move the loading logic out of the constructor to avoid
@@ -99,18 +103,19 @@ public class ContactCell extends ListCell<ContactInfo> {
 
         try {
             var resource = getClass().getResource(UiConstants.FXML_CONTACT_CELL);
-            LOGGER.info( "Loading contact cell FXML: {}", resource);
+            LOGGER.info("Loading contact cell FXML: {}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
 
             loadFXML(loader);
             bindReferences(loader);
         } catch (IOException e) {
-            LOGGER.error( "Could not load contact_cell.fxml", e);
+            LOGGER.error("Could not load contact_cell.fxml", e);
         }
     }
 
     /**
-     * Ensures the contact-cell FXML bytes are cached in memory for subsequent fast loads.
+     * Ensures the contact-cell FXML bytes are cached in memory for subsequent fast
+     * loads.
      *
      * @throws IOException when stream read fails
      */
@@ -162,9 +167,11 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Installs left-click behavior that selects the row and then invokes the optional callback.
+     * Installs left-click behavior that selects the row and then invokes the
+     * optional callback.
      *
-     * @param clickCallback callback invoked after row selection; may be {@code null}
+     * @param clickCallback callback invoked after row selection; may be
+     *                      {@code null}
      */
     private void installClickHandler(Runnable clickCallback) {
         if (overlayButton == null) {
@@ -182,7 +189,8 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Installs right-click behavior and dispatches delayed context-menu requests for smoother UX.
+     * Installs right-click behavior and dispatches delayed context-menu requests
+     * for smoother UX.
      *
      * @param handler context-menu request handler
      */
@@ -244,10 +252,11 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Updates row visuals for the current contact item or clears visuals when row becomes empty.
+     * Updates row visuals for the current contact item or clears visuals when row
+     * becomes empty.
      *
      * @param contact contact item assigned to this cell
-     * @param empty JavaFX empty-row flag
+     * @param empty   JavaFX empty-row flag
      */
     @Override
     protected void updateItem(ContactInfo contact, boolean empty) {
@@ -269,7 +278,7 @@ public class ContactCell extends ListCell<ContactInfo> {
     /**
      * Determines whether the current row should be treated as empty.
      *
-     * @param empty JavaFX empty flag
+     * @param empty   JavaFX empty flag
      * @param contact assigned contact item
      * @return {@code true} when row is empty or contact is absent
      */
@@ -327,7 +336,8 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Applies activeness indicator visibility and color based on contact presence fields.
+     * Applies activeness indicator visibility and color based on contact presence
+     * fields.
      *
      * @param contact contact model
      */
@@ -411,9 +421,9 @@ public class ContactCell extends ListCell<ContactInfo> {
      * Retrieves and casts a node/object from an FXMLLoader namespace map.
      *
      * @param namespace loader namespace map
-     * @param key namespace key
-     * @param type expected runtime type
-     * @param <T> expected type parameter
+     * @param key       namespace key
+     * @param type      expected runtime type
+     * @param <T>       expected type parameter
      * @return cast value when key exists and matches type, otherwise {@code null}
      */
     private static <T> T asNamespaceNode(Map<String, Object> namespace, String key, Class<T> type) {
@@ -438,7 +448,8 @@ public class ContactCell extends ListCell<ContactInfo> {
     }
 
     /**
-     * Formats unread badge text with capped display style (for example {@code 9+}).
+     * Formats unread badge text with capped display style (for example
+     * {@code 10+}).
      *
      * @param unreadCount unread count value
      * @return badge label text

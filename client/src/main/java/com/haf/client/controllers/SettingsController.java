@@ -24,12 +24,14 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
-import org.kordamp.ikonli.javafx.FontIcon;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
+import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,9 @@ import org.slf4j.LoggerFactory;
 public class SettingsController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsController.class);
+    private static final String RESTART_HANDLER_KEY = "settings.restartRequestHandler";
+    private static final Runnable NO_OP_RESTART_HANDLER = () -> {
+    };
 
     // Popup window controls
     @FXML
@@ -88,11 +93,8 @@ public class SettingsController {
 
     private double xOffset;
     private double yOffset;
-    private boolean closingStage;
 
     private ClientSettings settings = ClientSettings.defaults();
-    private Runnable restartRequestHandler = () -> {
-    };
 
     private final Map<String, VBox> panesById = new LinkedHashMap<>();
     private final List<SettingsMenuItem> menuItems = List.of(
@@ -134,8 +136,7 @@ public class SettingsController {
      * @param restartRequestHandler callback invoked for "Restart now"
      */
     public void setRestartRequestHandler(Runnable restartRequestHandler) {
-        this.restartRequestHandler = restartRequestHandler == null ? () -> {
-        } : restartRequestHandler;
+        storeRestartRequestHandler(restartRequestHandler == null ? NO_OP_RESTART_HANDLER : restartRequestHandler);
     }
 
     /**
@@ -227,6 +228,12 @@ public class SettingsController {
                             "Instant Search While Typing",
                             "Run user search automatically as query text changes.",
                             settings.isSearchInstantOnType()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "searchAutoOpenFilterOnFirstSearchRow",
+                            "searchAutoOpenFilterOnFirstSearchToggle",
+                            "Auto Open Filter On First Search",
+                            "Open the filter popup before executing the first search in the Search tab.",
+                            settings.isSearchAutoOpenFilterOnFirstSearch()),
                     SettingsRowBuilder.buildSwitchRow(
                             "searchInfiniteScrollRow",
                             "searchInfiniteScrollToggle",
@@ -320,10 +327,10 @@ public class SettingsController {
                             "notificationsBadgeCapSlider",
                             "Unread Badge Cap",
                             "Set the maximum count displayed before switching to a capped badge value.",
-                            9.0,
-                            99.0,
+                            10.0,
+                            100.0,
                             settings.getNotificationsBadgeCap(),
-                            9.0,
+                            10.0,
                             true,
                             true),
                     SettingsRowBuilder.buildCheckboxRow(
@@ -378,6 +385,8 @@ public class SettingsController {
         wireCheckbox("generalRestoreLastTabRow", "generalRestoreLastTabCheck", settings::setGeneralRestoreLastTab);
 
         wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
+        wireSwitch("searchAutoOpenFilterOnFirstSearchRow", "searchAutoOpenFilterOnFirstSearchToggle",
+                settings::setSearchAutoOpenFilterOnFirstSearch);
         wireSwitch("searchInfiniteScrollRow", "searchInfiniteScrollToggle", settings::setSearchInfiniteScroll);
         wireSlider("searchResultsPerPageSlider", settings::setSearchResultsPerPage);
         wireCheckbox("searchPreserveLastQueryRow", "searchPreserveLastQueryCheck", settings::setSearchPreserveLastQuery);
@@ -425,7 +434,7 @@ public class SettingsController {
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
-    private void wireSlider(String controlId, Consumer<Double> sink) {
+    private void wireSlider(String controlId, DoubleConsumer sink) {
         JFXSlider slider = findById(controlId, JFXSlider.class);
         if (slider == null) {
             return;
@@ -537,19 +546,20 @@ public class SettingsController {
             if (stage == null) {
                 return;
             }
+            AtomicBoolean closingStage = new AtomicBoolean(false);
 
             if (minimizeButton != null) {
                 minimizeButton.setOnAction(e -> stage.setIconified(true));
             }
             if (closeButton != null) {
-                closeButton.setOnAction(e -> requestClose(stage));
+                closeButton.setOnAction(e -> requestClose(stage, closingStage));
             }
             stage.setOnCloseRequest(event -> {
-                if (closingStage) {
+                if (closingStage.get()) {
                     return;
                 }
                 event.consume();
-                requestClose(stage);
+                requestClose(stage, closingStage);
             });
             if (titleBar != null) {
                 titleBar.setOnMousePressed(event -> {
@@ -564,12 +574,12 @@ public class SettingsController {
         });
     }
 
-    private void requestClose(Stage stage) {
+    private void requestClose(Stage stage, AtomicBoolean closingStage) {
         if (stage == null) {
             return;
         }
         if (!settings.isRestartRequiredDirty()) {
-            hideStage(stage);
+            hideStage(stage, closingStage);
             return;
         }
 
@@ -581,20 +591,38 @@ public class SettingsController {
                 .cancelText("Later")
                 .showCancel(true)
                 .onAction(() -> {
-                    restartRequestHandler.run();
-                    hideStage(stage);
+                    resolveRestartRequestHandler().run();
+                    hideStage(stage, closingStage);
                 })
-                .onCancel(() -> hideStage(stage))
+                .onCancel(() -> hideStage(stage, closingStage))
                 .show();
     }
 
-    private void hideStage(Stage stage) {
-        closingStage = true;
+    private void hideStage(Stage stage, AtomicBoolean closingStage) {
+        closingStage.set(true);
         try {
             stage.hide();
         } finally {
-            closingStage = false;
+            closingStage.set(false);
         }
+    }
+
+    private void storeRestartRequestHandler(Runnable restartRequestHandler) {
+        if (rootContainer == null) {
+            return;
+        }
+        rootContainer.getProperties().put(RESTART_HANDLER_KEY, restartRequestHandler);
+    }
+
+    private Runnable resolveRestartRequestHandler() {
+        if (rootContainer == null) {
+            return NO_OP_RESTART_HANDLER;
+        }
+        Object value = rootContainer.getProperties().get(RESTART_HANDLER_KEY);
+        if (value instanceof Runnable runnable) {
+            return runnable;
+        }
+        return NO_OP_RESTART_HANDLER;
     }
 
     /**

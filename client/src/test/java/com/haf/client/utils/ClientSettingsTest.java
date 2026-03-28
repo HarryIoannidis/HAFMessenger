@@ -35,6 +35,7 @@ class ClientSettingsTest {
         assertTrue(defaults.isGeneralRememberWindowState());
         assertTrue(defaults.isGeneralRestoreLastTab());
         assertFalse(defaults.isSearchInstantOnType());
+        assertTrue(defaults.isSearchAutoOpenFilterOnFirstSearch());
         assertTrue(defaults.isSearchInfiniteScroll());
         assertEquals(20, defaults.getSearchResultsPerPage());
         assertFalse(defaults.isSearchPreserveLastQuery());
@@ -46,7 +47,7 @@ class ClientSettingsTest {
         assertTrue(defaults.isChatAutoScrollToLatest());
         assertTrue(defaults.isChatShowMessageTimestamps());
         assertTrue(defaults.isNotificationsShowUnreadBadges());
-        assertEquals(9, defaults.getNotificationsBadgeCap());
+        assertEquals(10, defaults.getNotificationsBadgeCap());
         assertTrue(defaults.isNotificationsShowRuntimePopups());
         assertFalse(defaults.isPrivacyBlurOnFocusLoss());
         assertEquals(4.0, defaults.getPrivacyBlurStrength(), 0.0001);
@@ -90,9 +91,9 @@ class ClientSettingsTest {
         assertEquals(50, settings.getSearchResultsPerPage());
 
         settings.setNotificationsBadgeCap(2);
-        assertEquals(9, settings.getNotificationsBadgeCap());
+        assertEquals(10, settings.getNotificationsBadgeCap());
         settings.setNotificationsBadgeCap(95);
-        assertEquals(99, settings.getNotificationsBadgeCap());
+        assertEquals(100, settings.getNotificationsBadgeCap());
 
         settings.setMediaHoverZoomScale(1.12);
         assertEquals(1.10, settings.getMediaHoverZoomScale(), 0.0001);
@@ -106,12 +107,14 @@ class ClientSettingsTest {
 
         settings.setGeneralConfirmExit(false);
         settings.setChatSendOnEnter(false);
+        settings.setSearchAutoOpenFilterOnFirstSearch(false);
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
         assertFalse(reloaded.isChatSendOnEnter());
+        assertFalse(reloaded.isSearchAutoOpenFilterOnFirstSearch());
         assertEquals(50, reloaded.getSearchResultsPerPage());
-        assertEquals(99, reloaded.getNotificationsBadgeCap());
+        assertEquals(100, reloaded.getNotificationsBadgeCap());
         assertEquals(1.50, reloaded.getMediaHoverZoomScale(), 0.0001);
         assertEquals(9.0, reloaded.getPrivacyBlurStrength(), 0.0001);
     }

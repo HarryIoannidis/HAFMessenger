@@ -9,15 +9,16 @@ class ClockProviderTest {
     void systemClockProvider_returns_current_time() {
         ClockProvider clock = SystemClockProvider.getInstance();
         long time1 = clock.currentTimeMillis();
-        
-        // Small delay
-        try {
-            Thread.sleep(10);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        long time2 = time1;
+        long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(1);
+
+        while (time2 - time1 < 10 && System.nanoTime() < deadlineNanos) {
+            java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L); // 1ms
+            if (Thread.interrupted()) {
+                fail("Interrupted while waiting for time to advance");
+            }
+            time2 = clock.currentTimeMillis();
         }
-        
-        long time2 = clock.currentTimeMillis();
         
         assertTrue(time2 > time1, "Time should advance");
         assertTrue(time2 - time1 >= 10, "Time difference should be at least 10ms");

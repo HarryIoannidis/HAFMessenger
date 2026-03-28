@@ -30,6 +30,7 @@ public final class ClientSettings {
         GENERAL_RESTORE_LAST_TAB("general.restore_last_tab", true, ApplyMode.RESTART_REQUIRED),
 
         SEARCH_INSTANT_ON_TYPE("search.instant_on_type", false, ApplyMode.IMMEDIATE),
+        SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH("search.auto_open_filter_on_first_search", true, ApplyMode.IMMEDIATE),
         SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
         SEARCH_RESULTS_PER_PAGE("search.results_per_page", 20, ApplyMode.IMMEDIATE),
         SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", false, ApplyMode.IMMEDIATE),
@@ -44,7 +45,7 @@ public final class ClientSettings {
         CHAT_SHOW_MESSAGE_TIMESTAMPS("chat.show_message_timestamps", true, ApplyMode.IMMEDIATE),
 
         NOTIFICATIONS_SHOW_UNREAD_BADGES("notifications.show_unread_badges", true, ApplyMode.IMMEDIATE),
-        NOTIFICATIONS_BADGE_CAP("notifications.badge_cap", 9, ApplyMode.IMMEDIATE),
+        NOTIFICATIONS_BADGE_CAP("notifications.badge_cap", 10, ApplyMode.IMMEDIATE),
         NOTIFICATIONS_SHOW_RUNTIME_POPUPS("notifications.show_runtime_popups", true, ApplyMode.IMMEDIATE),
 
         PRIVACY_BLUR_ON_FOCUS_LOSS("privacy.blur_on_focus_loss", false, ApplyMode.IMMEDIATE),
@@ -196,6 +197,14 @@ public final class ClientSettings {
         setBoolean(Key.SEARCH_INSTANT_ON_TYPE, enabled);
     }
 
+    public boolean isSearchAutoOpenFilterOnFirstSearch() {
+        return getBoolean(Key.SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH);
+    }
+
+    public void setSearchAutoOpenFilterOnFirstSearch(boolean enabled) {
+        setBoolean(Key.SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH, enabled);
+    }
+
     public boolean isSearchInfiniteScroll() {
         return getBoolean(Key.SEARCH_INFINITE_SCROLL);
     }
@@ -289,7 +298,7 @@ public final class ClientSettings {
     }
 
     public void setNotificationsBadgeCap(double value) {
-        setInt(Key.NOTIFICATIONS_BADGE_CAP, clampToStep(value, 9, 99, 9));
+        setInt(Key.NOTIFICATIONS_BADGE_CAP, clampToStep(value, 10, 100, 10));
     }
 
     public boolean isNotificationsShowRuntimePopups() {
@@ -481,7 +490,8 @@ public final class ClientSettings {
         int rounded = (int) Math.round(value);
         int clamped = Math.clamp(rounded, min, max);
         int steps = Math.round((clamped - min) / (float) step);
-        return min + (steps * step);
+        int result = min + (steps * step);
+        return Math.clamp(result, min, max);
     }
 
     private static double clampDecimal(double value, double min, double max, double step) {
