@@ -472,10 +472,8 @@ class MainViewModelTest {
             if (condition.getAsBoolean()) {
                 return;
             }
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            java.util.concurrent.locks.LockSupport.parkNanos(10_000_000L);
+            if (Thread.interrupted()) {
                 fail("Interrupted while waiting for async operation");
             }
         }

@@ -380,6 +380,7 @@ public class MainController implements SearchController.ContactActions {
         searchFilterUi = new SearchFilterController(
                 this::executeSearchWithFilters,
                 this::onSearchExecuted);
+        applySearchFilterSettings();
 
         if (filterButton != null) {
             filterButton.setOnAction(e -> searchFilterUi.onFilterButtonTrigger(
@@ -1138,6 +1139,7 @@ public class MainController implements SearchController.ContactActions {
     }
 
     private void applyImmediateSettings() {
+        applySearchFilterSettings();
         applyContactCellSettings();
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
@@ -1145,6 +1147,7 @@ public class MainController implements SearchController.ContactActions {
     private void registerSettingsListener() {
         settings.addListener(key -> Platform.runLater(() -> {
             switch (key) {
+                case SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH -> applySearchFilterSettings();
                 case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP, PRIVACY_HIDE_PRESENCE_INDICATORS ->
                         applyContactCellSettings();
                 case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
@@ -1156,6 +1159,12 @@ public class MainController implements SearchController.ContactActions {
                 }
             }
         }));
+    }
+
+    private void applySearchFilterSettings() {
+        if (searchFilterUi != null) {
+            searchFilterUi.setAutoOpenFilterOnFirstSearch(settings.isSearchAutoOpenFilterOnFirstSearch());
+        }
     }
 
     private void applyContactCellSettings() {

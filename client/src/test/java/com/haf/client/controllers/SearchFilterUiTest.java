@@ -27,6 +27,21 @@ class SearchFilterUiTest {
     }
 
     @Test
+    void first_search_executes_immediately_when_auto_open_filter_is_disabled() {
+        StubPopup popup = new StubPopup();
+        StubSearchExecutor searchExecutor = new StubSearchExecutor();
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
+        });
+        flow.setAutoOpenFilterOnFirstSearch(false);
+
+        flow.onSearchTrigger("john", null);
+
+        assertEquals(0, popup.showCalls.get());
+        assertEquals(1, searchExecutor.calls.get());
+        assertFalse(flow.isApplyRequiredBeforeSearch());
+    }
+
+    @Test
     void apply_executes_search_and_disables_first_search_gate() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();

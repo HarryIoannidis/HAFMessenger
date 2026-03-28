@@ -67,6 +67,7 @@ final class SearchFilterController {
         private final Runnable onSearchExecuted;
 
         private boolean requireApplyBeforeSearch = true;
+        private boolean autoOpenFilterOnFirstSearch = true;
         private SearchSortViewModel.SortOptions selectedOptions = SearchSortViewModel.SortOptions.DEFAULT;
         private String pendingQuery = "";
 
@@ -107,8 +108,11 @@ final class SearchFilterController {
 
             pendingQuery = normalized;
             if (requireApplyBeforeSearch) {
-                openPopup(anchor, true);
-                return;
+                if (autoOpenFilterOnFirstSearch) {
+                    openPopup(anchor, true);
+                    return;
+                }
+                requireApplyBeforeSearch = false;
             }
 
             executeSearch(normalized);
@@ -154,6 +158,17 @@ final class SearchFilterController {
          */
         boolean isApplyRequiredBeforeSearch() {
             return requireApplyBeforeSearch;
+        }
+
+        /**
+         * Enables/disables auto opening the filter popup on the first search trigger
+         * in the current search session.
+         *
+         * @param enabled {@code true} to auto open filter popup, {@code false} to
+         *                execute the first search immediately
+         */
+        void setAutoOpenFilterOnFirstSearch(boolean enabled) {
+            autoOpenFilterOnFirstSearch = enabled;
         }
 
         /**
@@ -304,6 +319,17 @@ final class SearchFilterController {
      */
     void onClear() {
         flow.onClear();
+    }
+
+    /**
+     * Updates whether the filter popup should auto-open on the first search
+     * trigger.
+     *
+     * @param enabled {@code true} to open popup first, {@code false} to execute
+     *                search directly
+     */
+    void setAutoOpenFilterOnFirstSearch(boolean enabled) {
+        flow.setAutoOpenFilterOnFirstSearch(enabled);
     }
 
     /**
