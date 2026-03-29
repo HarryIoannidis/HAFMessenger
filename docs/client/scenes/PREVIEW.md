@@ -1,40 +1,31 @@
 # PREVIEW
 
-### Screen objective
-- Show an image preview popup from chat media messages.
-- Support saving the image locally when download is allowed.
-- Keep the popup lightweight, draggable, and resizable.
+## Purpose
+Describe the attachment preview scene for viewing/downloading media or files.
 
-### FXML
-- `preview.fxml`
+## Current Implementation
+- Controller: `PreviewController`.
+- View: `preview.fxml`.
+- Used for user-initiated preview flows from chat context actions.
+- Supports in-app image preview and save/download flows for attachment payloads.
 
-### Architecture
-- **Controller**: `PreviewController`.
-- **Opened from**: `ChatController.openImagePreview(...)` through `ViewRouter.showPopup(...)`.
-- **Pattern**: popup controller with imperative setup (`showImage(...)`).
+## Key Types/Interfaces
+- `client.controllers.PreviewController`
+- `client.utils.ImageSaveSupport`
+- `client.utils.ViewRouter`
 
-### UI elements
-- `HBox titleBar`: custom drag area.
-- `JFXButton minimizeButton`, `JFXButton closeButton`: window controls.
-- `ImageView previewImageView`: image display area (preserve ratio).
-- `ProgressIndicator loadingSpinner`: shown while image is loading.
-- `JFXButton downloadButton`: save image action.
+## Flow
+1. User triggers preview action from chat/message context.
+2. Preview scene/controller receives payload metadata/content.
+3. Controller loads the image asynchronously and manages spinner/hover-zoom behavior.
+4. Download action resolves local source path and opens save dialog when allowed.
+5. User can inspect and optionally save/download content.
 
-### Flow
-1. `ChatController` opens popup using `UiConstants.FXML_PREVIEW`.
-2. `PreviewController.showImage(source, suggestedName, downloadAllowed)`:
-   - stores source metadata
-   - enables/disables download button
-   - starts async image loading
-3. While loading:
-   - spinner is visible
-   - on completion, image is scaled to max 400x400 and stage is resized to scene
-4. Download action:
-   - resolves local file path via `ImageSaveSupport.resolveLocalSourcePath(...)`
-   - opens `FileChooser`
-   - copies file to destination with replace semantics
+## Error/Security Notes
+- Preview flow should avoid auto-executing external content.
+- File save paths and failures are surfaced to user safely.
 
-### Window behavior
-- Popup stage uses transparent shell from `ViewRouter`.
-- `PreviewController` enables drag-to-move and resize (`WindowResizeHelper.enableResizing`).
-- Close button hides the popup stage (does not terminate app).
+## Related Files
+- `client/src/main/resources/fxml/preview.fxml`
+- `client/src/main/java/com/haf/client/controllers/PreviewController.java`
+- `client/src/main/resources/css/preview.css`

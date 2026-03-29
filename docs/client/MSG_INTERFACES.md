@@ -1,50 +1,39 @@
 # MSG_INTERFACES
 
-## MessageSender
+## Purpose
+Define current client messaging interfaces used by ViewModels/controllers.
 
-### Purpose
-- Defines the contract for sending encrypted messages over the network to the client.
+## Current Implementation
+- `MessageSender` supports plaintext send, encrypt-only, send-encrypted, and attachment-related REST operations.
+- `MessageReceiver` supports websocket receive lifecycle plus envelope acknowledgement and detached decrypt helper.
+- Implementations are `DefaultMessageSender` and `DefaultMessageReceiver`.
 
-### Architecture
-- Interface: `MessageSender` with method `void send(EncryptedMessage message) throws Exception`.
-- Implemented by `DefaultMessageSender`.
+## Key Types/Interfaces
+- `client.network.MessageSender`
+  - `sendMessage(...)`
+  - `sendMessageWithResult(...)`
+  - `encryptMessage(...)`
+  - `sendEncryptedMessage(...)`
+  - attachment operations (`init`, `chunk`, `complete`, `bind`, `download`)
+- `client.network.MessageReceiver`
+  - `setMessageListener(...)`
+  - `start()` / `stop()`
+  - `acknowledgeEnvelopes(senderId)`
+  - `decryptDetachedMessage(...)`
 
-### Flow
-- Receives `EncryptedMessage` (already encrypted by MessageEncryptor).
-- Validates with `MessageValidator.validateEncryptedMessage()`.
-- Serializes to JSON with `JsonCodec.toJson()` (strict mode: FAIL_ON_UNKNOWN_PROPERTIES).
-- Transmits via `WebSocketAdapter.sendText(json)`.
+## Flow
+1. Outbound UI actions call `MessageSender` APIs.
+2. Sender builds/validates encrypted envelopes and submits authenticated HTTPS calls.
+3. Receiver consumes websocket traffic, decrypts valid envelopes, and emits listener callbacks.
+4. Receiver acks envelope ids to mark delivery on server side.
 
-### Security rules
-- Does not log payloads (ciphertextB64, ephemeralPublicB64, ivB64, tagB64).
-- Logs only identifiers: senderId, recipientId, timestamp, error types.
-- Validation failure → exception, not silent drop.
+## Error/Security Notes
+- Structural validation uses `MessageValidator.validate(...)`.
+- Key lookup failures propagate as `KeyNotFoundException`.
+- Receiver errors are surfaced through `MessageListener.onError(...)`.
 
----
-
-## MessageReceiver
-
-### Purpose
-- Defines the contract for receiving encrypted messages from the network.
-
-### Dependencies
-- `WebSocketAdapter`: transport layer.
-- `MessageValidator`: structural validation.
-- `JsonCodec`: JSON deserialization with strict mode.
-- `Logger`: logging without payloads.
-
-### Receive flow
-1. Constructor injection: `WebSocketAdapter adapter`.
-2. `onMessage(String jsonText)`:
-    - `JsonCodec.fromJson(jsonText, EncryptedMessage.class)` → strict JSON parsing.
-    - `MessageValidator.validateEncryptedMessage(m)` → throws on failure.
-    - Dispatch to registered `MessageListener`.
-3. Exception handling:
-    - Validation → `IllegalArgumentException`.
-    - JSON deserialization → `JsonProcessingException`.
-    - Network → propagated from adapter.
-
-### Security rules
-- Log format: `"Received message: sender={}, recipient={}, timestamp={}"` (no ciphertext/keys).
-- Does not perform retry at this layer (retry in WebSocketAdapter).
-- Validation before processing for fast-fail.
+## Related Files
+- `client/src/main/java/com/haf/client/network/MessageSender.java`
+- `client/src/main/java/com/haf/client/network/MessageReceiver.java`
+- `client/src/main/java/com/haf/client/network/DefaultMessageSender.java`
+- `client/src/main/java/com/haf/client/network/DefaultMessageReceiver.java`

@@ -1,31 +1,34 @@
 # VALIDATION
 
-### Purpose
-- Specifies rules and control steps for EncryptedMessage before decrypting.
+## Purpose
+Describe implemented validation rules for encrypted message envelopes.
 
-### Field rules
-- version: equal to MessageHeader.VERSION, otherwise reject.
-- algorithm: must equal `MessageHeader.ALGO_AEAD` (`"AES-256-GCM+X25519"`), otherwise reject.
-- senderId/recipientId: non-space, within character policy.
-- timestampEpochMs: > 0.
-- ttlSeconds: within [MIN_TTL_SECONDS, MAX_TTL_SECONDS].
-- ivB64: decode to 12 bytes.
-- ephemeralPublicB64: non‑empty.
-- ciphertextB64/tagB64: non‑empty, tag 16 bytes.
-- contentType: acceptable whitelist values.
-- contentLength: 0 ≤ length ≤ MAX_CONTENT_LENGTH.
+## Current Implementation
+- Primary validator: `MessageValidator.validate(...)`.
+- Additional helpers:
+  - `validateOrCollectErrors(...)`
+  - `validateRecipientOrThrow(...)`
+- Validation covers protocol version/algo, ids, ttl, timestamp, content type, base64 fields, and size constraints.
+- Error codes include targeted categories (`BAD_VERSION`, `BAD_TTL`, `BAD_IV`, `BAD_TAG`, `BAD_CONTENT_TYPE`, etc.) for diagnostics and tests.
 
-### Time Policies
-- now ≤ timestampEpochMs + ttlSeconds; otherwise "Message expired".
-- Optional: skew control, e.g. now + ALLOWED_SKEW ≥ timestampEpochMs.
+## Key Types/Interfaces
+- `shared.utils.MessageValidator`
+- `shared.utils.MessageValidator.ErrorCode`
+- `shared.constants.MessageHeader`
+- `shared.exceptions.MessageValidationException`
 
-### Recipient binding
-- Confirm that m.recipientId matches the local user/key.
+## Flow
+1. Validate DTO and collect policy violations.
+2. Throw/propagate validation exception when violations exist.
+3. Recipient-specific check is applied before decrypt in receive paths.
+4. Callers map validation failures to HTTP/client-safe error surfaces.
 
-### AAD canonicalization
-- decrypt rebuilds AAD from DTO; Any header/meta change causes an error tag.
+## Error/Security Notes
+- Validation is required before encrypt send and before decrypt receive.
+- Content-type allowlist and TTL bounds are enforced consistently.
+- Recipient mismatch is treated as hard failure.
 
-### Errors / exceptions
-- IllegalArgumentException for schema/policy violations.
-- IllegalStateException for expiry.
-- AEADBadTagException for Integrity/Identity (GCM).
+## Related Files
+- `shared/src/main/java/com/haf/shared/utils/MessageValidator.java`
+- `shared/src/main/java/com/haf/shared/constants/MessageHeader.java`
+- `shared/src/main/java/com/haf/shared/exceptions/MessageValidationException.java`

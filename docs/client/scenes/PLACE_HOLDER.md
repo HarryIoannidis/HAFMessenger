@@ -1,27 +1,29 @@
 # PLACE_HOLDER
 
-### Screen objective
-- Display a neutral empty-state view when no conversation is selected.
-- Guide the user to start a chat from the contacts list or search flow.
+## Purpose
+Describe the empty-state scene shown when no chat recipient is selected.
 
-### FXML
-- `place_holder.fxml`
+## Current Implementation
+- View file: `place_holder.fxml`.
+- Loaded by `MainContentLoader`/`MainController` into the main content pane.
+- Shows empty-chat illustration and guidance text.
+- Acts as the default center-pane content after login until a contact is selected.
 
-### Architecture
-- **Controller**: none (static view).
-- **Loader**: `MainContentLoader` lazily loads and caches this view.
-- **Usage**: shown in the main content pane when there is no active chat.
+## Key Types/Interfaces
+- `client.controllers.MainContentLoader`
+- `client.controllers.MainController`
+- placeholder FXML/CSS resources
 
-### UI elements
-- `Text`: "No chat selected..."
-- `Text`: "Start by opening a chat."
-- `ImageView`: empty chat illustration (`/images/misc/empty_chat.png`)
+## Flow
+1. Main shell has no active recipient.
+2. Content loader inserts placeholder scene.
+3. Selecting a contact replaces placeholder with chat scene.
 
-### Flow
-1. `MainContentLoader.ensurePlaceholderLoaded()` loads `place_holder.fxml` once.
-2. `MainContentLoader.showPlaceholder()` swaps the cached view into `contentPane`.
-3. `MainController` requests placeholder when no contact is selected or after tab state changes that clear active chat.
+## Error/Security Notes
+- Placeholder state should be safe fallback when chat view cannot be loaded.
+- Placeholder view is static UI only (no credential/network side effects).
 
-### Notes
-- The view uses `global.css` only.
-- This file is intentionally simple and does not require a dedicated controller.
+## Related Files
+- `client/src/main/resources/fxml/place_holder.fxml`
+- `client/src/main/resources/images/misc/empty_chat.png`
+- `client/src/main/java/com/haf/client/controllers/MainContentLoader.java`

@@ -1,49 +1,38 @@
 # KEYSTORE
 
-### Purpose
-- Single path policy, automatic keychain bootstrap and standardized sealing/IO so that dev/IDE works without overrides and production uses system path with strong private encryption.
+## Purpose
+Describe current keystore root policy, bootstrap, and sealing behavior.
 
-### Key Type
-- X25519 (Curve25519) for ECDH key agreement.
-- Generated via `EccKeyIO.generate()` using `KeyPairGenerator("XDH")`.
-- Public key: X.509 SPKI DER in PEM format.
-- Private key: PKCS#8 DER, sealed with AES-GCM.
+## Current Implementation
+- Root selection priority:
+  1. JVM property `haf.keystore.root`
+  2. env `HAF_KEYSTORE_ROOT`
+  3. OS preferred path (`/var/lib/haf/keystore` or `%ProgramData%\HAF\keystore`)
+- Fallback path from `KeystoreRoot.userFallback()`.
+- `UserKeystore` stores key directories with `public.pem`, `private.enc`, `metadata.json`.
+- `KeystoreSealing` uses PBKDF2-HMAC-SHA256 + AES-GCM envelope format `v1.<salt>.<iv>.<ciphertext>`.
+- `KeystoreBootstrap` can create initial key material and fallback to user path when privileged paths are unavailable.
 
-### Policy
-- Priority: JVM `haf.keystore.root` → ENV `HAF_KEYSTORE_ROOT` → OS default.
-- OS default: Linux `/var/lib/haf/keystore`, Windows `%ProgramData%\HAF\keystore`.
-- Fallback: Linux `~/.local/share/haf/keystore`, Windows `%LOCALAPPDATA%\HAF\keystore`.
+## Key Types/Interfaces
+- `shared.keystore.KeystoreRoot`
+- `shared.keystore.KeystoreBootstrap`
+- `shared.keystore.UserKeystore`
+- `shared.keystore.KeystoreSealing`
+- `shared.dto.KeyMetadata`
 
-### Feeds
-- Resolve: `KeystoreRoot.preferred()`, ensure 700. In `AccessDeniedException` → `KeystoreRoot.userFallback()`, ensure 700.
-- First-run: if root empty, create `<keyId>/` with `public.pem`, `private.enc`, `metadata.json`.
-- Permissions: 700 folders, 600 files; in Windows ignoring POSIX and using ACLs.
+## Flow
+1. Bootstrap resolves preferred root and falls back on permission/access errors.
+2. First-run path can generate and persist initial keypair artifacts.
+3. Runtime key loads open sealed private key with passphrase and metadata checks.
 
-### Encryption
-- `private.enc`: AES-GCM 256, IV 12B, tag 128b, key from PBKDF2-HMAC-SHA256 (salt 16B, 200k iter).
-- Envelope format: `v1.<salt_b64>.<iv_b64>.<ciphertext+tag_b64>`.
-- Pass: taken from `HAF_KEY_PASS` ENV or fallback `"dev-pass-change"` for dev.
+## Error/Security Notes
+- Wrong passphrase or tampered envelope raises `KeystoreOperationException`.
+- Private key remains sealed at rest.
+- File permissions are hardened through `FilePerms` helpers.
+- Passphrase arrays are cloned at API boundaries to reduce accidental shared mutable state.
 
-### Keychain IO
-- Structure: `<root>/<keyId>/{public.pem, private.enc, metadata.json}`.
-- APIs:
-    - `KeystoreBootstrap.run()`: auto-resolve root, fallback, first-run.
-    - `UserKeystore.todayKeyId()`: generate keyId (`"key-YYYYMMDD"`).
-    - `EccKeyIO.generate()`: X25519 keypair generation.
-    - `EccKeyIO.publicPem(PublicKey)`, `EccKeyIO.privatePem(PrivateKey)`: PEM encoding.
-    - `KeystoreSealing.sealWithPass(char[] pass, byte[] plaintext)`: seal private key.
-    - `KeystoreSealing.openWithPass(char[] pass, byte[] envelope)`: unseal private key.
-
-### API policy/bootstrap
-- `KeystoreRoot.preferred()`: returns preferred path with priority: JVM prop → ENV → OS default.
-- `KeystoreRoot.userFallback()`: returns user-scoped path.
-- `KeystoreBootstrap.run()`:
-    1. Try `preferred()` + `ensureDir700()`.
-    2. Catch `AccessDeniedException` → `userFallback()` + `ensureDir700()`.
-    3. `firstRunIfMissing(root)`: if empty, create X25519 keypair + metadata.
-    4. Return root Path.
-
-### Tests
-- Policy: `preferred()` adheres to JVM/ENV/OS, `userFallback()` returns user-scoped path.
-- Bootstrap: auto-fallback, generate 700/600, first-run files, idempotency on second run.
-- Sealing/IO IT: E2E encrypt with `public.pem` and decrypt with unsealed private, wrong-pass failure, tamper detection, permissions on Unix.
+## Related Files
+- `shared/src/main/java/com/haf/shared/keystore/KeystoreRoot.java`
+- `shared/src/main/java/com/haf/shared/keystore/KeystoreBootstrap.java`
+- `shared/src/main/java/com/haf/shared/keystore/UserKeystore.java`
+- `shared/src/main/java/com/haf/shared/keystore/KeystoreSealing.java`

@@ -1,46 +1,32 @@
 # SEARCH
 
-### Screen objective
-- Search users by name or registration number from the main shell.
-- Render result cards with contact actions (add/remove, start chat, open profile).
-- Support incremental loading when scrolling near the bottom.
+## Purpose
+Describe user search scene behavior and contact/chat action bridging.
 
-### FXML
-- `search.fxml`
+## Current Implementation
+- Controller: `SearchController`.
+- ViewModel: `SearchViewModel` + optional `SearchSortViewModel` options.
+- Result cards loaded from `search_result_item.fxml`.
+- Action bridge interface is `SearchController.ContactActions`.
 
-### Architecture
-- **Controller**: `SearchController`.
-- **ViewModel**: `SearchViewModel`.
-- **Loaded by**: `MainContentLoader` and cached for reuse.
-- **Card template**: `search_result_item.fxml`.
+## Key Types/Interfaces
+- `client.controllers.SearchController`
+- `SearchController.ContactActions`
+- `client.viewmodels.SearchViewModel`
+- `client.viewmodels.SearchSortViewModel`
 
-### UI elements
-- `ScrollPane resultsScrollPane`: scroll container for results.
-- `FlowPane resultsPane`: card layout for result items.
-- `VBox statusBox`: overlay shown when no results.
-- `Text statusText`: bound to search status text from ViewModel.
+## Flow
+1. Main shell triggers `search(query[, sort])`.
+2. ViewModel executes async search requests and publishes result/status properties.
+3. Controller renders result cards and handles infinite-scroll page loading.
+4. Card actions call `ContactActions` for add/remove/start-chat/open-profile.
 
-### Flow
-1. `SearchController.initialize()`:
-   - binds status and result visibility
-   - binds result list listeners
-   - binds infinite scroll (`vvalue >= UiConstants.SEARCH_SCROLL_LOAD_THRESHOLD`)
-   - clears initial results
-2. `search(query)` delegates async search execution to `SearchViewModel`.
-3. Result updates:
-   - full re-render for structural list changes
-   - append-only render for added pages
-4. Each card is loaded from `search_result_item.fxml`, then populated with:
-   - name, reg number, email
-   - rank icon
-   - action button handlers
-5. Card click behavior:
-   - open profile on primary click
-   - ignore clicks originating from action buttons
+## Error/Security Notes
+- Search failures are surfaced as runtime issues and status text updates.
+- Query minimum length and page-size controls protect server/query behavior.
 
-### Contact actions bridge
-- `setContactActions(SearchContactActions)` injects callbacks from `MainController`.
-- Supported actions:
-  - add/remove contact
-  - start chat
-  - open profile
+## Related Files
+- `client/src/main/resources/fxml/search.fxml`
+- `client/src/main/resources/fxml/search_result_item.fxml`
+- `client/src/main/java/com/haf/client/controllers/SearchController.java`
+- `client/src/main/java/com/haf/client/viewmodels/SearchViewModel.java`

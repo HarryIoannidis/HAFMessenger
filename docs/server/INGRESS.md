@@ -1,87 +1,36 @@
 # INGRESS
 
-### Purpose
-- Documents the real ingress behavior implemented in `HttpIngressServer` and `WebSocketIngressServer`.
-- Covers authentication, routing, rate limiting, and wire-level response behavior.
+## Purpose
+Describe implemented HTTPS and websocket ingress surfaces and request handling behavior.
 
----
+## Current Implementation
+- HTTPS ingress (`HttpIngressServer`) binds contexts under `/api/v1/...` including messages, auth, search, contacts, health, config, and attachments.
+- Websocket ingress (`WebSocketIngressServer`) manages authenticated real-time channel behavior.
+- Ingress integrates validator, rate limiter, mailbox router, DAOs, audit, and metrics.
+- Core HTTPS contexts include `/messages`, `/register`, `/login`, `/logout`, `/users`, `/search`, `/contacts`, `/attachments`, and config/health endpoints.
 
-## HttpIngressServer
+## Key Types/Interfaces
+- `server.ingress.HttpIngressServer`
+- `server.ingress.WebSocketIngressServer`
+- `server.handlers.EncryptedMessageValidator`
+- `server.router.RateLimiterService`
+- `server.router.MailboxRouter`
 
-### Bound HTTPS contexts
-- `POST /api/v1/messages`: authenticated encrypted message ingress.
-- `POST /api/v1/register`: registration.
-- `POST /api/v1/login`: login.
-- `POST /api/v1/logout`: logout (session revoke).
-- `GET /api/v1/users/{userId}/key`: public key lookup.
-- `GET /api/v1/search`: authenticated user search (cursor pagination).
-- `GET|POST|DELETE /api/v1/contacts`: contacts list/add/remove.
-- `GET|HEAD /api/v1/health`: health probe.
-- `GET /api/v1/config/admin-key`: optional admin public key for encrypted registration photos.
-- `GET /api/v1/config/messaging`: authenticated attachment/messaging policy.
-- `POST /api/v1/attachments/init`
-- `POST /api/v1/attachments/{attachmentId}/chunk`
-- `POST /api/v1/attachments/{attachmentId}/complete`
-- `POST /api/v1/attachments/{attachmentId}/bind`
-- `GET /api/v1/attachments/{attachmentId}`
+## Flow
+1. Request enters HTTPS/WSS endpoint with security headers and request id.
+2. Session/auth checks run for protected routes.
+3. Envelope payloads are validated and rate-limited.
+4. Router/DAO path persists, dispatches, and acknowledges envelopes.
+5. Websocket paths push message/presence events and process ACK payloads.
+6. Attachment endpoints run init/chunk/complete/bind/download lifecycle.
 
-### Message ingress flow (`POST /api/v1/messages`)
-1. Require `Authorization: Bearer <sessionId>`; invalid session returns `401`.
-2. Parse JSON to `EncryptedMessage`.
-3. Validate via `EncryptedMessageValidator`.
-4. Rate-limit via `RateLimiterService.checkAndConsume`.
-5. Route via `MailboxRouter.ingress(message)`.
-6. Return `202` with `IngressResponse(envelopeId, expiresAt)`.
+## Error/Security Notes
+- TLS is restricted to `TLSv1.3` with hardened cipher suites.
+- Invalid auth/session or malformed payloads return structured errors.
+- Ingress does envelope validation only; no plaintext decryption occurs server-side.
+- Security headers include HSTS, CSP, X-Content-Type-Options, and X-Frame-Options on responses.
 
-### Security headers
-- `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
-- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none';`
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `X-Request-Id` per request
-
-### TLS
-- HTTPS uses a TLS 1.3 `SSLContext` created in `Main`.
-- Cipher suites restricted to:
-  - `TLS_AES_256_GCM_SHA384`
-  - `TLS_CHACHA20_POLY1305_SHA256`
-
----
-
-## WebSocketIngressServer
-
-### Purpose
-- Authenticated WebSocket channel for real-time delivery and acknowledgements.
-
-### Connection lifecycle
-- Client connects with `Authorization: Bearer <sessionId>` in handshake headers.
-- On open:
-  - session is validated via `SessionDAO`
-  - mailbox subscription is created
-  - up to 100 undelivered envelopes are pushed immediately
-  - presence snapshot is sent for contacts
-- On close: subscription and presence registrations are cleaned up.
-
-### Inbound frame handling
-- Inbound text frames are treated as ACK payloads, not new encrypted messages.
-- Expected shape includes `envelopeIds` array.
-- `MailboxRouter.acknowledgeOwned(userId, envelopeIds)` enforces ownership-safe ACK.
-- Rate-limited connections receive `{"type":"rate_limit","retryAfterSeconds":...}`.
-
-### Outbound push payloads
-- Message push:
-  - `{"type":"message","envelopeId":"...","payload":<EncryptedMessage>,"expiresAt":...}`
-- Presence push:
-  - `{"type":"presence","userId":"...","active":true|false}`
-
-### Error handling
-- Unauthorized websocket: policy close (`1008`/`POLICY_VALIDATION`).
-- Internal processing errors: logged via `AuditLogger`, connection closed with `1011`.
-
----
-
-## Shared ingress dependencies
-- `EncryptedMessageValidator`: structural + expiry validation for encrypted messages.
-- `RateLimiterService`: DB-backed 60-second window + lockout.
-- `MailboxRouter`: persistence-backed routing, push dispatch, ACK ownership checks.
-- `AuditLogger` + `MetricsRegistry`: structured event logging and counters.
+## Related Files
+- `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`
+- `server/src/main/java/com/haf/server/ingress/WebSocketIngressServer.java`
+- `server/src/main/java/com/haf/server/handlers/EncryptedMessageValidator.java`

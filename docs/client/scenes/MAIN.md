@@ -1,53 +1,33 @@
 # MAIN
 
-### Screen objective
-- Primary application screen after login.
-- Contact list navigation, chat area, profile panel, and search functionality.
-- Dynamically loads chat view or placeholder based on contact selection.
+## Purpose
+Describe the main shell scene that coordinates tabs, contacts, dynamic content loading, and settings-driven behavior.
 
-### FXML
-- `main.fxml` (shell), `chat.fxml` (loaded into chat area), `place_holder.fxml` (default empty state), `contact_cell.fxml` (contact list items).
+## Current Implementation
+- Controller: `MainController`.
+- ViewModels: `MainViewModel`, `MessagesViewModel`, `SearchSortViewModel`.
+- Dynamic view loading handled by `MainContentLoader`.
+- Supports contacts tab, search tab, profile strip, popup actions, and settings/runtime issue handling.
 
-### Architecture
-- **Controller**: `MainController`.
-- **Sub-controllers**: `ChatController` (loaded per contact), `ContactCell` (list cell factory).
-- **Pattern**: MVVM — `MessageViewModel` via `ChatSession` singleton.
+## Key Types/Interfaces
+- `client.controllers.MainController`
+- `client.controllers.MainContentLoader`
+- `client.controllers.SearchController.ContactActions`
+- `client.viewmodels.MainViewModel`
 
-### UI elements
-- `BorderPane rootContainer`: main layout with title bar, sidebar, chat area.
-- `HBox titleBar`: draggable custom title bar with window controls.
-- `VBox sidebar`: navigation bar + contact list.
-- `StackPane chatArea`: dynamic content area (chat or placeholder).
-- `HBox profilePanel`: contact profile panel (toggle visibility).
+## Flow
+1. Main scene initializes bindings, nav handlers, and listeners.
+2. Contacts are fetched and list/profile state is synchronized.
+3. Main content area switches between placeholder/chat/search/profile views.
+4. Search actions bridge to contacts/chat/profile callbacks through `ContactActions`.
+5. Runtime issues and settings updates are surfaced through popup/handler mechanisms.
 
-### Navigation bar
-- `JFXButton messagesNavBtn`: messages tab (default active).
-- `JFXButton searchNavBtn`: search tab.
-- Active tab: blue indicator line under active button, icon color change.
-- `activateMessagesTab()`: show contact list, hide search.
-- `activateSearchTab()`: show search field + filter, hide contact list.
+## Error/Security Notes
+- View-load failures are trapped and surfaced through popup flows.
+- Logout/shutdown path attempts graceful server-side session cleanup.
 
-### Contact list
-- `ListView<ContactInfo> contactListView`: populated with sample contacts.
-- `ContactCell`: custom `ListCell` loaded from `contact_cell.fxml`.
-- Contact selection: `setupContactSelection()` listener.
-    - On select: `loadChat(recipientId)` → loads `chat.fxml`, injects recipient ID.
-    - Shows profile panel with contact info.
-    - On deselect: `loadPlaceholder()` → loads `place_holder.fxml`.
-
-### Chat area loading
-- `loadChat(String recipientId)`:
-    - `FXMLLoader` loads `chat.fxml`.
-    - Gets `ChatController`, calls `setRecipient(recipientId)`.
-    - Sets loaded view into `chatArea`.
-- `loadPlaceholder()`:
-    - `FXMLLoader` loads `place_holder.fxml`.
-    - Sets loaded view into `chatArea`.
-
-### Window style
-- `StageStyle.DECORATED` (standard window with OS controls + custom styling).
-- Draggable title bar with custom minimize/maximize/close buttons.
-
-### Profile panel
-- `showProfilePanel(ContactInfo contact)`: displays contact name, rank, email.
-- `hideProfilePanel()`: hides panel.
+## Related Files
+- `client/src/main/resources/fxml/main.fxml`
+- `client/src/main/java/com/haf/client/controllers/MainController.java`
+- `client/src/main/java/com/haf/client/controllers/MainContentLoader.java`
+- `client/src/main/java/com/haf/client/viewmodels/MainViewModel.java`

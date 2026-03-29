@@ -1,104 +1,37 @@
 # DTO
 
-## EncryptedMessage
+## Purpose
+Describe current shared DTO families used across client/server boundaries.
 
-### Purpose
-- Wire protocol DTO for E2E encrypted messages.
+## Current Implementation
+- Core encrypted payload DTOs:
+  - `EncryptedMessage`
+  - `EncryptedFileDTO`
+  - attachment payload DTOs
+- Auth/search/contact and attachment request/response DTOs are split under:
+  - `shared.requests`
+  - `shared.responses`
+- Metadata DTO: `KeyMetadata`.
+- Request/response families cover login/register/logout, user search, contacts, messaging policy, and attachment upload/download lifecycle.
 
-### Fields
-- `String version`: protocol version (`"1"`).
-- `String senderId`: sender ID.
-- `String recipientId`: recipient ID.
-- `long timestampEpochMs`: Unix timestamp in ms.
-- `long ttlSeconds`: TTL (60-86400).
-- `String algorithm`: `"AES-256-GCM+X25519"`.
-- `String ivB64`: IV (12 bytes) in Base64.
-- `String ephemeralPublicB64`: sender's ephemeral X25519 public key (DER) in Base64.
-- `String ciphertextB64`: encrypted payload in Base64.
-- `String tagB64`: GCM tag (16 bytes) in Base64.
-- `String contentType`: MIME type.
-- `long contentLength`: plaintext length in bytes.
-- `boolean e2e`: always `true`.
-- `@JsonIgnore String aadB64`: AAD (not serialized, reconstructed in decrypt).
+## Key Types/Interfaces
+- `shared.dto.EncryptedMessage`
+- `shared.dto.EncryptedFileDTO`
+- `shared.dto.KeyMetadata`
+- `shared.requests.*`
+- `shared.responses.*`
 
----
+## Flow
+1. Client serializes request DTOs for HTTPS/WSS operations.
+2. Server deserializes, processes, and returns response DTOs.
+3. Shared DTOs guarantee consistent wire contracts between modules.
+4. Codec/validator rules enforce strict field handling on boundaries.
 
-## EncryptedFileDTO
+## Error/Security Notes
+- DTO validation is enforced by shared/server validators, not by DTO classes themselves.
+- Sensitive payload fields remain encrypted on server-side persistence paths.
 
-### Purpose
-- Holds the result of client-side AES-256-GCM file encryption for E2E encrypted file uploads.
-
-### Fields
-- `String ciphertextB64`: AES-GCM ciphertext (Base64).
-- `String ivB64`: 12-byte GCM IV (Base64).
-- `String tagB64`: 16-byte GCM authentication tag (Base64).
-- `String ephemeralPublicB64`: sender's ephemeral X25519 public key (Base64/DER).
-- `String contentType`: MIME type of the original file.
-- `long originalSize`: size in bytes of the plaintext file.
-
-### Usage
-- Embedded in `RegisterRequest` for encrypted ID photo and selfie.
-- Server stores opaquely in `file_uploads` without the AES session key.
-
----
-
-## LoginRequest
-
-### Purpose
-- Login request DTO sent by the client.
-
-### Fields
-- `String email`: user email address.
-- `String password`: plaintext password (sent over TLS, server verifies against BCrypt hash).
-
----
-
-## LoginResponse
-
-### Purpose
-- Login response DTO returned by the server.
-
-### Fields
-- Server acknowledgement of login success/failure with session token or error message.
-
----
-
-## RegisterRequest
-
-### Purpose
-- Registration request DTO sent by the client.
-
-### Fields
-- `String fullName`: user's full name.
-- `String regNumber`: registration number.
-- `String idNumber`: ID card number.
-- `String rank`: military rank.
-- `String telephone`: phone number.
-- `String email`: email address.
-- `String password`: plaintext password (sent over TLS, server hashes before storage).
-- `String publicKeyPem`: user's X25519 public key in PEM format.
-- `String publicKeyFingerprint`: SHA-256 fingerprint of the public key.
-- `EncryptedFileDTO idPhoto`: E2E-encrypted ID card photo.
-- `EncryptedFileDTO selfiePhoto`: E2E-encrypted selfie photo.
-
----
-
-## RegisterResponse
-
-### Purpose
-- Registration response DTO returned by the server.
-
-### Fields
-- Server acknowledgement of registration success/failure with user ID or error message.
-
----
-
-## KeyMetadata
-
-### Purpose
-- Metadata for X25519 keypairs.
-
-### Fields
-- `String keyId`: unique identifier.
-- `String fingerprint`: SHA-256 of the public key.
-- `long createdAtMs`: creation timestamp.
+## Related Files
+- `shared/src/main/java/com/haf/shared/dto`
+- `shared/src/main/java/com/haf/shared/requests`
+- `shared/src/main/java/com/haf/shared/responses`

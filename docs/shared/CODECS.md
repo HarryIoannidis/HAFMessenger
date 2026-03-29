@@ -1,88 +1,33 @@
 # CODECS
 
-## AadCodec
+## Purpose
+Describe implemented serialization/encoding helpers in shared module.
 
-### Purpose
-- Build canonical AAD bytes from `EncryptedMessage` metadata for AES-GCM authentication.
+## Current Implementation
+- `JsonCodec`: strict JSON serialization/deserialization with Jackson (`FAIL_ON_UNKNOWN_PROPERTIES`, non-null inclusion).
+- `AadCodec`: deterministic metadata-to-bytes encoding for AES-GCM AAD.
+- `PemCodec` + `EccKeyIO`: PEM/DER conversion and X25519 key IO helpers.
+- `JsonCodec` wraps failures in `JsonCodecException` so client/server layers handle a shared error type.
 
-### Method
-- `static byte[] buildAAD(EncryptedMessage m)`: construct AAD with length-prefixed strings and big-endian numbers.
+## Key Types/Interfaces
+- `shared.utils.JsonCodec`
+- `shared.crypto.AadCodec`
+- `shared.utils.PemCodec`
+- `shared.utils.EccKeyIO`
 
-### Encoding
-- Strings: 4-byte length prefix (big-endian) + UTF-8 bytes.
-- Longs: 8-byte big-endian.
-- Null strings → empty array (length=0).
+## Flow
+1. DTOs are serialized/deserialized by `JsonCodec` on client/server boundaries.
+2. Key material is converted using PEM/DER helpers.
+3. AAD bytes are computed from DTO metadata before encrypt/decrypt.
+4. Parsing/encoding failures bubble as typed exceptions for consistent error mapping.
 
-### Field Row
-1. `version` (string).
-2. `algorithm` (string).
-3. `senderId` (string).
-4. `recipientId` (string).
-5. `timestampEpochMs` (long).
-6. `ttlSeconds` (long).
-7. `contentType` (string).
-8. `contentLength` (long).
+## Error/Security Notes
+- JSON failures raise `JsonCodecException`.
+- Unknown JSON fields are rejected by default.
+- PEM/key parsing failures propagate as typed exceptions or security exceptions.
 
-### Rules
-- Same metadata → same AAD bytes (byte-wise).
-- Change any field → GCM mismatch tag → `MessageTamperedException`.
-
----
-
-## JsonCodec
-
-### Purpose
-- Strict JSON serialization/deserialization for DTOs.
-
-### Methods
-- `static String toJson(Object value)`: serialize, throws `RuntimeException` if failed.
-- `static <T> T fromJson(String json, Class<T> type)`: deserialize, throws `RuntimeException` if failed.
-
-### ObjectMapper configuration
-- `JsonInclude.Include.NON_NULL`: does not serialize null fields.
-- `DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES = true`: reject JSON with extra fields.
-
-### Usage
-- Wire protocol: `EncryptedMessage` serialization.
-- Keystore: `KeyMetadata` storage in `metadata.json`.
-- Auth: `LoginRequest/Response`, `RegisterRequest/Response` serialization.
-
----
-
-## PemCodec
-
-### Purpose
-- PEM encoding/decoding for X25519 keys.
-
-### Methods
-- `static String toPem(String type, byte[] der)`: encode DER bytes to PEM format.
-- `static byte[] fromPem(String pem)`: decode PEM to DER bytes.
-
-### Format
-```
------BEGIN PUBLIC KEY-----
-<Base64-encoded DER>
------END PUBLIC KEY-----
-```
-
----
-
-## EccKeyIO
-
-### Purpose
-- X25519 key generation, PEM/DER encoding/decoding for Elliptic Curve keys.
-
-### Methods
-- `static KeyPair generate()`: generate new X25519 keypair via `KeyPairGenerator("XDH")`.
-- `static byte[] publicDer(PublicKey pub)`: return DER (X.509 SPKI) of public key.
-- `static byte[] privateDer(PrivateKey prv)`: return DER (PKCS#8) of private key.
-- `static String publicPem(PublicKey pub)`: export public key to PEM.
-- `static String privatePem(PrivateKey prv)`: export private key to PEM.
-- `static PublicKey publicFromPem(String pem)`: import X25519 public key from PEM.
-- `static PrivateKey privateFromPem(String pem)`: import X25519 private key from PEM.
-
-### Key Format
-- Algorithm: `XDH` with `X25519` named parameter.
-- Public key: X.509 SPKI DER encoding.
-- Private key: PKCS#8 DER encoding.
-- PEM headers: `BEGIN PUBLIC KEY` / `BEGIN PRIVATE KEY`.
+## Related Files
+- `shared/src/main/java/com/haf/shared/utils/JsonCodec.java`
+- `shared/src/main/java/com/haf/shared/utils/PemCodec.java`
+- `shared/src/main/java/com/haf/shared/utils/EccKeyIO.java`
+- `shared/src/main/java/com/haf/shared/crypto/AadCodec.java`

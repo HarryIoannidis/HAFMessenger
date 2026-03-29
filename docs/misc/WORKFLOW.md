@@ -1,221 +1,37 @@
 # WORKFLOW
 
-## Core Workflows
+## Purpose
+Describe implemented end-to-end workflows for message send/receive, routing, and key usage.
 
-### 1. Encryption Workflow (Message Sending)
+## Current Implementation
+- Send path uses `MessageSender` + `MessageEncryptor` and submits encrypted envelopes to server ingress.
+- Server path validates/rate-limits/routes via `HttpIngressServer` and `MailboxRouter`, with persistence through DAOs.
+- Receive path uses `MessageReceiver` + `MessageDecryptor`, updates UI state, and acknowledges envelope IDs.
+- Key provider path resolves sender id and recipient public keys through `KeyProvider` (`UserKeystoreKeyProvider` implementation).
+- Attachment flow extends message workflow with init/chunk/complete/bind/download endpoints while preserving encrypted payload handling.
 
-```
-                     ┌─────────────┐
-                     │   Sender    │
-                     └──────┬──────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ DefaultMessageSender.sendMessage()                      │
-│ - Input: plaintext payload, recipientId, contentType    │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ MessageEncryptor.encrypt()                              │
-│ 1. Generate random 256-bit AES key (ephemeral)          │
-│ 2. Generate random 12-byte IV                           │
-│ 3. Build AAD from metadata (version, algorithm, IDs...) │
-│ 4. Encrypt payload with AES-256-GCM                     │
-│    → produces: ciphertext + 128-bit auth tag            │
-│ 5. Derive AES key via X25519 ECDH key agreement         │
-│    (ECDH + SHA-256 KDF)                                 │ 
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ EncryptedMessage DTO                                    │
-│ - version, algorithm, senderId, recipientId             │
-│ - ciphertextB64, ivB64, tagB64, ephemeralPublicB64      │
-│ - contentType, contentLength, timestamp, ttl            │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ JsonCodec.toJson()                                      │
-│ - Strict Jackson serialization (UTF-8, canonical)       │
-└───────────────────────────┬─────────────────────────────┘     
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ WebSocketAdapter.send()                                 │
-│ - Sends to server over TLS 1.3                          │
-└─────────────────────────────────────────────────────────┘
-```
+## Key Types/Interfaces
+- Client: `DefaultMessageSender`, `DefaultMessageReceiver`, `WebSocketAdapter`, `MessagesViewModel`.
+- Server: `HttpIngressServer`, `WebSocketIngressServer`, `MailboxRouter`, `RateLimiterService`, `EnvelopeDAO`.
+- Shared: `EncryptedMessage`, `MessageValidator`, `MessageEncryptor`, `MessageDecryptor`, `KeyProvider`.
 
-### 2. Server Ingress & Routing (Phase 5)
+## Flow
+1. Compose message in UI -> ViewModel -> `MessageSender`.
+2. Encrypt payload and send envelope to `/api/v1/messages`.
+3. Server validates and stores envelope, then pushes/serves mailbox updates.
+4. Receiver validates/decrypts envelope and updates chat state.
+5. Client acknowledges delivered envelope IDs to avoid re-delivery.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ HttpIngressServer / WebSocketIngressServer              │
-│ - TLS 1.3 termination                                   │
-│ - Security headers (HSTS, CSP, etc.)                    │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ EncryptedMessageValidator.validate()                    │
-│ - Check version, algorithm, field lengths               │
-│ - Validate Base64 encoding                              │
-│ - Check TTL bounds, timestamp, contentType allowlist    │
-│ - NO DECRYPTION (envelope-only validation)              │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ RateLimiterService.checkAndConsume()                    │
-│ - Database-backed quota enforcement                     │
-│ - MAX_DAILY_MESSAGES, MAX_MESSAGE_BYTES                 │
-└───────────────────────────┬─────────────────────────────┘ 
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ MailboxRouter.ingress()                                 │
-│ - Routes to recipient's mailbox                         │
-│ - Notifies via WebSocket if online                      │
-└───────────────────────────┬─────────────────────────────┘     
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ EnvelopeDAO.insert()                                    │
-│ - Stores encrypted envelope in MySQL (HikariCP)         │
-│ - Computes AAD hash for integrity                       │
-│ - Sets expiration timestamp                             │
-│ - NO PAYLOAD DECRYPTION (zero-knowledge storage)        │
-└─────────────────────────────────────────────────────────┘ 
-```
+## Error/Security Notes
+- Validation occurs on both client and server boundaries.
+- Decrypt failures are surfaced as errors without exposing sensitive internals.
+- Envelope metadata and TTL are enforced server-side and receiver-side.
+- ACK operations are ownership-scoped to prevent cross-user acknowledgement of foreign envelope IDs.
 
-### 3. Decryption Workflow (Message Receiving)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ DefaultMessageReceiver.start()                          │
-│ - WebSocket listener for incoming messages              │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ JsonCodec.fromJson()                                    │
-│ - Deserialize to EncryptedMessage DTO                   │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ MessageValidator.validateRecipientOrThrow()             │
-│ - Verify recipientId matches current user               │
-│ - Check TTL expiration with ClockProvider               │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ MessageDecryptor.decrypt()                              │
-│ 1. Derive AES key via X25519 ECDH key agreement       │
-│    (recipient_private + ephemeral_public → SHA-256)     │
-│ 2. Rebuild AAD from message metadata                    │
-│ 3. Decrypt ciphertext with AES-256-GCM                  │
-│    - Uses IV, auth tag, AAD                             │ 
-│    - Throws AEADBadTagException if tampered             │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ MessageListener.onMessage()                             │
-│ - Routes to UI based on contentType                     │
-│ - text/media → MessageViewModel                         │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-                     ┌─────────────┐
-                     │  Receiver   │
-                     └──────┬──────┘
-                            │
-                            ▼
-                     ┌─────────────┐
-                     │     UI      │
-                     └─────────────┘
-
-```
-
-### 4. Key Management Workflow (Phase 3)
-
-#### Key Generation & Provisioning
-```
-┌─────────────────────────────────────────────────────────┐
-│ KeystoreBootstrap.run()                                 │
-│ - Prompts for user password                             │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ EccKeyIO.generate()                                     │
-│ - X25519 (Curve25519) key generation                    │
-└───────────────────────────┬─────────────────────────────┘ 
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ KeystoreSealing.seal()                                  │
-│ - Derive key from password: PBKDF2-SHA256               │
-│   (100,000 iterations, 256-bit salt)                    │ 
-│ - Encrypt private key with AES-256-GCM                  │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ UserKeyStore.saveKeypair()                              │
-│ - Save to: <keystore_root>/<userId>/<keyId>/            │
-│   - public.pem (SubjectPublicKeyInfo)                   │
-│   - private.enc (sealed PKCS#8)                         │
-│   - metadata.json (fingerprint, status, timestamps)     │
-│ - Set permissions: 700 (dir), 600 (files)               │
-└───────────────────────────┬─────────────────────────────┘       
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ FingerprintUtil.computeFingerprint()                    │
-│ - SHA-256 hash of public key DER encoding               │
-│ - Used for trust verification                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Key Loading
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ UserKeyStore.loadCurrentPrivate()                       │
-│ - Locate CURRENT key directory                          │
-│ - Read private.enc + metadata.json                      │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ KeystoreSealing.unseal()                                │
-│ - Derive key from password (PBKDF2-SHA256)              │
-│ - Decrypt with AES-256-GCM                              │
-│ - Verify auth tag (tamper detection)                    │
-└───────────────────────────┬─────────────────────────────┘     
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│ FingerprintUtil.verify()                                │
-│ - Recompute fingerprint from loaded key                 │
-│ - Compare with metadata.json                            │
-│ - Reject if mismatch                                    │
-└─────────────────────────────────────────────────────────┘
-
-```
-
----
-
-## Security Highlights
-- End-to-End Encryption: Server never sees plaintext
-- Zero-Knowledge Storage: Only encrypted envelopes stored
-- Forward Secrecy: Ephemeral AES keys per message
-- Tamper Detection: GCM auth tags + AAD binding
-- Key Protection: PBKDF2 + AES-GCM sealed private keys
-- TLS 1.3: All network traffic encrypted
-- Rate Limiting: Database-backed quota enforcement
+## Related Files
+- `client/src/main/java/com/haf/client/network/DefaultMessageSender.java`
+- `client/src/main/java/com/haf/client/network/DefaultMessageReceiver.java`
+- `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`
+- `server/src/main/java/com/haf/server/router/MailboxRouter.java`
+- `shared/src/main/java/com/haf/shared/crypto/MessageEncryptor.java`
+- `shared/src/main/java/com/haf/shared/crypto/MessageDecryptor.java`

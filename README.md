@@ -1,215 +1,45 @@
-# **HAF Secure Messenger — Project README**
+# HAF Secure Messenger
 
-## **Description**
+## Purpose
+This repository contains a Java 21 secure messaging system for HAF workflows, split into `client`, `server`, and `shared` modules. The documentation in this repo reflects implemented behavior and clearly marks future work.
 
-The **HAF Secure Messenger** is a desktop application written in **JavaFX**, providing secure, encrypted client–server communication for personnel of the **Hellenic Air Force**.
-The purpose of the project is to deliver **end-to-end encryption**, strict user authentication, and secure file transfer capabilities, focusing on **security**, **scalability**, and **documentation**.
+## Current Implementation
+- Architecture: JavaFX desktop client + plain Java server + shared contract/crypto module.
+- Build: Maven multi-module (`shared`, `client`, `server`).
+- Transport: TLS 1.3 HTTPS + WSS.
+- Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V11`).
+- Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
 
----
+## Key Types/Interfaces
+- `client.network.MessageSender`: send/encrypt message and attachment-related operations.
+- `client.network.MessageReceiver`: receive/decrypt flows and envelope acknowledgement.
+- `shared.keystore.KeyProvider`: sender identity + recipient public-key resolution.
+- `shared.utils.MessageValidator`: wire/policy validation for `EncryptedMessage`.
+- `server.ingress.HttpIngressServer`: HTTPS endpoint surface.
+- `server.router.MailboxRouter`: envelope routing, ACK handling, push dispatch.
 
-## **Key Features**
+## Flow
+1. Client authenticates via HTTPS and stores a session id.
+2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
+3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
+4. Receiver consumes pushed/polled envelopes, validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.
+5. Attachments follow init/chunk/complete/bind/download endpoints and inherit policy/TTL controls.
 
-* End-to-end encryption: AES-256 for message content + X25519 (ECDH) for key agreement
-* Authentication: email/password over TLS with Argon2id password verification and server-side sessions
-* Real-time user presence and push notifications
-* Encrypted file transfer (images, PDFs) with temporary encrypted server storage and automatic deletion
-* No local storage of sensitive data on the client side (when required)
-* Self-destructing messages (configurable TTL)
-* Logging & auditing with brute-force protection
-* Contact management and public-key lookup for secure recipient targeting
+## Error/Security Notes
+- Server never decrypts message payloads.
+- TLS is restricted to `TLSv1.3` with hardened cipher suites.
+- Validation and recipient checks happen before decrypt.
+- Rate limiting and audit logging are server-side enforcement points.
+- Docs distinguish implemented behavior from future/planned features.
 
----
-
-## **Technologies**
-
-* Language: Java 21
-* UI: JavaFX (FXML + CSS, MVVM pattern)
-* Server: Plain Java service (non-Spring) using:
-  - Java-WebSocket for WebSocket ingress
-  - HikariCP for JDBC connection pooling
-  - Flyway for database migrations
-  - Log4j2 for structured logging
-* Database: MySQL
-* Cryptography: Java Cryptography (AES-256, X25519, SHA-256)
-* Build / Packaging: Maven, jlink / jpackage for self-contained installers
-* Logging: Log4j2 (server), java.util.logging (client internals), SLF4J API (dependency bridge)
-
----
-
-## **System Architecture**
-
-The application follows a **client–server 3-tier** design and the **MVVM** pattern on the client side.
-
-* **Client Layer (Presentation / JavaFX)**
-
-    * Controllers in `client/src/main/java/com/haf/client/controllers/` connecting UI with ViewModels
-    * ViewModels in `client/src/main/java/com/haf/client/viewmodels/` implementing MVVM pattern with business logic
-    * Local crypto module in `client/src/main/java/com/haf/client/crypto/` for client-side crypto operations (uses shared crypto APIs)
-    * Network client in `client/src/main/java/com/haf/client/network/` using secure TCP sockets or WebSockets
-    * Models in `client/src/main/java/com/haf/client/models/` (Message, User, Session) for client-side data representation
-    * Utilities in `client/src/main/java/com/haf/client/utils/` for configuration, logging, and helpers (e.g., ViewRouter, UiConstants)
-    * FXML views in `client/src/main/resources/fxml/` for JavaFX scenes
-    * CSS styles in `client/src/main/resources/css/` for dark military UI theme
-    * Images in `client/src/main/resources/images/` for icons and assets
-
-* **Server Layer (Application / Business)**
-
-    * Core server logic in `server/src/main/java/com/haf/server/core/` (Main.java, server orchestration)
-    * Handlers in `server/src/main/java/com/haf/server/handlers/` for message validation and processing
-    * Ingress layer in `server/src/main/java/com/haf/server/ingress/` (HTTP and WebSocket servers for client connections)
-    * Routing in `server/src/main/java/com/haf/server/router/` (MailboxRouter, rate limiting, message queuing)
-    * Metrics in `server/src/main/java/com/haf/server/metrics/` (audit logging, metrics registry, observability)
-    * Database management in `server/src/main/java/com/haf/server/db/` (EnvelopeDAO for message persistence)
-    * Configuration in `server/src/main/java/com/haf/server/config/` (ServerConfig for server settings)
-    * Resources in `server/src/main/resources/` (config/, db/ with migrations, log4j2.xml)
-
-* **Shared Layer (Common / DTOs, Crypto & Utilities)**
-
-    * DTOs in `shared/src/main/java/com/haf/shared/dto/` (EncryptedMessage, KeyMetadata) for client-server communication
-    * Constants in `shared/src/main/java/com/haf/shared/constants/` (CryptoConstants, MessageHeader) for protocol and crypto constants
-    * Crypto implementations in `shared/src/main/java/com/haf/shared/crypto/` (CryptoService, MessageEncryptor, MessageDecryptor, UserKeyStore, KeystoreBootstrap, KeystoreSealing, etc.) for E2E encryption, key management, and keystore operations
-    * Utilities in `shared/src/main/java/com/haf/shared/utils/` (JsonCodec, MessageValidator, EccKeyIO, FilePerms, FingerprintUtil, PemCodec) for serialization, validation, and helper functions
-
-* **Documentation Layer (Docs / References)**
-
-    * Main project documentation in `docs/misc/` — ARCHITECTURE.md, CRYPTO.md, DATABASE.md, DEVELOPMENT.md, PHASES.md, SCENES.md, STRUCTURE.md, TESTING.md, WORKFLOW.md
-    * Shared module docs in `docs/shared/` — AAD.md, CODECS.md, CONSTANTS.md, CRYPTO_SERVICE.md, DECRYPTION.md, DTO.md, ENCRYPTION.md, EXCEPTIONS.md, FILEPERMS.md, KEYSTORE.md, UTILS.md, VALIDATION.md, WIRE_FORMAT.md
-    * Client docs in `docs/client/` — KEYSTORE_PROVIDER.md, MSG_INTERFACES.md, SENDER_RECEIVER.md, WEBSOCKET.md
-    * Server docs in `docs/server/` — CONFIG.md, INGRESS.md, MAIN.md, OBSERVABILITY.md, PERSISTENCE.md, RATE_LIMITER.md, ROUTING.md
-
-
----
-
-## **Project Structure**
-
-```
-haf-messenger/
-│
-├── client/
-│   ├── src/main/java/com/haf/client/
-│   │   ├── core/                # App entry point (Launcher, ClientApp, ChatSession, NetworkSession)
-│   │   ├── controllers/         # FXML controllers (Login, Chat, Main, Register, etc.)
-│   │   ├── viewmodels/          # ViewModels for MVVM pattern
-│   │   ├── services/            # Service interfaces and implementations (LoginService, RegistrationService, etc.)
-│   │   ├── crypto/              # Client-side key provider (uses shared crypto)
-│   │   ├── network/             # WebSocket client (WebSocketAdapter, DefaultMessageSender/Receiver)
-│   │   ├── models/              # Client view data classes (ContactInfo, MessageVM, UserProfileInfo)
-│   │   ├── exceptions/          # Typed client exceptions (SslConfigurationException, etc.)
-│   │   └── utils/               # Helpers (ViewRouter, ContextMenuBuilder, SslContextUtils, etc.)
-│   ├── src/main/resources/
-│   │   ├── fxml/                # JavaFX scenes (login.fxml, main.fxml, chat.fxml, etc.)
-│   │   ├── css/                 # Dark military UI theme
-│   │   └── images/              # Icons, SVGs, etc.
-│   └── src/test/                # Test classes mirroring main structure
-│
-├── server/
-│   ├── src/main/java/com/haf/server/
-│   │   ├── core/                # Server main, orchestration
-│   │   ├── handlers/            # Message validation and processing
-│   │   ├── ingress/             # HTTP and WebSocket ingress servers
-│   │   ├── router/              # MailboxRouter, rate limiting, message queuing
-│   │   ├── metrics/             # Audit logging, metrics registry
-│   │   ├── db/                  # EnvelopeDAO, database access
-│   │   └── config/              # ServerConfig, server settings
-│   ├── src/main/resources/
-│   │   ├── config/              # Server configuration files
-│   │   ├── db/                  # Database initialization 
-│   │   │   └── migration/       # Database migration scripts
-│   │   └── log4j2.xml           # Logging configuration
-│   └── src/test/                # Test classes mirroring main structure
-│
-├── shared/
-│   ├── src/main/java/com/haf/shared/
-│   │   ├── dto/                 # Core wire-format DTOs (EncryptedMessage, EncryptedFileDTO, KeyMetadata, Attachment*)
-│   │   ├── requests/            # Client-to-server request DTOs (LoginRequest, RegisterRequest, AddContactRequest, Attachment*Request)
-│   │   ├── responses/           # Server-to-client response DTOs (LoginResponse, ContactsResponse, PublicKeyResponse, Attachment*Response)
-│   │   ├── constants/           # Shared constants (CryptoConstants, MessageHeader, AttachmentConstants)
-│   │   ├── crypto/              # Crypto implementations (CryptoService, MessageEncryptor, MessageDecryptor, CryptoECC, AadCodec)
-│   │   ├── keystore/            # Key store formats, root selection, bootstrap, key loading logic
-│   │   ├── exceptions/          # Typed exceptions (MessageValidationException, KeyNotFoundException, etc.)
-│   │   └── utils/               # Common utilities (JsonCodec, MessageValidator, EccKeyIO, FilePerms, FingerprintUtil, PemCodec)
-│   └── src/test/                # Unit and integration tests (KeystoreE2EIT, etc.)
-│
-├── scripts/                     # Build and deployment scripts
-│
-└── docs/
-    ├── client/                  # Client-specific documentation
-    ├── server/                  # Server-specific documentation 
-    ├── shared/                  # Shared module docs
-    └── misc/                    # General docs 
-```
-
----
-
-## **Protocol & Message Model**
-
-* Uses a JSON-based protocol over TLS or secure WebSocket with end-to-end encryption.
-
-* Message format: `EncryptedMessage` DTO (defined in `shared/src/main/java/com/haf/shared/dto/EncryptedMessage.java`)
-
-* Encryption flow:
-
-  1. Client generates an ephemeral X25519 keypair for each message.
-  2. A 256-bit AES session key is derived via ECDH (ephemeral_private, recipient_public) + SHA-256 KDF.
-  3. Payload is encrypted using AES-256-GCM with a 12-byte IV and 128-bit authentication tag.
-  4. AAD (Additional Authenticated Data) is constructed from DTO metadata fields (version, algorithm, senderId, recipientId, timestamp, ttl, contentType, contentLength) — not transmitted, reconstructed during decryption.
-  5. Packet structure: `{version, senderId, recipientId, timestampEpochMs, ttlSeconds, algorithm, ivB64, ephemeralPublicB64, ciphertextB64, tagB64, contentType, contentLength, e2e}`
-
-* The server must **not decrypt messages** — true **E2E encryption** ensures the server only handles encrypted blobs and metadata.
-
-* Validation: All messages are validated using `MessageValidator` before sending (client) and upon receipt (server). See `docs/shared/WIRE_FORMAT.md` and `docs/shared/VALIDATION.md` for details.
-
----
-
-## **Database Design (summary)**
-
-Schema focuses on storing encrypted message envelopes; server never decrypts payloads.
-
-* users(user_id, username, email, password_hash, rank, reg_number, full_name, joined_date, telephone, public_key_fingerprint, public_key_pem, status, role, created_at, updated_at)
-* message_envelopes(
-    envelope_id, sender_id, recipient_id,
-    encrypted_payload LONGBLOB,
-    wrapped_key BLOB,
-    iv VARBINARY(12),
-    auth_tag VARBINARY(16),
-    aad_hash VARCHAR(64),
-    content_type VARCHAR(100),
-    content_length INT,
-    timestamp BIGINT,
-    ttl INT,
-    delivered BOOLEAN,
-    created_at TIMESTAMP,
-    expires_at TIMESTAMP
-  )
-* Additional indexes exist for recipient+delivered, expires_at, and sender+timestamp.
-
-Notes:
-- content_length is stored as INT in DB (32-bit range) while DTO uses long.
-- Encrypted payloads and metadata are stored; AAD hash is computed from DTO metadata.
-
----
-
-## **Security Best Practices**
-
-* Passwords: salted hashing (PBKDF2 / Argon2 / bcrypt)
-* Key management: private keys stored in client OS keystore (when available)
-* TLS enforced with certificate pinning where possible
-* Least privilege: separate admin scopes
-* Rate limiting & account lockout for brute-force protection
-* Audit logging: encrypted event logs
-* Regular key rotation policy and forced rekey capability
-
----
-
-## **UI / UX (JavaFX)**
-
-* **Pattern:** MVVM — each FXML view has a corresponding ViewModel
-* **ViewRouter:** central utility for FXML loading and scene transitions
-
----
-
-## **Build, Packaging & Deployment**
-
-* Build: Maven 
-* Native packaging: `jlink` + `jpackage` for self-contained installers (Linux/Windows/macOS)
-* Configuration: externalized `application.properties` / `.env`, secrets kept out of repository (use vault for production)
+## Related Files
+- `pom.xml`
+- `client/src/main/java/com/haf/client/core/ClientApp.java`
+- `client/src/main/java/com/haf/client/network/MessageSender.java`
+- `client/src/main/java/com/haf/client/network/MessageReceiver.java`
+- `server/src/main/java/com/haf/server/core/Main.java`
+- `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`
+- `server/src/main/java/com/haf/server/router/MailboxRouter.java`
+- `shared/src/main/java/com/haf/shared/dto/EncryptedMessage.java`
+- `shared/src/main/java/com/haf/shared/utils/MessageValidator.java`

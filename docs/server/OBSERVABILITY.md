@@ -1,84 +1,31 @@
 # OBSERVABILITY
 
-### Purpose
-- Documents the implemented observability components: `AuditLogger` and `MetricsRegistry`.
+## Purpose
+Describe built-in server observability mechanisms for audit and metrics.
 
----
+## Current Implementation
+- `AuditLogger` emits structured operational/security events.
+- `MetricsRegistry` tracks counters/timers used by ingress/router paths.
+- Main scheduler emits periodic metrics snapshots.
+- Metrics snapshot cadence is 60 seconds and includes ingress, rejects, rate-limit rejects, queue depth, delivered count, and average delivery latency.
 
-## AuditLogger
+## Key Types/Interfaces
+- `server.metrics.AuditLogger`
+- `server.metrics.MetricsRegistry`
+- `server.core.Main`
 
-### What it does
-- Emits structured Log4j2 audit events under logger name `AuditLogger`.
-- Attaches common fields (`timestamp`, `action`, `requestId`, `userId`) plus action-specific fields.
-- Increments metrics counters for key events.
+## Flow
+1. Ingress/router components emit events and metric increments.
+2. Periodic scheduler records snapshot summaries.
+3. Rate-limit and validation events are logged with explicit action/status fields.
+4. Errors are logged with request/user context where available.
 
-### Key methods
-- `logIngressAccepted(requestId, userId, recipientId, status, latencyMs)`
-  - action: `send_message`
-  - increments `ingressCount`
+## Error/Security Notes
+- Logs avoid encrypted payload plaintext/key material.
+- Audit hooks are used for rate-limit and processing failures.
+- Audit entries include `requestId` when available for traceability across ingress and DAO/router paths.
 
-- `logIngressRejected(requestId, userId, reason, status)`
-  - action: `send_message_rejected`
-  - increments `rejectCount`
-
-- `logRateLimit(requestId, userId, retryAfterSeconds)`
-  - action: `rate_limit`
-  - increments `rateLimitRejectCount`
-
-- `logValidationFailure(requestId, userId, recipientId, reason)`
-  - action: `validation_failed`
-
-- `logRegistration(requestId, userId, email)`
-  - action: `user_registered`
-
-- `logLogin(requestId, userId, email)`
-  - action: `user_login`
-
-- `logSearchRequest(requestId, userId, queryLength, queryHash, limit, cursorSupplied)`
-  - action: `search_users`
-
-- `logCleanup(deleted, durationMs)`
-  - action: `ttl_cleanup`
-
-- `logMetricsSnapshot(snapshot)`
-  - action: `metrics`
-  - includes queue + delivery-latency aggregates
-
-- `logError(action, requestId, userId, error[, extraFields])`
-  - structured ERROR event with stack trace
-
----
-
-## MetricsRegistry
-
-### Counters
-- `ingressCount`
-- `rejectCount`
-- `rateLimitRejectCount`
-- `queueDepth`
-- `totalDeliveryLatencyMs`
-- `deliveredCount`
-
-### Key methods
-- `incrementIngress()`
-- `incrementRejects()`
-- `incrementRateLimitRejects()`
-- `increaseQueueDepth()`
-- `decreaseQueueDepth(long count)`
-- `recordDeliveryLatency(long latencyMs)`
-- `snapshot()` -> `MetricsSnapshot`
-
-### Snapshot fields
-- `ingressCount`
-- `rejectCount`
-- `rateLimitRejectCount`
-- `queueDepth`
-- `avgDeliveryLatencyMs`
-- `deliveredCount`
-
----
-
-## Operational notes
-- Metrics are in-memory and process-local.
-- Main server schedules periodic `logMetricsSnapshot(...)` every 60 seconds.
-- TTL cleanup metrics are emitted by router cleanup and attachment cleanup scheduling.
+## Related Files
+- `server/src/main/java/com/haf/server/metrics/AuditLogger.java`
+- `server/src/main/java/com/haf/server/metrics/MetricsRegistry.java`
+- `server/src/main/java/com/haf/server/core/Main.java`
