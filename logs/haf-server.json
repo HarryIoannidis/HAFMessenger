@@ -36,3 +36,4 @@
 {"@timestamp":"2026-03-29T14:17:54.797Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@21a66d45","process.thread.name":"main","log.logger":"com.zaxxer.hikari.pool.HikariPool"}
 {"@timestamp":"2026-03-29T14:17:54.801Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Start completed.","process.thread.name":"main","log.logger":"com.zaxxer.hikari.HikariDataSource"}
 {"@timestamp":"2026-03-29T14:17:56.721Z","ecs.version":"1.2.0","log.level":"INFO","message":"Servers started on HTTP 8443 / WS 8444","process.thread.name":"main","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-29T15:13:43.251Z","ecs.version":"1.2.0","log.level":"INFO","message":"Shutdown initiated","process.thread.name":"Thread-7","log.logger":"com.haf.server.core.Main"}
