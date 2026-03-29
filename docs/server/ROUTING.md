@@ -1,62 +1,33 @@
 # ROUTING
 
-### Purpose
-- Documents `MailboxRouter` behavior for envelope ingress, push delivery, acknowledgements, and TTL cleanup.
+## Purpose
+Describe mailbox routing behavior for inbound envelopes and acknowledgements.
 
----
+## Current Implementation
+- `MailboxRouter` accepts validated envelopes from ingress.
+- Persists envelopes via DAO and tracks subscriptions for push delivery.
+- Supports acknowledgement (`acknowledgeOwned`) and timed cleanup work.
+- TTL cleanup runs on a fixed 5-minute interval and decrements queue-depth metrics for deleted rows.
 
-## MailboxRouter
+## Key Types/Interfaces
+- `server.router.MailboxRouter`
+- `server.router.QueuedEnvelope`
+- `server.db.EnvelopeDAO`
 
-### Dependencies
-- `EnvelopeDAO`: stores and retrieves envelopes from `message_envelopes`.
-- `MetricsRegistry`: queue depth and delivery-latency tracking.
-- `AuditLogger`: cleanup and error event logging.
-- `ScheduledExecutorService`: runs periodic TTL cleanup.
+## Flow
+1. Ingress hands validated envelope to router.
+2. Router persists envelope and increments queue-depth metrics.
+3. Router publishes to active websocket subscribers for the recipient.
+4. Polling paths can fetch undelivered envelopes by recipient.
+5. On ACK, router marks owned envelope ids as delivered and records delivery latency.
+6. Expired envelopes are pruned via cleanup paths.
 
-### Core methods
-- `start()`
-  - schedules `runTtlCleanup()` every 5 minutes.
+## Error/Security Notes
+- ACK path enforces ownership checks before delivery-state mutation.
+- Router relies on pre-validation/rate-limit checks from ingress layer.
+- Subscription map is concurrent and per-recipient, reducing cross-user delivery risk in memory.
 
-- `ingress(EncryptedMessage message) -> QueuedEnvelope`
-  - persists via `EnvelopeDAO.insert(message)`.
-  - increments queue depth.
-  - dispatches to current subscribers for recipient.
-
-- `fetchUndelivered(String recipientId, int limit) -> List<QueuedEnvelope>`
-  - loads undelivered, unexpired envelopes from DAO.
-
-- `acknowledge(Collection<String> envelopeIds) -> boolean`
-  - bulk mark-delivered path.
-
-- `acknowledgeOwned(String userId, Collection<String> envelopeIds) -> boolean`
-  - ownership-safe ACK path used by WebSocket ingress.
-  - only marks envelopes belonging to `userId`.
-  - decreases queue depth only for acknowledged owned envelopes.
-
-- `subscribe(String recipientId, MailboxSubscriber subscriber)`
-  - registers recipient push subscriber.
-
-- `unsubscribe(MailboxSubscription subscription)`
-  - unregisters subscriber.
-
-### Cleanup behavior
-- `runTtlCleanup()` calls `EnvelopeDAO.deleteExpired()`.
-- Queue depth reduced by deleted count.
-- Emits `AuditLogger.logCleanup(deleted, durationMs)`.
-
----
-
-## QueuedEnvelope
-
-`QueuedEnvelope` stores:
-- `envelopeId`
-- `payload` (`EncryptedMessage`)
-- `createdAtEpochMs`
-- `expiresAtEpochMs`
-
----
-
-## Concurrency model
-- Subscriber registry uses `ConcurrentHashMap<String, CopyOnWriteArraySet<MailboxSubscriber>>`.
-- Cleanup runs on scheduler thread; ingress and ACK run concurrently with thread-safe counters/collections.
-- DAO remains source-of-truth for persistence and ACK state.
+## Related Files
+- `server/src/main/java/com/haf/server/router/MailboxRouter.java`
+- `server/src/main/java/com/haf/server/router/QueuedEnvelope.java`
+- `server/src/main/java/com/haf/server/db/EnvelopeDAO.java`

@@ -1,36 +1,29 @@
 # SEARCH_RESULT_ITEM
 
-### Screen objective
-- Define the reusable card layout for one user row in search results.
-- Expose ids (`fx:id`) consumed by `SearchController.populateCard(...)`.
+## Purpose
+Document the reusable search result card template and its interaction points.
 
-### FXML
-- `search_result_item.fxml`
+## Current Implementation
+- View template: `search_result_item.fxml`.
+- Populated by `SearchController.populateCard(...)`.
+- Displays user summary fields and action buttons.
+- Card actions are rendered contextually (add/remove contact, open profile, start chat) through `ContactActions`.
 
-### Architecture
-- **Controller**: none (template view).
-- **Populated by**: `SearchController` using `Node.lookup("#id")`.
-- **Rendered in**: `FlowPane resultsPane` inside `search.fxml`.
+## Key Types/Interfaces
+- `client.controllers.SearchController`
+- `client.utils.RankIconResolver`
+- `shared.dto.UserSearchResultDTO`
 
-### UI elements
-- Identity section:
-  - `ImageView avatarImage`
-  - `Text fullNameText`
-  - `Text regNumberText`
-  - `Text emailText`
-  - `ImageView rankImage`
-- Action section:
-  - `JFXButton removeButton` (toggles Add/Remove contact)
-  - `JFXButton startChatButton`
+## Flow
+1. Controller loads card FXML for each result row.
+2. Card fields/icons are populated from `UserSearchResultDTO`.
+3. Button/click handlers dispatch through `SearchController.ContactActions`.
 
-### Flow
-1. `SearchController` loads this FXML for each `UserSearchResultDTO`.
-2. Controller fills text fields and rank icon.
-3. Controller wires action handlers:
-   - toggle contact relationship
-   - start chat with selected user
-4. Whole card is clickable for opening profile, except clicks on action buttons.
+## Error/Security Notes
+- Card rendering errors are isolated and logged without crashing whole result pane.
+- Action handlers should validate required IDs before issuing contact/chat operations.
 
-### Notes
-- The file uses `search.css` for card styling.
-- Since there is no dedicated controller, all behavior is centralized in `SearchController`.
+## Related Files
+- `client/src/main/resources/fxml/search_result_item.fxml`
+- `client/src/main/java/com/haf/client/controllers/SearchController.java`
+- `client/src/main/resources/css/search.css`

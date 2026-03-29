@@ -1,59 +1,35 @@
 # RATE_LIMITER
 
-### Purpose
-- Documents `RateLimiterService`, the DB-backed per-user ingress throttle.
+## Purpose
+Document implemented rate-limit policy and decision flow.
 
-### Runtime policy
-- Window: `60` seconds.
-- Max messages per window: `100`.
-- Lockout duration after threshold: `15` minutes.
+## Current Implementation
+- `RateLimiterService` enforces per-user limits using `rate_limits` table.
+- Policy values in code:
+  - window: 60 seconds
+  - max messages: 100 per window
+  - lockout: 15 minutes
+- Returns `RateLimitDecision(allowed, retryAfterSeconds)`.
+- Decision flow performs SQL upsert first, then a select to evaluate current lockout and counter state.
 
----
+## Key Types/Interfaces
+- `server.router.RateLimiterService`
+- `server.router.RateLimiterService.RateLimitDecision`
+- `server.exceptions.RateLimitException`
 
-## Backing table
+## Flow
+1. Upsert/update user window counters.
+2. Read current count and lockout state.
+3. If lockout is active, return block with computed retry-after seconds.
+4. If threshold is exceeded, return block with window retry hint.
+5. Return allow/block decision.
+6. Emit audit events for rate-limit blocks/failures.
 
-`rate_limits` schema (from Flyway migration):
-```sql
-CREATE TABLE rate_limits (
-    user_id VARCHAR(64) NOT NULL,
-    message_count INT DEFAULT 0,
-    window_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    lockout_until TIMESTAMP NULL,
-    PRIMARY KEY (user_id)
-);
-```
+## Error/Security Notes
+- SQL errors are logged and wrapped in `RateLimitException`.
+- Retry-after values are bounded to positive values.
+- Block decisions always normalize `retryAfterSeconds >= 1`.
 
----
-
-## `checkAndConsume(requestId, userId)` flow
-1. Upsert/update the user row:
-  - reset `message_count` and `window_start` when 60s window elapsed
-  - increment `message_count` otherwise
-  - set `lockout_until` when threshold is reached
-2. Read current state.
-3. If `lockout_until` is still in the future:
-  - return `RateLimitDecision.block(retryAfterSeconds)`
-  - emit `AuditLogger.logRateLimit(...)`
-4. If over threshold in current window:
-  - return blocked decision.
-5. Otherwise return `RateLimitDecision.allow()`.
-
----
-
-## Decision type
-- `RateLimitDecision(boolean allowed, long retryAfterSeconds)`
-- Constructors:
-  - `allow()` -> `(true, 0)`
-  - `block(seconds)` -> `(false, max(seconds,1))`
-
----
-
-## Failure behavior
-- SQL failures are logged via `AuditLogger.logError("rate_limit_failed", ...)`.
-- Service throws `RateLimitException` to caller.
-
----
-
-## Notes
-- This implementation is message-count based (not byte-budget based).
-- Enforcement is shared by HTTP message ingress and WebSocket ACK processing.
+## Related Files
+- `server/src/main/java/com/haf/server/router/RateLimiterService.java`
+- `server/src/main/resources/db/migration/V5__create_rate_limits_table.sql`

@@ -1,30 +1,35 @@
 # KEYSTORE_PROVIDER
 
-### Purpose
-- Provides client-side key lookup for local X25519 private key and recipient public keys, backed by `UserKeystore` and directory service stub.
+## Purpose
+Document the client key-provider implementation used by messaging send/receive flows.
 
-### Dependencies
-- `UserKeystore`: management of sealed local X25519 keypairs.
-- Directory service (stub): lookup recipient public keys by ID.
-- `char[] passphrase`: for unsealing the local private key.
+## Current Implementation
+- Client uses `UserKeystoreKeyProvider` as the `KeyProvider` implementation.
+- It wraps `UserKeystore` and exposes sender id + recipient public key resolution.
+- Recipient key lookup order:
+  1. local keystore metadata match
+  2. optional directory-service fetcher callback (`setDirectoryServiceFetcher`)
+- Default constructor path bootstraps keystore root through `KeystoreBootstrap.run(...)` before opening `UserKeystore`.
 
-### Key retrieval flow
-1. Constructor: `UserKeystore keystore, char[] passphrase, String localUserId`.
-2. `getLocalPrivateKey()`:
-    - `keystore.loadCurrentPrivate(root, passphrase)` → unseal with PBKDF2 + AES-256-GCM.
-    - Return X25519 PrivateKey.
-3. `getRecipientPublicKey(String recipientId)`:
-    - Lookup in directory stub (or cache).
-    - Return X25519 PublicKey or throw `KeyNotFoundException`.
+## Key Types/Interfaces
+- `com.haf.client.crypto.UserKeystoreKeyProvider`
+- `com.haf.shared.keystore.KeyProvider`
+- `com.haf.shared.keystore.UserKeystore`
+- `com.haf.shared.exceptions.KeyNotFoundException`
 
-### KeyStore integration
-- The `UserKeystore` stores X25519 keypairs in PEM format (public) and sealed envelope (private).
-- Sealed format: `v1.b64salt.b64iv.b64(ciphertext+tag)`.
-- Unsealing: PBKDF2(passphrase, salt, 200k iterations) → AES-256-GCM decrypt.
+## Flow
+1. Construct provider with sender id and passphrase.
+2. Sender calls `getSenderId()` for envelope identity.
+3. Encryption flow calls `getRecipientPublicKey(recipientId)`.
+4. Local metadata list is scanned for matching key id before remote fetch fallback.
+5. For receiver paths, provider exposes local keystore/passphrase accessors.
 
-### Security rules
-- Passphrase **never** stored—only in memory and zeroed after use.
-- Private key unsealed on-demand and zeroed immediately after use (where feasible).
-- Directory cache: short TTL (5 min) for recipient pubkeys, validate fingerprint.
-- KeyNotFoundException → user-visible error, no fallback to weak keys.
-- Log only key IDs (SHA-256 fingerprint), not key material.
+## Error/Security Notes
+- Missing recipient keys raise `KeyNotFoundException`.
+- Passphrase is cloned and never logged.
+- Directory fetch failures do not silently downgrade security behavior.
+
+## Related Files
+- `client/src/main/java/com/haf/client/crypto/UserKeystoreKeyProvider.java`
+- `shared/src/main/java/com/haf/shared/keystore/KeyProvider.java`
+- `shared/src/main/java/com/haf/shared/keystore/UserKeystore.java`

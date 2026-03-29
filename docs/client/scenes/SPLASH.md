@@ -1,41 +1,30 @@
 # SPLASH
 
-### Screen objective
-- Application initialization: configuration, crypto verification, resource checking, network reachability.
-- Visual progress feedback with animated progress bar and status messages.
-- Navigation to login on success, retry/exit dialog on failure.
+## Purpose
+Document splash scene UI behavior during bootstrap.
 
-### FXML
-- `splash.fxml`
+## Current Implementation
+- Controller: `SplashController`.
+- ViewModel: `SplashViewModel`.
+- Scene presents progress, status, version, and failure handling before transition to login.
+- Failure popup supports retry/exit and classifies network/resource/security startup errors for clearer user messaging.
 
-### Architecture
-- **Controller**: `SplashController`.
-- **ViewModel**: `SplashViewModel`.
-- **Pattern**: MVVM with property binding.
+## Key Types/Interfaces
+- `client.controllers.SplashController`
+- `client.viewmodels.SplashViewModel`
+- `client.utils.ViewRouter`
 
-### UI elements
-- `StackPane rootContainer`: transparent background for custom window.
-- `ImageView logo`: application logo (`app_logo.png`).
-- `Text title`: "HAF Messenger".
-- `Text subtitle`: tagline.
-- `Text status`: current bootstrap step message.
-- `ProgressBar progressBar`: 0.0–1.0, hidden on error.
-- `Text percentage`: formatted progress ("0%", "50%", "100%"), hidden on error.
-- `Text version`: detected application version.
+## Flow
+1. Splash scene loads and binds properties.
+2. ViewModel executes bootstrap checks asynchronously.
+3. Failures are normalized to user-facing categories with root-cause detail.
+4. Success routes to login; failure opens failure popup/dialog.
 
-### Flow
-1. `SplashController.initialize()`:
-    - Calls `bindViewModel()` to bind UI properties.
-    - Calls `viewModel.startBootstrap(onSuccess, onFailure)`.
-2. Bootstrap sequence (background thread):
-    - Config loading → Crypto init → Resource check → Network check.
-    - Progress and status updated via `Task` properties.
-3. On success → `navigateToLogin()` via `ViewRouter.switchToTransparent()`.
-4. On failure → `showFailureDialog()` with retry/exit options.
+## Error/Security Notes
+- Failure mode keeps app in controlled state with retry/exit options.
+- Bootstrap validates crypto/resource prerequisites before normal operation.
 
-### Window style
-- `StageStyle.TRANSPARENT` (undecorated, custom styling).
-- No title bar, no window controls.
-
-### Error handling
-- `Alert` dialog with error details, Retry (restarts bootstrap) or Cancel (exits app).
+## Related Files
+- `client/src/main/resources/fxml/splash.fxml`
+- `client/src/main/java/com/haf/client/controllers/SplashController.java`
+- `client/src/main/java/com/haf/client/viewmodels/SplashViewModel.java`

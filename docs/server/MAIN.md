@@ -1,47 +1,38 @@
 # MAIN
 
-### Purpose
-- Documents the real server bootstrap flow in `com.haf.server.core.Main`.
+## Purpose
+Document server bootstrap and shutdown orchestration performed by `Main`.
 
-### Startup sequence
-1. Load config via `ServerConfig.load()`.
-2. Run Flyway migrations from `filesystem:server/src/main/resources/db/migration`.
-3. Create `HikariDataSource` using `HAF_DB_*` settings.
-4. Build TLS 1.3 `SSLContext` from PKCS12 keystore.
-5. Create core services:
-  - `MetricsRegistry`
-  - `AuditLogger`
-  - `EncryptedMessageValidator`
-  - DAOs: `EnvelopeDAO`, `UserDAO`, `SessionDAO`, `FileUploadDAO`, `AttachmentDAO`, `ContactDAO`
-  - `MailboxRouter`
-  - `RateLimiterService`
-  - `PresenceRegistry`
-6. Build ingress servers:
-  - `HttpIngressServer`
-  - `WebSocketIngressServer`
-7. Start scheduled jobs:
-  - metrics snapshot every 60s
-  - attachment cleanup every 300s
-8. Start router and servers:
-  - `mailboxRouter.start()`
-  - `webSocketServer.start()` + `awaitStartup(Duration.ofSeconds(10))`
-  - `httpServer.start()`
+## Current Implementation
+- Startup sequence:
+  - load config
+  - run Flyway migrations
+  - build datasource/scheduler
+  - initialize services/DAOs/router/ingress servers
+  - start mailbox router + websocket + HTTPS ingress
+- Scheduled jobs include metrics snapshots and attachment cleanup.
+- Scheduler cadence is 60 seconds for metrics snapshots and 300 seconds for expired attachment cleanup.
 
-### TLS behavior
-- Protocol: `TLSv1.3` only.
-- Cipher suites:
-  - `TLS_AES_256_GCM_SHA384`
-  - `TLS_CHACHA20_POLY1305_SHA256`
+## Key Types/Interfaces
+- `server.core.Main`
+- `server.config.ServerConfig`
+- `server.router.MailboxRouter`
+- `server.ingress.HttpIngressServer`
+- `server.ingress.WebSocketIngressServer`
 
-### Shutdown behavior
-- Registers JVM shutdown hook that:
-  - stops websocket + HTTP servers
-  - closes router
-  - cancels scheduled tasks
-  - shuts down scheduler
-  - closes datasource
-- Main thread waits on shutdown latch until termination.
+## Flow
+1. `Main.main(...)` calls `start()`.
+2. Configuration, migrations, and dependency graph are initialized.
+3. Runtime services and ingress endpoints start (`MailboxRouter`, WSS, then HTTPS).
+4. Websocket startup is awaited (10s budget) before final HTTP start.
+5. Shutdown hook closes servers/router/scheduler/datasource.
 
-### Error handling
-- Any startup failure logs `Server startup failed` and throws `StartupException`.
-- WebSocket startup has explicit timeout/failure signaling via `awaitStartup(...)`.
+## Error/Security Notes
+- Any startup failure is logged and wrapped in `StartupException`.
+- TLS context is initialized with strict protocol/cipher policy.
+- Shutdown path cancels scheduled jobs and attempts graceful close before datasource teardown.
+
+## Related Files
+- `server/src/main/java/com/haf/server/core/Main.java`
+- `server/src/main/java/com/haf/server/config/ServerConfig.java`
+- `server/src/main/resources/db/migration`

@@ -1,27 +1,33 @@
 # UTILS
 
-## ClockProvider
+## Purpose
+Summarize shared utility classes used by both client and server modules.
 
-### Purpose
-- Interface for system time dependency injection (testing).
+## Current Implementation
+Utility groups include:
+- time providers (`ClockProvider`, `SystemClockProvider`, `FixedClockProvider`)
+- encoding/serialization (`JsonCodec`, `PemCodec`)
+- key/material helpers (`EccKeyIO`, `FingerprintUtil`)
+- policy/validation helpers (`MessageValidator`, `AttachmentPayloadCodec`)
+- filesystem permissions (`FilePerms`)
+- Utility implementations are reused across production and tests to keep validation/crypto behavior deterministic between modules.
 
-### Method
-- `long currentTimeMillis()`: returns current time to ms.
+## Key Types/Interfaces
+- `shared.utils.ClockProvider`
+- `shared.utils.JsonCodec`
+- `shared.utils.EccKeyIO`
+- `shared.utils.FingerprintUtil`
+- `shared.utils.MessageValidator`
 
-### Implementations
-- `SystemClockProvider`: `System.currentTimeMillis()` (production).
-- `FixedClockProvider`: fixed timestamp (testing).
+## Flow
+1. Core crypto/network/persistence components call utility helpers.
+2. Utilities provide deterministic behavior reused by tests and production code.
+3. Shared utility contracts reduce duplicated logic between client and server.
 
----
+## Error/Security Notes
+- Utility failures are wrapped/raised via typed exceptions where applicable.
+- Security-sensitive helpers (validation, key IO, file perms) are central trust points.
 
-## FingerprintUtil
-
-### Purpose
-- SHA-256 fingerprint for public key verification.
-
-### Method
-- `static String sha256Hex(byte[] derPublicKey)`: hash DER-encoded key, returns HEX uppercase.
-
-### Usage
-- Trust verification: checking if public key fingerprint matches expected.
-- `KeyMetadata.fingerprint` storage.
+## Related Files
+- `shared/src/main/java/com/haf/shared/utils`
+- `shared/src/test/java/com/haf/shared/utils`

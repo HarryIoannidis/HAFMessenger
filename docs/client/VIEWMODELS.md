@@ -1,172 +1,35 @@
 # VIEWMODELS
 
-## SplashViewModel
+## Purpose
+Summarize the implemented client ViewModel layer and ownership boundaries.
 
-### Purpose
-- Orchestrates bootstrap sequence during splash screen display.
-- Exposes status, progress, version, percentage, and error state properties.
+## Current Implementation
+- Authentication/bootstrap: `LoginViewModel`, `RegisterViewModel`, `SplashViewModel`.
+- Main-shell state: `MainViewModel`, `SearchViewModel`, `SearchSortViewModel`.
+- Messaging state: `MessagesViewModel`, `ChatViewModel`.
+- ViewModels expose JavaFX properties and keep network/business logic out of controllers.
 
-### Properties
-- `statusProperty()`: Current bootstrap step message ("Loading configuration...", "Initializing security modules...", etc.).
-- `progressProperty()`: Bootstrap progress (0.0 to 1.0).
-- `versionProperty()`: Detected application version.
-- `percentageProperty()`: Formatted progress percentage ("0%", "50%", "100%").
-- `errorProperty()`: Boolean indicating error state (hides progress bar when true).
+## Key Types/Interfaces
+- `client.viewmodels.LoginViewModel`
+- `client.viewmodels.RegisterViewModel`
+- `client.viewmodels.SplashViewModel`
+- `client.viewmodels.MainViewModel`
+- `client.viewmodels.SearchViewModel`
+- `client.viewmodels.SearchSortViewModel`
+- `client.viewmodels.MessagesViewModel`
+- `client.viewmodels.ChatViewModel`
 
-### Bootstrap flow
-- `startBootstrap(Runnable onSuccess, Consumer<Throwable> onFailure)`:
-    - Creates `Task<Void>` on background thread.
-    - Executes steps: config loading, crypto initialization, resource verification, network check.
-    - Updates progress via `Task.updateProgress()` and `Task.updateMessage()` (thread-safe).
-    - On success: invokes `onSuccess` callback on FX thread.
-    - On failure: sets error state, invokes `onFailure` callback with exception.
+## Flow
+1. Controllers bind to ViewModel properties and command handlers.
+2. ViewModels call services/network interfaces for async work.
+3. Property/list updates drive UI refresh and status labels.
+4. Runtime recoverable issues are surfaced to UI via callbacks/listeners.
 
-### Dependency injection
-- Constructor accepts functional interfaces: `ConfigLoader`, `CryptoInitializer`, `ResourceChecker`, `NetworkChecker`.
-- `createDefault()`: Factory method creating ViewModel with default implementations.
+## Error/Security Notes
+- ViewModels should emit user-safe error strings, not raw internal traces.
+- Messaging ViewModels preserve validation/decrypt boundaries from shared/server contracts.
 
----
-
-## LoginViewModel
-
-### Purpose
-- Handles login form validation and state management.
-- Exposes observable properties for email/password validation errors and login status.
-
-### Properties
-- `emailProperty()`: Bound to email input field.
-- `passwordProperty()`: Bound to password input field.
-- `emailErrorProperty()`: Boolean, true when email validation fails.
-- `passwordErrorProperty()`: Boolean, true when password validation fails.
-- `statusProperty()`: Current login status message.
-
-### Validation
-- `validate()`: Validates email format and password requirements.
-    - Email: non-empty, valid format.
-    - Password: non-empty, minimum length.
-    - Sets error properties and returns boolean.
-
----
-
-## RegisterViewModel
-
-### Purpose
-- Handles multi-step registration validation and state management.
-- Validates personal info fields, password, and photo uploads across steps.
-
-### Properties
-- Personal info: `fullNameProperty()`, `regNumberProperty()`, `idNumberProperty()`, `rankProperty()`, `telephoneProperty()`, `emailProperty()`.
-- Password: `passwordProperty()`, `confirmPasswordProperty()`.
-- Error properties: `*ErrorProperty()` for each field.
-- `currentStepProperty()`: Current step in the registration flow (1-4).
-
-### Validation
-- Step 1: Personal information (name, reg number, ID, rank, telephone, email).
-- Step 2: Password and confirmation (match, strength).
-- Step 3: ID photo (file selected, valid format).
-- Step 4: Selfie photo (file selected, valid format).
-
----
-
-## SearchViewModel
-
-### Purpose
-- Handles search query flow, async API calls, status messaging, and result state.
-- Keeps network/error/empty-state logic out of `SearchController`.
-
-### Properties
-- `statusTextProperty()`: Search status text (`Searching...`, `No results found.`, errors).
-- `loadingProperty()`: True while async search is running.
-- `hasResultsProperty()`: True when there are result cards to render.
-- `resultsProperty()`: Observable list of `UserSearchResult` values for rendering.
-
-### Operations
-- `search(String query)`: Validates query, executes async search, updates properties.
-- `clearResults()`: Resets state to idle prompt.
-
----
-
-## MainViewModel
-
-### Purpose
-- Owns main page state that is not pure UI chrome.
-- Handles contacts list data, contact persistence calls, active tab state, and search-result toggle state.
-
-### Properties
-- `contactsProperty()`: Observable list of `ContactInfo` shown in main contacts list.
-- `activeTabProperty()`: Current tab (`MESSAGES` or `SEARCH`).
-- `hasSearchResultsProperty()`: Tracks whether toolbar action should clear or search.
-
-### Operations
-- `fetchContacts()`: Loads contacts from backend and upserts local list.
-- `addContact(...)` / `removeContact(...)`: Updates local list and persists changes.
-- `updateContactPresence(...)`: Applies active/inactive updates from presence stream.
-- `ensureChatContact(...)`: Adds a contact locally if missing before opening chat.
-
----
-
-## ChatViewModel
-
-### Purpose
-- UI-state wrapper for chat screen on top of `MessageViewModel`.
-- Keeps recipient switching, draft caching, send enablement, and ack delegation out of `ChatController`.
-
-### Properties
-- `draftTextProperty()`: Text currently in the compose field.
-- `canSendProperty()`: True only when recipient and non-empty message exist.
-
-### Operations
-- `setRecipient(String)`: Switches active recipient, persists/restores per-contact drafts.
-- `getActiveMessages()`: Returns message list for active recipient.
-- `sendCurrentDraft()`: Sends trimmed text via `MessageViewModel`, clears draft on success path.
-- `acknowledgeActiveRecipient()`: Marks pending envelopes as delivered when chat is viewed.
-
----
-
-## MessageViewModel
-
-### Purpose
-- Coordinates message sending and receiving operations.
-- Maintains observable list of messages for UI display.
-- Exposes status property for operation feedback.
-
-### Properties
-- `statusProperty()`: Current operation status ("Ready", "Message sent to X", etc.).
-- `getMessages(contactId)`: Observable list of `MessageVM` records per contact.
-
-### Dependencies
-- `MessageSender`: Sends encrypted messages to recipients.
-- `MessageReceiver`: Receives and decrypts incoming messages.
-
-### Operations
-- `sendTextMessage(String recipientId, String messageText)`:
-    - Encodes text to bytes, calls `messageSender.sendMessage()`.
-    - Updates status and adds message to list on FX thread.
-- `startReceiving()` / `stopReceiving()`: Controls message receiver.
-
-### Message listener
-- `MessageReceiver.MessageListener` registered in constructor.
-- `onMessage()`: Handles incoming messages, adds to list on FX thread.
-- `onError()`: Handles errors, updates status.
-- All UI updates via `Platform.runLater()`.
-
----
-
-## ViewModel Best Practices
-
-### Property binding
-- Expose properties via getter methods: `statusProperty()`, `progressProperty()`.
-- Use `SimpleStringProperty`, `SimpleDoubleProperty`, `ReadOnlyStringWrapper`.
-
-### Thread safety
-- Background operations: use `Task<Void>` or `ExecutorService`.
-- UI updates: use `Platform.runLater()` or `Task` property updates.
-- Observable collections: update on FX thread.
-
-### Error handling
-- Catch exceptions in background operations, update status property.
-- Do not expose internal exceptions to UI (wrap in user-friendly messages).
-
-### Testing
-- Dependency injection for mocking.
-- Test property updates, callback invocations, error handling.
+## Related Files
+- `client/src/main/java/com/haf/client/viewmodels`
+- `client/src/main/java/com/haf/client/controllers`
+- `docs/client/scenes`

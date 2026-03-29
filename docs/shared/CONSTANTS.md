@@ -1,56 +1,34 @@
 # CONSTANTS
 
-## CryptoConstants
+## Purpose
+Summarize core protocol/crypto constants used across client and server.
 
-### Purpose
-- Constants for AES-GCM symmetric encryption and X25519 key agreement operations.
+## Current Implementation
+- `CryptoConstants` defines AES-GCM, X25519/XDH, Argon2, and salt/tag/IV sizes.
+- `MessageHeader` defines wire protocol constants and validation policy:
+  - version/algo
+  - identity and TTL bounds
+  - ciphertext size limit
+  - content-type allowlist
+- `AttachmentConstants` defines default attachment size/chunk/allowlist policy.
+- Notable policy bounds include TTL `60..86400` seconds and ciphertext Base64 max length `8 MiB` equivalent (`MAX_CIPHERTEXT_BASE64`).
 
-### AES
-- `AES = "AES"`.
-- `AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"`.
-- `AES_KEY_BITS = 256`.
-- `GCM_TAG_BITS = 128`.
-- `GCM_IV_BYTES = 12`.
-- `SALT_LEN = 16`.
+## Key Types/Interfaces
+- `shared.constants.CryptoConstants`
+- `shared.constants.MessageHeader`
+- `shared.constants.AttachmentConstants`
 
-### X25519 Key Agreement
-- `XDH_ALGORITHM = "XDH"`.
-- `X25519_CURVE = "X25519"`.
-- `KEY_AGREEMENT_ALGO = "XDH"`.
+## Flow
+1. Validators/encryptors use constants to enforce policy.
+2. Server config may override some attachment defaults at runtime.
+3. Client/server remain aligned through shared constants.
 
-### Key Derivation (KDF)
-- `KDF_ALGORITHM = "HKDF"`.
-- `KDF_HASH_ALGO = "SHA-256"`.
+## Error/Security Notes
+- Constant changes are protocol-impacting and require synchronized client/server rollout.
+- Content-type allowlist is enforced during validation.
+- Attachment defaults are shared across modules to prevent client/server drift in upload limits.
 
----
-
-## MessageHeader
-
-### Purpose
-- Wire protocol policy and validation rules.
-
-### Protocol
-- `VERSION = "1"`.
-- `ALGO_AEAD = "AES-256-GCM+X25519"`.
-
-### AEAD sizes
-- `IV_BYTES = 12` (from `CryptoConstants.GCM_IV_BYTES`).
-- `GCM_TAG_BYTES = 16` (128 bits / 8).
-
-### Identity policy
-- `MIN_SENDER_LEN = 3`.
-- `MIN_RECIPIENT_LEN = 3`.
-
-### TTL policy
-- `MAX_TTL_SECONDS = 86400` (24 hours).
-- `MIN_TTL_SECONDS = 60` (1 minute).
-
-### Size limits
-- `MAX_CIPHERTEXT_BASE64 = 8388608` (8 MB).
-
-### Content types allowlist
-- Text: `"text/plain"`, `"text/markdown"`.
-- Images: `"image/png"`, `"image/jpeg"`, `"image/gif"`, `"image/webp"`.
-- Video: `"video/mp4"`, `"video/webm"`, `"video/ogg"`.
-- Documents: `"application/pdf"`, Office formats (docx, xlsx, pptx), MS Office legacy.
-- Generic: `"application/octet-stream"`.
+## Related Files
+- `shared/src/main/java/com/haf/shared/constants/CryptoConstants.java`
+- `shared/src/main/java/com/haf/shared/constants/MessageHeader.java`
+- `shared/src/main/java/com/haf/shared/constants/AttachmentConstants.java`

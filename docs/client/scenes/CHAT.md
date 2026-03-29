@@ -1,48 +1,31 @@
 # CHAT
 
-### Screen objective
-- Displays conversation messages as styled bubbles.
-- Provides text input and send controls.
-- Auto-scrolls to newest message.
+## Purpose
+Describe the active chat scene behavior for messages, compose actions, and attachment actions.
 
-### FXML
-- `chat.fxml` (loaded dynamically by `MainController`)
+## Current Implementation
+- Controller: `ChatController`.
+- ViewModels: `ChatViewModel` on top of `MessagesViewModel` (`ChatSession.get()`).
+- Supports message rendering, compose/send, attachment triggers, and per-message context actions.
 
-### Architecture
-- **Controller**: `ChatController`.
-- **ViewModel**: `MessageViewModel` (shared via `ChatSession` singleton).
-- **Pattern**: MVVM with observable list binding.
+## Key Types/Interfaces
+- `client.controllers.ChatController`
+- `client.viewmodels.ChatViewModel`
+- `client.viewmodels.MessagesViewModel`
+- `client.services.ChatAttachmentService`
 
-### UI elements
-- `ScrollPane chatScrollPane`: scrollable message area.
-- `VBox chatBox`: vertical container for message bubbles.
-- `TextField messageField`: text input for composing messages.
-- `JFXButton sendButton`: sends the message.
+## Flow
+1. `MainController` loads `chat.fxml` and injects recipient via `setRecipient(...)`.
+2. Chat view binds draft/send state to `ChatViewModel`.
+3. Message list changes render bubbles through `MessageBubbleFactory`.
+4. Send and attachment actions call service/network flows.
+5. Receiver updates are acknowledged for active recipient.
 
-### Flow
-1. `MainController.loadChat(recipientId)`:
-    - Loads `chat.fxml` via `FXMLLoader`.
-    - Calls `chatController.setRecipient(recipientId)`.
-2. `ChatController.initialize()`:
-    - Gets `MessageViewModel` from `ChatSession.get()`.
-    - Populates existing messages: iterates `viewModel.getMessages()`, creates bubbles via `MessageBubbleFactory.create(vm)`.
-    - Registers `ListChangeListener` on `viewModel.getMessages()`:
-        - On add: creates bubble, appends to `chatBox`, auto-scrolls.
-    - Wires `sendButton.setOnAction()` and `messageField.setOnAction()` to `sendMessage()`.
-3. `sendMessage()`:
-    - Guards: `viewModel != null`, text not empty.
-    - `viewModel.sendTextMessage(recipientId, text)`.
-    - Clears `messageField`.
+## Error/Security Notes
+- Invalid attachment/message actions surface user-safe errors.
+- Auto-scroll and context actions are governed by runtime client settings.
 
-### Message bubbles
-- Created by `MessageBubbleFactory.create(MessageVM vm)`.
-- Supports message types: TEXT, IMAGE, FILE.
-- Styled differently for sent vs received messages.
-
-### Dependencies
-- `ChatSession`: singleton holding the current `MessageViewModel`.
-- `MessageBubbleFactory`: creates styled JavaFX nodes from `MessageVM` records.
-- `MessageVM`: record with sender, content, type, timestamp, direction.
-
-### Auto-scroll
-- After adding new bubbles: `chatScrollPane.layout()` then `chatScrollPane.setVvalue(1.0)`.
+## Related Files
+- `client/src/main/resources/fxml/chat.fxml`
+- `client/src/main/java/com/haf/client/controllers/ChatController.java`
+- `client/src/main/java/com/haf/client/viewmodels/ChatViewModel.java`

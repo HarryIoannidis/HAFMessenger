@@ -1,20 +1,30 @@
 # FILEPERMS
 
-### Purpose
-- Describes using FilePerms to enforce 700/600 permissions on the root and keychain files, regardless of UMask/OS.
+## Purpose
+Document filesystem-permission helpers used by keystore storage.
 
-### Rules
-- Folders: 700 with ensureDir700(Path).
-- Files: 600 with writeFile600(Path, byte[]).
-- Windows: ignore POSIX set, rely on ACLs; it doesn't fail.
+## Current Implementation
+- `FilePerms.ensureDir700(...)` for secure directory creation/hardening.
+- `FilePerms.writeFile600(...)` for secure file writes.
+- Used by keystore bootstrap and user-key storage operations.
+- Non-POSIX fallback verifies write access and raises `AccessDeniedException` when secure access cannot be guaranteed.
 
-### Feeds
-- Root: ensureDir700(preferred) → in AccessDenied → ensureDir700(userFallback).
-- Key set: ensureDir700(keyDir) → writeFile600(public.pem) → writeFile600(private.enc) → writeFile600(metadata.json).
+## Key Types/Interfaces
+- `shared.utils.FilePerms`
+- `shared.keystore.KeystoreBootstrap`
+- `shared.keystore.UserKeystore`
 
-### API
-- FilePerms.ensureDir700(Path dir): creates/hardens folder to 700.
-- FilePerms.writeFile600(Path file, byte[] data): creates/writes file to 600.
+## Flow
+1. Resolve keystore root.
+2. Ensure root/key directories with strict permissions.
+3. Write key artifacts (`public.pem`, `private.enc`, `metadata.json`) with secure file mode.
+4. Re-apply permission hardening on each write/update path.
 
-### Tests
-- Verify that root dir is drwx------ and the files are -rw------- in Unix, idempotent on the second run.
+## Error/Security Notes
+- Unix mode targets are 700 (dirs) and 600 (files).
+- Platform differences (for example Windows ACL behavior) are handled defensively in utility logic.
+
+## Related Files
+- `shared/src/main/java/com/haf/shared/utils/FilePerms.java`
+- `shared/src/main/java/com/haf/shared/keystore/UserKeystore.java`
+- `shared/src/main/java/com/haf/shared/keystore/KeystoreBootstrap.java`

@@ -1,55 +1,33 @@
 # MAIN
 
-### Purpose
-- The central entry point of the HAF Messenger client, responsible for initializing JavaFX and launching the application UI.
-- Coordinates JavaFX Application lifecycle, sets up the primary stage, and delegates to ViewRouter for navigation to the splash screen.
+## Purpose
+Describe client startup entrypoints and initial navigation behavior.
 
-### Startup sequence
-- `Launcher.main(String[] args)`:
-    - Simple wrapper that delegates to `ClientApp.main(args)` for compatibility with JavaFX Maven plugin.
-- `ClientApp.start(Stage primaryStage)`:
-    - Called by JavaFX Application framework after toolkit initialization.
-    - Registers primary stage with `ViewRouter.setMainStage(primaryStage)`.
-    - Loads application icon from `/images/logo/app_logo.png` (logs warning if missing, non-fatal).
-    - Sets window title to "HAF Messenger".
-    - Launches splash screen via `ViewRouter.switchToTransparent("/fxml/splash.fxml")`.
-- Splash screen bootstrap:
-    - `SplashController` initializes and starts `SplashViewModel` bootstrap sequence.
-    - Bootstrap performs: config loading, crypto initialization, resource verification, network reachability check.
-    - On success: navigates to login screen.
-    - On failure: shows error dialog with retry/exit options.
+## Current Implementation
+- `Launcher.main(...)` delegates to JavaFX app bootstrap.
+- `ClientApp.start(Stage)` sets app title/icon, registers stage in `ViewRouter`, and opens splash view.
+- Navigation uses `ViewRouter.switchToTransparent(...)` / `switchTo(...)`.
+- App startup sets JavaFX text-rendering properties before launch and starts from transparent splash shell.
 
-### Dependencies created
-- `ViewRouter.setMainStage(Stage stage)`:
-    - Registers the primary JavaFX stage for navigation.
-- `ViewRouter.switchToTransparent(String fxmlPath)`:
-    - Loads FXML file and switches to transparent stage style.
-    - FXML loader resolves resources relative to classpath.
-- `SplashViewModel.createDefault()`:
-    - Creates default bootstrap dependencies (config loader, crypto initializer, resource checker, network checker).
-- `SplashController`:
-    - Binds UI properties to ViewModel.
-    - Starts bootstrap on initialization.
-    - Handles navigation and error dialogs.
+## Key Types/Interfaces
+- `com.haf.client.core.Launcher`
+- `com.haf.client.core.ClientApp`
+- `com.haf.client.utils.ViewRouter`
+- `com.haf.client.controllers.SplashController`
 
-### Error handling
-- Missing resources:
-    - Application icon missing: logs warning, continues without icon.
-    - FXML file missing: `ViewRouter` throws `RuntimeException` wrapping `IOException`, application terminates.
-- Bootstrap failures:
-    - SplashViewModel catches exceptions during bootstrap steps.
-    - `SplashController.showFailureDialog()` displays error message with retry/exit options.
-    - Retry: restarts bootstrap sequence.
-    - Exit: closes application via `ViewRouter.close()`.
-- JavaFX initialization errors:
-    - If JavaFX toolkit fails to initialize, `Application.launch()` throws exception and terminates.
-    - No graceful degradation: JavaFX is required for the client.
+## Flow
+1. JavaFX application starts from `Launcher`.
+2. Main stage is registered with `ViewRouter`.
+3. Splash scene is loaded and bootstrap logic runs.
+4. Splash performs bootstrap checks and classifies startup failures for popup presentation.
+5. Splash success transitions to login/main views.
 
-### Threading
-- JavaFX Application Thread:
-    - All UI operations (stage setup, FXML loading, property binding) run on FX thread.
-    - `ViewRouter` methods are called from FX thread.
-- Background threads:
-    - Bootstrap steps run on background thread via `Task` in `SplashViewModel`.
-    - UI updates via `Task.updateMessage()` and `Task.updateProgress()` (thread-safe property updates).
-    - Success/failure callbacks executed on FX thread via `Platform.runLater()`.
+## Error/Security Notes
+- Missing FXML/resources fail fast through routing load exceptions.
+- Splash bootstrap validates crypto/resources/network prerequisites before normal UI use.
+
+## Related Files
+- `client/src/main/java/com/haf/client/core/Launcher.java`
+- `client/src/main/java/com/haf/client/core/ClientApp.java`
+- `client/src/main/java/com/haf/client/utils/ViewRouter.java`
+- `client/src/main/java/com/haf/client/controllers/SplashController.java`

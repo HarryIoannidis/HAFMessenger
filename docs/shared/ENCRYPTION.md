@@ -1,27 +1,32 @@
 # ENCRYPTION
 
-### Purpose
-- Describes the encryption schema in shared: AES-256-GCM with X25519 ECDH key agreement, detached GCM tag in DTO and canonical AAD.
+## Purpose
+Document the implemented shared encryption path for outbound payloads.
 
-### Algorithms
-- Symmetric: AES-GCM with 12-byte IV (96-bit), tag 128-bit.
-- Asymmetric: X25519 ECDH key agreement + SHA-256 KDF for deriving the AES session key.
+## Current Implementation
+- `MessageEncryptor.encrypt(...)` creates one `EncryptedMessage` per payload.
+- Uses X25519-derived AES key, random IV, canonical AAD, AES-GCM encryption, and detached tag encoding.
+- IV length is 12 bytes (`MessageHeader.IV_BYTES`) and tag length is 16 bytes (`MessageHeader.GCM_TAG_BYTES`).
 
-### Feeds
-- Encrypt: generate ephemeral X25519 keypair → ECDH(ephemeral_private, recipient_public) → SHA-256 KDF → AES key → build DTO meta → build AAD (canonical) → AES-GCM encrypt (combined) → split ct/tag → fill DTO (ciphertextB64, tagB64, ivB64, ephemeralPublicB64).
-- Decrypt: policy checks → reconstruct ephemeral public key from DER → ECDH(recipient_private, ephemeral_public) → SHA-256 KDF → AES key → rebuild AAD (canonical) → join ct+tag → AES-GCM decrypt → return plaintext.
+## Key Types/Interfaces
+- `shared.crypto.MessageEncryptor`
+- `shared.crypto.CryptoECC`
+- `shared.crypto.CryptoService`
+- `shared.dto.EncryptedMessage`
 
-### AAD (canonical)
-- Fields and row: version | algo | senderId | recipientId | timestampEpochMs | ttlSeconds | contentType | contentLength.
-- Encoding: UTF-8 strings with 4-byte length-prefix, numbers in big-endian (long/int).
+## Flow
+1. Validate payload/contentType/ttl arguments.
+2. Generate ephemeral keypair and derive AES key.
+3. Populate envelope metadata and compute AAD.
+4. Encrypt payload and split ciphertext/tag into Base64 fields.
+5. Set `e2e=true` and return ready-to-send `EncryptedMessage`.
 
-### DTO EncryptedMessage (about encryption)
-- ivB64: 12-byte IV (96-bit).
-- ephemeralPublicB64: sender's ephemeral X25519 public key (DER, Base64).
-- ciphertextB64, tagB64: detached tag (16B) from combined.
-- aadB64: base64 of AAD bytes (informational).
+## Error/Security Notes
+- Invalid inputs throw `IllegalArgumentException`.
+- Crypto operation failures raise `CryptoOperationException` or wrapped exceptions.
+- Detached tag and metadata binding are required for tamper detection.
 
-### Safety rules
-- New ephemeral X25519 keypair per message (perfect forward secrecy).
-- New IV per message, strong SecureRandom.
-- Avoid key/IV reuse, fixed AAD series, check TTL before decrypt.
+## Related Files
+- `shared/src/main/java/com/haf/shared/crypto/MessageEncryptor.java`
+- `shared/src/main/java/com/haf/shared/crypto/CryptoService.java`
+- `shared/src/main/java/com/haf/shared/crypto/AadCodec.java`

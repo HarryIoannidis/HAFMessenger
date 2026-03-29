@@ -1,53 +1,33 @@
 # CONFIG
 
-### Purpose
-- Documents the actual runtime configuration surface loaded by `ServerConfig`.
-- Centralizes server settings (DB, TLS, search, attachments) and fail-fast validation rules.
+## Purpose
+Document server runtime configuration loaded by `ServerConfig`.
 
-### Loading behavior
-- `ServerConfig.load()` starts from `System.getenv()` and then overlays values from `server/src/main/resources/config/variables.env` if present.
-- In this implementation, values from `variables.env` override environment variables with the same key.
+## Current Implementation
+- `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
+- Required vars include DB, TLS keystore, key passphrase, and search cursor secret.
+- Optional vars control pool sizing, ports, search limits, and attachment policy.
+- Required keys currently include `HAF_DB_URL`, `HAF_DB_USER`, `HAF_DB_PASS`, `HAF_KEY_PASS`, `HAF_TLS_KEYSTORE_PATH`, `HAF_TLS_KEYSTORE_PASS`, and `HAF_SEARCH_CURSOR_SECRET`.
+- Defaults include HTTP `8443`, WS `8444`, search page size `20`, and search max page size `50`.
 
-### Required variables
-- `HAF_DB_URL`: JDBC URL for MySQL.
-- `HAF_DB_USER`: database username.
-- `HAF_DB_PASS`: database password.
-- `HAF_KEY_PASS`: keystore passphrase used by shared keystore flows.
-- `HAF_TLS_KEYSTORE_PATH`: PKCS12 path for TLS server cert/key.
-- `HAF_TLS_KEYSTORE_PASS`: password for the TLS keystore.
-- `HAF_SEARCH_CURSOR_SECRET`: HMAC secret used to sign search cursors.
+## Key Types/Interfaces
+- `server.config.ServerConfig`
+- `server.exceptions.ConfigurationException`
 
-### Optional variables (with defaults)
-- `HAF_DB_POOL_SIZE` (default `20`).
-- `HAF_HTTP_PORT` (default `8443`).
-- `HAF_WS_PORT` (default `8444`).
-- `HAF_KEYSTORE_ROOT` (optional path override).
-- `HAF_ADMIN_PUBLIC_KEY` (optional PEM returned by `/api/v1/config/admin-key`).
+## Flow
+1. Load env map and optional `variables.env` file.
+2. Parse required/optional values with defaults and normalized types.
+3. Apply TLS keystore compatibility fallback for `server/...` path variants.
+4. Validate search and attachment constraints.
+5. Expose typed getters used by server bootstrap and ingress.
 
-### Search configuration
-- `HAF_SEARCH_PAGE_SIZE` (default `20`).
-- `HAF_SEARCH_MAX_PAGE_SIZE` (default `50`).
-- `HAF_SEARCH_MIN_QUERY_LENGTH` (default `3`).
-- `HAF_SEARCH_MAX_QUERY_LENGTH` (default `128`).
+## Error/Security Notes
+- Missing required values fail fast with `ConfigurationException`.
+- TLS keystore path has compatibility fallback resolution logic.
+- Attachment policy values are validated to prevent invalid runtime limits.
+- Password getters return cloned char arrays to reduce accidental mutable sharing.
 
-### Attachment policy configuration
-- `HAF_ATTACHMENT_MAX_BYTES` (default `10485760` / 10 MB).
-- `HAF_ATTACHMENT_INLINE_MAX_BYTES` (default `1048576` / 1 MB).
-- `HAF_ATTACHMENT_CHUNK_BYTES` (default `524288` / 512 KB).
-- `HAF_ATTACHMENT_ALLOWED_TYPES` (CSV MIME allowlist; defaults to shared attachment constants).
-- `HAF_ATTACHMENT_UNBOUND_TTL_SECONDS` (default `1800`).
-
-### Validation rules
-- Missing required values throw `ConfigurationException` and abort startup.
-- Search constraints are validated at boot:
-  - `minQueryLength >= 1`
-  - `maxQueryLength >= minQueryLength`
-  - `pageSize` and `maxPageSize` are positive
-- Attachment constraints are validated at boot:
-  - all size/TTL values must be positive
-  - `inlineMaxBytes <= maxBytes`
-  - MIME allowlist must not be empty
-
-### Path normalization notes
-- TLS keystore path is resolved with compatibility fallbacks when prefixed or not prefixed by `server/`.
-- If the configured path does not exist directly, `ServerConfig` tries alternative relative forms.
+## Related Files
+- `server/src/main/java/com/haf/server/config/ServerConfig.java`
+- `server/src/main/resources/config/variables.env`
+- `server/src/main/java/com/haf/server/core/Main.java`

@@ -1,46 +1,30 @@
 # PROFILE
 
-### Screen objective
-- Present detailed profile data for either:
-  - the current user (self profile), or
-  - a selected/search result contact.
-- Provide placeholder self-service actions for profile edit/deletion requests.
+## Purpose
+Document profile scene behavior for displaying user/contact details from current app state.
 
-### FXML
-- `profile.fxml`
+## Current Implementation
+- Controller: `ProfileController`.
+- View: `profile.fxml`.
+- Invoked from main/search/chat flows when profile display is requested.
+- Self-profile actions (`request edit`, `request deletion`) are currently stubbed with popup feedback.
 
-### Architecture
-- **Controller**: `ProfileController`.
-- **Opened from**: `MainController` via `ViewRouter.showPopup(...)`.
-- **Model**: `UserProfileInfo`.
+## Key Types/Interfaces
+- `client.controllers.ProfileController`
+- `client.models.UserProfileInfo`
+- `client.utils.ViewRouter`
 
-### UI elements
-- Left panel:
-  - Avatar image
-  - `Text userIdText`
-  - `JFXButton requestEditButton`
-  - `JFXButton requestDeletionButton`
-- Main panel fields:
-  - `fullNameValueText`
-  - `rankValueText`
-  - `regNumberValueText`
-  - `joinedDateValueText`
-  - `emailValueText`
-  - `telephoneValueText`
-- Title bar:
-  - `minimizeButton`
-  - `closeButton`
+## Flow
+1. Caller opens profile scene/popup with selected profile data.
+2. Controller binds profile fields and renders values/icons.
+3. Controller shows/hides self-action controls based on `UserProfileInfo.selfProfile()`.
+4. User returns to previous context after viewing.
 
-### Flow
-1. `MainController` resolves target profile and calls popup configuration `controller.showProfile(profile)`.
-2. `ProfileController.showProfile(...)` stores model and calls `applyProfile()`.
-3. `applyProfile()`:
-   - maps values to UI
-   - formats empty values as fallback dash
-   - formats `userId` with `#` prefix
-4. Self-action buttons are only visible when `profile.selfProfile()` is true.
-5. Edit/Delete actions currently show informational stub dialogs ("not implemented yet").
+## Error/Security Notes
+- Profile rendering should tolerate partial data without exposing internal errors.
+- Editable/destructive actions should remain explicitly gated.
 
-### Window behavior
-- Drag support via `titleBar` mouse events.
-- Minimize and close handled by controller buttons.
+## Related Files
+- `client/src/main/resources/fxml/profile.fxml`
+- `client/src/main/java/com/haf/client/controllers/ProfileController.java`
+- `client/src/main/resources/css/profile.css`

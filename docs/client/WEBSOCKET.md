@@ -1,46 +1,39 @@
 # WEBSOCKET
 
-### Purpose
-- Documents `WebSocketAdapter`, the client network bridge used for authenticated WebSocket and HTTPS API calls.
+## Purpose
+Document `WebSocketAdapter` behavior for websocket and authenticated HTTPS helper calls.
 
-### Implementation
-- Uses Java `HttpClient` + `java.net.http.WebSocket` (not Java-WebSocket).
-- Shares one TLS-configured `HttpClient` for websocket and authenticated HTTP calls.
+## Current Implementation
+- Transport implementation uses Java `HttpClient` + `java.net.http.WebSocket`.
+- One TLS-configured `HttpClient` is reused for websocket and authenticated REST helper requests.
+- REST helper methods:
+  - `getAuthenticated(path)`
+  - `postAuthenticated(path, body)`
+  - `deleteAuthenticated(path)`
+- Websocket lifecycle methods:
+  - `connect(onMessage, onError)`
+  - `sendText(...)`
+  - `close()`
+  - `isConnected()`
 
-### Exposed operations
-- `connect(Consumer<String> onMessage, Consumer<Throwable> onError)`
-- `sendText(String message)`
-- `close()`
-- `isConnected()`
-- `getAuthenticated(String path)`
-- `postAuthenticated(String path, String body)`
-- `deleteAuthenticated(String path)`
+## Key Types/Interfaces
+- `client.network.WebSocketAdapter`
+- `client.utils.SslContextUtils`
+- `client.exceptions.HttpCommunicationException`
 
-### Connection behavior
-- Connects to `wss://...` URI with `Authorization: Bearer <sessionId>` header.
-- Incoming text frames are reassembled across fragments.
-- Max inbound message size: 4 MB by default (`haf.ws.maxInboundBytes` system-property override).
-- Oversized frames emit `IOException("Inbound message too large")`, and remaining fragments of that same oversized message are discarded until the final fragment.
+## Flow
+1. Connect with bearer session header over WSS.
+2. Receive fragmented text frames and reassemble safely.
+3. Apply heartbeat ping/pong and stale-connection detection.
+4. Retry websocket reconnect with bounded exponential backoff.
+5. Authenticated REST helpers rewrite host/scheme to HTTPS and perform one connection-level retry.
 
-### Heartbeat and liveness
-- Sends ping every 5 seconds.
-- Tracks latest pong timestamp.
-- If no pong for >15 seconds, aborts websocket and marks disconnected.
+## Error/Security Notes
+- TLS is constrained to `TLSv1.3` and hardened cipher suites.
+- Inbound message size is guarded (`haf.ws.maxInboundBytes`, default 4MB).
+- HTTP non-2xx responses raise `HttpCommunicationException`.
 
-### Reconnect policy
-- Automatic reconnect unless user explicitly closed connection.
-- Max retry attempts: 3.
-- Exponential backoff: 1s, 2s, 4s (capped at 5s).
-
-### Authenticated HTTP helper behavior
-- Rewrites websocket host URI to `https://<host>:8443/...` for REST paths.
-- Adds bearer session header.
-- Retries once on connection-level failures (e.g., stale pooled connection).
-
-### TLS policy
-- TLS 1.3 only.
-- Cipher allowlist:
-  - `TLS_AES_256_GCM_SHA384`
-  - `TLS_CHACHA20_POLY1305_SHA256`
-- Endpoint identification algorithm: `HTTPS`.
-- SSL context is provided by `SslContextUtils`.
+## Related Files
+- `client/src/main/java/com/haf/client/network/WebSocketAdapter.java`
+- `client/src/main/java/com/haf/client/utils/SslContextUtils.java`
+- `client/src/test/java/com/haf/client/network/WebSocketAdapterTest.java`
