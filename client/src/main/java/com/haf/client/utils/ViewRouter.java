@@ -10,6 +10,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import javafx.stage.Window;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Map;
@@ -217,7 +218,7 @@ public class ViewRouter {
 
         Stage popupStage = entry.stage();
         popupStage.sizeToScene();
-        centerPopupOverMainStage(popupStage);
+        centerPopupOverCurrentWindow(popupStage);
 
         if (!popupStage.isShowing()) {
             popupStage.show();
@@ -376,7 +377,7 @@ public class ViewRouter {
             double previousOpacity = popupStage.getOpacity();
             try {
                 popupStage.setOpacity(0.0);
-                centerPopupOverMainStage(popupStage);
+                centerPopupOverCurrentWindow(popupStage);
                 popupStage.show();
                 popupStage.hide();
             } catch (RuntimeException ex) {
@@ -391,11 +392,33 @@ public class ViewRouter {
     }
 
     /**
-     * Centers a popup stage over the current main stage bounds.
+     * Centers a popup stage over the currently focused window (or main stage as
+     * fallback).
      *
      * @param popupStage popup stage to reposition
      */
-    private static void centerPopupOverMainStage(Stage popupStage) {
+    private static void centerPopupOverCurrentWindow(Stage popupStage) {
+        Stage anchorStage = resolveCurrentStage(popupStage);
+        if (anchorStage == null) {
+            return;
+        }
+
+        double anchorX = anchorStage.getX();
+        double anchorY = anchorStage.getY();
+        double anchorWidth = anchorStage.getWidth();
+        double anchorHeight = anchorStage.getHeight();
+
+        if (anchorStage.getScene() != null && anchorStage.getScene().getRoot() != null) {
+            var root = anchorStage.getScene().getRoot();
+            var rootBounds = root.localToScreen(root.getLayoutBounds());
+            if (rootBounds != null && rootBounds.getWidth() > 0 && rootBounds.getHeight() > 0) {
+                anchorX = rootBounds.getMinX();
+                anchorY = rootBounds.getMinY();
+                anchorWidth = rootBounds.getWidth();
+                anchorHeight = rootBounds.getHeight();
+            }
+        }
+
         double popupWidth = popupStage.getWidth();
         double popupHeight = popupStage.getHeight();
 
@@ -405,10 +428,43 @@ public class ViewRouter {
             popupHeight = popupStage.getHeight();
         }
 
-        double targetX = mainStage.getX() + ((mainStage.getWidth() - popupWidth) / 2.0);
-        double targetY = mainStage.getY() + ((mainStage.getHeight() - popupHeight) / 2.0);
+        double targetX = anchorX + ((anchorWidth - popupWidth) / 2.0);
+        double targetY = anchorY + ((anchorHeight - popupHeight) / 2.0);
         popupStage.setX(targetX);
         popupStage.setY(targetY);
+    }
+
+    /**
+     * Resolves the active stage to anchor popup centering.
+     * Preference order: focused showing stage -> showing main stage -> first
+     * showing stage -> main stage.
+     *
+     * @return stage used as centering anchor, or {@code null} when unavailable
+     */
+    private static Stage resolveCurrentStage(Stage excludedStage) {
+        for (Window window : Window.getWindows()) {
+            if (window instanceof Stage stage
+                    && stage != excludedStage
+                    && stage.isShowing()
+                    && stage.isFocused()) {
+                return stage;
+            }
+        }
+
+        if (mainStage != null && mainStage != excludedStage && mainStage.isShowing()) {
+            return mainStage;
+        }
+
+        for (Window window : Window.getWindows()) {
+            if (window instanceof Stage stage && stage != excludedStage && stage.isShowing()) {
+                return stage;
+            }
+        }
+
+        if (mainStage != excludedStage) {
+            return mainStage;
+        }
+        return null;
     }
 
     /**
