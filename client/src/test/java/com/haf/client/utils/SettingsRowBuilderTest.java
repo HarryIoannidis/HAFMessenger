@@ -139,6 +139,17 @@ class SettingsRowBuilderTest {
         assertEquals("Trigger & Query", title.getText());
         assertTrue(title.getStyleClass().contains("settings-pane-title"));
         assertTrue(divider.getStyleClass().contains("divider-profile"));
+        assertEquals(0.0, VBox.getMargin(section).getTop());
+    }
+
+    @Test
+    void build_section_spacer_uses_fixed_height_20px() throws Exception {
+        Pane spacer = onFxThread(() -> SettingsRowBuilder.buildSectionSpacer("searchFlowSectionSpacer"));
+
+        assertEquals("searchFlowSectionSpacer", spacer.getId());
+        assertEquals(20.0, spacer.getMinHeight());
+        assertEquals(20.0, spacer.getPrefHeight());
+        assertEquals(20.0, spacer.getMaxHeight());
     }
 
     private static <T> T onFxThread(Callable<T> callable) throws Exception {

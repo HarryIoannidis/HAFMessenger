@@ -51,6 +51,7 @@ public final class ClientSettings {
 
         NOTIFICATIONS_SHOW_UNREAD_BADGES("notifications.show_unread_badges", true, ApplyMode.IMMEDIATE),
         NOTIFICATIONS_BADGE_CAP("notifications.badge_cap", 10, ApplyMode.IMMEDIATE),
+        NOTIFICATIONS_SHOW_OS_NOTIFICATIONS("notifications.show_os_notifications", true, ApplyMode.IMMEDIATE),
         NOTIFICATIONS_SHOW_RUNTIME_POPUPS("notifications.show_runtime_popups", true, ApplyMode.IMMEDIATE),
 
         PRIVACY_BLUR_ON_FOCUS_LOSS("privacy.blur_on_focus_loss", false, ApplyMode.IMMEDIATE),
@@ -58,6 +59,7 @@ public final class ClientSettings {
         PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK("privacy.blur_on_startup_until_unlock", false, ApplyMode.IMMEDIATE),
         PRIVACY_CONFIRM_ATTACHMENT_OPEN("privacy.confirm_attachment_open", false, ApplyMode.IMMEDIATE),
         PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN("privacy.confirm_external_link_open", true, ApplyMode.IMMEDIATE),
+        PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW("privacy.show_notification_message_preview", false, ApplyMode.IMMEDIATE),
         PRIVACY_HIDE_PRESENCE_INDICATORS("privacy.hide_presence_indicators", false, ApplyMode.IMMEDIATE);
 
         private final String preferenceKey;
@@ -366,6 +368,14 @@ public final class ClientSettings {
         setBoolean(Key.NOTIFICATIONS_SHOW_RUNTIME_POPUPS, enabled);
     }
 
+    public boolean isNotificationsShowOsNotifications() {
+        return getBoolean(Key.NOTIFICATIONS_SHOW_OS_NOTIFICATIONS);
+    }
+
+    public void setNotificationsShowOsNotifications(boolean enabled) {
+        setBoolean(Key.NOTIFICATIONS_SHOW_OS_NOTIFICATIONS, enabled);
+    }
+
     public boolean isPrivacyBlurOnFocusLoss() {
         return getBoolean(Key.PRIVACY_BLUR_ON_FOCUS_LOSS);
     }
@@ -404,6 +414,14 @@ public final class ClientSettings {
 
     public void setPrivacyConfirmExternalLinkOpen(boolean enabled) {
         setBoolean(Key.PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN, enabled);
+    }
+
+    public boolean isPrivacyShowNotificationMessagePreview() {
+        return getBoolean(Key.PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW);
+    }
+
+    public void setPrivacyShowNotificationMessagePreview(boolean enabled) {
+        setBoolean(Key.PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW, enabled);
     }
 
     public boolean isPrivacyHidePresenceIndicators() {

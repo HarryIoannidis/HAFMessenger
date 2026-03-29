@@ -18,6 +18,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -260,6 +261,7 @@ public class SettingsController {
                             1.0,
                             true,
                             true),
+                    SettingsRowBuilder.buildSectionSpacer("searchFlowSectionSpacer"),
                     SettingsRowBuilder.buildSectionHeader(
                             "searchFlowSection",
                             "Flow & Results"),
@@ -383,6 +385,12 @@ public class SettingsController {
                             10.0,
                             true,
                             true),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "notificationsShowOsNotificationsRow",
+                            "notificationsShowOsNotificationsToggle",
+                            "Show OS Notifications",
+                            "Display incoming-message alerts through your operating system notification center.",
+                            settings.isNotificationsShowOsNotifications()),
                     SettingsRowBuilder.buildCheckboxRow(
                             "notificationsShowRuntimePopupsRow",
                             "notificationsShowRuntimePopupsCheck",
@@ -402,6 +410,12 @@ public class SettingsController {
                             "Blur On Focus Loss",
                             "Blur sensitive content when the main window loses focus.",
                             settings.isPrivacyBlurOnFocusLoss()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "privacyBlurOnStartupUntilUnlockRow",
+                            "privacyBlurOnStartupUntilUnlockToggle",
+                            "Blur On Startup Until Unlock",
+                            "Blur content when app opens, until you explicitly unlock it.",
+                            settings.isPrivacyBlurOnStartupUntilUnlock()),
                     SettingsRowBuilder.buildSliderRow(
                             "privacyBlurStrengthRow",
                             "privacyBlurStrengthSlider",
@@ -413,12 +427,7 @@ public class SettingsController {
                             1.0,
                             true,
                             true),
-                    SettingsRowBuilder.buildSwitchRow(
-                            "privacyBlurOnStartupUntilUnlockRow",
-                            "privacyBlurOnStartupUntilUnlockToggle",
-                            "Blur On Startup Until Unlock",
-                            "Blur content when app opens, until you explicitly unlock it.",
-                            settings.isPrivacyBlurOnStartupUntilUnlock()),
+                    SettingsRowBuilder.buildSectionSpacer("privacySafetySectionSpacer"),
                     SettingsRowBuilder.buildSectionHeader(
                             "privacySafetySection",
                             "Safety Prompts"),
@@ -434,6 +443,13 @@ public class SettingsController {
                             "Confirm External Links",
                             "Ask for confirmation before opening external links in your browser.",
                             settings.isPrivacyConfirmExternalLinkOpen()),
+                    SettingsRowBuilder.buildCheckboxRow(
+                            "privacyShowNotificationMessagePreviewRow",
+                            "privacyShowNotificationMessagePreviewCheck",
+                            "Show Message Preview In Notifications",
+                            "When enabled, text notifications can include a preview of message content.",
+                            settings.isPrivacyShowNotificationMessagePreview()),
+                    SettingsRowBuilder.buildSectionSpacer("privacyPresenceSectionSpacer"),
                     SettingsRowBuilder.buildSectionHeader(
                             "privacyPresenceSection",
                             "Presence"),
@@ -484,6 +500,8 @@ public class SettingsController {
         wireSwitch("notificationsShowUnreadBadgesRow", "notificationsShowUnreadBadgesToggle",
                 settings::setNotificationsShowUnreadBadges);
         wireSlider("notificationsBadgeCapSlider", settings::setNotificationsBadgeCap);
+        wireSwitch("notificationsShowOsNotificationsRow", "notificationsShowOsNotificationsToggle",
+                settings::setNotificationsShowOsNotifications);
         wireCheckbox("notificationsShowRuntimePopupsRow", "notificationsShowRuntimePopupsCheck",
                 settings::setNotificationsShowRuntimePopups);
 
@@ -495,6 +513,8 @@ public class SettingsController {
                 settings::setPrivacyConfirmAttachmentOpen);
         wireCheckbox("privacyConfirmExternalLinkOpenRow", "privacyConfirmExternalLinkOpenCheck",
                 settings::setPrivacyConfirmExternalLinkOpen);
+        wireCheckbox("privacyShowNotificationMessagePreviewRow", "privacyShowNotificationMessagePreviewCheck",
+                settings::setPrivacyShowNotificationMessagePreview);
         wireSwitch("privacyHidePresenceIndicatorsRow", "privacyHidePresenceIndicatorsToggle",
                 settings::setPrivacyHidePresenceIndicators);
 
@@ -518,7 +538,8 @@ public class SettingsController {
         if (checkBox == null) {
             return;
         }
-        checkBox.selectedProperty().addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
+        checkBox.selectedProperty()
+                .addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
@@ -527,8 +548,8 @@ public class SettingsController {
         if (checkBox == null) {
             return;
         }
-        checkBox.selectedProperty().addListener((obs, oldValue, newValue) ->
-                sink.accept(!Boolean.TRUE.equals(newValue)));
+        checkBox.selectedProperty()
+                .addListener((obs, oldValue, newValue) -> sink.accept(!Boolean.TRUE.equals(newValue)));
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
@@ -599,8 +620,8 @@ public class SettingsController {
         }
 
         applyDependentRowState(dependentRow, toggle.isSelected());
-        toggle.selectedProperty().addListener((obs, oldValue, newValue) ->
-                applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
+        toggle.selectedProperty().addListener(
+                (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
     }
 
     private static void applyDependentRowState(Node row, boolean enabled) {
@@ -652,15 +673,30 @@ public class SettingsController {
         if (nodeId.equals(node.getId()) && nodeType.isInstance(node)) {
             return nodeType.cast(node);
         }
-        if (node instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) {
-                T found = findByIdRecursive(child, nodeId, nodeType);
-                if (found != null) {
-                    return found;
-                }
+        for (Node child : childNodesOf(node)) {
+            T found = findByIdRecursive(child, nodeId, nodeType);
+            if (found != null) {
+                return found;
             }
         }
         return null;
+    }
+
+    private static List<Node> childNodesOf(Node node) {
+        if (node == null) {
+            return List.of();
+        }
+        java.util.ArrayList<Node> children = new java.util.ArrayList<>();
+        if (node instanceof Parent parent) {
+            children.addAll(parent.getChildrenUnmodifiable());
+        }
+        if (node instanceof SplitPane splitPane) {
+            children.addAll(splitPane.getItems());
+        }
+        if (node instanceof ScrollPane scrollPane && scrollPane.getContent() != null) {
+            children.add(scrollPane.getContent());
+        }
+        return children;
     }
 
     /**
@@ -806,7 +842,8 @@ public class SettingsController {
     }
 
     /**
-     * Cell for settings left navigation menu, rendered from settings_item_cell.fxml.
+     * Cell for settings left navigation menu, rendered from
+     * settings_item_cell.fxml.
      */
     private static final class SettingsMenuCell extends ListCell<SettingsMenuItem> {
 
@@ -841,14 +878,14 @@ public class SettingsController {
                     overlayButton = button;
                 }
             } catch (IOException ex) {
-                LOGGER.error( "Could not load settings_item_cell.fxml", ex);
+                LOGGER.error("Could not load settings_item_cell.fxml", ex);
             }
         }
 
         /**
          * Updates cell graphics and menu-item text/icon content.
          *
-         * @param item menu item payload
+         * @param item  menu item payload
          * @param empty JavaFX empty flag
          */
         @Override

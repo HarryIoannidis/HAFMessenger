@@ -218,7 +218,7 @@ public class ViewRouter {
 
         Stage popupStage = entry.stage();
         popupStage.sizeToScene();
-        centerPopupOverCurrentWindow(popupStage);
+        centerPopupOverMainWindow(popupStage);
 
         if (!popupStage.isShowing()) {
             popupStage.show();
@@ -377,7 +377,7 @@ public class ViewRouter {
             double previousOpacity = popupStage.getOpacity();
             try {
                 popupStage.setOpacity(0.0);
-                centerPopupOverCurrentWindow(popupStage);
+                centerPopupOverMainWindow(popupStage);
                 popupStage.show();
                 popupStage.hide();
             } catch (RuntimeException ex) {
@@ -392,13 +392,12 @@ public class ViewRouter {
     }
 
     /**
-     * Centers a popup stage over the currently focused window (or main stage as
-     * fallback).
+     * Centers a popup stage over the main application stage.
      *
      * @param popupStage popup stage to reposition
      */
-    private static void centerPopupOverCurrentWindow(Stage popupStage) {
-        Stage anchorStage = resolveCurrentStage(popupStage);
+    private static void centerPopupOverMainWindow(Stage popupStage) {
+        Stage anchorStage = resolvePopupAnchorStage(popupStage);
         if (anchorStage == null) {
             return;
         }
@@ -435,13 +434,17 @@ public class ViewRouter {
     }
 
     /**
-     * Resolves the active stage to anchor popup centering.
-     * Preference order: focused showing stage -> showing main stage -> first
-     * showing stage -> main stage.
+     * Resolves the stage used to anchor popup centering.
+     * Preference order: showing main stage -> focused showing stage -> first
+     * showing stage.
      *
      * @return stage used as centering anchor, or {@code null} when unavailable
      */
-    private static Stage resolveCurrentStage(Stage excludedStage) {
+    private static Stage resolvePopupAnchorStage(Stage excludedStage) {
+        if (mainStage != null && mainStage != excludedStage && mainStage.isShowing()) {
+            return mainStage;
+        }
+
         for (Window window : Window.getWindows()) {
             if (window instanceof Stage stage
                     && stage != excludedStage
@@ -451,19 +454,12 @@ public class ViewRouter {
             }
         }
 
-        if (mainStage != null && mainStage != excludedStage && mainStage.isShowing()) {
-            return mainStage;
-        }
-
         for (Window window : Window.getWindows()) {
             if (window instanceof Stage stage && stage != excludedStage && stage.isShowing()) {
                 return stage;
             }
         }
 
-        if (mainStage != excludedStage) {
-            return mainStage;
-        }
         return null;
     }
 

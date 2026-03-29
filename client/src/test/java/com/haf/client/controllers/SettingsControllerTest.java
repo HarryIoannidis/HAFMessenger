@@ -9,6 +9,8 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -280,15 +282,30 @@ class SettingsControllerTest {
         if (id.equals(root.getId()) && type.isInstance(root)) {
             return type.cast(root);
         }
-        if (root instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) {
-                T found = findById(child, id, type);
-                if (found != null) {
-                    return found;
-                }
+        for (Node child : childNodesOf(root)) {
+            T found = findById(child, id, type);
+            if (found != null) {
+                return found;
             }
         }
         return null;
+    }
+
+    private static List<Node> childNodesOf(Node node) {
+        if (node == null) {
+            return List.of();
+        }
+        java.util.ArrayList<Node> children = new java.util.ArrayList<>();
+        if (node instanceof Parent parent) {
+            children.addAll(parent.getChildrenUnmodifiable());
+        }
+        if (node instanceof SplitPane splitPane) {
+            children.addAll(splitPane.getItems());
+        }
+        if (node instanceof ScrollPane scrollPane && scrollPane.getContent() != null) {
+            children.add(scrollPane.getContent());
+        }
+        return children;
     }
 
     private static <T> T onFxThread(Callable<T> callable) throws Exception {
@@ -362,10 +379,13 @@ class SettingsControllerTest {
                 source.contains("wireDependentSliderRowState(\"mediaHoverZoomToggle\", \"mediaHoverZoomScaleRow\");"));
         assertTrue(source.contains(
                 "wireDependentSliderRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
+        assertTrue(source.contains(
+                "wireSwitch(\"notificationsShowOsNotificationsRow\", \"notificationsShowOsNotificationsToggle\","));
         assertTrue(source.contains("if (syncing.get() || !Boolean.TRUE.equals(newValue)) {"));
         assertTrue(source.contains("applyDependentRowState(dependentRow, toggle.isSelected());"));
         assertTrue(source.contains("row.setDisable(!enabled);"));
         assertTrue(source.contains("DISABLED_ROW_STYLE_CLASS"));
+        assertTrue(source.contains("\"notificationsShowOsNotificationsRow\""));
         assertTrue(source
                 .contains("wireSlider(\"searchMinimumQueryLengthSlider\", settings::setSearchMinimumQueryLength);"));
         assertTrue(source
@@ -374,6 +394,12 @@ class SettingsControllerTest {
                 "wireSwitch(\"privacyBlurOnStartupUntilUnlockRow\", \"privacyBlurOnStartupUntilUnlockToggle\","));
         assertTrue(source.contains(
                 "wireCheckbox(\"privacyConfirmExternalLinkOpenRow\", \"privacyConfirmExternalLinkOpenCheck\","));
+        assertTrue(source.contains(
+                "wireCheckbox(\"privacyShowNotificationMessagePreviewRow\", \"privacyShowNotificationMessagePreviewCheck\","));
+        assertTrue(source.contains("\"privacyShowNotificationMessagePreviewRow\""));
+        assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"searchFlowSectionSpacer\")"));
+        assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"privacySafetySectionSpacer\")"));
+        assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"privacyPresenceSectionSpacer\")"));
         assertTrue(source.contains("SettingsRowBuilder.buildSectionHeader("));
     }
 }

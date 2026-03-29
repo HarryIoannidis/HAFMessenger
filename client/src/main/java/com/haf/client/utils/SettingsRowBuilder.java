@@ -178,8 +178,23 @@ public final class SettingsRowBuilder {
         VBox.setMargin(divider, new Insets(10.0, 0.0, 10.0, 0.0));
 
         sectionBox.getChildren().addAll(sectionTitle, divider);
-        VBox.setMargin(sectionBox, new Insets(6.0, 0.0, 2.0, 0.0));
+        VBox.setMargin(sectionBox, new Insets(0.0, 0.0, 2.0, 0.0));
         return sectionBox;
+    }
+
+    /**
+     * Builds an in-pane spacer used to separate section groups.
+     *
+     * @param spacerId spacer node id
+     * @return spacer pane with a fixed 20px height
+     */
+    public static Pane buildSectionSpacer(String spacerId) {
+        Pane spacer = new Pane();
+        spacer.setId(spacerId);
+        spacer.setMinHeight(20.0);
+        spacer.setPrefHeight(20.0);
+        spacer.setMaxHeight(20.0);
+        return spacer;
     }
 
     /**
