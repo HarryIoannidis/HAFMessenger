@@ -46,6 +46,9 @@ class MessageReceiverTest {
 
         @Override
         public void sendText(String text) throws java.io.IOException {
+            if (!connected) {
+                throw new java.io.IOException("WebSocket is not connected");
+            }
             if (failNextSend) {
                 failNextSend = false;
                 throw new java.io.IOException("forced send failure");
@@ -337,6 +340,25 @@ class MessageReceiverTest {
 
         messageReceiver.acknowledgeEnvelopes(senderKeyId);
         assertEquals(List.of("{\"envelopeIds\":[\"env-retry\"]}"), webSocketAdapter.getSentMessages());
+    }
+
+    @Test
+    void acknowledge_defers_while_disconnected_then_sends_after_reconnect() throws Exception {
+        messageReceiver.start();
+
+        byte[] payload = "offline-ack".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+        webSocketAdapter.simulateIncomingMessage(JsonCodec.toJson(encrypted), "env-offline-ack");
+
+        webSocketAdapter.close();
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+        assertTrue(webSocketAdapter.getSentMessages().isEmpty(), "ACK should be deferred while disconnected");
+
+        messageReceiver.start();
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+        assertEquals(List.of("{\"envelopeIds\":[\"env-offline-ack\"]}"), webSocketAdapter.getSentMessages());
     }
 
     @Test

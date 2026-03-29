@@ -5,7 +5,9 @@ import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.Launcher;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.models.MessageVM;
+import com.haf.client.models.MessageType;
 import com.haf.client.services.DefaultMainSessionService;
+import com.haf.client.services.DesktopNotificationService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ClientSettings;
@@ -65,6 +67,8 @@ public class MainController implements SearchController.ContactActions {
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HELP_CENTER_URL = "https://localhost:8443";
+    private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
+            new DesktopNotificationService();
 
     // Window chrome
     @FXML
@@ -143,6 +147,7 @@ public class MainController implements SearchController.ContactActions {
             CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
+    private final DesktopNotificationService desktopNotificationService;
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
     private PauseTransition instantSearchDebounce;
     private final GaussianBlur privacyBlurEffect = new GaussianBlur();
@@ -163,7 +168,7 @@ public class MainController implements SearchController.ContactActions {
      * Creates the controller with the default main-session service implementation.
      */
     public MainController() {
-        this(new DefaultMainSessionService());
+        this(new DefaultMainSessionService(), DEFAULT_DESKTOP_NOTIFICATION_SERVICE);
     }
 
     /**
@@ -174,7 +179,22 @@ public class MainController implements SearchController.ContactActions {
      * @throws NullPointerException when {@code mainSessionService} is {@code null}
      */
     MainController(MainSessionService mainSessionService) {
+        this(mainSessionService, DEFAULT_DESKTOP_NOTIFICATION_SERVICE);
+    }
+
+    /**
+     * Creates the controller with explicit dependencies.
+     *
+     * @param mainSessionService        service responsible for logout and
+     *                                  listener wiring
+     * @param desktopNotificationService service used for OS-native notification
+     *                                   display
+     */
+    MainController(MainSessionService mainSessionService, DesktopNotificationService desktopNotificationService) {
         this.mainSessionService = Objects.requireNonNull(mainSessionService, "mainSessionService");
+        this.desktopNotificationService = Objects.requireNonNull(
+                desktopNotificationService,
+                "desktopNotificationService");
     }
 
     /**
@@ -1823,15 +1843,17 @@ public class MainController implements SearchController.ContactActions {
      * Updates unread counters in response to an incoming message event.
      *
      * @param senderId sender/contact id
-     * @param message  incoming message payload (unused here but included by
-     *                 listener contract)
+     * @param message  incoming message payload used for OS notification text
      */
     private void applyIncomingMessage(String senderId, MessageVM message) {
         if (senderId == null || senderId.isBlank()) {
             return;
         }
 
-        Runnable task = () -> updateUnreadForIncomingMessage(senderId);
+        Runnable task = () -> {
+            MainViewModel.IncomingUnreadAction unreadAction = updateUnreadForIncomingMessage(senderId);
+            maybeShowIncomingOsNotification(senderId, message, unreadAction);
+        };
         if (Platform.isFxApplicationThread()) {
             task.run();
         } else {
@@ -1871,8 +1893,104 @@ public class MainController implements SearchController.ContactActions {
      *
      * @param senderId sender/contact id of the incoming message
      */
-    private void updateUnreadForIncomingMessage(String senderId) {
+    private MainViewModel.IncomingUnreadAction updateUnreadForIncomingMessage(String senderId) {
         String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
-        viewModel.applyIncomingMessage(senderId, activeChatRecipientId);
+        return viewModel.applyIncomingMessage(senderId, activeChatRecipientId);
+    }
+
+    private void maybeShowIncomingOsNotification(
+            String senderId,
+            MessageVM message,
+            MainViewModel.IncomingUnreadAction unreadAction) {
+        Stage stage = ViewRouter.getMainStage();
+        boolean windowFocused = stage != null && stage.isFocused();
+        if (!shouldShowIncomingOsNotification(settings.isNotificationsShowOsNotifications(), unreadAction, windowFocused)) {
+            return;
+        }
+
+        ContactInfo contact = viewModel.getContactById(senderId);
+        String title = resolveIncomingOsNotificationTitle(contact);
+        String body = resolveIncomingOsNotificationBody(message, settings.isPrivacyShowNotificationMessagePreview());
+        desktopNotificationService.showNotification(
+                title,
+                body,
+                () -> Platform.runLater(() -> focusAppAndOpenSenderChat(senderId)));
+    }
+
+    static boolean shouldShowIncomingOsNotification(
+            boolean notificationsEnabled,
+            MainViewModel.IncomingUnreadAction unreadAction,
+            boolean windowFocused) {
+        if (!notificationsEnabled || unreadAction == null) {
+            return false;
+        }
+        return unreadAction == MainViewModel.IncomingUnreadAction.INCREMENT || !windowFocused;
+    }
+
+    static String resolveIncomingOsNotificationBody(MessageVM message, boolean showMessagePreview) {
+        if (message == null || message.type() == null) {
+            return "sent a message";
+        }
+        MessageType type = message.type();
+        if (showMessagePreview && type == MessageType.TEXT) {
+            String preview = normalizeNotificationTextPreview(message.content());
+            if (!preview.isBlank()) {
+                return preview;
+            }
+        }
+        return switch (type) {
+            case TEXT -> "sent a text";
+            case IMAGE -> "sent an image";
+            case FILE -> "sent a file";
+        };
+    }
+
+    private static String normalizeNotificationTextPreview(String text) {
+        if (text == null) {
+            return "";
+        }
+        String normalized = text
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .trim()
+                .replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            return "";
+        }
+        int maxLength = 120;
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength - 3) + "...";
+    }
+
+    static String resolveIncomingOsNotificationTitle(ContactInfo contact) {
+        if (contact != null && contact.name() != null && !contact.name().isBlank()) {
+            return contact.name().trim();
+        }
+        return "Unknown Contact";
+    }
+
+    private void focusAppAndOpenSenderChat(String senderId) {
+        if (senderId == null || senderId.isBlank()) {
+            return;
+        }
+
+        Stage stage = ViewRouter.getMainStage();
+        if (stage != null) {
+            stage.setIconified(false);
+            stage.show();
+            stage.toFront();
+            stage.requestFocus();
+        }
+
+        ContactInfo target = viewModel.getContactById(senderId);
+        if (target == null) {
+            target = viewModel.ensureIncomingContact(senderId);
+        }
+        if (target == null) {
+            return;
+        }
+        selectContactAndOpenChat(target);
     }
 }

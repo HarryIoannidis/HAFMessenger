@@ -53,12 +53,14 @@ class ClientSettingsTest {
         assertTrue(defaults.isChatShowMessageTimestamps());
         assertTrue(defaults.isNotificationsShowUnreadBadges());
         assertEquals(10, defaults.getNotificationsBadgeCap());
+        assertTrue(defaults.isNotificationsShowOsNotifications());
         assertTrue(defaults.isNotificationsShowRuntimePopups());
         assertFalse(defaults.isPrivacyBlurOnFocusLoss());
         assertEquals(4.0, defaults.getPrivacyBlurStrength(), 0.0001);
         assertFalse(defaults.isPrivacyBlurOnStartupUntilUnlock());
         assertFalse(defaults.isPrivacyConfirmAttachmentOpen());
         assertTrue(defaults.isPrivacyConfirmExternalLinkOpen());
+        assertFalse(defaults.isPrivacyShowNotificationMessagePreview());
         assertFalse(defaults.isPrivacyHidePresenceIndicators());
     }
 
@@ -139,8 +141,10 @@ class ClientSettingsTest {
         settings.setSearchAutoOpenFilterOnFirstSearch(false);
         settings.setSearchRequireEnterToSearch(true);
         settings.setSearchRememberSortOptions(false);
+        settings.setNotificationsShowOsNotifications(false);
         settings.setPrivacyBlurOnStartupUntilUnlock(true);
         settings.setPrivacyConfirmExternalLinkOpen(false);
+        settings.setPrivacyShowNotificationMessagePreview(true);
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
@@ -148,6 +152,7 @@ class ClientSettingsTest {
         assertFalse(reloaded.isSearchAutoOpenFilterOnFirstSearch());
         assertTrue(reloaded.isSearchRequireEnterToSearch());
         assertFalse(reloaded.isSearchRememberSortOptions());
+        assertFalse(reloaded.isNotificationsShowOsNotifications());
         assertEquals(50, reloaded.getSearchResultsPerPage());
         assertEquals(5, reloaded.getSearchMinimumQueryLength());
         assertEquals(100, reloaded.getNotificationsBadgeCap());
@@ -155,6 +160,7 @@ class ClientSettingsTest {
         assertEquals(9.0, reloaded.getPrivacyBlurStrength(), 0.0001);
         assertTrue(reloaded.isPrivacyBlurOnStartupUntilUnlock());
         assertFalse(reloaded.isPrivacyConfirmExternalLinkOpen());
+        assertTrue(reloaded.isPrivacyShowNotificationMessagePreview());
     }
 
     @Test

@@ -1,5 +1,8 @@
 package com.haf.client.controllers;
 
+import com.haf.client.models.ContactInfo;
+import com.haf.client.models.MessageType;
+import com.haf.client.models.MessageVM;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.viewmodels.MainViewModel;
 import org.junit.jupiter.api.Test;
@@ -166,6 +169,68 @@ class MainControllerTest {
 
         assertTrue(source.contains("if (!settings.isNotificationsShowRuntimePopups()) {"));
         assertTrue(source.contains("if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {"));
+    }
+
+    @Test
+    void incoming_os_notification_decision_matrix_matches_expected_behavior() {
+        assertFalse(MainController.shouldShowIncomingOsNotification(
+                false,
+                MainViewModel.IncomingUnreadAction.INCREMENT,
+                false));
+
+        assertFalse(MainController.shouldShowIncomingOsNotification(
+                true,
+                MainViewModel.IncomingUnreadAction.RESET,
+                true));
+
+        assertTrue(MainController.shouldShowIncomingOsNotification(
+                true,
+                MainViewModel.IncomingUnreadAction.INCREMENT,
+                true));
+
+        assertTrue(MainController.shouldShowIncomingOsNotification(
+                true,
+                MainViewModel.IncomingUnreadAction.RESET,
+                false));
+    }
+
+    @Test
+    void incoming_os_notification_body_respects_preview_toggle_and_type_mapping() {
+        MessageVM text = new MessageVM(false, MessageType.TEXT, "  Body with\npreview  ", null, null, null, null, false);
+        MessageVM image = new MessageVM(false, MessageType.IMAGE, null, null, "a.png", null, null, false);
+        MessageVM file = new MessageVM(false, MessageType.FILE, null, "/tmp/a", "a.pdf", "10 KB", null, false);
+
+        assertEquals("sent a text", MainController.resolveIncomingOsNotificationBody(text, false));
+        assertEquals("sent an image", MainController.resolveIncomingOsNotificationBody(image, false));
+        assertEquals("sent a file", MainController.resolveIncomingOsNotificationBody(file, false));
+        assertEquals("sent a message", MainController.resolveIncomingOsNotificationBody(null, false));
+
+        assertEquals("Body with preview", MainController.resolveIncomingOsNotificationBody(text, true));
+        assertEquals("sent an image", MainController.resolveIncomingOsNotificationBody(image, true));
+        assertEquals("sent a file", MainController.resolveIncomingOsNotificationBody(file, true));
+    }
+
+    @Test
+    void incoming_os_notification_title_uses_contact_name_or_unknown_fallback() {
+        ContactInfo named = ContactInfo.online("u-1", "Alice Pilot", "R1");
+        ContactInfo blank = ContactInfo.online("u-2", "  ", "R2");
+
+        assertEquals("Alice Pilot", MainController.resolveIncomingOsNotificationTitle(named));
+        assertEquals("Unknown Contact", MainController.resolveIncomingOsNotificationTitle(blank));
+        assertEquals("Unknown Contact", MainController.resolveIncomingOsNotificationTitle(null));
+    }
+
+    @Test
+    void incoming_os_notification_flow_uses_setting_gate_and_click_navigation_path() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("settings.isNotificationsShowOsNotifications()"));
+        assertTrue(source.contains("settings.isPrivacyShowNotificationMessagePreview()"));
+        assertTrue(source.contains("unreadAction == MainViewModel.IncomingUnreadAction.INCREMENT || !windowFocused"));
+        assertTrue(source.contains("desktopNotificationService.showNotification("));
+        assertTrue(source.contains("() -> Platform.runLater(() -> focusAppAndOpenSenderChat(senderId))"));
+        assertTrue(source.contains("stage.toFront();"));
+        assertTrue(source.contains("selectContactAndOpenChat(target);"));
     }
 
     @Test

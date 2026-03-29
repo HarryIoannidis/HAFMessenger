@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
@@ -352,6 +353,10 @@ public class DefaultMessageReceiver implements MessageReceiver {
         if (senderId == null) {
             return;
         }
+        if (!webSocketAdapter.isConnected()) {
+            LOGGER.debug("Deferring ACK for sender {} while websocket is disconnected", senderId);
+            return;
+        }
         List<String> ids = pendingAcks.remove(senderId);
         if (ids == null || ids.isEmpty()) {
             return;
@@ -359,10 +364,33 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             sendAck(ids);
         } catch (IOException e) {
-            LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
+            if (isDisconnectedError(e)) {
+                LOGGER.debug("Deferring ACK for sender {} until websocket reconnects", senderId);
+            } else {
+                LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
+            }
             // Put them back so we can try again later
             pendingAcks.computeIfAbsent(senderId, k -> new ArrayList<>()).addAll(ids);
         }
+    }
+
+    /**
+     * Detects send failures caused by websocket disconnect races.
+     *
+     * @param error send failure to inspect
+     * @return {@code true} when the exception chain indicates disconnected
+     *         transport
+     */
+    private static boolean isDisconnectedError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("not connected")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**
