@@ -1,0 +1,29 @@
+package com.haf.client.controllers;
+
+import org.junit.jupiter.api.Test;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class PopupMessageControllerTest {
+
+    private static final Path CONTROLLER_SOURCE = Path.of("src/main/java/com/haf/client/controllers/PopupMessageController.java");
+
+    @Test
+    void drag_handlers_respect_popup_movable_flag() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (!currentSpec.movable()) {"));
+        assertTrue(source.contains("titleBar.setOnMousePressed"));
+        assertTrue(source.contains("titleBar.setOnMouseDragged"));
+    }
+
+    @Test
+    void startup_privacy_unlock_popup_keeps_close_button_hidden_rule() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("STARTUP_PRIVACY_UNLOCK_POPUP_KEY"));
+        assertTrue(source.contains("boolean showCloseButton = !STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(spec.popupKey());"));
+    }
+}

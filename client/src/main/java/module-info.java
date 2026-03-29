@@ -10,6 +10,7 @@ module client {
     requires org.kordamp.ikonli.javafx;
     requires org.kordamp.ikonli.materialdesign2;
     requires java.prefs;
+    requires java.desktop;
 
     exports com.haf.client.models;
     exports com.haf.client.controllers;

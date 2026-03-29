@@ -7,6 +7,7 @@ import com.jfoenix.controls.JFXToggleButton;
 import com.jfoenix.controls.JFXTogglePane;
 import javafx.application.Platform;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
@@ -120,6 +121,24 @@ class SettingsRowBuilderTest {
         assertTrue(slider.isShowTickMarks());
         assertTrue(slider.isSnapToTicks());
         assertEquals(12.0, sliderBox.getPadding().getTop());
+    }
+
+    @Test
+    void build_section_header_uses_pane_title_and_divider_profile_styles() throws Exception {
+        VBox section = onFxThread(() -> SettingsRowBuilder.buildSectionHeader(
+                "searchTriggerSection",
+                "Trigger & Query"));
+
+        assertEquals("searchTriggerSection", section.getId());
+        assertInstanceOf(Text.class, section.getChildren().get(0));
+        assertInstanceOf(Pane.class, section.getChildren().get(1));
+
+        Text title = (Text) section.getChildren().get(0);
+        Pane divider = (Pane) section.getChildren().get(1);
+
+        assertEquals("Trigger & Query", title.getText());
+        assertTrue(title.getStyleClass().contains("settings-pane-title"));
+        assertTrue(divider.getStyleClass().contains("divider-profile"));
     }
 
     private static <T> T onFxThread(Callable<T> callable) throws Exception {

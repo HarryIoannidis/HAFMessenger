@@ -393,6 +393,7 @@ public class PreviewController {
                 .message(spec.message())
                 .actionText(spec.actionText())
                 .singleAction(true)
+                .movable(spec.movable())
                 .show();
     }
 
@@ -412,6 +413,7 @@ public class PreviewController {
                 "Cancel",
                 false,
                 false,
+                true,
                 null,
                 null);
     }

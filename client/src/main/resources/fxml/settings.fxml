@@ -12,7 +12,6 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Text?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="670.0" prefWidth="880.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.SettingsController">
@@ -62,12 +61,6 @@
                            <children>
                               <VBox fx:id="generalSettingsPane" alignment="TOP_LEFT" spacing="0.0" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="General" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="generalRowsContainer" />
                                  </children>
                                  <padding>
@@ -76,12 +69,6 @@
                               </VBox>
                               <VBox fx:id="searchSettingsPane" alignment="TOP_LEFT" managed="false" spacing="0.0" visible="false" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="Search" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="searchRowsContainer" />
                                  </children>
                                  <padding>
@@ -90,12 +77,6 @@
                               </VBox>
                               <VBox fx:id="mediaSettingsPane" alignment="TOP_LEFT" managed="false" spacing="0.0" visible="false" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="Preview &amp; Media" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="mediaRowsContainer" />
                                  </children>
                                  <padding>
@@ -104,12 +85,6 @@
                               </VBox>
                               <VBox fx:id="chatSettingsPane" alignment="TOP_LEFT" managed="false" spacing="0.0" visible="false" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="Chat" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="chatRowsContainer" />
                                  </children>
                                  <padding>
@@ -118,12 +93,6 @@
                               </VBox>
                               <VBox fx:id="notificationsSettingsPane" alignment="TOP_LEFT" managed="false" spacing="0.0" visible="false" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="Notifications" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="notificationsRowsContainer" />
                                  </children>
                                  <padding>
@@ -132,12 +101,6 @@
                               </VBox>
                               <VBox fx:id="privacySettingsPane" alignment="TOP_LEFT" managed="false" spacing="0.0" visible="false" StackPane.alignment="TOP_LEFT">
                                  <children>
-                                    <Text strokeType="OUTSIDE" strokeWidth="0.0" styleClass="settings-pane-title" text="Privacy" />
-                                    <Pane minHeight="-Infinity" minWidth="-Infinity" prefHeight="1.0" styleClass="divider-profile">
-                                       <VBox.margin>
-                                          <Insets bottom="10.0" top="10.0" />
-                                       </VBox.margin>
-                                    </Pane>
                                     <VBox fx:id="privacyRowsContainer" />
                                  </children>
                                  <padding>

@@ -43,6 +43,8 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.util.Objects;
+import java.awt.Desktop;
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +64,7 @@ public class MainController implements SearchController.ContactActions {
     private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
+    private static final String HELP_CENTER_URL = "https://localhost:8443";
 
     // Window chrome
     @FXML
@@ -129,6 +132,7 @@ public class MainController implements SearchController.ContactActions {
     private double yOffset;
     private ContactInfo contactContextTarget;
     private ContextMenu contactContextMenu;
+    private ContextMenu dotsMenu;
     private EventHandler<MouseEvent> contactContextOutsideClickHandler;
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
@@ -142,6 +146,8 @@ public class MainController implements SearchController.ContactActions {
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
     private PauseTransition instantSearchDebounce;
     private final GaussianBlur privacyBlurEffect = new GaussianBlur();
+    private boolean startupBlurLocked;
+    private boolean startupBlurPopupQueued;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
     private SearchController runtimeIssueSearchController;
@@ -209,6 +215,10 @@ public class MainController implements SearchController.ContactActions {
             activateSearchTab();
         } else {
             activateMessagesTab();
+        }
+
+        if (startupBlurLocked) {
+            scheduleStartupBlurUnlockPopupAfterMainRender();
         }
     }
 
@@ -303,8 +313,12 @@ public class MainController implements SearchController.ContactActions {
      * Wires Enter key on the search field and the action button (magnify / clear).
      */
     private void setupSearchField() {
-        // Enter key triggers search flow through the filter UI state machine.
-        toolbarSearchField.setOnAction(e -> triggerSearchFlow());
+        // Enter key can be policy-gated by settings; icon button remains available.
+        toolbarSearchField.setOnAction(e -> {
+            if (settings.isSearchRequireEnterToSearch()) {
+                triggerSearchFlow();
+            }
+        });
 
         setupSearchActionButton();
 
@@ -336,8 +350,13 @@ public class MainController implements SearchController.ContactActions {
      * @param newValue updated search field text
      */
     private void handleSearchFieldTextChanged(String newValue) {
-        if (!settings.isSearchInstantOnType()
+        if (settings.isSearchRequireEnterToSearch()
+                || !settings.isSearchInstantOnType()
                 || viewModel.activeTabProperty().get() != MainViewModel.MainTab.SEARCH) {
+            PauseTransition debounce = instantSearchDebounce;
+            if (debounce != null) {
+                debounce.stop();
+            }
             return;
         }
 
@@ -353,13 +372,17 @@ public class MainController implements SearchController.ContactActions {
      * @param text search field text at the time the debounce was scheduled
      */
     private void handleInstantSearchDebounceFinished(String text) {
-        if (!settings.isSearchInstantOnType()
+        if (settings.isSearchRequireEnterToSearch()
+                || !settings.isSearchInstantOnType()
                 || viewModel.activeTabProperty().get() != MainViewModel.MainTab.SEARCH) {
             return;
         }
         String normalized = text == null ? "" : text.trim();
         if (normalized.isBlank()) {
             clearSearch();
+            return;
+        }
+        if (normalized.length() < settings.getSearchMinimumQueryLength()) {
             return;
         }
         triggerSearchFlow();
@@ -381,6 +404,7 @@ public class MainController implements SearchController.ContactActions {
                 this::executeSearchWithFilters,
                 this::onSearchExecuted);
         applySearchFilterSettings();
+        applySearchSortMemorySettings();
 
         if (filterButton != null) {
             filterButton.setOnAction(e -> searchFilterUi.onFilterButtonTrigger(
@@ -409,9 +433,18 @@ public class MainController implements SearchController.ContactActions {
         if (searchFilterUi == null) {
             return;
         }
+        String query = toolbarSearchField == null ? null : toolbarSearchField.getText();
+        if (isSearchQueryTooShort(query)) {
+            return;
+        }
         searchFilterUi.onSearchTrigger(
-                toolbarSearchField == null ? null : toolbarSearchField.getText(),
+                query,
                 filterButton != null ? filterButton : searchActionButton);
+    }
+
+    private boolean isSearchQueryTooShort(String query) {
+        String normalized = query == null ? "" : query.trim();
+        return !normalized.isBlank() && normalized.length() < settings.getSearchMinimumQueryLength();
     }
 
     /**
@@ -429,6 +462,9 @@ public class MainController implements SearchController.ContactActions {
             return false;
         }
         searchController.search(query, sortOptions);
+        if (settings.isSearchRememberSortOptions()) {
+            settings.setSearchSortOptions(sortOptions);
+        }
         return true;
     }
 
@@ -1140,7 +1176,9 @@ public class MainController implements SearchController.ContactActions {
 
     private void applyImmediateSettings() {
         applySearchFilterSettings();
+        applySearchSortMemorySettings();
         applyContactCellSettings();
+        syncStartupBlurLockFromSetting(false);
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
 
@@ -1148,9 +1186,15 @@ public class MainController implements SearchController.ContactActions {
         settings.addListener(key -> Platform.runLater(() -> {
             switch (key) {
                 case SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH -> applySearchFilterSettings();
+                case SEARCH_REMEMBER_SORT_OPTIONS -> applySearchSortMemorySettings();
                 case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP, PRIVACY_HIDE_PRESENCE_INDICATORS ->
                         applyContactCellSettings();
                 case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
+                    Stage stage = ViewRouter.getMainStage();
+                    applyPrivacyBlur(stage == null || stage.isFocused());
+                }
+                case PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK -> {
+                    syncStartupBlurLockFromSetting();
                     Stage stage = ViewRouter.getMainStage();
                     applyPrivacyBlur(stage == null || stage.isFocused());
                 }
@@ -1167,6 +1211,18 @@ public class MainController implements SearchController.ContactActions {
         }
     }
 
+    private void applySearchSortMemorySettings() {
+        if (searchFilterUi == null) {
+            return;
+        }
+        if (!settings.isSearchRememberSortOptions()) {
+            settings.clearSearchSortOptions();
+            searchFilterUi.setSelectedSortOptions(SearchSortViewModel.SortOptions.DEFAULT);
+            return;
+        }
+        searchFilterUi.setSelectedSortOptions(settings.getSearchSortOptions());
+    }
+
     private void applyContactCellSettings() {
         ContactCell.setShowUnreadBadges(settings.isNotificationsShowUnreadBadges());
         ContactCell.setUnreadBadgeCap(settings.getNotificationsBadgeCap());
@@ -1181,12 +1237,72 @@ public class MainController implements SearchController.ContactActions {
         if (rootContainer == null) {
             return;
         }
+        if (startupBlurLocked) {
+            privacyBlurEffect.setRadius(Math.max(1.0, settings.getPrivacyBlurStrength() * 2.0));
+            rootContainer.setEffect(privacyBlurEffect);
+            return;
+        }
         if (!focused && settings.isPrivacyBlurOnFocusLoss()) {
             privacyBlurEffect.setRadius(Math.max(1.0, settings.getPrivacyBlurStrength() * 2.0));
             rootContainer.setEffect(privacyBlurEffect);
             return;
         }
         rootContainer.setEffect(null);
+    }
+
+    private void syncStartupBlurLockFromSetting() {
+        syncStartupBlurLockFromSetting(true);
+    }
+
+    private void syncStartupBlurLockFromSetting(boolean scheduleUnlockPopup) {
+        if (!settings.isPrivacyBlurOnStartupUntilUnlock()) {
+            startupBlurLocked = false;
+            startupBlurPopupQueued = false;
+            return;
+        }
+
+        startupBlurLocked = true;
+        if (scheduleUnlockPopup) {
+            scheduleStartupBlurUnlockPopupAfterMainRender();
+        }
+    }
+
+    private void lockStartupPrivacyBlur() {
+        startupBlurLocked = true;
+        Stage stage = ViewRouter.getMainStage();
+        applyPrivacyBlur(stage == null || stage.isFocused());
+    }
+
+    private void unlockStartupPrivacyBlur() {
+        startupBlurLocked = false;
+        Stage stage = ViewRouter.getMainStage();
+        applyPrivacyBlur(stage == null || stage.isFocused());
+    }
+
+    private void scheduleStartupBlurUnlockPopupAfterMainRender() {
+        if (!startupBlurLocked || startupBlurPopupQueued) {
+            return;
+        }
+        startupBlurPopupQueued = true;
+        Platform.runLater(() -> Platform.runLater(() -> {
+            startupBlurPopupQueued = false;
+            if (!startupBlurLocked) {
+                return;
+            }
+            showStartupBlurUnlockPopup();
+        }));
+    }
+
+    private void showStartupBlurUnlockPopup() {
+        PopupMessageBuilder.create()
+                .popupKey("popup-privacy-startup-blur-unlock")
+                .title("Privacy lock enabled")
+                .message("Sensitive content is blurred. Select Unlock to continue.")
+                .actionText("Unlock")
+                .singleAction(true)
+                .movable(false)
+                .onAction(this::unlockStartupPrivacyBlur)
+                .show();
     }
 
     private void restoreWindowState(Stage stage) {
@@ -1224,22 +1340,76 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
 
-        ContextMenu menu = ContextMenuBuilder.create()
+        dotsMenuButton.setOnAction(e -> {
+            if (dotsMenu != null && dotsMenu.isShowing()) {
+                dotsMenu.hide();
+                return;
+            }
+            dotsMenu = buildDotsMenu();
+            showDotsMenuAnchored(dotsMenu);
+        });
+    }
+
+    private ContextMenu buildDotsMenu() {
+        boolean blurLocked = startupBlurLocked;
+        String blurActionIcon = blurLocked ? "mdi2l-lock-open-variant-outline" : "mdi2l-lock-outline";
+        String blurActionText = blurLocked ? "Unlock Privacy Blur" : "Lock Privacy Blur";
+        Runnable blurAction = blurLocked ? this::unlockStartupPrivacyBlur : this::lockStartupPrivacyBlur;
+
+        return ContextMenuBuilder.create()
                 .addOption("mdi2a-account-circle-outline", "Profile", this::openSelfProfilePopup)
                 .addSeparator()
                 .addOption("mdi2c-cog-outline", "Settings", this::openSettingsPopup)
-                .addOption("mdi2h-help-circle-outline", "Help", () -> LOGGER.info("TODO: Help clicked"))
+                .addOption(blurActionIcon, blurActionText, blurAction)
+                .addOption("mdi2h-help-circle-outline", "Help", this::openHelpCenter)
                 .addSeparator()
                 .addOption("mdi2l-logout", "Log out", this::confirmLogout)
                 .build();
+    }
 
-        dotsMenuButton.setOnAction(e -> {
-            if (menu.isShowing()) {
-                menu.hide();
-            } else {
-                showDotsMenuAnchored(menu);
+    private void openHelpCenter() {
+        requestExternalLinkOpen(HELP_CENTER_URL);
+    }
+
+    private void requestExternalLinkOpen(String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        if (!settings.isPrivacyConfirmExternalLinkOpen()) {
+            openExternalLink(url);
+            return;
+        }
+        PopupMessageBuilder.create()
+                .popupKey("popup-confirm-open-external-link")
+                .title("Open external link")
+                .message("Open this link in your browser?\n" + url)
+                .actionText("Open")
+                .cancelText("Cancel")
+                .onAction(() -> openExternalLink(url))
+                .show();
+    }
+
+    private void openExternalLink(String url) {
+        try {
+            if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                showExternalLinkOpenFailedPopup();
+                return;
             }
-        });
+            Desktop.getDesktop().browse(new URI(url));
+        } catch (Exception ex) {
+            LOGGER.warn( "Failed to open external link: {}", url, ex);
+            showExternalLinkOpenFailedPopup();
+        }
+    }
+
+    private void showExternalLinkOpenFailedPopup() {
+        PopupMessageBuilder.create()
+                .popupKey("popup-open-external-link-failed")
+                .title("Could not open link")
+                .message("Your system browser could not be opened for this link.")
+                .actionText("OK")
+                .singleAction(true)
+                .show();
     }
 
     /**

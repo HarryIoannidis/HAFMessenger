@@ -152,6 +152,15 @@ final class SearchFilterController {
         }
 
         /**
+         * Overrides currently selected sort options.
+         *
+         * @param options options to store as active selection
+         */
+        void setSelectedSortOptions(SearchSortViewModel.SortOptions options) {
+            selectedOptions = SearchSortViewModel.normalize(options);
+        }
+
+        /**
          * Indicates whether the next search requires explicit filter apply.
          *
          * @return {@code true} when popup apply must happen before search execution
@@ -330,6 +339,27 @@ final class SearchFilterController {
      */
     void setAutoOpenFilterOnFirstSearch(boolean enabled) {
         flow.setAutoOpenFilterOnFirstSearch(enabled);
+    }
+
+    /**
+     * Returns currently selected sort options tracked by the flow controller.
+     *
+     * @return active selected sort options
+     */
+    SearchSortViewModel.SortOptions getSelectedSortOptions() {
+        return flow.currentSortOptions();
+    }
+
+    /**
+     * Sets selected sort options tracked by the flow controller.
+     *
+     * @param options sort options to make active
+     */
+    void setSelectedSortOptions(SearchSortViewModel.SortOptions options) {
+        flow.setSelectedSortOptions(options);
+        if (menu.isShowing()) {
+            selectOptions(flow.currentSortOptions());
+        }
     }
 
     /**

@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.prefs.Preferences;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -42,6 +43,8 @@ public class SettingsController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsController.class);
     private static final String RESTART_HANDLER_KEY = "settings.restartRequestHandler";
+    private static final String DISABLED_ROW_STYLE_CLASS = "settings-row-disabled";
+    private static final Preferences LOGIN_PREFS = Preferences.userNodeForPackage(LoginController.class);
     private static final Runnable NO_OP_RESTART_HANDLER = () -> {
     };
 
@@ -200,6 +203,9 @@ public class SettingsController {
     private void buildRows() {
         if (generalRowsContainer != null) {
             generalRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "generalSection",
+                            "General"),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalConfirmExitRow",
                             "generalConfirmExitToggle",
@@ -213,6 +219,12 @@ public class SettingsController {
                             "Restore the previous window size and position when reopening the app.",
                             settings.isGeneralRememberWindowState()),
                     SettingsRowBuilder.buildCheckboxRow(
+                            "generalRememberCredentialsRow",
+                            "generalRememberCredentialsCheck",
+                            "Remember Credentials",
+                            "Keep your login email prefilled between app launches.",
+                            isRememberCredentialsEnabled()),
+                    SettingsRowBuilder.buildCheckboxRow(
                             "generalRestoreLastTabRow",
                             "generalRestoreLastTabCheck",
                             "Restore Last Tab",
@@ -222,12 +234,35 @@ public class SettingsController {
 
         if (searchRowsContainer != null) {
             searchRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "searchTriggerSection",
+                            "Trigger & Query"),
                     SettingsRowBuilder.buildSwitchRow(
                             "searchInstantOnTypeRow",
                             "searchInstantOnTypeToggle",
                             "Instant Search While Typing",
                             "Run user search automatically as query text changes.",
                             settings.isSearchInstantOnType()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "searchRequireEnterToSearchRow",
+                            "searchRequireEnterToSearchToggle",
+                            "Require Enter To Search",
+                            "Start search only when pressing Enter (or using the search icon).",
+                            settings.isSearchRequireEnterToSearch()),
+                    SettingsRowBuilder.buildSliderRow(
+                            "searchMinimumQueryLengthRow",
+                            "searchMinimumQueryLengthSlider",
+                            "Minimum Query Length",
+                            "Set the minimum number of characters needed before search runs.",
+                            3.0,
+                            5.0,
+                            settings.getSearchMinimumQueryLength(),
+                            1.0,
+                            true,
+                            true),
+                    SettingsRowBuilder.buildSectionHeader(
+                            "searchFlowSection",
+                            "Flow & Results"),
                     SettingsRowBuilder.buildSwitchRow(
                             "searchAutoOpenFilterOnFirstSearchRow",
                             "searchAutoOpenFilterOnFirstSearchToggle",
@@ -252,15 +287,24 @@ public class SettingsController {
                             true,
                             true),
                     SettingsRowBuilder.buildCheckboxRow(
-                            "searchPreserveLastQueryRow",
-                            "searchPreserveLastQueryCheck",
-                            "Preserve Last Query",
-                            "Keep the last search text when returning to the Search tab.",
-                            settings.isSearchPreserveLastQuery()));
+                            "searchAutoClearOnTabExitRow",
+                            "searchAutoClearOnTabExitCheck",
+                            "Auto Clear Search On Tab Exit",
+                            "Clear query and results when leaving the Search tab.",
+                            !settings.isSearchPreserveLastQuery()),
+                    SettingsRowBuilder.buildCheckboxRow(
+                            "searchRememberSortOptionsRow",
+                            "searchRememberSortOptionsCheck",
+                            "Remember Search Sort",
+                            "Keep selected search sort options between app restarts for your account.",
+                            settings.isSearchRememberSortOptions()));
         }
 
         if (mediaRowsContainer != null) {
             mediaRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "mediaPreviewSection",
+                            "Preview & Media"),
                     SettingsRowBuilder.buildSwitchRow(
                             "mediaHoverZoomRow",
                             "mediaHoverZoomToggle",
@@ -294,6 +338,9 @@ public class SettingsController {
 
         if (chatRowsContainer != null) {
             chatRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "chatSection",
+                            "Chat"),
                     SettingsRowBuilder.buildSwitchRow(
                             "chatSendOnEnterRow",
                             "chatSendOnEnterToggle",
@@ -316,6 +363,9 @@ public class SettingsController {
 
         if (notificationsRowsContainer != null) {
             notificationsRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "notificationsSection",
+                            "Notifications"),
                     SettingsRowBuilder.buildSwitchRow(
                             "notificationsShowUnreadBadgesRow",
                             "notificationsShowUnreadBadgesToggle",
@@ -343,6 +393,9 @@ public class SettingsController {
 
         if (privacyRowsContainer != null) {
             privacyRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "privacyBlurSection",
+                            "Blur Protection"),
                     SettingsRowBuilder.buildSwitchRow(
                             "privacyBlurOnFocusLossRow",
                             "privacyBlurOnFocusLossToggle",
@@ -360,12 +413,30 @@ public class SettingsController {
                             1.0,
                             true,
                             true),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "privacyBlurOnStartupUntilUnlockRow",
+                            "privacyBlurOnStartupUntilUnlockToggle",
+                            "Blur On Startup Until Unlock",
+                            "Blur content when app opens, until you explicitly unlock it.",
+                            settings.isPrivacyBlurOnStartupUntilUnlock()),
+                    SettingsRowBuilder.buildSectionHeader(
+                            "privacySafetySection",
+                            "Safety Prompts"),
                     SettingsRowBuilder.buildCheckboxRow(
                             "privacyConfirmAttachmentOpenRow",
                             "privacyConfirmAttachmentOpenCheck",
                             "Confirm Attachment Open",
                             "Ask for confirmation before opening or downloading attachments.",
                             settings.isPrivacyConfirmAttachmentOpen()),
+                    SettingsRowBuilder.buildCheckboxRow(
+                            "privacyConfirmExternalLinkOpenRow",
+                            "privacyConfirmExternalLinkOpenCheck",
+                            "Confirm External Links",
+                            "Ask for confirmation before opening external links in your browser.",
+                            settings.isPrivacyConfirmExternalLinkOpen()),
+                    SettingsRowBuilder.buildSectionHeader(
+                            "privacyPresenceSection",
+                            "Presence"),
                     SettingsRowBuilder.buildSwitchRow(
                             "privacyHidePresenceIndicatorsRow",
                             "privacyHidePresenceIndicatorsToggle",
@@ -382,14 +453,22 @@ public class SettingsController {
         wireSwitch("generalConfirmExitRow", "generalConfirmExitToggle", settings::setGeneralConfirmExit);
         wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
                 settings::setGeneralRememberWindowState);
+        wireCheckbox("generalRememberCredentialsRow", "generalRememberCredentialsCheck",
+                this::setRememberCredentialsEnabled);
         wireCheckbox("generalRestoreLastTabRow", "generalRestoreLastTabCheck", settings::setGeneralRestoreLastTab);
 
         wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
+        wireSwitch("searchRequireEnterToSearchRow", "searchRequireEnterToSearchToggle",
+                settings::setSearchRequireEnterToSearch);
+        wireSlider("searchMinimumQueryLengthSlider", settings::setSearchMinimumQueryLength);
         wireSwitch("searchAutoOpenFilterOnFirstSearchRow", "searchAutoOpenFilterOnFirstSearchToggle",
                 settings::setSearchAutoOpenFilterOnFirstSearch);
         wireSwitch("searchInfiniteScrollRow", "searchInfiniteScrollToggle", settings::setSearchInfiniteScroll);
         wireSlider("searchResultsPerPageSlider", settings::setSearchResultsPerPage);
-        wireCheckbox("searchPreserveLastQueryRow", "searchPreserveLastQueryCheck", settings::setSearchPreserveLastQuery);
+        wireInvertedCheckbox("searchAutoClearOnTabExitRow", "searchAutoClearOnTabExitCheck",
+                settings::setSearchPreserveLastQuery);
+        wireCheckbox("searchRememberSortOptionsRow", "searchRememberSortOptionsCheck",
+                settings::setSearchRememberSortOptions);
 
         wireSwitch("mediaHoverZoomRow", "mediaHoverZoomToggle", settings::setMediaHoverZoom);
         wireSlider("mediaHoverZoomScaleSlider", settings::setMediaHoverZoomScale);
@@ -410,10 +489,19 @@ public class SettingsController {
 
         wireSwitch("privacyBlurOnFocusLossRow", "privacyBlurOnFocusLossToggle", settings::setPrivacyBlurOnFocusLoss);
         wireSlider("privacyBlurStrengthSlider", settings::setPrivacyBlurStrength);
+        wireSwitch("privacyBlurOnStartupUntilUnlockRow", "privacyBlurOnStartupUntilUnlockToggle",
+                settings::setPrivacyBlurOnStartupUntilUnlock);
         wireCheckbox("privacyConfirmAttachmentOpenRow", "privacyConfirmAttachmentOpenCheck",
                 settings::setPrivacyConfirmAttachmentOpen);
+        wireCheckbox("privacyConfirmExternalLinkOpenRow", "privacyConfirmExternalLinkOpenCheck",
+                settings::setPrivacyConfirmExternalLinkOpen);
         wireSwitch("privacyHidePresenceIndicatorsRow", "privacyHidePresenceIndicatorsToggle",
                 settings::setPrivacyHidePresenceIndicators);
+
+        wireSearchModeMutualExclusivity();
+        wireDependentSliderRowState("privacyBlurOnFocusLossToggle", "privacyBlurStrengthRow");
+        wireDependentSliderRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
+        wireDependentSliderRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
     }
 
     private void wireSwitch(String rowId, String controlId, Consumer<Boolean> sink) {
@@ -434,6 +522,16 @@ public class SettingsController {
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
+    private void wireInvertedCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
+        JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
+        if (checkBox == null) {
+            return;
+        }
+        checkBox.selectedProperty().addListener((obs, oldValue, newValue) ->
+                sink.accept(!Boolean.TRUE.equals(newValue)));
+        wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
+    }
+
     private void wireSlider(String controlId, DoubleConsumer sink) {
         JFXSlider slider = findById(controlId, JFXSlider.class);
         if (slider == null) {
@@ -444,6 +542,76 @@ public class SettingsController {
                 sink.accept(newValue.doubleValue());
             }
         });
+    }
+
+    private static boolean isRememberCredentialsEnabled() {
+        return LOGIN_PREFS.getBoolean(LoginController.PREF_REMEMBER_ME, false);
+    }
+
+    private static void setRememberCredentialsEnabled(boolean enabled) {
+        LOGIN_PREFS.putBoolean(LoginController.PREF_REMEMBER_ME, enabled);
+        if (!enabled) {
+            LOGIN_PREFS.remove(LoginController.PREF_REMEMBERED_EMAIL);
+        }
+    }
+
+    private void wireSearchModeMutualExclusivity() {
+        JFXToggleButton instantSearchToggle = findById("searchInstantOnTypeToggle", JFXToggleButton.class);
+        JFXToggleButton requireEnterToggle = findById("searchRequireEnterToSearchToggle", JFXToggleButton.class);
+        if (instantSearchToggle == null || requireEnterToggle == null) {
+            return;
+        }
+
+        AtomicBoolean syncing = new AtomicBoolean(false);
+        instantSearchToggle.selectedProperty().addListener((obs, oldValue, newValue) -> {
+            if (syncing.get() || !Boolean.TRUE.equals(newValue)) {
+                return;
+            }
+            syncing.set(true);
+            try {
+                if (requireEnterToggle.isSelected()) {
+                    requireEnterToggle.setSelected(false);
+                }
+            } finally {
+                syncing.set(false);
+            }
+        });
+        requireEnterToggle.selectedProperty().addListener((obs, oldValue, newValue) -> {
+            if (syncing.get() || !Boolean.TRUE.equals(newValue)) {
+                return;
+            }
+            syncing.set(true);
+            try {
+                if (instantSearchToggle.isSelected()) {
+                    instantSearchToggle.setSelected(false);
+                }
+            } finally {
+                syncing.set(false);
+            }
+        });
+    }
+
+    private void wireDependentSliderRowState(String toggleId, String dependentRowId) {
+        Node dependentRow = findById(dependentRowId, Node.class);
+        JFXToggleButton toggle = findById(toggleId, JFXToggleButton.class);
+        if (dependentRow == null || toggle == null) {
+            return;
+        }
+
+        applyDependentRowState(dependentRow, toggle.isSelected());
+        toggle.selectedProperty().addListener((obs, oldValue, newValue) ->
+                applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
+    }
+
+    private static void applyDependentRowState(Node row, boolean enabled) {
+        row.setDisable(!enabled);
+        if (enabled) {
+            row.getStyleClass().remove(DISABLED_ROW_STYLE_CLASS);
+            return;
+        }
+        if (!row.getStyleClass().contains(DISABLED_ROW_STYLE_CLASS)) {
+            row.getStyleClass().add(DISABLED_ROW_STYLE_CLASS);
+        }
     }
 
     private void wireOverlayRowToggle(String rowId, Runnable toggleAction) {

@@ -21,6 +21,7 @@ class PreviewControllerTest {
         assertEquals(
                 "Attachment error",
                 PreviewController.buildAttachmentErrorSpec("x").title());
+        assertTrue(PreviewController.buildAttachmentErrorSpec("x").movable());
     }
 
     @Test
@@ -30,5 +31,6 @@ class PreviewControllerTest {
         assertTrue(source.contains("boolean visible = settings.isMediaShowDownloadButton();"));
         assertTrue(source.contains("if (!settings.isMediaHoverZoom()) {"));
         assertTrue(source.contains("if (settings.isPrivacyConfirmAttachmentOpen()) {"));
+        assertTrue(source.contains(".movable(spec.movable())"));
     }
 }

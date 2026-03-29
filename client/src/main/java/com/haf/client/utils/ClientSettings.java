@@ -2,7 +2,9 @@ package com.haf.client.utils;
 
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.models.UserProfileInfo;
+import com.haf.client.viewmodels.SearchSortViewModel;
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -31,9 +33,12 @@ public final class ClientSettings {
 
         SEARCH_INSTANT_ON_TYPE("search.instant_on_type", false, ApplyMode.IMMEDIATE),
         SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH("search.auto_open_filter_on_first_search", true, ApplyMode.IMMEDIATE),
+        SEARCH_REQUIRE_ENTER_TO_SEARCH("search.require_enter_to_search", false, ApplyMode.IMMEDIATE),
+        SEARCH_MINIMUM_QUERY_LENGTH("search.minimum_query_length", 3, ApplyMode.IMMEDIATE),
         SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
         SEARCH_RESULTS_PER_PAGE("search.results_per_page", 20, ApplyMode.IMMEDIATE),
         SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", false, ApplyMode.IMMEDIATE),
+        SEARCH_REMEMBER_SORT_OPTIONS("search.remember_sort_options", true, ApplyMode.IMMEDIATE),
 
         MEDIA_HOVER_ZOOM("media.hover_zoom", true, ApplyMode.IMMEDIATE),
         MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 1.15, ApplyMode.IMMEDIATE),
@@ -50,7 +55,9 @@ public final class ClientSettings {
 
         PRIVACY_BLUR_ON_FOCUS_LOSS("privacy.blur_on_focus_loss", false, ApplyMode.IMMEDIATE),
         PRIVACY_BLUR_STRENGTH("privacy.blur_strength", 4.0, ApplyMode.IMMEDIATE),
+        PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK("privacy.blur_on_startup_until_unlock", false, ApplyMode.IMMEDIATE),
         PRIVACY_CONFIRM_ATTACHMENT_OPEN("privacy.confirm_attachment_open", false, ApplyMode.IMMEDIATE),
+        PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN("privacy.confirm_external_link_open", true, ApplyMode.IMMEDIATE),
         PRIVACY_HIDE_PRESENCE_INDICATORS("privacy.hide_presence_indicators", false, ApplyMode.IMMEDIATE);
 
         private final String preferenceKey;
@@ -90,12 +97,15 @@ public final class ClientSettings {
     public record WindowState(double x, double y, double width, double height, boolean maximized) {
     }
 
+    private static final String PREF_SEARCH_SORT_FIELD = "search.sort.field";
+    private static final String PREF_SEARCH_SORT_DIRECTION = "search.sort.direction";
 
     private final Preferences prefs;
     private final boolean persistent;
     private final Map<Key, Object> values = new EnumMap<>(Key.class);
     private final Map<Key, Object> restartBaseline = new EnumMap<>(Key.class);
     private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
+    private SearchSortViewModel.SortOptions searchSortOptions;
 
     private volatile boolean restartRequiredDirty;
 
@@ -118,6 +128,7 @@ public final class ClientSettings {
                 restartBaseline.put(key, loaded);
             }
         }
+        this.searchSortOptions = loadSearchSortOptions();
         this.restartRequiredDirty = false;
     }
 
@@ -205,12 +216,28 @@ public final class ClientSettings {
         setBoolean(Key.SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH, enabled);
     }
 
+    public boolean isSearchRequireEnterToSearch() {
+        return getBoolean(Key.SEARCH_REQUIRE_ENTER_TO_SEARCH);
+    }
+
+    public void setSearchRequireEnterToSearch(boolean enabled) {
+        setBoolean(Key.SEARCH_REQUIRE_ENTER_TO_SEARCH, enabled);
+    }
+
     public boolean isSearchInfiniteScroll() {
         return getBoolean(Key.SEARCH_INFINITE_SCROLL);
     }
 
     public void setSearchInfiniteScroll(boolean enabled) {
         setBoolean(Key.SEARCH_INFINITE_SCROLL, enabled);
+    }
+
+    public int getSearchMinimumQueryLength() {
+        return getInt(Key.SEARCH_MINIMUM_QUERY_LENGTH);
+    }
+
+    public void setSearchMinimumQueryLength(double value) {
+        setInt(Key.SEARCH_MINIMUM_QUERY_LENGTH, clampToStep(value, 3, 5, 1));
     }
 
     public int getSearchResultsPerPage() {
@@ -227,6 +254,36 @@ public final class ClientSettings {
 
     public void setSearchPreserveLastQuery(boolean enabled) {
         setBoolean(Key.SEARCH_PRESERVE_LAST_QUERY, enabled);
+    }
+
+    public boolean isSearchRememberSortOptions() {
+        return getBoolean(Key.SEARCH_REMEMBER_SORT_OPTIONS);
+    }
+
+    public void setSearchRememberSortOptions(boolean enabled) {
+        setBoolean(Key.SEARCH_REMEMBER_SORT_OPTIONS, enabled);
+        if (!enabled) {
+            clearSearchSortOptions();
+        }
+    }
+
+    public SearchSortViewModel.SortOptions getSearchSortOptions() {
+        return SearchSortViewModel.normalize(searchSortOptions);
+    }
+
+    public void setSearchSortOptions(SearchSortViewModel.SortOptions options) {
+        SearchSortViewModel.SortOptions normalized = SearchSortViewModel.normalize(options);
+        searchSortOptions = normalized;
+        persistSearchSortOptions(normalized);
+    }
+
+    public void clearSearchSortOptions() {
+        searchSortOptions = SearchSortViewModel.SortOptions.DEFAULT;
+        if (!persistent) {
+            return;
+        }
+        prefs.remove(PREF_SEARCH_SORT_FIELD);
+        prefs.remove(PREF_SEARCH_SORT_DIRECTION);
     }
 
     public boolean isMediaHoverZoom() {
@@ -333,6 +390,22 @@ public final class ClientSettings {
         setBoolean(Key.PRIVACY_CONFIRM_ATTACHMENT_OPEN, enabled);
     }
 
+    public boolean isPrivacyBlurOnStartupUntilUnlock() {
+        return getBoolean(Key.PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK);
+    }
+
+    public void setPrivacyBlurOnStartupUntilUnlock(boolean enabled) {
+        setBoolean(Key.PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK, enabled);
+    }
+
+    public boolean isPrivacyConfirmExternalLinkOpen() {
+        return getBoolean(Key.PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN);
+    }
+
+    public void setPrivacyConfirmExternalLinkOpen(boolean enabled) {
+        setBoolean(Key.PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN, enabled);
+    }
+
     public boolean isPrivacyHidePresenceIndicators() {
         return getBoolean(Key.PRIVACY_HIDE_PRESENCE_INDICATORS);
     }
@@ -387,6 +460,56 @@ public final class ClientSettings {
             return "search";
         }
         return "messages";
+    }
+
+    private SearchSortViewModel.SortOptions loadSearchSortOptions() {
+        if (!persistent) {
+            return SearchSortViewModel.SortOptions.DEFAULT;
+        }
+
+        String storedField = prefs.get(PREF_SEARCH_SORT_FIELD, null);
+        String storedDirection = prefs.get(PREF_SEARCH_SORT_DIRECTION, null);
+        if (storedField == null || storedDirection == null) {
+            return SearchSortViewModel.SortOptions.DEFAULT;
+        }
+
+        SearchSortViewModel.Field field = parseSortField(storedField);
+        SearchSortViewModel.Direction direction = parseSortDirection(storedDirection);
+        if (field == null || direction == null) {
+            return SearchSortViewModel.SortOptions.DEFAULT;
+        }
+        return new SearchSortViewModel.SortOptions(field, direction);
+    }
+
+    private void persistSearchSortOptions(SearchSortViewModel.SortOptions options) {
+        if (!persistent) {
+            return;
+        }
+        SearchSortViewModel.SortOptions safe = SearchSortViewModel.normalize(options);
+        prefs.put(PREF_SEARCH_SORT_FIELD, safe.field().name());
+        prefs.put(PREF_SEARCH_SORT_DIRECTION, safe.direction().name());
+    }
+
+    private static SearchSortViewModel.Field parseSortField(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return SearchSortViewModel.Field.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static SearchSortViewModel.Direction parseSortDirection(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return SearchSortViewModel.Direction.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private boolean getBoolean(Key key) {

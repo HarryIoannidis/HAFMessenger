@@ -20,6 +20,7 @@ class PopupMessageBuilderTest {
         assertEquals("Cancel", spec.cancelText());
         assertTrue(spec.showCancel());
         assertFalse(spec.dangerAction());
+        assertTrue(spec.movable());
         assertNotNull(spec.onAction());
         assertNotNull(spec.onCancel());
     }
@@ -36,6 +37,7 @@ class PopupMessageBuilderTest {
                 .actionText("Delete")
                 .cancelText("Keep")
                 .dangerAction(true)
+                .movable(false)
                 .singleAction(false)
                 .onAction(actionCalls::incrementAndGet)
                 .onCancel(cancelCalls::incrementAndGet)
@@ -48,6 +50,7 @@ class PopupMessageBuilderTest {
         assertEquals("Keep", spec.cancelText());
         assertTrue(spec.showCancel());
         assertTrue(spec.dangerAction());
+        assertFalse(spec.movable());
 
         spec.onAction().run();
         spec.onCancel().run();

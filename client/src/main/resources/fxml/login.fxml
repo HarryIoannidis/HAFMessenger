@@ -156,7 +156,7 @@
                               <Insets bottom="5.0" left="30.0" right="30.0" top="20.0" />
                            </VBox.margin>
                            <children>
-                              <JFXCheckBox fx:id="rememberCheckBox" alignment="CENTER_RIGHT" checkedColor="#007abd" graphicTextGap="10.0" prefHeight="30.0" text="Remember Credentials">
+                              <JFXCheckBox fx:id="rememberCheckBox" alignment="CENTER_RIGHT" checkedColor="#007abd" focusTraversable="true" graphicTextGap="10.0" prefHeight="30.0" text="Remember Credentials">
                                  <HBox.margin>
                                     <Insets left="2.0" />
                                  </HBox.margin></JFXCheckBox>

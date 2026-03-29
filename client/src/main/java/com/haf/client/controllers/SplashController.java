@@ -96,6 +96,7 @@ public class SplashController {
                 .cancelText(spec.cancelText())
                 .showCancel(spec.showCancel())
                 .dangerAction(spec.dangerAction())
+                .movable(spec.movable())
                 .onAction(spec.onAction())
                 .onCancel(spec.onCancel())
                 .show();
@@ -119,6 +120,7 @@ public class SplashController {
                 "Exit",
                 true,
                 false,
+                true,
                 onRetry,
                 onExit);
     }
