@@ -205,14 +205,24 @@ public class SettingsController {
         if (generalRowsContainer != null) {
             generalRowsContainer.getChildren().setAll(
                     SettingsRowBuilder.buildSectionHeader(
-                            "generalSection",
-                            "General"),
+                            "generalConfirmationsSection",
+                            "Confirmations"),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalConfirmExitRow",
                             "generalConfirmExitToggle",
                             "Confirm Before Exit",
                             "Show a confirmation dialog before closing the app window.",
                             settings.isGeneralConfirmExit()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "generalConfirmLogoutRow",
+                            "generalConfirmLogoutToggle",
+                            "Confirm Before Logout",
+                            "Show a confirmation dialog before logging out.",
+                            settings.isGeneralConfirmLogout()),
+                    SettingsRowBuilder.buildSectionSpacer("generalRememberSectionSpacer"),
+                    SettingsRowBuilder.buildSectionHeader(
+                            "generalRememberSection",
+                            "Remember"),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalRememberWindowStateRow",
                             "generalRememberWindowStateToggle",
@@ -360,7 +370,13 @@ public class SettingsController {
                             "chatShowMessageTimestampsCheck",
                             "Show Message Timestamps",
                             "Render sent/received times on each chat bubble.",
-                            settings.isChatShowMessageTimestamps()));
+                            settings.isChatShowMessageTimestamps()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "chatUse24HourTimeRow",
+                            "chatUse24HourTimeToggle",
+                            "Use 24-Hour Time",
+                            "When disabled, timestamps are shown in 12-hour format with AM/PM.",
+                            settings.isChatUse24HourTime()));
         }
 
         if (notificationsRowsContainer != null) {
@@ -467,6 +483,7 @@ public class SettingsController {
      */
     private void wireSettingControls() {
         wireSwitch("generalConfirmExitRow", "generalConfirmExitToggle", settings::setGeneralConfirmExit);
+        wireSwitch("generalConfirmLogoutRow", "generalConfirmLogoutToggle", settings::setGeneralConfirmLogout);
         wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
                 settings::setGeneralRememberWindowState);
         wireCheckbox("generalRememberCredentialsRow", "generalRememberCredentialsCheck",
@@ -496,6 +513,7 @@ public class SettingsController {
         wireSwitch("chatAutoScrollToLatestRow", "chatAutoScrollToLatestToggle", settings::setChatAutoScrollToLatest);
         wireCheckbox("chatShowMessageTimestampsRow", "chatShowMessageTimestampsCheck",
                 settings::setChatShowMessageTimestamps);
+        wireSwitch("chatUse24HourTimeRow", "chatUse24HourTimeToggle", settings::setChatUse24HourTime);
 
         wireSwitch("notificationsShowUnreadBadgesRow", "notificationsShowUnreadBadgesToggle",
                 settings::setNotificationsShowUnreadBadges);
@@ -522,6 +540,7 @@ public class SettingsController {
         wireDependentSliderRowState("privacyBlurOnFocusLossToggle", "privacyBlurStrengthRow");
         wireDependentSliderRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
         wireDependentSliderRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
+        wireDependentCheckboxRowState("chatShowMessageTimestampsCheck", "chatUse24HourTimeRow");
     }
 
     private void wireSwitch(String rowId, String controlId, Consumer<Boolean> sink) {
@@ -621,6 +640,18 @@ public class SettingsController {
 
         applyDependentRowState(dependentRow, toggle.isSelected());
         toggle.selectedProperty().addListener(
+                (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
+    }
+
+    private void wireDependentCheckboxRowState(String checkboxId, String dependentRowId) {
+        Node dependentRow = findById(dependentRowId, Node.class);
+        JFXCheckBox checkbox = findById(checkboxId, JFXCheckBox.class);
+        if (dependentRow == null || checkbox == null) {
+            return;
+        }
+
+        applyDependentRowState(dependentRow, checkbox.isSelected());
+        checkbox.selectedProperty().addListener(
                 (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
     }
 

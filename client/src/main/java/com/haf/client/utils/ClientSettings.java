@@ -28,6 +28,7 @@ public final class ClientSettings {
      */
     public enum Key {
         GENERAL_CONFIRM_EXIT("general.confirm_exit", true, ApplyMode.IMMEDIATE),
+        GENERAL_CONFIRM_LOGOUT("general.confirm_logout", true, ApplyMode.IMMEDIATE),
         GENERAL_REMEMBER_WINDOW_STATE("general.remember_window_state", true, ApplyMode.RESTART_REQUIRED),
         GENERAL_RESTORE_LAST_TAB("general.restore_last_tab", true, ApplyMode.RESTART_REQUIRED),
 
@@ -48,6 +49,7 @@ public final class ClientSettings {
         CHAT_SEND_ON_ENTER("chat.send_on_enter", true, ApplyMode.IMMEDIATE),
         CHAT_AUTO_SCROLL_TO_LATEST("chat.auto_scroll_to_latest", true, ApplyMode.IMMEDIATE),
         CHAT_SHOW_MESSAGE_TIMESTAMPS("chat.show_message_timestamps", true, ApplyMode.IMMEDIATE),
+        CHAT_USE_24_HOUR_TIME("chat.use_24_hour_time", true, ApplyMode.IMMEDIATE),
 
         NOTIFICATIONS_SHOW_UNREAD_BADGES("notifications.show_unread_badges", true, ApplyMode.IMMEDIATE),
         NOTIFICATIONS_BADGE_CAP("notifications.badge_cap", 10, ApplyMode.IMMEDIATE),
@@ -184,6 +186,14 @@ public final class ClientSettings {
 
     public void setGeneralConfirmExit(boolean enabled) {
         setBoolean(Key.GENERAL_CONFIRM_EXIT, enabled);
+    }
+
+    public boolean isGeneralConfirmLogout() {
+        return getBoolean(Key.GENERAL_CONFIRM_LOGOUT);
+    }
+
+    public void setGeneralConfirmLogout(boolean enabled) {
+        setBoolean(Key.GENERAL_CONFIRM_LOGOUT, enabled);
     }
 
     public boolean isGeneralRememberWindowState() {
@@ -342,6 +352,14 @@ public final class ClientSettings {
 
     public void setChatShowMessageTimestamps(boolean enabled) {
         setBoolean(Key.CHAT_SHOW_MESSAGE_TIMESTAMPS, enabled);
+    }
+
+    public boolean isChatUse24HourTime() {
+        return getBoolean(Key.CHAT_USE_24_HOUR_TIME);
+    }
+
+    public void setChatUse24HourTime(boolean enabled) {
+        setBoolean(Key.CHAT_USE_24_HOUR_TIME, enabled);
     }
 
     public boolean isNotificationsShowUnreadBadges() {

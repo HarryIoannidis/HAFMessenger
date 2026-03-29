@@ -33,6 +33,7 @@ class ClientSettingsTest {
         ClientSettings defaults = ClientSettings.defaults();
 
         assertTrue(defaults.isGeneralConfirmExit());
+        assertTrue(defaults.isGeneralConfirmLogout());
         assertTrue(defaults.isGeneralRememberWindowState());
         assertTrue(defaults.isGeneralRestoreLastTab());
         assertFalse(defaults.isSearchInstantOnType());
@@ -51,6 +52,7 @@ class ClientSettingsTest {
         assertTrue(defaults.isChatSendOnEnter());
         assertTrue(defaults.isChatAutoScrollToLatest());
         assertTrue(defaults.isChatShowMessageTimestamps());
+        assertTrue(defaults.isChatUse24HourTime());
         assertTrue(defaults.isNotificationsShowUnreadBadges());
         assertEquals(10, defaults.getNotificationsBadgeCap());
         assertTrue(defaults.isNotificationsShowOsNotifications());
@@ -75,6 +77,7 @@ class ClientSettingsTest {
         ClientSettings b = ClientSettings.forUser(userB);
 
         a.setGeneralConfirmExit(false);
+        a.setGeneralConfirmLogout(false);
         a.setSearchResultsPerPage(80);
         a.setSearchMinimumQueryLength(5);
         a.setPrivacyHidePresenceIndicators(true);
@@ -86,6 +89,7 @@ class ClientSettingsTest {
         a.setSearchRememberSortOptions(false);
 
         assertFalse(a.isGeneralConfirmExit());
+        assertFalse(a.isGeneralConfirmLogout());
         assertEquals(80, a.getSearchResultsPerPage());
         assertEquals(5, a.getSearchMinimumQueryLength());
         assertTrue(a.isPrivacyHidePresenceIndicators());
@@ -95,6 +99,7 @@ class ClientSettingsTest {
         assertEquals(SearchSortViewModel.SortOptions.DEFAULT, a.getSearchSortOptions());
 
         assertTrue(b.isGeneralConfirmExit());
+        assertTrue(b.isGeneralConfirmLogout());
         assertEquals(20, b.getSearchResultsPerPage());
         assertEquals(3, b.getSearchMinimumQueryLength());
         assertFalse(b.isPrivacyHidePresenceIndicators());
@@ -137,7 +142,9 @@ class ClientSettingsTest {
         assertEquals(9.0, settings.getPrivacyBlurStrength(), 0.0001);
 
         settings.setGeneralConfirmExit(false);
+        settings.setGeneralConfirmLogout(false);
         settings.setChatSendOnEnter(false);
+        settings.setChatUse24HourTime(false);
         settings.setSearchAutoOpenFilterOnFirstSearch(false);
         settings.setSearchRequireEnterToSearch(true);
         settings.setSearchRememberSortOptions(false);
@@ -148,7 +155,9 @@ class ClientSettingsTest {
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
+        assertFalse(reloaded.isGeneralConfirmLogout());
         assertFalse(reloaded.isChatSendOnEnter());
+        assertFalse(reloaded.isChatUse24HourTime());
         assertFalse(reloaded.isSearchAutoOpenFilterOnFirstSearch());
         assertTrue(reloaded.isSearchRequireEnterToSearch());
         assertFalse(reloaded.isSearchRememberSortOptions());

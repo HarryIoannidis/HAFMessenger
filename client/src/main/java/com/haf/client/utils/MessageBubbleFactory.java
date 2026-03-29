@@ -17,6 +17,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
  * Factory that builds a chat-bubble {@link Node} ready to be inserted into
@@ -24,7 +25,8 @@ import java.time.format.DateTimeFormatter;
  */
 public final class MessageBubbleFactory {
 
-    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter TIME_FMT_24H = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter TIME_FMT_12H = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
     private static final double BUBBLE_MAX_WIDTH = 360.0;
     private static final double BUBBLE_MAX_WIDTH_RATIO = 0.72;
     private static final double BUBBLE_HORIZONTAL_PADDING = 28.0;
@@ -57,6 +59,18 @@ public final class MessageBubbleFactory {
      * @return rendered row node
      */
     public static Node create(MessageVM message, boolean showTimestamp) {
+        return create(message, showTimestamp, true);
+    }
+
+    /**
+     * Creates a full-width row bubble with optional timestamp row.
+     *
+     * @param message message to render
+     * @param showTimestamp whether to render timestamp metadata
+     * @param use24HourTime whether to format timestamp as 24-hour clock
+     * @return rendered row node
+     */
+    public static Node create(MessageVM message, boolean showTimestamp, boolean use24HourTime) {
         // Outer row
         HBox row = new HBox();
         row.setMaxWidth(Double.MAX_VALUE);
@@ -82,7 +96,7 @@ public final class MessageBubbleFactory {
 
         // Timestamp
         if (showTimestamp) {
-            HBox timestampRow = buildTimestampRow(message);
+            HBox timestampRow = buildTimestampRow(message, use24HourTime);
             bubble.getChildren().add(timestampRow);
         }
 
@@ -325,9 +339,10 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the timestamp row
      */
-    private static HBox buildTimestampRow(MessageVM message) {
+    private static HBox buildTimestampRow(MessageVM message, boolean use24HourTime) {
+        DateTimeFormatter formatter = use24HourTime ? TIME_FMT_24H : TIME_FMT_12H;
         String time = message.timestamp() != null
-                ? message.timestamp().format(TIME_FMT)
+                ? message.timestamp().format(formatter)
                 : "";
         Text ts = new Text(time);
         ts.getStyleClass().add(
