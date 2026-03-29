@@ -1599,6 +1599,10 @@ public class MainController implements SearchController.ContactActions {
      * Displays confirmation popup before executing logout.
      */
     private void confirmLogout() {
+        if (!settings.isGeneralConfirmLogout()) {
+            handleLogout();
+            return;
+        }
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_CONFIRM_LOGOUT)
                 .title("Log out")

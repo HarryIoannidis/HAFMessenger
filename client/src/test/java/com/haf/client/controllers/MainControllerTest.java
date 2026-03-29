@@ -172,6 +172,15 @@ class MainControllerTest {
     }
 
     @Test
+    void logout_confirmation_flow_respects_general_confirm_logout_setting() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (!settings.isGeneralConfirmLogout()) {"));
+        assertTrue(source.contains(".popupKey(UiConstants.POPUP_CONFIRM_LOGOUT)"));
+        assertTrue(source.contains(".onAction(this::handleLogout)"));
+    }
+
+    @Test
     void incoming_os_notification_decision_matrix_matches_expected_behavior() {
         assertFalse(MainController.shouldShowIncomingOsNotification(
                 false,

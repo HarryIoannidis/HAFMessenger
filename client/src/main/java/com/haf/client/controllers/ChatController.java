@@ -116,6 +116,7 @@ public class ChatController {
         this.settings = settings == null ? ClientSettings.defaults() : settings;
         this.settingsListener = key -> {
             if (key == ClientSettings.Key.CHAT_SHOW_MESSAGE_TIMESTAMPS
+                    || key == ClientSettings.Key.CHAT_USE_24_HOUR_TIME
                     || key == ClientSettings.Key.CHAT_AUTO_SCROLL_TO_LATEST) {
                 Platform.runLater(this::refreshRenderedMessages);
             }
@@ -472,7 +473,10 @@ public class ChatController {
      * @return rendered node for the message
      */
     private Node createMessageNode(MessageVM message) {
-        Node node = MessageBubbleFactory.create(message, settings.isChatShowMessageTimestamps());
+        Node node = MessageBubbleFactory.create(
+                message,
+                settings.isChatShowMessageTimestamps(),
+                settings.isChatUse24HourTime());
         installMessageContextMenu(node, message);
         installImagePrimaryClickPreview(node, message);
         installFilePrimaryClickDownload(node, message);

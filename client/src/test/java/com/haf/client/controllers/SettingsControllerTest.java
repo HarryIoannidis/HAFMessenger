@@ -117,6 +117,7 @@ class SettingsControllerTest {
         settings.setPrivacyBlurOnFocusLoss(false);
         settings.setMediaHoverZoom(true);
         settings.setNotificationsShowUnreadBadges(true);
+        settings.setChatShowMessageTimestamps(false);
 
         LoadedSettingsView loaded = loadSettingsView();
         onFxThread(() -> {
@@ -131,6 +132,9 @@ class SettingsControllerTest {
         Node badgeCapRow = findById(loaded.root(), "notificationsBadgeCapRow", Node.class);
         JFXToggleButton badgeToggle = findById(loaded.root(), "notificationsShowUnreadBadgesToggle",
                 JFXToggleButton.class);
+        Node chatUse24HourTimeRow = findById(loaded.root(), "chatUse24HourTimeRow", Node.class);
+        JFXCheckBox chatTimestampsCheck = findById(loaded.root(), "chatShowMessageTimestampsCheck",
+                JFXCheckBox.class);
 
         assertNotNull(blurStrengthRow);
         assertNotNull(blurToggle);
@@ -138,32 +142,39 @@ class SettingsControllerTest {
         assertNotNull(hoverZoomToggle);
         assertNotNull(badgeCapRow);
         assertNotNull(badgeToggle);
+        assertNotNull(chatUse24HourTimeRow);
+        assertNotNull(chatTimestampsCheck);
 
         assertDependentRowState(blurStrengthRow, false);
         assertDependentRowState(hoverZoomScaleRow, true);
         assertDependentRowState(badgeCapRow, true);
+        assertDependentRowState(chatUse24HourTimeRow, false);
 
         onFxThread(() -> {
             blurToggle.setSelected(true);
             hoverZoomToggle.setSelected(false);
             badgeToggle.setSelected(false);
+            chatTimestampsCheck.setSelected(true);
             return null;
         });
 
         assertDependentRowState(blurStrengthRow, true);
         assertDependentRowState(hoverZoomScaleRow, false);
         assertDependentRowState(badgeCapRow, false);
+        assertDependentRowState(chatUse24HourTimeRow, true);
 
         onFxThread(() -> {
             blurToggle.setSelected(false);
             hoverZoomToggle.setSelected(true);
             badgeToggle.setSelected(true);
+            chatTimestampsCheck.setSelected(false);
             return null;
         });
 
         assertDependentRowState(blurStrengthRow, false);
         assertDependentRowState(hoverZoomScaleRow, true);
         assertDependentRowState(badgeCapRow, true);
+        assertDependentRowState(chatUse24HourTimeRow, false);
     }
 
     @Test
@@ -361,6 +372,26 @@ class SettingsControllerTest {
     }
 
     @Test
+    void general_settings_rows_are_grouped_into_confirmations_and_remember_sections() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        int confirmationsHeaderIndex = source.indexOf("\"generalConfirmationsSection\"");
+        int confirmExitRowIndex = source.indexOf("\"generalConfirmExitRow\"");
+        int confirmLogoutRowIndex = source.indexOf("\"generalConfirmLogoutRow\"");
+        int rememberHeaderIndex = source.indexOf("\"generalRememberSection\"");
+        int rememberWindowRowIndex = source.indexOf("\"generalRememberWindowStateRow\"");
+
+        assertTrue(source.contains("\"Confirmations\""));
+        assertTrue(source.contains("\"Remember\""));
+        assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"generalRememberSectionSpacer\")"));
+        assertTrue(confirmationsHeaderIndex >= 0);
+        assertTrue(confirmExitRowIndex > confirmationsHeaderIndex);
+        assertTrue(confirmLogoutRowIndex > confirmExitRowIndex);
+        assertTrue(rememberHeaderIndex > confirmLogoutRowIndex);
+        assertTrue(rememberWindowRowIndex > rememberHeaderIndex);
+    }
+
+    @Test
     void search_toggle_order_mutual_exclusion_and_dependent_slider_row_states_are_wired() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
@@ -380,7 +411,14 @@ class SettingsControllerTest {
         assertTrue(source.contains(
                 "wireDependentSliderRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
         assertTrue(source.contains(
+                "wireDependentCheckboxRowState(\"chatShowMessageTimestampsCheck\", \"chatUse24HourTimeRow\");"));
+        assertTrue(source.contains(
                 "wireSwitch(\"notificationsShowOsNotificationsRow\", \"notificationsShowOsNotificationsToggle\","));
+        assertTrue(source.contains("SettingsRowBuilder.buildSwitchRow("));
+        assertTrue(source.contains("\"generalConfirmLogoutRow\""));
+        assertTrue(source.contains("\"generalConfirmLogoutToggle\""));
+        assertTrue(source.contains("\"Confirm Before Logout\""));
+        assertTrue(source.contains("wireSwitch(\"generalConfirmLogoutRow\", \"generalConfirmLogoutToggle\","));
         assertTrue(source.contains("if (syncing.get() || !Boolean.TRUE.equals(newValue)) {"));
         assertTrue(source.contains("applyDependentRowState(dependentRow, toggle.isSelected());"));
         assertTrue(source.contains("row.setDisable(!enabled);"));
