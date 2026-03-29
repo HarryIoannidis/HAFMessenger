@@ -454,7 +454,7 @@ public class SettingsController {
         wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
                 settings::setGeneralRememberWindowState);
         wireCheckbox("generalRememberCredentialsRow", "generalRememberCredentialsCheck",
-                this::setRememberCredentialsEnabled);
+                SettingsController::setRememberCredentialsEnabled);
         wireCheckbox("generalRestoreLastTabRow", "generalRestoreLastTabCheck", settings::setGeneralRestoreLastTab);
 
         wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
