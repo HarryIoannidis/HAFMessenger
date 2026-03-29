@@ -35,6 +35,8 @@ public class LoginController {
     private static final String SIGN_IN_TEXT = "Sign In";
     private static final String SIGNING_IN_TEXT = "Signing in...";
     private static final String LOADING_COMPONENTS_TEXT = "Loading components...";
+    static final String PREF_REMEMBER_ME = "remember_me";
+    static final String PREF_REMEMBERED_EMAIL = "remembered_email";
 
 
     // Window chrome and layout containers
@@ -418,9 +420,9 @@ public class LoginController {
      */
     private void loadPreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
-        boolean remember = prefs.getBoolean("remember_me", false);
+        boolean remember = prefs.getBoolean(PREF_REMEMBER_ME, false);
         if (remember) {
-            String savedEmail = prefs.get("remembered_email", "");
+            String savedEmail = prefs.get(PREF_REMEMBERED_EMAIL, "");
             viewModel.setEmail(savedEmail);
             viewModel.rememberCredentialsProperty().set(true);
             javafx.application.Platform.runLater(passwordField::requestFocus);
@@ -433,11 +435,11 @@ public class LoginController {
     private void savePreferences() {
         Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
         if (viewModel.isRememberCredentials()) {
-            prefs.put("remembered_email", viewModel.getEmail());
-            prefs.putBoolean("remember_me", true);
+            prefs.put(PREF_REMEMBERED_EMAIL, viewModel.getEmail());
+            prefs.putBoolean(PREF_REMEMBER_ME, true);
         } else {
-            prefs.remove("remembered_email");
-            prefs.putBoolean("remember_me", false);
+            prefs.remove(PREF_REMEMBERED_EMAIL);
+            prefs.putBoolean(PREF_REMEMBER_ME, false);
         }
     }
 

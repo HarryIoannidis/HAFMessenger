@@ -405,6 +405,7 @@ public class ChatController {
                 .actionText(spec.actionText())
                 .cancelText(spec.cancelText())
                 .showCancel(spec.showCancel())
+                .movable(spec.movable())
                 .onAction(spec.onAction())
                 .onCancel(spec.onCancel())
                 .show();
@@ -428,6 +429,7 @@ public class ChatController {
                 "Cancel",
                 true,
                 false,
+                true,
                 onPickAnother,
                 null);
     }
@@ -906,6 +908,7 @@ public class ChatController {
                 .message(spec.message())
                 .actionText(spec.actionText())
                 .singleAction(true)
+                .movable(spec.movable())
                 .show();
     }
 
@@ -925,6 +928,7 @@ public class ChatController {
                 "Cancel",
                 false,
                 false,
+                true,
                 null,
                 null);
     }

@@ -14,6 +14,7 @@ public final class PopupMessageBuilder {
     private String cancelText = "Cancel";
     private boolean showCancel = true;
     private boolean dangerAction;
+    private boolean movable = true;
     private Runnable onAction;
     private Runnable onCancel;
 
@@ -121,6 +122,17 @@ public final class PopupMessageBuilder {
     }
 
     /**
+     * Controls whether popup window dragging is enabled from the title bar.
+     *
+     * @param movable {@code true} to allow drag-to-move behavior
+     * @return this builder for fluent chaining
+     */
+    public PopupMessageBuilder movable(boolean movable) {
+        this.movable = movable;
+        return this;
+    }
+
+    /**
      * Sets the callback executed when the primary action is pressed.
      *
      * @param onAction callback for the primary action button
@@ -157,6 +169,7 @@ public final class PopupMessageBuilder {
                 cancelText,
                 showCancel,
                 dangerAction,
+                movable,
                 onAction,
                 onCancel);
     }

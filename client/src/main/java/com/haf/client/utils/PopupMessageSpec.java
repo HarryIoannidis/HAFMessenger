@@ -13,6 +13,7 @@ public record PopupMessageSpec(
         String cancelText,
         boolean showCancel,
         boolean dangerAction,
+        boolean movable,
         Runnable onAction,
         Runnable onCancel) {
 
@@ -27,6 +28,7 @@ public record PopupMessageSpec(
      * @param cancelText   cancel button caption
      * @param showCancel   whether the cancel button should be visible
      * @param dangerAction whether the primary action should use destructive styling
+     * @param movable      whether the popup can be dragged by its title bar
      * @param onAction     callback invoked when primary action is clicked
      * @param onCancel     callback invoked when cancel/close is clicked
      */

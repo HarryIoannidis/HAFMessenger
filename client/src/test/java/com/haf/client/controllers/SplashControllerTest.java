@@ -4,12 +4,15 @@ import com.haf.client.utils.PopupMessageSpec;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SplashControllerTest {
+    private static final Path CONTROLLER_SOURCE = Path.of("src/main/java/com/haf/client/controllers/SplashController.java");
 
     @Test
     void classify_failure_detects_network_errors() {
@@ -62,7 +65,14 @@ class SplashControllerTest {
 
         assertEquals("Retry", spec.actionText());
         assertEquals("Exit", spec.cancelText());
+        assertTrue(spec.movable());
         assertEquals(1, retryCalls.get());
         assertEquals(1, exitCalls.get());
+    }
+
+    @Test
+    void splash_failure_popup_propagates_spec_movable_flag() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+        assertTrue(source.contains(".movable(spec.movable())"));
     }
 }

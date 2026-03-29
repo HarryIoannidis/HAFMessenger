@@ -102,6 +102,23 @@ class SearchFilterUiTest {
         assertEquals(1, searchExecutor.calls.get());
     }
 
+    @Test
+    void externally_set_sort_options_are_used_when_popup_opens() {
+        StubPopup popup = new StubPopup();
+        StubSearchExecutor searchExecutor = new StubSearchExecutor();
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
+        });
+
+        SearchSortViewModel.SortOptions selected = new SearchSortViewModel.SortOptions(
+                SearchSortViewModel.Field.RANK,
+                SearchSortViewModel.Direction.DESC);
+        flow.setSelectedSortOptions(selected);
+        flow.onFilterButtonTrigger("alex", null);
+
+        assertEquals(1, popup.showCalls.get());
+        assertEquals(selected, popup.lastInitialOptions.get());
+    }
+
     private static final class StubSearchExecutor implements SearchFilterController.SearchExecutor {
         private final AtomicInteger calls = new AtomicInteger();
         private final AtomicReference<String> lastQuery = new AtomicReference<>();

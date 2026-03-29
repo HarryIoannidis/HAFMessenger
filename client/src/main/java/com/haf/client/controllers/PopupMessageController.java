@@ -13,6 +13,7 @@ import javafx.stage.Stage;
  */
 public class PopupMessageController {
 
+    private static final String STARTUP_PRIVACY_UNLOCK_POPUP_KEY = "popup-privacy-startup-blur-unlock";
 
     // Popup window chrome
     @FXML
@@ -42,6 +43,7 @@ public class PopupMessageController {
             "Cancel",
             true,
             false,
+            true,
             null,
             null);
 
@@ -91,6 +93,11 @@ public class PopupMessageController {
                 actionButton.getStyleClass().add("button-action-danger");
             }
         }
+        if (closeButton != null) {
+            boolean showCloseButton = !STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(spec.popupKey());
+            closeButton.setVisible(showCloseButton);
+            closeButton.setManaged(showCloseButton);
+        }
         if (cancelButton != null) {
             cancelButton.setText(spec.cancelText());
             cancelButton.setVisible(spec.showCancel());
@@ -136,10 +143,16 @@ public class PopupMessageController {
         }
 
         titleBar.setOnMousePressed(event -> {
+            if (!currentSpec.movable()) {
+                return;
+            }
             xOffset = event.getSceneX();
             yOffset = event.getSceneY();
         });
         titleBar.setOnMouseDragged(event -> {
+            if (!currentSpec.movable()) {
+                return;
+            }
             Stage stage = resolveStage();
             if (stage == null) {
                 return;

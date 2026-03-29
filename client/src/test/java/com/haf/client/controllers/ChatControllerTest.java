@@ -192,6 +192,7 @@ class ChatControllerTest {
         assertEquals(
                 "Attachment error",
                 ChatController.buildAttachmentErrorSpec("x").title());
+        assertTrue(ChatController.buildAttachmentErrorSpec("x").movable());
     }
 
     @Test
@@ -202,6 +203,7 @@ class ChatControllerTest {
         assertEquals("The image you are trying to send is over 10MB.", spec.message());
         assertEquals("Pick Another", spec.actionText());
         assertEquals("Cancel", spec.cancelText());
+        assertTrue(spec.movable());
     }
 
     @Test
@@ -264,6 +266,7 @@ class ChatControllerTest {
 
         assertTrue(source.contains("if (!settings.isMediaOpenPreviewOnImageClick()) {"));
         assertTrue(source.contains("if (!settings.isPrivacyConfirmAttachmentOpen()) {"));
+        assertTrue(source.contains(".movable(spec.movable())"));
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {

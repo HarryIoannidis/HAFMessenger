@@ -169,6 +169,27 @@ class MainControllerTest {
     }
 
     @Test
+    void search_trigger_modes_follow_enter_and_instant_search_settings() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (settings.isSearchRequireEnterToSearch()) {"));
+        assertTrue(source.contains("if (settings.isSearchRequireEnterToSearch()"));
+        assertTrue(source.contains("normalized.length() < settings.getSearchMinimumQueryLength()"));
+        assertTrue(source.contains("isSearchQueryTooShort("));
+    }
+
+    @Test
+    void remember_search_sort_setting_is_loaded_saved_and_reset() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (settings.isSearchRememberSortOptions()) {"));
+        assertTrue(source.contains("settings.setSearchSortOptions(sortOptions);"));
+        assertTrue(source.contains("settings.clearSearchSortOptions();"));
+        assertTrue(source.contains("searchFilterUi.setSelectedSortOptions(settings.getSearchSortOptions());"));
+        assertTrue(source.contains("searchFilterUi.setSelectedSortOptions(SearchSortViewModel.SortOptions.DEFAULT);"));
+    }
+
+    @Test
     void restart_request_flow_logs_out_then_relaunches_launcher_process() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
@@ -177,6 +198,22 @@ class MainControllerTest {
         assertTrue(source.contains("boolean relaunched = relaunchClientProcess();"));
         assertTrue(source.contains("Launcher.class.getName()"));
         assertTrue(source.contains("Platform.exit();"));
+    }
+
+    @Test
+    void startup_blur_lock_and_external_link_opening_are_gated_by_settings() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("syncStartupBlurLockFromSetting();"));
+        assertTrue(source.contains("String blurActionText = blurLocked ? \"Unlock Privacy Blur\" : \"Lock Privacy Blur\";"));
+        assertTrue(source.contains("Runnable blurAction = blurLocked ? this::unlockStartupPrivacyBlur : this::lockStartupPrivacyBlur;"));
+        assertTrue(source.contains("if (startupBlurLocked) {"));
+        assertTrue(source.contains("settings.isPrivacyBlurOnStartupUntilUnlock()"));
+        assertTrue(source.contains("scheduleStartupBlurUnlockPopupAfterMainRender()"));
+        assertTrue(source.contains(".movable(false)"));
+        assertTrue(source.contains("requestExternalLinkOpen("));
+        assertTrue(source.contains("if (!settings.isPrivacyConfirmExternalLinkOpen()) {"));
+        assertTrue(source.contains("Desktop.getDesktop().browse(new URI(url));"));
     }
 
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {

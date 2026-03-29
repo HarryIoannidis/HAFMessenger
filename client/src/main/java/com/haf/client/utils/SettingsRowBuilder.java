@@ -8,6 +8,7 @@ import com.jfoenix.controls.JFXTogglePane;
 import javafx.geometry.Insets;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Paint;
@@ -23,6 +24,7 @@ public final class SettingsRowBuilder {
     private static final Paint PRIMARY_BLUE = Paint.valueOf("#007ABD");
     private static final Paint TOGGLE_OFF_KNOB = Paint.valueOf("#F4F4F4");
     private static final Paint TOGGLE_OFF_TRACK = Paint.valueOf("#BDBDBD");
+    private static final Paint ROW_RIPPLE_FILL = Paint.valueOf("rgba(0, 0, 0, 0.14)");
 
     /**
      * Utility class.
@@ -51,6 +53,7 @@ public final class SettingsRowBuilder {
 
         JFXToggleButton toggleButton = new JFXToggleButton();
         toggleButton.setId(controlId);
+        toggleButton.setFocusTraversable(false);
         toggleButton.setAlignment(javafx.geometry.Pos.TOP_RIGHT);
         toggleButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         toggleButton.setSize(9.0);
@@ -87,6 +90,7 @@ public final class SettingsRowBuilder {
 
         JFXCheckBox checkBox = new JFXCheckBox();
         checkBox.setId(controlId);
+        checkBox.setFocusTraversable(false);
         checkBox.setAlignment(javafx.geometry.Pos.CENTER);
         checkBox.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         checkBox.setSelected(selected);
@@ -152,6 +156,33 @@ public final class SettingsRowBuilder {
     }
 
     /**
+     * Builds an in-pane section header using the existing title + divider visual
+     * style.
+     *
+     * @param sectionId section node id
+     * @param title section title
+     * @return section header node
+     */
+    public static VBox buildSectionHeader(String sectionId, String title) {
+        VBox sectionBox = new VBox(0.0);
+        sectionBox.setId(sectionId);
+
+        Text sectionTitle = new Text(title == null ? "" : title);
+        sectionTitle.getStyleClass().add("settings-pane-title");
+
+        Pane divider = new Pane();
+        divider.setMinHeight(Double.NEGATIVE_INFINITY);
+        divider.setMinWidth(Double.NEGATIVE_INFINITY);
+        divider.setPrefHeight(1.0);
+        divider.getStyleClass().add("divider-profile");
+        VBox.setMargin(divider, new Insets(10.0, 0.0, 10.0, 0.0));
+
+        sectionBox.getChildren().addAll(sectionTitle, divider);
+        VBox.setMargin(sectionBox, new Insets(6.0, 0.0, 2.0, 0.0));
+        return sectionBox;
+    }
+
+    /**
      * Creates the shared row scaffold with text content and optional overlay
      * button.
      *
@@ -186,6 +217,7 @@ public final class SettingsRowBuilder {
             overlayButton.setFocusTraversable(false);
             overlayButton.setMaxHeight(Double.MAX_VALUE);
             overlayButton.setMaxWidth(Double.MAX_VALUE);
+            overlayButton.setRipplerFill(ROW_RIPPLE_FILL);
             overlayButton.getStyleClass().add("settings-row-overlay-button");
             overlayButton.setText(" ");
             row.getChildren().add(overlayButton);
