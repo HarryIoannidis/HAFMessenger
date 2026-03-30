@@ -1730,6 +1730,10 @@ public class MainController implements SearchController.ContactActions {
      * @param target contact whose chat history may be deleted
      */
     private void confirmDeleteChat(ContactInfo target) {
+        if (!settings.isGeneralConfirmDeleteChat()) {
+            clearLocalChatHistory(target == null ? null : target.id());
+            return;
+        }
         String contactName = target == null || target.name() == null || target.name().isBlank() ? "this contact"
                 : target.name();
         PopupMessageBuilder.create()
@@ -1750,6 +1754,10 @@ public class MainController implements SearchController.ContactActions {
      */
     private void confirmRemoveContact(ContactInfo target) {
         if (target == null || target.id() == null || target.id().isBlank()) {
+            return;
+        }
+        if (!settings.isGeneralConfirmRemoveContact()) {
+            removeContact(target.id());
             return;
         }
         String contactName = resolveContactDisplayName(target.name(), target.id());

@@ -29,6 +29,8 @@ public final class ClientSettings {
     public enum Key {
         GENERAL_CONFIRM_EXIT("general.confirm_exit", true, ApplyMode.IMMEDIATE),
         GENERAL_CONFIRM_LOGOUT("general.confirm_logout", true, ApplyMode.IMMEDIATE),
+        GENERAL_CONFIRM_DELETE_CHAT("general.confirm_delete_chat", true, ApplyMode.IMMEDIATE),
+        GENERAL_CONFIRM_REMOVE_CONTACT("general.confirm_remove_contact", true, ApplyMode.IMMEDIATE),
         GENERAL_REMEMBER_WINDOW_STATE("general.remember_window_state", true, ApplyMode.RESTART_REQUIRED),
         GENERAL_RESTORE_LAST_TAB("general.restore_last_tab", true, ApplyMode.RESTART_REQUIRED),
 
@@ -242,6 +244,34 @@ public final class ClientSettings {
      */
     public void setGeneralConfirmLogout(boolean enabled) {
         setBoolean(Key.GENERAL_CONFIRM_LOGOUT, enabled);
+    }
+
+    /**
+     * Returns whether general confirm delete chat.
+     */
+    public boolean isGeneralConfirmDeleteChat() {
+        return getBoolean(Key.GENERAL_CONFIRM_DELETE_CHAT);
+    }
+
+    /**
+     * Updates general confirm delete chat.
+     */
+    public void setGeneralConfirmDeleteChat(boolean enabled) {
+        setBoolean(Key.GENERAL_CONFIRM_DELETE_CHAT, enabled);
+    }
+
+    /**
+     * Returns whether general confirm remove contact.
+     */
+    public boolean isGeneralConfirmRemoveContact() {
+        return getBoolean(Key.GENERAL_CONFIRM_REMOVE_CONTACT);
+    }
+
+    /**
+     * Updates general confirm remove contact.
+     */
+    public void setGeneralConfirmRemoveContact(boolean enabled) {
+        setBoolean(Key.GENERAL_CONFIRM_REMOVE_CONTACT, enabled);
     }
 
     /**

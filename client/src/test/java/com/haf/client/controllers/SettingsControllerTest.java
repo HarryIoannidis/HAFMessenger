@@ -3,7 +3,6 @@ package com.haf.client.controllers;
 import com.haf.client.models.SettingsMenuItem;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.UiConstants;
-import com.jfoenix.controls.JFXCheckBox;
 import com.jfoenix.controls.JFXToggleButton;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
@@ -132,8 +131,8 @@ class SettingsControllerTest {
         JFXToggleButton badgeToggle = findById(loaded.root(), "notificationsShowUnreadBadgesToggle",
                 JFXToggleButton.class);
         Node chatUse24HourTimeRow = findById(loaded.root(), "chatUse24HourTimeRow", Node.class);
-        JFXCheckBox chatTimestampsCheck = findById(loaded.root(), "chatShowMessageTimestampsCheck",
-                JFXCheckBox.class);
+        JFXToggleButton chatTimestampsToggle = findById(loaded.root(), "chatShowMessageTimestampsToggle",
+                JFXToggleButton.class);
 
         assertNotNull(blurStrengthRow);
         assertNotNull(blurToggle);
@@ -142,7 +141,7 @@ class SettingsControllerTest {
         assertNotNull(badgeCapRow);
         assertNotNull(badgeToggle);
         assertNotNull(chatUse24HourTimeRow);
-        assertNotNull(chatTimestampsCheck);
+        assertNotNull(chatTimestampsToggle);
 
         assertDependentRowState(blurStrengthRow, false);
         assertDependentRowState(hoverZoomScaleRow, true);
@@ -153,7 +152,7 @@ class SettingsControllerTest {
             blurToggle.setSelected(true);
             hoverZoomToggle.setSelected(false);
             badgeToggle.setSelected(false);
-            chatTimestampsCheck.setSelected(true);
+            chatTimestampsToggle.setSelected(true);
             return null;
         });
 
@@ -166,7 +165,7 @@ class SettingsControllerTest {
             blurToggle.setSelected(false);
             hoverZoomToggle.setSelected(true);
             badgeToggle.setSelected(true);
-            chatTimestampsCheck.setSelected(false);
+            chatTimestampsToggle.setSelected(false);
             return null;
         });
 
@@ -257,17 +256,18 @@ class SettingsControllerTest {
             return null;
         });
 
-        JFXCheckBox autoClearCheck = findById(loaded.root(), "searchAutoClearOnTabExitCheck", JFXCheckBox.class);
-        assertNotNull(autoClearCheck);
-        assertTrue(autoClearCheck.isSelected());
+        JFXToggleButton autoClearToggle = findById(loaded.root(), "searchAutoClearOnTabExitToggle",
+                JFXToggleButton.class);
+        assertNotNull(autoClearToggle);
+        assertTrue(autoClearToggle.isSelected());
         assertFalse(settings.isSearchPreserveLastQuery());
 
         onFxThread(() -> {
-            autoClearCheck.setSelected(false);
+            autoClearToggle.setSelected(false);
             return null;
         });
 
-        assertFalse(autoClearCheck.isSelected());
+        assertFalse(autoClearToggle.isSelected());
         assertTrue(settings.isSearchPreserveLastQuery());
     }
 
@@ -367,7 +367,7 @@ class SettingsControllerTest {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         assertTrue(source.contains("wireOverlayRowToggle(rowId, () -> toggle.setSelected(!toggle.isSelected()));"));
-        assertTrue(source.contains("wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));"));
+        assertFalse(source.contains("wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));"));
     }
 
     @Test
@@ -377,6 +377,8 @@ class SettingsControllerTest {
         int confirmationsHeaderIndex = source.indexOf("\"generalConfirmationsSection\"");
         int confirmExitRowIndex = source.indexOf("\"generalConfirmExitRow\"");
         int confirmLogoutRowIndex = source.indexOf("\"generalConfirmLogoutRow\"");
+        int confirmDeleteChatRowIndex = source.indexOf("\"generalConfirmDeleteChatRow\"");
+        int confirmRemoveContactRowIndex = source.indexOf("\"generalConfirmRemoveContactRow\"");
         int rememberHeaderIndex = source.indexOf("\"generalRememberSection\"");
         int rememberWindowRowIndex = source.indexOf("\"generalRememberWindowStateRow\"");
 
@@ -386,12 +388,17 @@ class SettingsControllerTest {
         assertTrue(confirmationsHeaderIndex >= 0);
         assertTrue(confirmExitRowIndex > confirmationsHeaderIndex);
         assertTrue(confirmLogoutRowIndex > confirmExitRowIndex);
-        assertTrue(rememberHeaderIndex > confirmLogoutRowIndex);
+        assertTrue(confirmDeleteChatRowIndex > confirmLogoutRowIndex);
+        assertTrue(confirmRemoveContactRowIndex > confirmDeleteChatRowIndex);
+        assertTrue(rememberHeaderIndex > confirmRemoveContactRowIndex);
         assertTrue(rememberWindowRowIndex > rememberHeaderIndex);
+        assertTrue(source.contains("wireSwitch(\"generalConfirmDeleteChatRow\", \"generalConfirmDeleteChatToggle\""));
+        assertTrue(source.contains(
+                "wireSwitch(\"generalConfirmRemoveContactRow\", \"generalConfirmRemoveContactToggle\""));
     }
 
     @Test
-    void search_toggle_order_and_dependent_slider_row_states_are_wired() throws IOException {
+    void search_toggle_order_and_dependent_toggle_row_states_are_wired() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         int instantRowIndex = source.indexOf("\"searchInstantOnTypeRow\"");
@@ -404,13 +411,13 @@ class SettingsControllerTest {
 
         assertTrue(source.contains("wireSearchModeMutualExclusivity();"));
         assertTrue(source.contains(
-                "wireDependentSliderRowState(\"privacyBlurOnFocusLossToggle\", \"privacyBlurStrengthRow\");"));
+                "wireDependentToggleRowState(\"privacyBlurOnFocusLossToggle\", \"privacyBlurStrengthRow\");"));
         assertTrue(
-                source.contains("wireDependentSliderRowState(\"mediaHoverZoomToggle\", \"mediaHoverZoomScaleRow\");"));
+                source.contains("wireDependentToggleRowState(\"mediaHoverZoomToggle\", \"mediaHoverZoomScaleRow\");"));
         assertTrue(source.contains(
-                "wireDependentSliderRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
+                "wireDependentToggleRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
         assertTrue(source.contains(
-                "wireDependentCheckboxRowState(\"chatShowMessageTimestampsCheck\", \"chatUse24HourTimeRow\");"));
+                "wireDependentToggleRowState(\"chatShowMessageTimestampsToggle\", \"chatUse24HourTimeRow\");"));
     }
 
     @Test
@@ -432,7 +439,7 @@ class SettingsControllerTest {
         assertTrue(source
                 .contains("wireSlider(\"searchMinimumQueryLengthSlider\", settings::setSearchMinimumQueryLength);"));
         assertTrue(source
-                .contains("wireInvertedCheckbox(\"searchAutoClearOnTabExitRow\", \"searchAutoClearOnTabExitCheck\","));
+                .contains("wireSwitch(\"searchAutoClearOnTabExitRow\", \"searchAutoClearOnTabExitToggle\","));
     }
 
     @Test
@@ -442,9 +449,9 @@ class SettingsControllerTest {
         assertTrue(source.contains(
                 "wireSwitch(\"privacyBlurOnStartupUntilUnlockRow\", \"privacyBlurOnStartupUntilUnlockToggle\","));
         assertTrue(source.contains(
-                "wireCheckbox(\"privacyConfirmExternalLinkOpenRow\", \"privacyConfirmExternalLinkOpenCheck\","));
+                "wireSwitch(\"privacyConfirmExternalLinkOpenRow\", \"privacyConfirmExternalLinkOpenToggle\","));
         assertTrue(source.contains(
-                "wireCheckbox(\"privacyShowNotificationMessagePreviewRow\", \"privacyShowNotificationMessagePreviewCheck\","));
+                "wireSwitch(\"privacyShowNotificationMessagePreviewRow\", \"privacyShowNotificationMessagePreviewToggle\","));
         assertTrue(source.contains("\"privacyShowNotificationMessagePreviewRow\""));
         assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"searchFlowSectionSpacer\")"));
         assertTrue(source.contains("SettingsRowBuilder.buildSectionSpacer(\"privacySafetySectionSpacer\")"));

@@ -181,6 +181,16 @@ class MainControllerTest {
     }
 
     @Test
+    void destructive_contact_actions_respect_individual_confirmation_settings() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (!settings.isGeneralConfirmDeleteChat()) {"));
+        assertTrue(source.contains("if (!settings.isGeneralConfirmRemoveContact()) {"));
+        assertTrue(source.contains(".popupKey(UiConstants.POPUP_CONFIRM_DELETE_CHAT)"));
+        assertTrue(source.contains(".popupKey(UiConstants.POPUP_CONFIRM_REMOVE_CONTACT)"));
+    }
+
+    @Test
     void incoming_os_notification_decision_matrix_matches_expected_behavior() {
         assertFalse(MainController.shouldShowIncomingOsNotification(
                 false,

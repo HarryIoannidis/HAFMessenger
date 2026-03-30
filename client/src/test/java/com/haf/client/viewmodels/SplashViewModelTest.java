@@ -11,6 +11,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SplashViewModelTest {
@@ -101,5 +103,59 @@ class SplashViewModelTest {
         );
 
         assertEquals(expectedOrder, order, "Stages should execute in order");
+    }
+
+    @Test
+    void bootstrap_retries_network_check_until_success() throws Exception {
+        assumeJavaFxAvailable();
+        CountDownLatch success = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+
+        SplashViewModel vm = new SplashViewModel(
+                () -> "2.0.0-test",
+                () -> {},
+                () -> {},
+                () -> {
+                    if (attempts.incrementAndGet() < 3) {
+                        throw new IOException("network down");
+                    }
+                });
+
+        vm.startBootstrap(success::countDown, ex -> fail("Should not fail"));
+
+        assertTrue(success.await(8, TimeUnit.SECONDS));
+        assertEquals(3, attempts.get());
+        assertEquals("Ready", vm.statusProperty().get());
+    }
+
+    @Test
+    void bootstrap_fails_after_three_network_attempts() throws Exception {
+        assumeJavaFxAvailable();
+        CountDownLatch failure = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicReference<Throwable> failureRef = new AtomicReference<>();
+        AtomicBoolean successCalled = new AtomicBoolean(false);
+
+        SplashViewModel vm = new SplashViewModel(
+                () -> "2.0.0-test",
+                () -> {},
+                () -> {},
+                () -> {
+                    attempts.incrementAndGet();
+                    throw new IOException("network down");
+                });
+
+        vm.startBootstrap(
+                () -> successCalled.set(true),
+                ex -> {
+                    failureRef.set(ex);
+                    failure.countDown();
+                });
+
+        assertTrue(failure.await(8, TimeUnit.SECONDS));
+        assertFalse(successCalled.get());
+        assertEquals(3, attempts.get());
+        assertNotNull(failureRef.get());
+        assertTrue(failureRef.get().getMessage().contains("Initialization could not be completed"));
     }
 }

@@ -6,7 +6,6 @@ import com.haf.client.utils.SettingsRowBuilder;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
-import com.jfoenix.controls.JFXCheckBox;
 import com.jfoenix.controls.JFXSlider;
 import com.jfoenix.controls.JFXToggleButton;
 import javafx.application.Platform;
@@ -219,6 +218,18 @@ public class SettingsController {
                             "Confirm Before Logout",
                             "Show a confirmation dialog before logging out.",
                             settings.isGeneralConfirmLogout()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "generalConfirmDeleteChatRow",
+                            "generalConfirmDeleteChatToggle",
+                            "Confirm Before Deleting Chat",
+                            "Show a confirmation dialog before deleting local chat history.",
+                            settings.isGeneralConfirmDeleteChat()),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "generalConfirmRemoveContactRow",
+                            "generalConfirmRemoveContactToggle",
+                            "Confirm Before Removing Contact",
+                            "Show a confirmation dialog before removing a contact.",
+                            settings.isGeneralConfirmRemoveContact()),
                     SettingsRowBuilder.buildSectionSpacer("generalRememberSectionSpacer"),
                     SettingsRowBuilder.buildSectionHeader(
                             "generalRememberSection",
@@ -229,15 +240,15 @@ public class SettingsController {
                             "Remember Window State",
                             "Restore the previous window size and position when reopening the app.",
                             settings.isGeneralRememberWindowState()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "generalRememberCredentialsRow",
-                            "generalRememberCredentialsCheck",
+                            "generalRememberCredentialsToggle",
                             "Remember Credentials",
                             "Keep your login email prefilled between app launches.",
                             isRememberCredentialsEnabled()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "generalRestoreLastTabRow",
-                            "generalRestoreLastTabCheck",
+                            "generalRestoreLastTabToggle",
                             "Restore Last Tab",
                             "Open the last active toolbar tab after startup.",
                             settings.isGeneralRestoreLastTab()));
@@ -298,15 +309,15 @@ public class SettingsController {
                             10.0,
                             true,
                             true),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "searchAutoClearOnTabExitRow",
-                            "searchAutoClearOnTabExitCheck",
+                            "searchAutoClearOnTabExitToggle",
                             "Auto Clear Search On Tab Exit",
                             "Clear query and results when leaving the Search tab.",
                             !settings.isSearchPreserveLastQuery()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "searchRememberSortOptionsRow",
-                            "searchRememberSortOptionsCheck",
+                            "searchRememberSortOptionsToggle",
                             "Remember Search Sort",
                             "Keep selected search sort options between app restarts for your account.",
                             settings.isSearchRememberSortOptions()));
@@ -340,9 +351,9 @@ public class SettingsController {
                             "Show Download Button",
                             "Display the download action in the preview popup toolbar.",
                             settings.isMediaShowDownloadButton()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "mediaOpenPreviewOnImageClickRow",
-                            "mediaOpenPreviewOnImageClickCheck",
+                            "mediaOpenPreviewOnImageClickToggle",
                             "Open Preview On Image Click",
                             "Open the image preview popup when clicking image messages.",
                             settings.isMediaOpenPreviewOnImageClick()));
@@ -371,9 +382,9 @@ public class SettingsController {
                             "Use 24-Hour Time",
                             "When disabled, timestamps are shown in 12-hour format with AM/PM.",
                             settings.isChatUse24HourTime()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "chatShowMessageTimestampsRow",
-                            "chatShowMessageTimestampsCheck",
+                            "chatShowMessageTimestampsToggle",
                             "Show Message Timestamps",
                             "Render sent/received times on each chat bubble.",
                             settings.isChatShowMessageTimestamps()));
@@ -407,9 +418,9 @@ public class SettingsController {
                             "Show OS Notifications",
                             "Display incoming-message alerts through your operating system notification center.",
                             settings.isNotificationsShowOsNotifications()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "notificationsShowRuntimePopupsRow",
-                            "notificationsShowRuntimePopupsCheck",
+                            "notificationsShowRuntimePopupsToggle",
                             "Show Runtime Popups",
                             "Show runtime issue popup dialogs for recoverable application errors.",
                             settings.isNotificationsShowRuntimePopups()));
@@ -447,21 +458,21 @@ public class SettingsController {
                     SettingsRowBuilder.buildSectionHeader(
                             "privacySafetySection",
                             "Safety Prompts"),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "privacyConfirmAttachmentOpenRow",
-                            "privacyConfirmAttachmentOpenCheck",
+                            "privacyConfirmAttachmentOpenToggle",
                             "Confirm Attachment Open",
                             "Ask for confirmation before opening or downloading attachments.",
                             settings.isPrivacyConfirmAttachmentOpen()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "privacyConfirmExternalLinkOpenRow",
-                            "privacyConfirmExternalLinkOpenCheck",
+                            "privacyConfirmExternalLinkOpenToggle",
                             "Confirm External Links",
                             "Ask for confirmation before opening external links in your browser.",
                             settings.isPrivacyConfirmExternalLinkOpen()),
-                    SettingsRowBuilder.buildCheckboxRow(
+                    SettingsRowBuilder.buildSwitchRow(
                             "privacyShowNotificationMessagePreviewRow",
-                            "privacyShowNotificationMessagePreviewCheck",
+                            "privacyShowNotificationMessagePreviewToggle",
                             "Show Message Preview In Notifications",
                             "When enabled, text notifications can include a preview of message content.",
                             settings.isPrivacyShowNotificationMessagePreview()),
@@ -484,11 +495,15 @@ public class SettingsController {
     private void wireSettingControls() {
         wireSwitch("generalConfirmExitRow", "generalConfirmExitToggle", settings::setGeneralConfirmExit);
         wireSwitch("generalConfirmLogoutRow", "generalConfirmLogoutToggle", settings::setGeneralConfirmLogout);
+        wireSwitch("generalConfirmDeleteChatRow", "generalConfirmDeleteChatToggle",
+                settings::setGeneralConfirmDeleteChat);
+        wireSwitch("generalConfirmRemoveContactRow", "generalConfirmRemoveContactToggle",
+                settings::setGeneralConfirmRemoveContact);
         wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
                 settings::setGeneralRememberWindowState);
-        wireCheckbox("generalRememberCredentialsRow", "generalRememberCredentialsCheck",
+        wireSwitch("generalRememberCredentialsRow", "generalRememberCredentialsToggle",
                 SettingsController::setRememberCredentialsEnabled);
-        wireCheckbox("generalRestoreLastTabRow", "generalRestoreLastTabCheck", settings::setGeneralRestoreLastTab);
+        wireSwitch("generalRestoreLastTabRow", "generalRestoreLastTabToggle", settings::setGeneralRestoreLastTab);
 
         wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
         wireSwitch("searchRequireEnterToSearchRow", "searchRequireEnterToSearchToggle",
@@ -498,20 +513,20 @@ public class SettingsController {
                 settings::setSearchAutoOpenFilterOnFirstSearch);
         wireSwitch("searchInfiniteScrollRow", "searchInfiniteScrollToggle", settings::setSearchInfiniteScroll);
         wireSlider("searchResultsPerPageSlider", settings::setSearchResultsPerPage);
-        wireInvertedCheckbox("searchAutoClearOnTabExitRow", "searchAutoClearOnTabExitCheck",
-                settings::setSearchPreserveLastQuery);
-        wireCheckbox("searchRememberSortOptionsRow", "searchRememberSortOptionsCheck",
+        wireSwitch("searchAutoClearOnTabExitRow", "searchAutoClearOnTabExitToggle",
+                enabled -> settings.setSearchPreserveLastQuery(!enabled));
+        wireSwitch("searchRememberSortOptionsRow", "searchRememberSortOptionsToggle",
                 settings::setSearchRememberSortOptions);
 
         wireSwitch("mediaHoverZoomRow", "mediaHoverZoomToggle", settings::setMediaHoverZoom);
         wireSlider("mediaHoverZoomScaleSlider", settings::setMediaHoverZoomScale);
         wireSwitch("mediaShowDownloadButtonRow", "mediaShowDownloadButtonToggle", settings::setMediaShowDownloadButton);
-        wireCheckbox("mediaOpenPreviewOnImageClickRow", "mediaOpenPreviewOnImageClickCheck",
+        wireSwitch("mediaOpenPreviewOnImageClickRow", "mediaOpenPreviewOnImageClickToggle",
                 settings::setMediaOpenPreviewOnImageClick);
 
         wireSwitch("chatSendOnEnterRow", "chatSendOnEnterToggle", settings::setChatSendOnEnter);
         wireSwitch("chatAutoScrollToLatestRow", "chatAutoScrollToLatestToggle", settings::setChatAutoScrollToLatest);
-        wireCheckbox("chatShowMessageTimestampsRow", "chatShowMessageTimestampsCheck",
+        wireSwitch("chatShowMessageTimestampsRow", "chatShowMessageTimestampsToggle",
                 settings::setChatShowMessageTimestamps);
         wireSwitch("chatUse24HourTimeRow", "chatUse24HourTimeToggle", settings::setChatUse24HourTime);
 
@@ -520,27 +535,27 @@ public class SettingsController {
         wireSlider("notificationsBadgeCapSlider", settings::setNotificationsBadgeCap);
         wireSwitch("notificationsShowOsNotificationsRow", "notificationsShowOsNotificationsToggle",
                 settings::setNotificationsShowOsNotifications);
-        wireCheckbox("notificationsShowRuntimePopupsRow", "notificationsShowRuntimePopupsCheck",
+        wireSwitch("notificationsShowRuntimePopupsRow", "notificationsShowRuntimePopupsToggle",
                 settings::setNotificationsShowRuntimePopups);
 
         wireSwitch("privacyBlurOnFocusLossRow", "privacyBlurOnFocusLossToggle", settings::setPrivacyBlurOnFocusLoss);
         wireSlider("privacyBlurStrengthSlider", settings::setPrivacyBlurStrength);
         wireSwitch("privacyBlurOnStartupUntilUnlockRow", "privacyBlurOnStartupUntilUnlockToggle",
                 settings::setPrivacyBlurOnStartupUntilUnlock);
-        wireCheckbox("privacyConfirmAttachmentOpenRow", "privacyConfirmAttachmentOpenCheck",
+        wireSwitch("privacyConfirmAttachmentOpenRow", "privacyConfirmAttachmentOpenToggle",
                 settings::setPrivacyConfirmAttachmentOpen);
-        wireCheckbox("privacyConfirmExternalLinkOpenRow", "privacyConfirmExternalLinkOpenCheck",
+        wireSwitch("privacyConfirmExternalLinkOpenRow", "privacyConfirmExternalLinkOpenToggle",
                 settings::setPrivacyConfirmExternalLinkOpen);
-        wireCheckbox("privacyShowNotificationMessagePreviewRow", "privacyShowNotificationMessagePreviewCheck",
+        wireSwitch("privacyShowNotificationMessagePreviewRow", "privacyShowNotificationMessagePreviewToggle",
                 settings::setPrivacyShowNotificationMessagePreview);
         wireSwitch("privacyHidePresenceIndicatorsRow", "privacyHidePresenceIndicatorsToggle",
                 settings::setPrivacyHidePresenceIndicators);
 
         wireSearchModeMutualExclusivity();
-        wireDependentSliderRowState("privacyBlurOnFocusLossToggle", "privacyBlurStrengthRow");
-        wireDependentSliderRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
-        wireDependentSliderRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
-        wireDependentCheckboxRowState("chatShowMessageTimestampsCheck", "chatUse24HourTimeRow");
+        wireDependentToggleRowState("privacyBlurOnFocusLossToggle", "privacyBlurStrengthRow");
+        wireDependentToggleRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
+        wireDependentToggleRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
+        wireDependentToggleRowState("chatShowMessageTimestampsToggle", "chatUse24HourTimeRow");
     }
 
     /**
@@ -557,40 +572,6 @@ public class SettingsController {
         }
         toggle.selectedProperty().addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
         wireOverlayRowToggle(rowId, () -> toggle.setSelected(!toggle.isSelected()));
-    }
-
-    /**
-     * Wires a checkbox row to a boolean sink and row-overlay click behavior.
-     *
-     * @param rowId     row node id containing the checkbox
-     * @param controlId checkbox control id
-     * @param sink      consumer receiving the selected state
-     */
-    private void wireCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
-        JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
-        if (checkBox == null) {
-            return;
-        }
-        checkBox.selectedProperty()
-                .addListener((obs, oldValue, newValue) -> sink.accept(Boolean.TRUE.equals(newValue)));
-        wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
-    }
-
-    /**
-     * Wires a checkbox row whose semantic meaning is inverse of selected state.
-     *
-     * @param rowId     row node id containing the checkbox
-     * @param controlId checkbox control id
-     * @param sink      consumer receiving the inverted selected state
-     */
-    private void wireInvertedCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
-        JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
-        if (checkBox == null) {
-            return;
-        }
-        checkBox.selectedProperty()
-                .addListener((obs, oldValue, newValue) -> sink.accept(!Boolean.TRUE.equals(newValue)));
-        wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
     /**
@@ -677,7 +658,7 @@ public class SettingsController {
      * @param toggleId       toggle control id
      * @param dependentRowId row id to enable/disable
      */
-    private void wireDependentSliderRowState(String toggleId, String dependentRowId) {
+    private void wireDependentToggleRowState(String toggleId, String dependentRowId) {
         Node dependentRow = findById(dependentRowId, Node.class);
         JFXToggleButton toggle = findById(toggleId, JFXToggleButton.class);
         if (dependentRow == null || toggle == null) {
@@ -686,24 +667,6 @@ public class SettingsController {
 
         applyDependentRowState(dependentRow, toggle.isSelected());
         toggle.selectedProperty().addListener(
-                (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
-    }
-
-    /**
-     * Enables/disables a dependent row based on a checkbox control state.
-     *
-     * @param checkboxId     checkbox control id
-     * @param dependentRowId row id to enable/disable
-     */
-    private void wireDependentCheckboxRowState(String checkboxId, String dependentRowId) {
-        Node dependentRow = findById(dependentRowId, Node.class);
-        JFXCheckBox checkbox = findById(checkboxId, JFXCheckBox.class);
-        if (dependentRow == null || checkbox == null) {
-            return;
-        }
-
-        applyDependentRowState(dependentRow, checkbox.isSelected());
-        checkbox.selectedProperty().addListener(
                 (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
     }
 
