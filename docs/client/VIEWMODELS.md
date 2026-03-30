@@ -9,7 +9,7 @@ Summarize the implemented client ViewModel layer and ownership boundaries.
 - Authentication/bootstrap: `LoginViewModel`, `RegisterViewModel`, `SplashViewModel`.
 - Main-shell state: `MainViewModel`, `SearchViewModel`, `SearchSortViewModel`.
 - Messaging state: `MessagesViewModel`, `ChatViewModel`.
-- ViewModels expose JavaFX properties and keep network/business logic out of controllers.
+- ViewModels expose JavaFX 25 properties and keep network/business logic out of controllers.
 
 ## Key Types/Interfaces
 

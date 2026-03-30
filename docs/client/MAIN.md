@@ -6,10 +6,10 @@ Describe client startup entrypoints and initial navigation behavior.
 
 ## Current Implementation
 
-- `Launcher.main(...)` delegates to JavaFX app bootstrap.
+- `Launcher.main(...)` delegates to JavaFX 25 app bootstrap.
 - `ClientApp.start(Stage)` sets app title/icon, registers stage in `ViewRouter`, and opens splash view.
 - Navigation uses `ViewRouter.switchToTransparent(...)` / `switchTo(...)`.
-- App startup sets JavaFX text-rendering properties before launch and starts from transparent splash shell.
+- App startup sets JavaFX 25 text-rendering properties before launch and starts from transparent splash shell.
 
 ## Key Types/Interfaces
 
@@ -20,7 +20,7 @@ Describe client startup entrypoints and initial navigation behavior.
 
 ## Flow
 
-1. JavaFX application starts from `Launcher`.
+1. JavaFX 25 application starts from `Launcher`.
 2. Main stage is registered with `ViewRouter`.
 3. Splash scene is loaded and bootstrap logic runs.
 4. Splash performs bootstrap checks and classifies startup failures for popup presentation.

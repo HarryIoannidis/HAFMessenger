@@ -6,7 +6,7 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 
 ## Current Implementation
 
-- Client: JavaFX MVVM app (`controllers`, `viewmodels`, `services`, `network`, `crypto`, `utils`).
+- Client: JavaFX 25 MVVM app (`controllers`, `viewmodels`, `services`, `network`, `crypto`, `utils`).
 - Server: layered plain Java service (`ingress`, `router`, `db`, `metrics`, `config`, `handlers`).
 - Shared: DTOs, requests/responses, constants, crypto, keystore, validation, and utility contracts.
 - Dependency direction: `client -> shared`, `server -> shared`; no direct `client -> server` compile dependency.

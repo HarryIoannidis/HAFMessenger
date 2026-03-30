@@ -1,10 +1,12 @@
 # HAF Secure Messenger
 
 ## Purpose
+
 This repository contains a Java 21 secure messaging system for HAF workflows, split into `client`, `server`, and `shared` modules. The documentation in this repo reflects implemented behavior and clearly marks future work.
 
 ## Current Implementation
-- Architecture: JavaFX desktop client + plain Java server + shared contract/crypto module.
+
+- Architecture: JavaFX 25 desktop client + plain Java server + shared contract/crypto module.
 - Build: Maven multi-module (`shared`, `client`, `server`).
 - Transport: TLS 1.3 HTTPS + WSS.
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
@@ -12,6 +14,7 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 - Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
 
 ## Key Types/Interfaces
+
 - `client.network.MessageSender`: send/encrypt message and attachment-related operations.
 - `client.network.MessageReceiver`: receive/decrypt flows and envelope acknowledgement.
 - `shared.keystore.KeyProvider`: sender identity + recipient public-key resolution.
@@ -20,6 +23,7 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 - `server.router.MailboxRouter`: envelope routing, ACK handling, push dispatch.
 
 ## Flow
+
 1. Client authenticates via HTTPS and stores a session id.
 2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
 3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
@@ -27,6 +31,7 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 5. Attachments follow init/chunk/complete/bind/download endpoints and inherit policy/TTL controls.
 
 ## Error/Security Notes
+
 - Server never decrypts message payloads.
 - TLS is restricted to `TLSv1.3` with hardened cipher suites.
 - Validation and recipient checks happen before decrypt.
@@ -34,6 +39,7 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 - Docs distinguish implemented behavior from future/planned features.
 
 ## Related Files
+
 - `pom.xml`
 - `client/src/main/java/com/haf/client/core/ClientApp.java`
 - `client/src/main/java/com/haf/client/network/MessageSender.java`

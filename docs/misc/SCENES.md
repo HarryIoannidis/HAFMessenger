@@ -11,7 +11,7 @@ Implemented scene docs live under `docs/client/scenes/` and cover:
 - `SPLASH`, `LOGIN`, `REGISTER`, `MAIN`, `CHAT`
 - `SEARCH`, `SEARCH_RESULT_ITEM`, `PROFILE`, `PREVIEW`, `PLACE_HOLDER`, `CONTACT_CELL`
 - `SETTINGS`, `SETTINGS_ITEM_CELL`, `POPUP_MESSAGE`
-- Scene files map directly to JavaFX resources under `client/src/main/resources/fxml` and are loaded by controller/router entrypoints.
+- Scene files map directly to JavaFX 25 resources under `client/src/main/resources/fxml` and are loaded by controller/router entrypoints.
 
 ## Key Types/Interfaces
 
