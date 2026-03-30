@@ -1,6 +1,7 @@
 package com.haf.client.network;
 
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.exceptions.MessageDecryptionException;
 import java.io.IOException;
 
 public interface MessageReceiver {
@@ -35,8 +36,12 @@ public interface MessageReceiver {
     /**
      * Decrypts a detached encrypted message payload (not sourced from WS mailbox).
      * Used for attachment reference downloads.
+     * 
+     * @param encryptedMessage the encrypted message to decrypt
+     * @return the decrypted message bytes
+     * @throws MessageDecryptionException if the message cannot be decrypted
      */
-    default byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws Exception {
+    default byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws MessageDecryptionException {
         throw new UnsupportedOperationException("decryptDetachedMessage is not implemented");
     }
 
@@ -47,11 +52,11 @@ public interface MessageReceiver {
         /**
          * Called when a message is successfully decrypted.
          *
-         * @param plaintext the decrypted message bytes
-         * @param senderId the sender's identifier
-         * @param contentType the MIME content type of the message
+         * @param plaintext        the decrypted message bytes
+         * @param senderId         the sender's identifier
+         * @param contentType      the MIME content type of the message
          * @param timestampEpochMs the original sent timestamp in milliseconds
-         * @param envelopeId the server envelope ID for deferred acknowledgement
+         * @param envelopeId       the server envelope ID for deferred acknowledgement
          */
         void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId);
 

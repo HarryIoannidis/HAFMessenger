@@ -336,13 +336,19 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @throws Exception when validation/decryption fails
      */
     @Override
-    public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws Exception {
+    public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws com.haf.shared.exceptions.MessageDecryptionException {
         if (encryptedMessage == null) {
             throw new IllegalArgumentException("encryptedMessage is required");
         }
-        validateRecipient(encryptedMessage);
-        validateExpiry(encryptedMessage);
-        return decryptWithFallbackKeys(encryptedMessage, null);
+        try {
+            validateRecipient(encryptedMessage);
+            validateExpiry(encryptedMessage);
+            return decryptWithFallbackKeys(encryptedMessage, null);
+        } catch (com.haf.shared.exceptions.MessageDecryptionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new com.haf.shared.exceptions.MessageDecryptionException("Failed to decrypt detached message", e);
+        }
     }
 
     /**
