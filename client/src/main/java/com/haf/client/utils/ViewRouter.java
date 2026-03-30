@@ -407,15 +407,14 @@ public class ViewRouter {
         double anchorWidth = anchorStage.getWidth();
         double anchorHeight = anchorStage.getHeight();
 
-        if (anchorStage.getScene() != null && anchorStage.getScene().getRoot() != null) {
-            var root = anchorStage.getScene().getRoot();
-            var rootBounds = root.localToScreen(root.getLayoutBounds());
-            if (rootBounds != null && rootBounds.getWidth() > 0 && rootBounds.getHeight() > 0) {
-                anchorX = rootBounds.getMinX();
-                anchorY = rootBounds.getMinY();
-                anchorWidth = rootBounds.getWidth();
-                anchorHeight = rootBounds.getHeight();
-            }
+        Scene anchorScene = anchorStage.getScene();
+        if (anchorScene != null && anchorScene.getWidth() > 0 && anchorScene.getHeight() > 0) {
+            // Center against the visible scene area. This avoids root-bound
+            // conversions returning shifted values on transparent/custom windows.
+            anchorX = anchorStage.getX() + anchorScene.getX();
+            anchorY = anchorStage.getY() + anchorScene.getY();
+            anchorWidth = anchorScene.getWidth();
+            anchorHeight = anchorScene.getHeight();
         }
 
         double popupWidth = popupStage.getWidth();

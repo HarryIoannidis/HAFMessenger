@@ -1,0 +1,43 @@
+Database: jdbc:mysql://127.0.0.1:3306/haf_messenger?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC (MySQL 8.4)
+Successfully validated 11 migrations (execution time 00:00.275s)
+Current version of schema `haf_messenger`: 11
+Schema `haf_messenger` is up to date. No migration necessary.
+HikariPool-1 - Starting...
+HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@dffa30b
+HikariPool-1 - Start completed.
+Servers started on HTTP 8443 / WS 8444
+Database: jdbc:mysql://127.0.0.1:3306/haf_messenger?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC (MySQL 8.4)
+Successfully validated 11 migrations (execution time 00:00.087s)
+Current version of schema `haf_messenger`: 11
+Schema `haf_messenger` is up to date. No migration necessary.
+HikariPool-1 - Starting...
+HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@dffa30b
+HikariPool-1 - Start completed.
+HikariPool-1 - Shutdown initiated...
+HikariPool-1 - Shutdown completed.
+Server startup failed
+java.net.BindException: Address already in use
+	at java.base/sun.nio.ch.Net.bind0(Native Method)
+	at java.base/sun.nio.ch.Net.bind(Net.java:565)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.netBind(ServerSocketChannelImpl.java:344)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.bind(ServerSocketChannelImpl.java:301)
+	at java.base/sun.nio.ch.ServerSocketAdaptor.bind(ServerSocketAdaptor.java:89)
+	at jdk.httpserver/sun.net.httpserver.ServerImpl.<init>(ServerImpl.java:144)
+	at jdk.httpserver/sun.net.httpserver.HttpsServerImpl.<init>(HttpsServerImpl.java:50)
+	at jdk.httpserver/sun.net.httpserver.DefaultHttpServerProvider.createHttpsServer(DefaultHttpServerProvider.java:39)
+	at jdk.httpserver/com.sun.net.httpserver.HttpsServer.create(HttpsServer.java:95)
+	at server/com.haf.server.ingress.HttpIngressServer.createServer(HttpIngressServer.java:253)
+	at server/com.haf.server.ingress.HttpIngressServer.<init>(HttpIngressServer.java:242)
+	at server/com.haf.server.core.Main.start(Main.java:82)
+	at server/com.haf.server.core.Main.main(Main.java:50)
+Shutdown initiated
+{"@timestamp":"2026-03-30T18:27:22.698Z","ecs.version":"1.2.0","log.level":"INFO","message":"Database: jdbc:mysql://127.0.0.1:3306/haf_messenger?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC (MySQL 8.4)","process.thread.name":"main","log.logger":"org.flywaydb.core.FlywayExecutor"}
+{"@timestamp":"2026-03-30T18:27:23.376Z","ecs.version":"1.2.0","log.level":"INFO","message":"Successfully validated 11 migrations (execution time 00:00.075s)","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.command.DbValidate"}
+{"@timestamp":"2026-03-30T18:27:23.407Z","ecs.version":"1.2.0","log.level":"INFO","message":"Current version of schema `haf_messenger`: 11","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.command.DbMigrate"}
+{"@timestamp":"2026-03-30T18:27:23.413Z","ecs.version":"1.2.0","log.level":"INFO","message":"Schema `haf_messenger` is up to date. No migration necessary.","process.thread.name":"main","log.logger":"org.flywaydb.core.internal.command.DbMigrate"}
+{"@timestamp":"2026-03-30T18:27:23.453Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Starting...","process.thread.name":"main","log.logger":"com.zaxxer.hikari.HikariDataSource"}
+{"@timestamp":"2026-03-30T18:27:23.488Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@7ca0863b","process.thread.name":"main","log.logger":"com.zaxxer.hikari.pool.HikariPool"}
+{"@timestamp":"2026-03-30T18:27:23.491Z","ecs.version":"1.2.0","log.level":"INFO","message":"HikariPool-1 - Start completed.","process.thread.name":"main","log.logger":"com.zaxxer.hikari.HikariDataSource"}
+{"@timestamp":"2026-03-30T18:27:24.270Z","ecs.version":"1.2.0","log.level":"INFO","message":"Servers started on HTTP 8443 / WS 8444","process.thread.name":"main","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-30T18:32:24.358Z","ecs.version":"1.2.0","log.level":"INFO","message":"Attachment cleanup removed 4 expired uploads","process.thread.name":"haf-scheduler-2","log.logger":"com.haf.server.core.Main"}
+{"@timestamp":"2026-03-30T18:47:24.272Z","ecs.version":"1.2.0","log.level":"INFO","message":"Attachment cleanup removed 1 expired uploads","process.thread.name":"haf-scheduler-1","log.logger":"com.haf.server.core.Main"}
