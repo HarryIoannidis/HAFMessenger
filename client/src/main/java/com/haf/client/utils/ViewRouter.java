@@ -225,23 +225,7 @@ public class ViewRouter {
         }
         popupStage.toFront();
         popupStage.requestFocus();
-
-        // First show can still report transient size/position values on some
-        // platforms. Recenter on the next pulse for stable geometry.
-        Platform.runLater(() -> {
-            if (!popupStage.isShowing()) {
-                return;
-            }
-            layoutAndCenterPopup(popupStage);
-            popupStage.toFront();
-            Platform.runLater(() -> {
-                if (!popupStage.isShowing()) {
-                    return;
-                }
-                layoutAndCenterPopup(popupStage);
-                popupStage.toFront();
-            });
-        });
+        recenterPopupAfterRender(popupStage);
     }
 
     /**
@@ -464,6 +448,22 @@ public class ViewRouter {
         root.layout();
         popupStage.sizeToScene();
         centerPopupOverMainWindow(popupStage);
+    }
+
+    /**
+     * Re-centers popup after rendering settles. Two pulses are used to avoid
+     * first-show geometry races observed on some JavaFX/Linux setups.
+     *
+     * @param popupStage popup stage to re-center
+     */
+    private static void recenterPopupAfterRender(Stage popupStage) {
+        Platform.runLater(() -> Platform.runLater(() -> {
+            if (!popupStage.isShowing()) {
+                return;
+            }
+            layoutAndCenterPopup(popupStage);
+            popupStage.toFront();
+        }));
     }
 
     /**
