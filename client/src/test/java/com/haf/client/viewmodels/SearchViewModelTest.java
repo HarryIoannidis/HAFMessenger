@@ -54,6 +54,7 @@ class SearchViewModelTest {
         String shortQuery = "x".repeat(UiConstants.SEARCH_MIN_QUERY_LENGTH - 1);
         viewModel.search(shortQuery);
 
+        awaitCondition(() -> SearchViewModel.STATUS_MIN_QUERY.equals(viewModel.statusTextProperty().get()));
         assertFalse(called.get());
         assertEquals(SearchViewModel.STATUS_MIN_QUERY, viewModel.statusTextProperty().get());
     }
@@ -97,12 +98,12 @@ class SearchViewModelTest {
 
         viewModel.setPageSize(500);
         viewModel.search("Jane");
-        awaitCondition(() -> !viewModel.loadingProperty().get());
+        awaitCondition(() -> Integer.valueOf(100).equals(receivedLimit.get()));
         assertEquals(100, receivedLimit.get());
 
         viewModel.setPageSize(1);
         viewModel.search("Jane");
-        awaitCondition(() -> !viewModel.loadingProperty().get());
+        awaitCondition(() -> Integer.valueOf(10).equals(receivedLimit.get()));
         assertEquals(10, receivedLimit.get());
     }
 
