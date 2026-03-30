@@ -1321,9 +1321,14 @@ public class MainController implements SearchController.ContactActions {
      * Handles lock startup privacy blur.
      */
     private void lockStartupPrivacyBlur() {
+        if (startupBlurLocked) {
+            showStartupBlurUnlockPopup();
+            return;
+        }
         startupBlurLocked = true;
         Stage stage = ViewRouter.getMainStage();
         applyPrivacyBlur(stage == null || stage.isFocused());
+        showStartupBlurUnlockPopup();
     }
 
     /**
