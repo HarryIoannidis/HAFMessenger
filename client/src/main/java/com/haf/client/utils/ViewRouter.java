@@ -1,5 +1,6 @@
 package com.haf.client.utils;
 
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
@@ -217,14 +218,30 @@ public class ViewRouter {
         }
 
         Stage popupStage = entry.stage();
-        popupStage.sizeToScene();
-        centerPopupOverMainWindow(popupStage);
+        layoutAndCenterPopup(popupStage);
 
         if (!popupStage.isShowing()) {
             popupStage.show();
         }
         popupStage.toFront();
         popupStage.requestFocus();
+
+        // First show can still report transient size/position values on some
+        // platforms. Recenter on the next pulse for stable geometry.
+        Platform.runLater(() -> {
+            if (!popupStage.isShowing()) {
+                return;
+            }
+            layoutAndCenterPopup(popupStage);
+            popupStage.toFront();
+            Platform.runLater(() -> {
+                if (!popupStage.isShowing()) {
+                    return;
+                }
+                layoutAndCenterPopup(popupStage);
+                popupStage.toFront();
+            });
+        });
     }
 
     /**
@@ -377,7 +394,7 @@ public class ViewRouter {
             double previousOpacity = popupStage.getOpacity();
             try {
                 popupStage.setOpacity(0.0);
-                centerPopupOverMainWindow(popupStage);
+                layoutAndCenterPopup(popupStage);
                 popupStage.show();
                 popupStage.hide();
             } catch (RuntimeException ex) {
@@ -430,6 +447,23 @@ public class ViewRouter {
         double targetY = anchorY + ((anchorHeight - popupHeight) / 2.0);
         popupStage.setX(targetX);
         popupStage.setY(targetY);
+    }
+
+    /**
+     * Applies CSS/layout sizing and then centers the popup against the anchor
+     * window.
+     *
+     * @param popupStage popup stage to measure and center
+     */
+    private static void layoutAndCenterPopup(Stage popupStage) {
+        if (popupStage == null || popupStage.getScene() == null || popupStage.getScene().getRoot() == null) {
+            return;
+        }
+        Parent root = popupStage.getScene().getRoot();
+        root.applyCss();
+        root.layout();
+        popupStage.sizeToScene();
+        centerPopupOverMainWindow(popupStage);
     }
 
     /**
