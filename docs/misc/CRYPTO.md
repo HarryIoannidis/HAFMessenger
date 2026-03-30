@@ -1,9 +1,11 @@
 # CRYPTO
 
 ## Purpose
+
 Describe the current end-to-end cryptography model and where each crypto responsibility lives in the codebase.
 
 ## Current Implementation
+
 - Envelope profile is fixed by `MessageHeader`: version `1`, algorithm `AES-256-GCM+X25519`.
 - `MessageEncryptor` performs per-message encryption:
   - Generates an ephemeral X25519 keypair.
@@ -15,6 +17,7 @@ Describe the current end-to-end cryptography model and where each crypto respons
 - Private key material is managed through `UserKeystore` and sealed at rest by `KeystoreSealing`.
 
 ## Key Types/Interfaces
+
 - `shared.crypto.MessageEncryptor`
 - `shared.crypto.MessageDecryptor`
 - `shared.crypto.CryptoService`
@@ -26,6 +29,7 @@ Describe the current end-to-end cryptography model and where each crypto respons
 - `shared.keystore.UserKeystore`
 
 ## Flow
+
 1. Sender resolves recipient public key via `KeyProvider.getRecipientPublicKey(...)`.
 2. `MessageEncryptor.encrypt(...)` creates encrypted envelope fields (`ivB64`, `ephemeralPublicB64`, `ciphertextB64`, `tagB64`).
 3. Client sends the envelope through `MessageSender` over TLS ingress.
@@ -33,6 +37,7 @@ Describe the current end-to-end cryptography model and where each crypto respons
 5. Receiver acknowledges delivered envelope IDs using `MessageReceiver.acknowledgeEnvelopes(...)`.
 
 ## Error/Security Notes
+
 - Validation rejects malformed fields, unsupported content types, bad TTL, and base64/size violations before decrypt.
 - AEAD tag failures are wrapped as `MessageTamperedException`.
 - Expired envelopes raise `MessageExpiredException`.
@@ -40,6 +45,7 @@ Describe the current end-to-end cryptography model and where each crypto respons
 - Private keys remain sealed on disk; keystore root fallback avoids startup failure on restricted system paths.
 
 ## Related Files
+
 - `shared/src/main/java/com/haf/shared/crypto/MessageEncryptor.java`
 - `shared/src/main/java/com/haf/shared/crypto/MessageDecryptor.java`
 - `shared/src/main/java/com/haf/shared/crypto/CryptoService.java`

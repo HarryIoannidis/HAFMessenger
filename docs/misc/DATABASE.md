@@ -1,9 +1,11 @@
 # DATABASE
 
 ## Purpose
+
 Document the current relational schema and DAO responsibilities used by the server.
 
 ## Current Implementation
+
 - Database: MySQL with Flyway migrations under `server/src/main/resources/db/migration`.
 - Connection management: HikariCP configured by `ServerConfig`.
 - Main tables (from migrations):
@@ -20,6 +22,7 @@ Document the current relational schema and DAO responsibilities used by the serv
 - Migration execution is part of server startup (`Main.runFlywayMigrations(...)`) before ingress servers start.
 
 ## Key Types/Interfaces
+
 - DAOs:
   - `UserDAO`
   - `SessionDAO`
@@ -32,6 +35,7 @@ Document the current relational schema and DAO responsibilities used by the serv
   - `RateLimitException`
 
 ## Flow
+
 1. Startup runs Flyway migrations before ingress starts.
 2. Ingress and router paths call DAOs with prepared statements.
 3. `EnvelopeDAO` persists encrypted envelope metadata/payload and supports fetch/ack/expiry cleanup.
@@ -40,12 +44,14 @@ Document the current relational schema and DAO responsibilities used by the serv
 6. Metrics/audit layers observe DAO-side outcomes (ingress rejects, cleanup counts, delivery latency).
 
 ## Error/Security Notes
+
 - Server stores encrypted payloads opaquely; no decrypt in DAO layer.
 - SQL is executed through `PreparedStatement` patterns.
 - Session and auth checks gate protected endpoints before DAO mutation paths.
 - Rate-limit state is stored server-side in `rate_limits`.
 
 ## Related Files
+
 - `server/src/main/java/com/haf/server/core/Main.java`
 - `server/src/main/java/com/haf/server/db/EnvelopeDAO.java`
 - `server/src/main/java/com/haf/server/db/AttachmentDAO.java`

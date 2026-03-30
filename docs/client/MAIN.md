@@ -1,21 +1,25 @@
 # MAIN
 
 ## Purpose
+
 Describe client startup entrypoints and initial navigation behavior.
 
 ## Current Implementation
+
 - `Launcher.main(...)` delegates to JavaFX app bootstrap.
 - `ClientApp.start(Stage)` sets app title/icon, registers stage in `ViewRouter`, and opens splash view.
 - Navigation uses `ViewRouter.switchToTransparent(...)` / `switchTo(...)`.
 - App startup sets JavaFX text-rendering properties before launch and starts from transparent splash shell.
 
 ## Key Types/Interfaces
+
 - `com.haf.client.core.Launcher`
 - `com.haf.client.core.ClientApp`
 - `com.haf.client.utils.ViewRouter`
 - `com.haf.client.controllers.SplashController`
 
 ## Flow
+
 1. JavaFX application starts from `Launcher`.
 2. Main stage is registered with `ViewRouter`.
 3. Splash scene is loaded and bootstrap logic runs.
@@ -23,10 +27,12 @@ Describe client startup entrypoints and initial navigation behavior.
 5. Splash success transitions to login/main views.
 
 ## Error/Security Notes
+
 - Missing FXML/resources fail fast through routing load exceptions.
 - Splash bootstrap validates crypto/resources/network prerequisites before normal UI use.
 
 ## Related Files
+
 - `client/src/main/java/com/haf/client/core/Launcher.java`
 - `client/src/main/java/com/haf/client/core/ClientApp.java`
 - `client/src/main/java/com/haf/client/utils/ViewRouter.java`

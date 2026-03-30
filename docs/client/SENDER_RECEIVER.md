@@ -1,9 +1,11 @@
 # SENDER_RECEIVER
 
 ## Purpose
+
 Describe concrete messaging implementations used by the client runtime.
 
 ## Current Implementation
+
 - `DefaultMessageSender`:
   - resolves keys via `KeyProvider`
   - encrypts payloads with `MessageEncryptor`
@@ -16,6 +18,7 @@ Describe concrete messaging implementations used by the client runtime.
   - performs envelope acknowledgement flow
 
 ## Key Types/Interfaces
+
 - `client.network.DefaultMessageSender`
 - `client.network.DefaultMessageReceiver`
 - `shared.utils.MessageValidator`
@@ -23,6 +26,7 @@ Describe concrete messaging implementations used by the client runtime.
 - `shared.crypto.MessageDecryptor`
 
 ## Flow
+
 1. Sender builds encrypted envelope and posts to `/api/v1/messages`.
 2. Server returns envelope metadata (`envelopeId`, `expiresAt`).
 3. Receiver gets inbound envelope events over websocket.
@@ -30,11 +34,13 @@ Describe concrete messaging implementations used by the client runtime.
 5. Receiver acknowledges delivered envelope ids.
 
 ## Error/Security Notes
+
 - Send path propagates key/validation/network exceptions.
 - Receive path rejects invalid/expired/tampered payloads before UI state update.
 - Logs avoid plaintext/key material.
 
 ## Related Files
+
 - `client/src/main/java/com/haf/client/network/DefaultMessageSender.java`
 - `client/src/main/java/com/haf/client/network/DefaultMessageReceiver.java`
 - `shared/src/main/java/com/haf/shared/utils/MessageValidator.java`
