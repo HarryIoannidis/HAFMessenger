@@ -5,6 +5,7 @@ module server {
     requires jdk.httpserver;
     requires org.apache.logging.log4j;
     requires org.apache.logging.log4j.core;
+    requires org.apache.logging.log4j.layout.template.json;
     requires org.java_websocket;
     requires io.github.cdimascio.dotenv.java;
     requires password4j;

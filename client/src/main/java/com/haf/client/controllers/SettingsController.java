@@ -365,18 +365,18 @@ public class SettingsController {
                             "Auto Scroll To Latest",
                             "Keep the message view anchored to the newest message.",
                             settings.isChatAutoScrollToLatest()),
-                    SettingsRowBuilder.buildCheckboxRow(
-                            "chatShowMessageTimestampsRow",
-                            "chatShowMessageTimestampsCheck",
-                            "Show Message Timestamps",
-                            "Render sent/received times on each chat bubble.",
-                            settings.isChatShowMessageTimestamps()),
                     SettingsRowBuilder.buildSwitchRow(
                             "chatUse24HourTimeRow",
                             "chatUse24HourTimeToggle",
                             "Use 24-Hour Time",
                             "When disabled, timestamps are shown in 12-hour format with AM/PM.",
-                            settings.isChatUse24HourTime()));
+                            settings.isChatUse24HourTime()),
+                    SettingsRowBuilder.buildCheckboxRow(
+                            "chatShowMessageTimestampsRow",
+                            "chatShowMessageTimestampsCheck",
+                            "Show Message Timestamps",
+                            "Render sent/received times on each chat bubble.",
+                            settings.isChatShowMessageTimestamps()));
         }
 
         if (notificationsRowsContainer != null) {
@@ -546,9 +546,9 @@ public class SettingsController {
     /**
      * Wires a toggle row to a boolean sink and row-overlay click behavior.
      *
-     * @param rowId row node id containing the toggle
+     * @param rowId     row node id containing the toggle
      * @param controlId toggle control id
-     * @param sink consumer receiving the selected state
+     * @param sink      consumer receiving the selected state
      */
     private void wireSwitch(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXToggleButton toggle = findById(controlId, JFXToggleButton.class);
@@ -562,9 +562,9 @@ public class SettingsController {
     /**
      * Wires a checkbox row to a boolean sink and row-overlay click behavior.
      *
-     * @param rowId row node id containing the checkbox
+     * @param rowId     row node id containing the checkbox
      * @param controlId checkbox control id
-     * @param sink consumer receiving the selected state
+     * @param sink      consumer receiving the selected state
      */
     private void wireCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
@@ -579,9 +579,9 @@ public class SettingsController {
     /**
      * Wires a checkbox row whose semantic meaning is inverse of selected state.
      *
-     * @param rowId row node id containing the checkbox
+     * @param rowId     row node id containing the checkbox
      * @param controlId checkbox control id
-     * @param sink consumer receiving the inverted selected state
+     * @param sink      consumer receiving the inverted selected state
      */
     private void wireInvertedCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
@@ -597,7 +597,7 @@ public class SettingsController {
      * Wires a slider control to a numeric sink callback.
      *
      * @param controlId slider node id
-     * @param sink consumer receiving current slider value
+     * @param sink      consumer receiving current slider value
      */
     private void wireSlider(String controlId, DoubleConsumer sink) {
         JFXSlider slider = findById(controlId, JFXSlider.class);
@@ -674,7 +674,7 @@ public class SettingsController {
     /**
      * Enables/disables a dependent row based on a toggle control state.
      *
-     * @param toggleId toggle control id
+     * @param toggleId       toggle control id
      * @param dependentRowId row id to enable/disable
      */
     private void wireDependentSliderRowState(String toggleId, String dependentRowId) {
@@ -692,7 +692,7 @@ public class SettingsController {
     /**
      * Enables/disables a dependent row based on a checkbox control state.
      *
-     * @param checkboxId checkbox control id
+     * @param checkboxId     checkbox control id
      * @param dependentRowId row id to enable/disable
      */
     private void wireDependentCheckboxRowState(String checkboxId, String dependentRowId) {
@@ -710,7 +710,7 @@ public class SettingsController {
     /**
      * Applies disabled-row presentation and interactivity state.
      *
-     * @param row target row node
+     * @param row     target row node
      * @param enabled whether row should be enabled
      */
     private static void applyDependentRowState(Node row, boolean enabled) {
@@ -727,7 +727,7 @@ public class SettingsController {
     /**
      * Wires row overlay button clicks to toggle the underlying control.
      *
-     * @param rowId row node id
+     * @param rowId        row node id
      * @param toggleAction action that flips the target control state
      */
     private void wireOverlayRowToggle(String rowId, Runnable toggleAction) {
@@ -766,9 +766,9 @@ public class SettingsController {
     /**
      * Resolves a node by id and type within the settings scene graph.
      *
-     * @param nodeId node id to find
+     * @param nodeId   node id to find
      * @param nodeType expected node type
-     * @param <T> expected node subtype
+     * @param <T>      expected node subtype
      * @return matching node instance or {@code null} when absent
      */
     private <T extends Node> T findById(String nodeId, Class<T> nodeType) {
@@ -781,10 +781,10 @@ public class SettingsController {
     /**
      * Recursively searches for a node by id and expected type.
      *
-     * @param node current root node
-     * @param nodeId node id to match
+     * @param node     current root node
+     * @param nodeId   node id to match
      * @param nodeType expected node type
-     * @param <T> expected node subtype
+     * @param <T>      expected node subtype
      * @return matching node instance or {@code null} when absent
      */
     private static <T extends Node> T findByIdRecursive(Node node, String nodeId, Class<T> nodeType) {
@@ -906,7 +906,7 @@ public class SettingsController {
      * Closes the settings popup, optionally prompting when restart-required
      * settings are dirty.
      *
-     * @param stage settings popup stage
+     * @param stage        settings popup stage
      * @param closingStage re-entry guard for close handling
      */
     private void requestClose(Stage stage, AtomicBoolean closingStage) {
@@ -936,7 +936,7 @@ public class SettingsController {
     /**
      * Hides the settings stage while guarding against recursive close handlers.
      *
-     * @param stage settings popup stage
+     * @param stage        settings popup stage
      * @param closingStage re-entry guard for close handling
      */
     private void hideStage(Stage stage, AtomicBoolean closingStage) {
