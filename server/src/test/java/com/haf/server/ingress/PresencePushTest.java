@@ -33,7 +33,7 @@ class PresencePushTest {
                                 "contact-online");
 
                 verify(requesterConnection, times(1))
-                                .send("{\"type\":\"presence\",\"userId\":\"contact-online\",\"active\":true,\"hidden\":false}");
+                                .send("{\"type\":\"presence\",\"userId\":\"contact-online\",\"active\":true}");
                 verify(auditLogger, never()).logError(any(), any(), any(), any(Throwable.class), anyMap());
         }
 
@@ -53,30 +53,7 @@ class PresencePushTest {
                                 "contact-offline");
 
                 verify(requesterConnection, times(1))
-                                .send("{\"type\":\"presence\",\"userId\":\"contact-offline\",\"active\":false,\"hidden\":false}");
-                verify(auditLogger, never()).logError(any(), any(), any(), any(Throwable.class), anyMap());
-        }
-
-        @Test
-        void push_contact_presence_to_requester_masks_activity_when_contact_hides_presence() {
-                PresenceRegistry presenceRegistry = new PresenceRegistry();
-                AuditLogger auditLogger = mock(AuditLogger.class);
-                WebSocket requesterConnection = mock(WebSocket.class);
-                WebSocket hiddenContactConnection = mock(WebSocket.class);
-
-                presenceRegistry.registerConnection("requester", requesterConnection);
-                presenceRegistry.registerConnection("contact-hidden", hiddenContactConnection);
-                presenceRegistry.setPresenceHidden("contact-hidden", true);
-
-                HttpIngressServer.pushContactPresenceToRequester(
-                                presenceRegistry,
-                                auditLogger,
-                                "req-hidden",
-                                "requester",
-                                "contact-hidden");
-
-                verify(requesterConnection, times(1))
-                                .send("{\"type\":\"presence\",\"userId\":\"contact-hidden\",\"active\":false,\"hidden\":true}");
+                                .send("{\"type\":\"presence\",\"userId\":\"contact-offline\",\"active\":false}");
                 verify(auditLogger, never()).logError(any(), any(), any(), any(Throwable.class), anyMap());
         }
 
@@ -127,7 +104,7 @@ class PresencePushTest {
                 String payload = HttpIngressServer.presenceJson("id\"\\\\x", true);
 
                 org.junit.jupiter.api.Assertions.assertEquals(
-                                "{\"type\":\"presence\",\"userId\":\"id\\\"\\\\\\\\x\",\"active\":true,\"hidden\":false}",
+                                "{\"type\":\"presence\",\"userId\":\"id\\\"\\\\\\\\x\",\"active\":true}",
                                 payload);
         }
 }

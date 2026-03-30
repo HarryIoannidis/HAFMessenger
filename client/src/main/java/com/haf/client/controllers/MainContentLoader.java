@@ -126,14 +126,31 @@ final class MainContentLoader {
     }
 
     /**
-     * Starts background preloading for placeholder and search views.
+     * Starts background preloading for primary main-content views.
      */
     void triggerPreloading() {
+        preloadAllViewsAsync();
+    }
+
+    /**
+     * Starts background preloading for all primary main-content views and returns a
+     * completion future.
+     *
+     * @return future that completes when placeholder, search, and chat views are
+     *         preloaded
+     */
+    CompletableFuture<Void> preloadAllViewsAsync() {
+        CompletableFuture<Parent> placeholderReady = ensurePlaceholderFutureReady();
+        CompletableFuture<Parent> searchReady = ensureSearchFutureReady();
+        CompletableFuture<LoadedView> chatReady = ensureChatFutureReady();
+
         Thread.ofPlatform().daemon().name("view-preloader").start(() -> {
             ensurePlaceholderLoaded();
             ensureSearchLoaded();
             ensureChatLoaded();
         });
+
+        return CompletableFuture.allOf(placeholderReady, searchReady, chatReady);
     }
 
     /**

@@ -14,7 +14,6 @@ public class UserSearchResultDTO implements Serializable {
     private String telephone;
     private String joinedDate;
     private boolean active;
-    private boolean presenceHidden;
 
     /**
      * Creates an empty search-result DTO for JSON deserialization.
@@ -33,7 +32,7 @@ public class UserSearchResultDTO implements Serializable {
      * @param rank rank value
      */
     public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank) {
-        this(userId, fullName, regNumber, email, rank, null, null, false, false);
+        this(userId, fullName, regNumber, email, rank, null, null, false);
     }
 
     /**
@@ -47,7 +46,7 @@ public class UserSearchResultDTO implements Serializable {
      * @param active active presence flag
      */
     public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
-        this(userId, fullName, regNumber, email, rank, null, null, active, false);
+        this(userId, fullName, regNumber, email, rank, null, null, active);
     }
 
     /**
@@ -69,7 +68,7 @@ public class UserSearchResultDTO implements Serializable {
             String rank,
             String telephone,
             String joinedDate) {
-        this(userId, fullName, regNumber, email, rank, telephone, joinedDate, false, false);
+        this(userId, fullName, regNumber, email, rank, telephone, joinedDate, false);
     }
 
     /**
@@ -93,33 +92,6 @@ public class UserSearchResultDTO implements Serializable {
             String telephone,
             String joinedDate,
             boolean active) {
-        this(userId, fullName, regNumber, email, rank, telephone, joinedDate, active, false);
-    }
-
-    /**
-     * Creates a fully populated search-result DTO with explicit presence-privacy
-     * state.
-     *
-     * @param userId user id
-     * @param fullName full name
-     * @param regNumber registration number
-     * @param email email address
-     * @param rank rank value
-     * @param telephone telephone number
-     * @param joinedDate joined-date text
-     * @param active active presence flag
-     * @param presenceHidden {@code true} when presence is intentionally hidden
-     */
-    public UserSearchResultDTO(
-            String userId,
-            String fullName,
-            String regNumber,
-            String email,
-            String rank,
-            String telephone,
-            String joinedDate,
-            boolean active,
-            boolean presenceHidden) {
         this.userId = userId;
         this.fullName = fullName;
         this.regNumber = regNumber;
@@ -128,7 +100,6 @@ public class UserSearchResultDTO implements Serializable {
         this.telephone = telephone;
         this.joinedDate = joinedDate;
         this.active = active;
-        this.presenceHidden = presenceHidden;
     }
 
     /**
@@ -275,21 +246,4 @@ public class UserSearchResultDTO implements Serializable {
         this.active = active;
     }
 
-    /**
-     * Returns whether the user is hiding presence details.
-     *
-     * @return {@code true} when presence is hidden
-     */
-    public boolean isPresenceHidden() {
-        return presenceHidden;
-    }
-
-    /**
-     * Sets whether the user is hiding presence details.
-     *
-     * @param presenceHidden hidden-presence flag
-     */
-    public void setPresenceHidden(boolean presenceHidden) {
-        this.presenceHidden = presenceHidden;
-    }
 }

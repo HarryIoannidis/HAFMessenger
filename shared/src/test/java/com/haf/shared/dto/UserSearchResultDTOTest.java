@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class UserSearchResultDTOTest {
 
     @Test
-    void constructor_supports_presence_hidden_flag() {
+    void constructor_supports_active_flag() {
         UserSearchResultDTO dto = new UserSearchResultDTO(
                 "u-1",
                 "Jane Doe",
@@ -17,15 +17,13 @@ class UserSearchResultDTOTest {
                 "SMINIAS",
                 "6900000000",
                 "2026-01-01",
-                false,
-                true);
+                false);
 
         assertFalse(dto.isActive());
-        assertTrue(dto.isPresenceHidden());
     }
 
     @Test
-    void json_roundtrip_preserves_presence_hidden_flag() {
+    void json_roundtrip_preserves_active_flag() {
         UserSearchResultDTO dto = new UserSearchResultDTO(
                 "u-1",
                 "Jane Doe",
@@ -33,12 +31,10 @@ class UserSearchResultDTOTest {
                 "jane@haf.gr",
                 "SMINIAS",
                 true);
-        dto.setPresenceHidden(true);
 
         String json = JsonCodec.toJson(dto);
         UserSearchResultDTO decoded = JsonCodec.fromJson(json, UserSearchResultDTO.class);
 
         assertTrue(decoded.isActive());
-        assertTrue(decoded.isPresenceHidden());
     }
 }

@@ -20,7 +20,6 @@ import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.requests.AttachmentInitRequest;
-import com.haf.shared.requests.PresenceVisibilityRequest;
 import com.haf.shared.requests.RegisterRequest;
 import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.utils.JsonCodec;
@@ -36,7 +35,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -50,7 +48,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -60,7 +57,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -597,27 +593,6 @@ class HttpIngressServerTest {
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"contacts\""));
         assertTrue(exchange.responseBodyAsString().contains("\"userId\":\"u-2\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"presenceHidden\":false"));
-    }
-
-    @Test
-    void contacts_get_masks_hidden_presence() throws Exception {
-        HttpHandler handler = createHandler("ContactsHandler");
-        ExchangeHarness exchange = newExchange("GET", "/api/v1/contacts", "");
-        authenticate(exchange, "sess-contacts-hidden", "caller");
-
-        presenceRegistry.registerConnection("u-2", mock(WebSocket.class));
-        presenceRegistry.setPresenceHidden("u-2", true);
-        when(contactDAO.getContacts("caller")).thenReturn(List.of(
-                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
-                        "2026-01-01")));
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(200, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"userId\":\"u-2\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"active\":false"));
-        assertTrue(exchange.responseBodyAsString().contains("\"presenceHidden\":true"));
     }
 
     @Test
@@ -655,48 +630,6 @@ class HttpIngressServerTest {
 
         assertEquals(400, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("invalid contactId"));
-    }
-
-    @Test
-    void presence_visibility_rejects_missing_auth() throws Exception {
-        HttpHandler handler = createHandler("PresenceVisibilityHandler");
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/presence/visibility", "{}");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(401, exchange.statusCode().get());
-    }
-
-    @Test
-    void presence_visibility_rejects_method_not_allowed() throws Exception {
-        HttpHandler handler = createHandler("PresenceVisibilityHandler");
-        ExchangeHarness exchange = newExchange("GET", "/api/v1/presence/visibility", "");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(405, exchange.statusCode().get());
-    }
-
-    @Test
-    void presence_visibility_updates_registry_and_pushes_to_watchers() throws Exception {
-        HttpHandler handler = createHandler("PresenceVisibilityHandler");
-        PresenceVisibilityRequest request = new PresenceVisibilityRequest(true);
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/presence/visibility", JsonCodec.toJson(request));
-        authenticate(exchange, "sess-presence-visibility", "caller");
-
-        WebSocket callerConnection = mock(WebSocket.class);
-        WebSocket watcherConnection = mock(WebSocket.class);
-        presenceRegistry.registerConnection("caller", callerConnection);
-        presenceRegistry.registerConnection("watcher-1", watcherConnection);
-        when(contactDAO.getWatcherUserIds("caller")).thenReturn(List.of("watcher-1"));
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(200, exchange.statusCode().get());
-        assertTrue(presenceRegistry.isPresenceHidden("caller"));
-        verify(contactDAO, times(1)).getWatcherUserIds("caller");
-        verify(watcherConnection, times(1))
-                .send(contains("\"userId\":\"caller\",\"active\":false,\"hidden\":true"));
     }
 
     @Test

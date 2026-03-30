@@ -111,7 +111,6 @@ class MessageReceiverTest {
     List<byte[]> receivedMessages = new ArrayList<>();
     List<Throwable> receivedErrors = new ArrayList<>();
     List<String> presenceUpdates = new ArrayList<>();
-    List<String> presenceMetadataUpdates = new ArrayList<>();
 
     @BeforeEach
     void setup() throws Exception {
@@ -146,9 +145,8 @@ class MessageReceiverTest {
             }
 
             @Override
-            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
+            public void onPresenceUpdate(String userId, boolean active) {
                 presenceUpdates.add(userId + ":" + active);
-                presenceMetadataUpdates.add(userId + ":" + active + ":" + hidden);
             }
         });
     }
@@ -257,7 +255,7 @@ class MessageReceiverTest {
     }
 
     @Test
-    void receives_presence_event_with_hidden_metadata() throws Exception {
+    void receives_presence_event_with_extra_hidden_field() throws Exception {
         messageReceiver.start();
 
         webSocketAdapter.simulateIncomingRaw("{\"type\":\"presence\",\"userId\":\"user-42\",\"active\":false,\"hidden\":true}");
@@ -265,7 +263,6 @@ class MessageReceiverTest {
         assertEquals(0, receivedMessages.size());
         assertEquals(0, receivedErrors.size());
         assertEquals(List.of("user-42:false"), presenceUpdates);
-        assertEquals(List.of("user-42:false:true"), presenceMetadataUpdates);
         assertTrue(webSocketAdapter.getSentMessages().isEmpty());
     }
 

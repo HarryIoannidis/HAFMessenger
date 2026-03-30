@@ -115,7 +115,9 @@ public class ViewRouter {
             Scene scene = new Scene(sceneRoot);
             scene.setFill(Color.TRANSPARENT);
             if (isSplash) {
-                scene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
+                scene.getRoot().setStyle(
+                        "-fx-font-smoothing-type: lcd; "
+                                + "-fx-background-color: transparent;");
             } else {
                 // Keep custom transparent stage chrome for non-splash views, but let the
                 // view's own CSS control panel/window backgrounds.
@@ -129,6 +131,13 @@ public class ViewRouter {
             boolean wasShowing = mainStage.isShowing();
             if (wasShowing && !isSplash && mainStage.getWidth() < 1200) {
                 mainStage.hide();
+            }
+            boolean mainLoadTransition = UiConstants.FXML_MAIN.equals(fxmlPath);
+            if (mainLoadTransition) {
+                // MainController reveals the stage after all startup preloads finish.
+                mainStage.setOpacity(0.0);
+            } else {
+                mainStage.setOpacity(1.0);
             }
 
             mainStage.setResizable(true);
@@ -321,7 +330,9 @@ public class ViewRouter {
 
             Scene popupScene = new Scene(popupShell);
             popupScene.setFill(Color.TRANSPARENT);
-            popupScene.getRoot().setStyle("-fx-font-smoothing-type: lcd; -fx-background-color: transparent;");
+            popupScene.getRoot().setStyle(
+                    "-fx-font-smoothing-type: lcd; "
+                            + "-fx-background-color: transparent;");
             popupStage.setScene(popupScene);
             popupStage.setTitle(mainStage.getTitle());
 

@@ -29,26 +29,41 @@ class ClientSettingsTest {
     }
 
     @Test
-    void defaults_match_expected_values() {
+    void defaults_match_expected_values_general() {
         ClientSettings defaults = ClientSettings.defaults();
 
-        assertTrue(defaults.isGeneralConfirmExit());
-        assertTrue(defaults.isGeneralConfirmLogout());
-        assertTrue(defaults.isGeneralRememberWindowState());
-        assertTrue(defaults.isGeneralRestoreLastTab());
+        assertGeneralDefaults(defaults);
+    }
+
+    @Test
+    void defaults_match_expected_values_search() {
+        ClientSettings defaults = ClientSettings.defaults();
+
         assertFalse(defaults.isSearchInstantOnType());
         assertTrue(defaults.isSearchAutoOpenFilterOnFirstSearch());
-        assertFalse(defaults.isSearchRequireEnterToSearch());
+        assertTrue(defaults.isSearchRequireEnterToSearch());
         assertEquals(3, defaults.getSearchMinimumQueryLength());
         assertTrue(defaults.isSearchInfiniteScroll());
         assertEquals(20, defaults.getSearchResultsPerPage());
         assertFalse(defaults.isSearchPreserveLastQuery());
         assertTrue(defaults.isSearchRememberSortOptions());
         assertEquals(SearchSortViewModel.SortOptions.DEFAULT, defaults.getSearchSortOptions());
+    }
+
+    @Test
+    void defaults_match_expected_values_media() {
+        ClientSettings defaults = ClientSettings.defaults();
+
         assertTrue(defaults.isMediaHoverZoom());
         assertEquals(1.15, defaults.getMediaHoverZoomScale(), 0.0001);
         assertTrue(defaults.isMediaShowDownloadButton());
         assertTrue(defaults.isMediaOpenPreviewOnImageClick());
+    }
+
+    @Test
+    void defaults_match_expected_values_chat_and_notifications() {
+        ClientSettings defaults = ClientSettings.defaults();
+
         assertTrue(defaults.isChatSendOnEnter());
         assertTrue(defaults.isChatAutoScrollToLatest());
         assertTrue(defaults.isChatShowMessageTimestamps());
@@ -57,6 +72,12 @@ class ClientSettingsTest {
         assertEquals(10, defaults.getNotificationsBadgeCap());
         assertTrue(defaults.isNotificationsShowOsNotifications());
         assertTrue(defaults.isNotificationsShowRuntimePopups());
+    }
+
+    @Test
+    void defaults_match_expected_values_privacy() {
+        ClientSettings defaults = ClientSettings.defaults();
+
         assertFalse(defaults.isPrivacyBlurOnFocusLoss());
         assertEquals(4.0, defaults.getPrivacyBlurStrength(), 0.0001);
         assertFalse(defaults.isPrivacyBlurOnStartupUntilUnlock());
@@ -88,29 +109,12 @@ class ClientSettingsTest {
                 SearchSortViewModel.Direction.DESC));
         a.setSearchRememberSortOptions(false);
 
-        assertFalse(a.isGeneralConfirmExit());
-        assertFalse(a.isGeneralConfirmLogout());
-        assertEquals(80, a.getSearchResultsPerPage());
-        assertEquals(5, a.getSearchMinimumQueryLength());
-        assertTrue(a.isPrivacyHidePresenceIndicators());
-        assertTrue(a.isPrivacyBlurOnStartupUntilUnlock());
-        assertFalse(a.isPrivacyConfirmExternalLinkOpen());
-        assertFalse(a.isSearchRememberSortOptions());
-        assertEquals(SearchSortViewModel.SortOptions.DEFAULT, a.getSearchSortOptions());
-
-        assertTrue(b.isGeneralConfirmExit());
-        assertTrue(b.isGeneralConfirmLogout());
-        assertEquals(20, b.getSearchResultsPerPage());
-        assertEquals(3, b.getSearchMinimumQueryLength());
-        assertFalse(b.isPrivacyHidePresenceIndicators());
-        assertFalse(b.isPrivacyBlurOnStartupUntilUnlock());
-        assertTrue(b.isPrivacyConfirmExternalLinkOpen());
-        assertTrue(b.isSearchRememberSortOptions());
-        assertEquals(SearchSortViewModel.SortOptions.DEFAULT, b.getSearchSortOptions());
+        assertCustomizedUserSettings(a);
+        assertDefaultUserSettings(b);
     }
 
     @Test
-    void persisted_values_reload_and_slider_values_are_clamped() throws Exception {
+    void slider_values_are_clamped() throws Exception {
         Assumptions.assumeTrue(preferencesWritable(), "Preferences storage unavailable in this environment.");
 
         String userId = registerTestUser("settings-clamp");
@@ -140,6 +144,14 @@ class ClientSettingsTest {
         assertEquals(1.0, settings.getPrivacyBlurStrength(), 0.0001);
         settings.setPrivacyBlurStrength(8.6);
         assertEquals(9.0, settings.getPrivacyBlurStrength(), 0.0001);
+    }
+
+    @Test
+    void persisted_values_reload() throws Exception {
+        Assumptions.assumeTrue(preferencesWritable(), "Preferences storage unavailable in this environment.");
+
+        String userId = registerTestUser("settings-reload");
+        ClientSettings settings = ClientSettings.forUser(userId);
 
         settings.setGeneralConfirmExit(false);
         settings.setGeneralConfirmLogout(false);
@@ -152,6 +164,12 @@ class ClientSettingsTest {
         settings.setPrivacyBlurOnStartupUntilUnlock(true);
         settings.setPrivacyConfirmExternalLinkOpen(false);
         settings.setPrivacyShowNotificationMessagePreview(true);
+
+        settings.setSearchResultsPerPage(46);
+        settings.setSearchMinimumQueryLength(5.9);
+        settings.setNotificationsBadgeCap(95);
+        settings.setMediaHoverZoomScale(2.0);
+        settings.setPrivacyBlurStrength(8.6);
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
@@ -232,6 +250,37 @@ class ClientSettingsTest {
 
         settings.setGeneralRestoreLastTab(true);
         assertFalse(settings.isRestartRequiredDirty());
+    }
+
+    private static void assertGeneralDefaults(ClientSettings defaults) {
+        assertTrue(defaults.isGeneralConfirmExit());
+        assertTrue(defaults.isGeneralConfirmLogout());
+        assertTrue(defaults.isGeneralRememberWindowState());
+        assertTrue(defaults.isGeneralRestoreLastTab());
+    }
+
+    private static void assertCustomizedUserSettings(ClientSettings settings) {
+        assertFalse(settings.isGeneralConfirmExit());
+        assertFalse(settings.isGeneralConfirmLogout());
+        assertEquals(80, settings.getSearchResultsPerPage());
+        assertEquals(5, settings.getSearchMinimumQueryLength());
+        assertTrue(settings.isPrivacyHidePresenceIndicators());
+        assertTrue(settings.isPrivacyBlurOnStartupUntilUnlock());
+        assertFalse(settings.isPrivacyConfirmExternalLinkOpen());
+        assertFalse(settings.isSearchRememberSortOptions());
+        assertEquals(SearchSortViewModel.SortOptions.DEFAULT, settings.getSearchSortOptions());
+    }
+
+    private static void assertDefaultUserSettings(ClientSettings settings) {
+        assertTrue(settings.isGeneralConfirmExit());
+        assertTrue(settings.isGeneralConfirmLogout());
+        assertEquals(20, settings.getSearchResultsPerPage());
+        assertEquals(3, settings.getSearchMinimumQueryLength());
+        assertFalse(settings.isPrivacyHidePresenceIndicators());
+        assertFalse(settings.isPrivacyBlurOnStartupUntilUnlock());
+        assertTrue(settings.isPrivacyConfirmExternalLinkOpen());
+        assertTrue(settings.isSearchRememberSortOptions());
+        assertEquals(SearchSortViewModel.SortOptions.DEFAULT, settings.getSearchSortOptions());
     }
 
     private String registerTestUser(String prefix) throws Exception {

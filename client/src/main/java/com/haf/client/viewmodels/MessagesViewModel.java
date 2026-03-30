@@ -59,17 +59,6 @@ public class MessagesViewModel {
          *               otherwise
          */
         void onPresenceUpdate(String userId, boolean active);
-
-        /**
-         * Receives presence transition with hidden-presence metadata.
-         *
-         * @param userId user id whose presence changed
-         * @param active visible activity flag
-         * @param hidden {@code true} when user hides presence visibility
-         */
-        default void onPresenceUpdate(String userId, boolean active, boolean hidden) {
-            onPresenceUpdate(userId, active);
-        }
     }
 
     @FunctionalInterface
@@ -171,11 +160,10 @@ public class MessagesViewModel {
              *
              * @param userId user whose presence changed
              * @param active latest activity flag
-             * @param hidden hidden-presence visibility flag
              */
             @Override
-            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
-                runOnUiThread(() -> notifyPresenceListeners(userId, active, hidden));
+            public void onPresenceUpdate(String userId, boolean active) {
+                runOnUiThread(() -> notifyPresenceListeners(userId, active));
             }
         });
     }
@@ -530,12 +518,11 @@ public class MessagesViewModel {
      *
      * @param userId user whose presence changed
      * @param active latest active flag
-     * @param hidden hidden-presence flag
      */
-    private void notifyPresenceListeners(String userId, boolean active, boolean hidden) {
+    private void notifyPresenceListeners(String userId, boolean active) {
         for (PresenceListener listener : presenceListeners) {
             try {
-                listener.onPresenceUpdate(userId, active, hidden);
+                listener.onPresenceUpdate(userId, active);
             } catch (Exception ignored) {
                 // A bad listener must not break dispatching for others.
             }
