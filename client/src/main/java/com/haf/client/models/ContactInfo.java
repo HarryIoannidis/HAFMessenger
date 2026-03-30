@@ -25,6 +25,9 @@ public record ContactInfo(
         String activenessColor,
         int unreadCount) {
 
+    private static final int DEFAULT_UNREAD_COUNT = 0;
+    private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
+
     /**
      * Canonical constructor that normalizes unread count to a non-negative value.
      *
@@ -71,7 +74,7 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return online(id, name, regNumber, rank, email, telephone, joinedDate, 0);
+        return online(id, name, regNumber, rank, email, telephone, joinedDate, DEFAULT_UNREAD_COUNT);
     }
 
     /**
@@ -125,7 +128,7 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return offline(id, name, regNumber, rank, email, telephone, joinedDate, unreadCountForNewContact());
+        return offline(id, name, regNumber, rank, email, telephone, joinedDate, DEFAULT_UNREAD_COUNT);
     }
 
     /**
@@ -181,7 +184,7 @@ public record ContactInfo(
             String email,
             String telephone,
             String joinedDate) {
-        return unknown(id, name, regNumber, rank, email, telephone, joinedDate, unreadCountForNewContact());
+        return unknown(id, name, regNumber, rank, email, telephone, joinedDate, DEFAULT_UNREAD_COUNT);
     }
 
     /**
@@ -207,6 +210,63 @@ public record ContactInfo(
             String joinedDate,
             int unreadCount) {
         return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "", "transparent", unreadCount);
+    }
+
+    /**
+     * Creates a contact with hidden-presence activity state.
+     *
+     * @param id unique contact id
+     * @param name display name
+     * @param regNumber military registration number
+     * @param rank rank label
+     * @param email contact email
+     * @param telephone contact telephone
+     * @param joinedDate join date text
+     * @param unreadCount unread messages for this contact
+     * @return hidden-activity {@link ContactInfo} entry
+     */
+    public static ContactInfo hiddenActivity(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            int unreadCount) {
+        return new ContactInfo(
+                id,
+                name,
+                regNumber,
+                rank,
+                email,
+                telephone,
+                joinedDate,
+                HIDDEN_ACTIVITY_LABEL,
+                "transparent",
+                unreadCount);
+    }
+
+    /**
+     * Returns hidden activity label literal used in UI.
+     *
+     * @return hidden activity label
+     */
+    public static String hiddenActivityLabel() {
+        return HIDDEN_ACTIVITY_LABEL;
+    }
+
+    /**
+     * Checks whether a status label represents hidden activity.
+     *
+     * @param label status label to evaluate
+     * @return {@code true} when label resolves to hidden activity
+     */
+    public static boolean isHiddenActivityLabel(String label) {
+        if (label == null) {
+            return false;
+        }
+        return HIDDEN_ACTIVITY_LABEL.equalsIgnoreCase(label.trim());
     }
 
     /**
@@ -364,7 +424,17 @@ public record ContactInfo(
             String telephone,
             String joinedDate,
             boolean active) {
-        return fromPresence(id, name, regNumber, rank, email, telephone, joinedDate, active, unreadCountForNewContact());
+        return fromPresence(
+                id,
+                name,
+                regNumber,
+                rank,
+                email,
+                telephone,
+                joinedDate,
+                active,
+                false,
+                DEFAULT_UNREAD_COUNT);
     }
 
     /**
@@ -391,17 +461,42 @@ public record ContactInfo(
             String joinedDate,
             boolean active,
             int unreadCount) {
+        return fromPresence(id, name, regNumber, rank, email, telephone, joinedDate, active, false, unreadCount);
+    }
+
+    /**
+     * Creates contact info from presence state, hidden flag, and explicit unread
+     * count.
+     *
+     * @param id unique contact id
+     * @param name display name
+     * @param regNumber military registration number
+     * @param rank rank label
+     * @param email contact email
+     * @param telephone contact telephone
+     * @param joinedDate join date text
+     * @param active visible presence flag
+     * @param hidden {@code true} when presence is intentionally hidden
+     * @param unreadCount unread messages for this contact
+     * @return contact derived from effective presence visibility
+     */
+    public static ContactInfo fromPresence(
+            String id,
+            String name,
+            String regNumber,
+            String rank,
+            String email,
+            String telephone,
+            String joinedDate,
+            boolean active,
+            boolean hidden,
+            int unreadCount) {
+        if (hidden) {
+            return hiddenActivity(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount);
+        }
         return active
                 ? active(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount)
                 : inactive(id, name, regNumber, rank, email, telephone, joinedDate, unreadCount);
     }
 
-    /**
-     * Defines default unread count assigned to newly created contacts.
-     *
-     * @return default unread count for new contacts
-     */
-    private static int unreadCountForNewContact() {
-        return 0;
-    }
 }

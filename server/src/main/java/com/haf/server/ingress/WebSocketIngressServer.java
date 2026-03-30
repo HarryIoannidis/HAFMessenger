@@ -125,7 +125,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
             sendPresenceSnapshot(conn, userId);
 
             if (becameActive) {
-                broadcastPresenceToWatchers(userId, true);
+                broadcastPresenceToWatchers(userId);
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_open_error", null, userId, ex);
@@ -270,7 +270,7 @@ public final class WebSocketIngressServer extends WebSocketServer {
         }
         boolean becameInactive = presenceRegistry.unregisterConnection(userId, conn);
         if (becameInactive) {
-            broadcastPresenceToWatchers(userId, false);
+            broadcastPresenceToWatchers(userId);
         }
     }
 
@@ -279,16 +279,17 @@ public final class WebSocketIngressServer extends WebSocketServer {
      * currently connected.
      *
      * @param userId user whose presence changed
-     * @param active latest active state
      */
-    private void broadcastPresenceToWatchers(String userId, boolean active) {
+    private void broadcastPresenceToWatchers(String userId) {
         try {
             List<String> watcherUserIds = contactDAO.getWatcherUserIds(userId);
             if (watcherUserIds == null || watcherUserIds.isEmpty()) {
                 return;
             }
 
-            String payload = presenceJson(userId, active);
+            boolean hidden = presenceRegistry.isPresenceHidden(userId);
+            boolean active = presenceRegistry.isVisibleActive(userId);
+            String payload = presenceJson(userId, active, hidden);
             for (String watcherUserId : watcherUserIds) {
                 Set<WebSocket> watcherConnections = presenceRegistry.getActiveConnections(watcherUserId);
                 for (WebSocket watcherConnection : watcherConnections) {
@@ -332,7 +333,10 @@ public final class WebSocketIngressServer extends WebSocketServer {
                 if (contact == null || contact.userId() == null || contact.userId().isBlank()) {
                     continue;
                 }
-                conn.send(presenceJson(contact.userId(), presenceRegistry.isActive(contact.userId())));
+                String contactId = contact.userId();
+                boolean hidden = presenceRegistry.isPresenceHidden(contactId);
+                boolean active = presenceRegistry.isVisibleActive(contactId);
+                conn.send(presenceJson(contactId, active, hidden));
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_presence_snapshot_error", null, userId, ex);
@@ -354,10 +358,12 @@ public final class WebSocketIngressServer extends WebSocketServer {
      *
      * @param userId user id included in payload
      * @param active presence state flag
+     * @param hidden hidden-presence flag
      * @return compact JSON payload string
      */
-    private String presenceJson(String userId, boolean active) {
-        return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active + "}";
+    private String presenceJson(String userId, boolean active, boolean hidden) {
+        return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active
+                + ",\"hidden\":" + hidden + "}";
     }
 
     /**

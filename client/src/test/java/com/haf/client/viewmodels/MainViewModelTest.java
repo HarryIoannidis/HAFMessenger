@@ -233,6 +233,21 @@ class MainViewModelTest {
     }
 
     @Test
+    void update_contact_presence_with_hidden_flag_uses_hidden_activity_state() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.completedFuture("{}")));
+
+        viewModel.ensureChatContact("u-1", "Jane", "100");
+
+        ContactInfo updated = viewModel.updateContactPresence("u-1", true, true);
+
+        assertNotNull(updated);
+        assertEquals(ContactInfo.hiddenActivityLabel(), updated.activenessLabel());
+        assertEquals("transparent", updated.activenessColor());
+        assertEquals(ContactInfo.hiddenActivityLabel(), viewModel.contactsProperty().getFirst().activenessLabel());
+    }
+
+    @Test
     void enriched_profile_fields_survive_presence_update() {
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> CompletableFuture.completedFuture("{}")));

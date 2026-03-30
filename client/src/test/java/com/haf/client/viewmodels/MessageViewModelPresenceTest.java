@@ -33,6 +33,32 @@ class MessageViewModelPresenceTest {
         assertEquals(List.of("user-123:true"), updates);
     }
 
+    @Test
+    void hidden_presence_metadata_is_forwarded_to_listener_override() throws Exception {
+        StubMessageReceiver receiver = new StubMessageReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopMessageSender(), receiver);
+
+        List<String> updates = new CopyOnWriteArrayList<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        viewModel.addPresenceListener(new MessagesViewModel.PresenceListener() {
+            @Override
+            public void onPresenceUpdate(String userId, boolean active) {
+                // No-op: this test validates 3-arg override dispatch.
+            }
+
+            @Override
+            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
+                updates.add(userId + ":" + active + ":" + hidden);
+                latch.countDown();
+            }
+        });
+
+        receiver.emitPresence("user-123", false, true);
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertEquals(List.of("user-123:false:true"), updates);
+    }
+
     private static final class NoopMessageSender implements MessageSender {
         @Override
         public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds)
@@ -65,8 +91,12 @@ class MessageViewModelPresenceTest {
         }
 
         void emitPresence(String userId, boolean active) {
+            emitPresence(userId, active, false);
+        }
+
+        void emitPresence(String userId, boolean active, boolean hidden) {
             if (listener != null) {
-                listener.onPresenceUpdate(userId, active);
+                listener.onPresenceUpdate(userId, active, hidden);
             }
         }
     }

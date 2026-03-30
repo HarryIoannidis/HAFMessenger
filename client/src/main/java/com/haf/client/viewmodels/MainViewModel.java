@@ -4,6 +4,7 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.requests.AddContactRequest;
+import com.haf.shared.requests.PresenceVisibilityRequest;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
@@ -73,6 +74,16 @@ public class MainViewModel {
          * @return future containing backend response payload
          */
         CompletableFuture<String> removeContact(String userId);
+
+        /**
+         * Synchronizes hide-presence preference for current authenticated user.
+         *
+         * @param hidePresenceIndicators desired hidden-presence state
+         * @return future containing backend response payload
+         */
+        default CompletableFuture<String> syncPresenceVisibility(boolean hidePresenceIndicators) {
+            return CompletableFuture.completedFuture("{}");
+        }
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainViewModel.class);
@@ -97,6 +108,8 @@ public class MainViewModel {
 
     /**
      * Factory using the current authenticated session.
+     *
+     * @return main view-model wired to the active network session
      */
     public static MainViewModel createDefault() {
         return new MainViewModel(new ContactsGateway() {
@@ -150,6 +163,23 @@ public class MainViewModel {
                 String path = "/api/v1/contacts?contactId="
                         + URLEncoder.encode(userId, StandardCharsets.UTF_8);
                 return NetworkSession.get().deleteAuthenticated(path);
+            }
+
+            /**
+             * Synchronizes hide-presence preference with backend visibility policy.
+             *
+             * @param hidePresenceIndicators desired hidden-presence state
+             * @return future with backend response body
+             */
+            @Override
+            public CompletableFuture<String> syncPresenceVisibility(boolean hidePresenceIndicators) {
+                if (NetworkSession.get() == null) {
+                    return CompletableFuture.completedFuture("{}");
+                }
+
+                PresenceVisibilityRequest request = new PresenceVisibilityRequest(hidePresenceIndicators);
+                String body = JsonCodec.toJson(request);
+                return NetworkSession.get().postAuthenticated("/api/v1/presence/visibility", body);
             }
         });
     }
@@ -223,6 +253,11 @@ public class MainViewModel {
 
     /**
      * Pure UI-state decision for contact click behavior on the Main screen.
+     *
+     * @param currentTab                 current main-tab selection
+     * @param clickedSameAsLastSelection whether the clicked contact matches the
+     *                                   previously selected contact
+     * @return selected contact-selection action
      */
     public ContactSelectionAction resolveContactSelectionAction(MainTab currentTab,
             boolean clickedSameAsLastSelection) {
@@ -242,12 +277,25 @@ public class MainViewModel {
         contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
-                    LOGGER.error( "Failed to load contacts", ex);
+                    LOGGER.error("Failed to load contacts", ex);
                     publishRuntimeIssue(
                             "contacts.fetch.failed",
                             "Contacts could not be loaded",
                             "Failed to load contacts from server. " + resolveErrorMessage(ex, "Please retry."),
                             this::fetchContacts);
+                    return null;
+                });
+    }
+
+    /**
+     * Synchronizes hide-presence preference with backend visibility projection.
+     *
+     * @param hidePresenceIndicators desired hidden-presence state
+     */
+    public void syncPresenceVisibility(boolean hidePresenceIndicators) {
+        contactsGateway.syncPresenceVisibility(hidePresenceIndicators)
+                .exceptionally(ex -> {
+                    LOGGER.warn("Failed to sync hide-presence setting", ex);
                     return null;
                 });
     }
@@ -420,6 +468,19 @@ public class MainViewModel {
      * @return updated contact, or {@code null} when contact does not exist
      */
     public ContactInfo updateContactPresence(String userId, boolean active) {
+        return updateContactPresence(userId, active, false);
+    }
+
+    /**
+     * Updates contact presence visibility state and records a presence signal
+     * marker.
+     *
+     * @param userId contact id
+     * @param active visible presence flag
+     * @param hidden hidden-presence flag
+     * @return updated contact, or {@code null} when contact does not exist
+     */
+    public ContactInfo updateContactPresence(String userId, boolean active, boolean hidden) {
         int index = findContactIndex(userId);
         if (index < 0) {
             return null;
@@ -435,6 +496,7 @@ public class MainViewModel {
                 existing.telephone(),
                 existing.joinedDate(),
                 active,
+                hidden,
                 existing.unreadCount());
         contacts.set(index, updated);
         presenceSignalByUser.put(userId, presenceSignalCounter.incrementAndGet());
@@ -531,6 +593,16 @@ public class MainViewModel {
     /**
      * Inserts or replaces a contact entry from server snapshot fields and presence
      * state.
+     *
+     * @param userId     contact/user id
+     * @param fullName   contact display name
+     * @param regNumber  registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
+     * @param joinedDate joined-date text
+     * @param active     visible presence flag
+     * @param hidden     hidden-presence flag
      */
     private void upsertContact(
             String userId,
@@ -540,7 +612,8 @@ public class MainViewModel {
             String email,
             String telephone,
             String joinedDate,
-            boolean active) {
+            boolean active,
+            boolean hidden) {
         int index = findContactIndex(userId);
         int unreadCount = index >= 0 ? contacts.get(index).unreadCount() : 0;
 
@@ -553,6 +626,7 @@ public class MainViewModel {
                 telephone,
                 joinedDate,
                 active,
+                hidden,
                 unreadCount);
         if (index >= 0) {
             contacts.set(index, contact);
@@ -598,13 +672,22 @@ public class MainViewModel {
                         contact.getEmail(),
                         contact.getTelephone(),
                         contact.getJoinedDate(),
-                        contact.isActive());
+                        contact.isActive(),
+                        contact.isPresenceHidden());
             }
         });
     }
 
     /**
      * Merges non-blank profile fields into an existing contact entry.
+     *
+     * @param userId     contact id
+     * @param fullName   full name candidate
+     * @param regNumber  registration number candidate
+     * @param rank       rank candidate
+     * @param email      email candidate
+     * @param telephone  telephone candidate
+     * @param joinedDate joined-date candidate
      */
     private void mergeContactProfile(
             String userId,
@@ -636,6 +719,10 @@ public class MainViewModel {
 
     /**
      * Updates unread count for a contact using provided update function.
+     *
+     * @param userId  contact id
+     * @param updater unread-count update function
+     * @return updated contact, or {@code null} when contact cannot be updated
      */
     private ContactInfo updateUnread(String userId, IntUnaryOperator updater) {
         if (userId == null || userId.isBlank()) {
@@ -670,6 +757,10 @@ public class MainViewModel {
 
     /**
      * Prefers incoming non-blank field value, otherwise keeps fallback.
+     *
+     * @param incoming incoming candidate value
+     * @param fallback fallback value
+     * @return incoming value when non-blank, otherwise fallback
      */
     private static String preferNonBlank(String incoming, String fallback) {
         if (incoming != null && !incoming.isBlank()) {
@@ -682,6 +773,11 @@ public class MainViewModel {
      * Evaluates whether chat placeholder should be shown after contact removal
      * using
      * current contacts state.
+     *
+     * @param removedUserId         removed contact id
+     * @param selectedBeforeRemoval selected contact before removal
+     * @param activeChatRecipientId active chat recipient id
+     * @return {@code true} when placeholder should be shown
      */
     public boolean shouldShowPlaceholderAfterRemoval(
             String removedUserId,
@@ -696,6 +792,12 @@ public class MainViewModel {
 
     /**
      * Evaluates whether chat placeholder should be shown after contact removal.
+     *
+     * @param removedUserId             removed contact id
+     * @param selectedBeforeRemoval     selected contact before removal
+     * @param activeChatRecipientId     active chat recipient id
+     * @param contactsEmptyAfterRemoval whether contacts list is empty after removal
+     * @return {@code true} when placeholder should be shown
      */
     public static boolean shouldShowPlaceholderAfterRemoval(
             String removedUserId,
@@ -717,6 +819,11 @@ public class MainViewModel {
     /**
      * Resolves unread action for incoming message based on active tab and selected
      * chat recipient.
+     *
+     * @param activeTab              currently active main tab
+     * @param currentChatRecipientId currently open chat recipient id
+     * @param senderId               incoming sender id
+     * @return unread action to apply
      */
     public static IncomingUnreadAction resolveIncomingUnreadAction(
             MainTab activeTab,
@@ -732,6 +839,10 @@ public class MainViewModel {
 
     /**
      * Compares two potential contact selections by id.
+     *
+     * @param clicked   clicked contact candidate
+     * @param candidate candidate selection object
+     * @return {@code true} when both represent the same contact id
      */
     public static boolean isSameContactSelection(ContactInfo clicked, Object candidate) {
         if (clicked == null || clicked.id() == null || clicked.id().isBlank()) {
@@ -746,6 +857,9 @@ public class MainViewModel {
     /**
      * Schedules a delayed contacts refresh when no newer presence signal has
      * arrived.
+     *
+     * @param userId                 target contact id
+     * @param baselinePresenceSignal presence signal snapshot captured before add
      */
     private void scheduleAddContactPresenceFallback(String userId, long baselinePresenceSignal) {
         if (userId == null || userId.isBlank()) {
@@ -772,7 +886,7 @@ public class MainViewModel {
             contactsGateway.fetchContacts()
                     .thenAccept(this::applyContactsSnapshot)
                     .exceptionally(ex -> {
-                        LOGGER.debug( "Presence fallback refresh failed", ex);
+                        LOGGER.debug("Presence fallback refresh failed", ex);
                         return null;
                     });
         });
@@ -781,7 +895,7 @@ public class MainViewModel {
     /**
      * Synchronizes optimistic add-contact operation with backend.
      *
-     * @param userId target contact id
+     * @param userId                 target contact id
      * @param baselinePresenceSignal presence signal snapshot for fallback logic
      */
     private void syncAddContactWithServer(String userId, long baselinePresenceSignal) {
@@ -793,7 +907,7 @@ public class MainViewModel {
                     scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
                 })
                 .exceptionally(ex -> {
-                    LOGGER.error( "Failed to add contact on server", ex);
+                    LOGGER.error("Failed to add contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.add.failed",
                             "Contact could not be added",
@@ -814,7 +928,7 @@ public class MainViewModel {
         }
         contactsGateway.removeContact(userId)
                 .exceptionally(ex -> {
-                    LOGGER.error( "Failed to remove contact on server", ex);
+                    LOGGER.error("Failed to remove contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.remove.failed",
                             "Contact removal failed",
@@ -827,9 +941,9 @@ public class MainViewModel {
     /**
      * Dispatches a runtime issue to registered listeners.
      *
-     * @param dedupeKey issue dedupe key
-     * @param title issue title
-     * @param message issue message
+     * @param dedupeKey   issue dedupe key
+     * @param title       issue title
+     * @param message     issue message
      * @param retryAction retry callback
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
@@ -846,7 +960,7 @@ public class MainViewModel {
     /**
      * Resolves readable throwable message with fallback.
      *
-     * @param error throwable
+     * @param error    throwable
      * @param fallback fallback text
      * @return resolved message
      */
@@ -864,6 +978,8 @@ public class MainViewModel {
 
     /**
      * Runs UI updates on JavaFX thread with fallback for non-JavaFX test contexts.
+     *
+     * @param action UI action to execute
      */
     private static void runOnUiThread(Runnable action) {
         try {

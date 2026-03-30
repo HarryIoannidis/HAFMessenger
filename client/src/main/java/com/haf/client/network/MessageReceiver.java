@@ -76,5 +76,17 @@ public interface MessageReceiver {
         default void onPresenceUpdate(String userId, boolean active) {
             // Optional callback.
         }
+
+        /**
+         * Called when a user presence update is received with hidden-presence
+         * metadata.
+         *
+         * @param userId the user whose presence changed
+         * @param active true when active, false when inactive
+         * @param hidden true when the user hides presence visibility
+         */
+        default void onPresenceUpdate(String userId, boolean active, boolean hidden) {
+            onPresenceUpdate(userId, active);
+        }
     }
 }

@@ -180,7 +180,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
         String userId = String.valueOf(userIdRaw);
         boolean active = toBoolean(activeRaw);
-        messageListener.onPresenceUpdate(userId, active);
+        boolean hidden = toBoolean(envelope.get("hidden"));
+        messageListener.onPresenceUpdate(userId, active, hidden);
     }
 
     /**
