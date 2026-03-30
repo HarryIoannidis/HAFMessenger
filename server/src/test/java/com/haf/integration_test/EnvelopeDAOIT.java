@@ -11,19 +11,22 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
-@Disabled("Requires Docker/Testcontainers; disabled on local dev without Docker")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class EnvelopeDAOIT {
 
     @Container
@@ -99,9 +102,11 @@ class EnvelopeDAOIT {
     @Test
     void delete_expired_removes_expired_envelopes() {
         EncryptedMessage expired = createValidMessage();
-        expired.setTimestampEpochMs(System.currentTimeMillis() - Duration.ofHours(2).toMillis());
-        expired.setTtlSeconds(3600); // Expired 1 hour ago
+        // Keep expiry far enough in the past to avoid timezone boundary flakiness.
+        expired.setTimestampEpochMs(System.currentTimeMillis() - Duration.ofDays(2).toMillis());
+        expired.setTtlSeconds((int) Duration.ofHours(1).toSeconds());
 
+        dao.insert(expired);
         int deleted = dao.deleteExpired();
         assertTrue(deleted >= 1);
 
@@ -115,6 +120,7 @@ class EnvelopeDAOIT {
         message1.setRecipientId("recipient-1");
         EncryptedMessage message2 = createValidMessage();
         message2.setRecipientId("recipient-1");
+        seedUser("recipient-1");
 
         var env1 = dao.insert(message1);
         var env2 = dao.insert(message2);
@@ -130,8 +136,12 @@ class EnvelopeDAOIT {
         EncryptedMessage message = new EncryptedMessage();
         message.setVersion(MessageHeader.VERSION);
         message.setAlgorithm(MessageHeader.ALGO_AEAD);
-        message.setSenderId("sender-" + System.currentTimeMillis());
-        message.setRecipientId("recipient-" + System.currentTimeMillis());
+        String senderId = "sender-" + System.nanoTime();
+        String recipientId = "recipient-" + System.nanoTime();
+        seedUser(senderId);
+        seedUser(recipientId);
+        message.setSenderId(senderId);
+        message.setRecipientId(recipientId);
         message.setTimestampEpochMs(System.currentTimeMillis());
         message.setTtlSeconds((int) Duration.ofDays(1).toSeconds());
         message.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
@@ -143,5 +153,45 @@ class EnvelopeDAOIT {
         message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));
         message.setE2e(true);
         return message;
+    }
+
+    private void seedUser(String userId) {
+        String username = "u_" + userId.replaceAll("[^A-Za-z0-9_\\-]", "_");
+        String email = username + "@it.local";
+        String fingerprint = sha256Hex("fp:" + userId);
+        String publicKeyPem = "-----BEGIN PUBLIC KEY-----\n" + userId + "\n-----END PUBLIC KEY-----";
+
+        String sql = """
+                INSERT INTO users (
+                    user_id, username, email, password_hash, `rank`, reg_number, full_name,
+                    joined_date, telephone, public_key_fingerprint, public_key_pem, `status`, `role`
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, 'APPROVED', 'USER')
+                ON DUPLICATE KEY UPDATE user_id = user_id
+                """;
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            ps.setString(2, username);
+            ps.setString(3, email);
+            ps.setString(4, "$argon2id$v=19$m=19456,t=2,p=1$dummy$dummy");
+            ps.setString(5, "SMINIAS");
+            ps.setString(6, userId);
+            ps.setString(7, "IT " + userId);
+            ps.setString(8, "+3000000000");
+            ps.setString(9, fingerprint);
+            ps.setString(10, publicKeyPem);
+            ps.executeUpdate();
+        } catch (SQLException ex) {
+            fail("Failed to seed test user " + userId + ": " + ex.getMessage());
+        }
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
+        }
     }
 }
