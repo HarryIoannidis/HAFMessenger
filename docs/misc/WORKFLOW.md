@@ -1,9 +1,11 @@
 # WORKFLOW
 
 ## Purpose
+
 Describe implemented end-to-end workflows for message send/receive, routing, and key usage.
 
 ## Current Implementation
+
 - Send path uses `MessageSender` + `MessageEncryptor` and submits encrypted envelopes to server ingress.
 - Server path validates/rate-limits/routes via `HttpIngressServer` and `MailboxRouter`, with persistence through DAOs.
 - Receive path uses `MessageReceiver` + `MessageDecryptor`, updates UI state, and acknowledges envelope IDs.
@@ -11,11 +13,13 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 - Attachment flow extends message workflow with init/chunk/complete/bind/download endpoints while preserving encrypted payload handling.
 
 ## Key Types/Interfaces
+
 - Client: `DefaultMessageSender`, `DefaultMessageReceiver`, `WebSocketAdapter`, `MessagesViewModel`.
 - Server: `HttpIngressServer`, `WebSocketIngressServer`, `MailboxRouter`, `RateLimiterService`, `EnvelopeDAO`.
 - Shared: `EncryptedMessage`, `MessageValidator`, `MessageEncryptor`, `MessageDecryptor`, `KeyProvider`.
 
 ## Flow
+
 1. Compose message in UI -> ViewModel -> `MessageSender`.
 2. Encrypt payload and send envelope to `/api/v1/messages`.
 3. Server validates and stores envelope, then pushes/serves mailbox updates.
@@ -23,12 +27,14 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 5. Client acknowledges delivered envelope IDs to avoid re-delivery.
 
 ## Error/Security Notes
+
 - Validation occurs on both client and server boundaries.
 - Decrypt failures are surfaced as errors without exposing sensitive internals.
 - Envelope metadata and TTL are enforced server-side and receiver-side.
 - ACK operations are ownership-scoped to prevent cross-user acknowledgement of foreign envelope IDs.
 
 ## Related Files
+
 - `client/src/main/java/com/haf/client/network/DefaultMessageSender.java`
 - `client/src/main/java/com/haf/client/network/DefaultMessageReceiver.java`
 - `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`
