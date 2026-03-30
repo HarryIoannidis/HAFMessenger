@@ -5,11 +5,6 @@ import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for {@link EncryptedFileDTO}.
- * Verifies JSON round-trip serialization which is the primary transport use of
- * this DTO.
- */
 class EncryptedFileDTOTest {
 
     @Test

@@ -29,6 +29,14 @@ public record RuntimeIssue(
         } : retryAction;
     }
 
+    /**
+     * Normalizes a mandatory text field and falls back to a default label when
+     * blank.
+     *
+     * @param value input field value
+     * @param fallback fallback value for null/blank inputs
+     * @return normalized non-blank value
+     */
     private static String normalizeRequired(String value, String fallback) {
         String normalized = normalize(value, fallback);
         if (normalized.isBlank()) {
@@ -37,6 +45,13 @@ public record RuntimeIssue(
         return normalized;
     }
 
+    /**
+     * Trims nullable text and applies a fallback for empty values.
+     *
+     * @param value input field value
+     * @param fallback fallback value for null/empty inputs
+     * @return trimmed value or fallback
+     */
     private static String normalize(String value, String fallback) {
         String normalized = value == null ? null : value.trim();
         if (normalized == null || normalized.isEmpty()) {

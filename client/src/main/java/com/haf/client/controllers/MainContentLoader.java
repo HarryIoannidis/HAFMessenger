@@ -87,6 +87,15 @@ final class MainContentLoader {
         this(contentPane, searchContactActions, viewLoadFailureHandler, ClientSettings.defaults(), MainContentLoader::loadFromFxml);
     }
 
+    /**
+     * Creates a content loader using the default FXML loader strategy and explicit
+     * client settings.
+     *
+     * @param contentPane main content container to populate
+     * @param searchContactActions search callbacks used by the search controller
+     * @param viewLoadFailureHandler optional failure handler (no-op when {@code null})
+     * @param settings client settings used by created child controllers
+     */
     MainContentLoader(StackPane contentPane,
             SearchController.ContactActions searchContactActions,
             ViewLoadFailureHandler viewLoadFailureHandler,

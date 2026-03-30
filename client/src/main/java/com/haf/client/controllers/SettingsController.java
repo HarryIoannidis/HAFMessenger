@@ -543,6 +543,13 @@ public class SettingsController {
         wireDependentCheckboxRowState("chatShowMessageTimestampsCheck", "chatUse24HourTimeRow");
     }
 
+    /**
+     * Wires a toggle row to a boolean sink and row-overlay click behavior.
+     *
+     * @param rowId row node id containing the toggle
+     * @param controlId toggle control id
+     * @param sink consumer receiving the selected state
+     */
     private void wireSwitch(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXToggleButton toggle = findById(controlId, JFXToggleButton.class);
         if (toggle == null) {
@@ -552,6 +559,13 @@ public class SettingsController {
         wireOverlayRowToggle(rowId, () -> toggle.setSelected(!toggle.isSelected()));
     }
 
+    /**
+     * Wires a checkbox row to a boolean sink and row-overlay click behavior.
+     *
+     * @param rowId row node id containing the checkbox
+     * @param controlId checkbox control id
+     * @param sink consumer receiving the selected state
+     */
     private void wireCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
         if (checkBox == null) {
@@ -562,6 +576,13 @@ public class SettingsController {
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
+    /**
+     * Wires a checkbox row whose semantic meaning is inverse of selected state.
+     *
+     * @param rowId row node id containing the checkbox
+     * @param controlId checkbox control id
+     * @param sink consumer receiving the inverted selected state
+     */
     private void wireInvertedCheckbox(String rowId, String controlId, Consumer<Boolean> sink) {
         JFXCheckBox checkBox = findById(controlId, JFXCheckBox.class);
         if (checkBox == null) {
@@ -572,6 +593,12 @@ public class SettingsController {
         wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));
     }
 
+    /**
+     * Wires a slider control to a numeric sink callback.
+     *
+     * @param controlId slider node id
+     * @param sink consumer receiving current slider value
+     */
     private void wireSlider(String controlId, DoubleConsumer sink) {
         JFXSlider slider = findById(controlId, JFXSlider.class);
         if (slider == null) {
@@ -584,10 +611,20 @@ public class SettingsController {
         });
     }
 
+    /**
+     * Reads whether login credential persistence is enabled.
+     *
+     * @return {@code true} when remember-me is enabled
+     */
     private static boolean isRememberCredentialsEnabled() {
         return LOGIN_PREFS.getBoolean(LoginController.PREF_REMEMBER_ME, false);
     }
 
+    /**
+     * Stores remember-me preference and clears remembered email when disabled.
+     *
+     * @param enabled desired remember-me state
+     */
     private static void setRememberCredentialsEnabled(boolean enabled) {
         LOGIN_PREFS.putBoolean(LoginController.PREF_REMEMBER_ME, enabled);
         if (!enabled) {
@@ -595,6 +632,9 @@ public class SettingsController {
         }
     }
 
+    /**
+     * Enforces mutual exclusivity between instant-search and require-enter modes.
+     */
     private void wireSearchModeMutualExclusivity() {
         JFXToggleButton instantSearchToggle = findById("searchInstantOnTypeToggle", JFXToggleButton.class);
         JFXToggleButton requireEnterToggle = findById("searchRequireEnterToSearchToggle", JFXToggleButton.class);
@@ -631,6 +671,12 @@ public class SettingsController {
         });
     }
 
+    /**
+     * Enables/disables a dependent row based on a toggle control state.
+     *
+     * @param toggleId toggle control id
+     * @param dependentRowId row id to enable/disable
+     */
     private void wireDependentSliderRowState(String toggleId, String dependentRowId) {
         Node dependentRow = findById(dependentRowId, Node.class);
         JFXToggleButton toggle = findById(toggleId, JFXToggleButton.class);
@@ -643,6 +689,12 @@ public class SettingsController {
                 (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
     }
 
+    /**
+     * Enables/disables a dependent row based on a checkbox control state.
+     *
+     * @param checkboxId checkbox control id
+     * @param dependentRowId row id to enable/disable
+     */
     private void wireDependentCheckboxRowState(String checkboxId, String dependentRowId) {
         Node dependentRow = findById(dependentRowId, Node.class);
         JFXCheckBox checkbox = findById(checkboxId, JFXCheckBox.class);
@@ -655,6 +707,12 @@ public class SettingsController {
                 (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
     }
 
+    /**
+     * Applies disabled-row presentation and interactivity state.
+     *
+     * @param row target row node
+     * @param enabled whether row should be enabled
+     */
     private static void applyDependentRowState(Node row, boolean enabled) {
         row.setDisable(!enabled);
         if (enabled) {
@@ -666,6 +724,12 @@ public class SettingsController {
         }
     }
 
+    /**
+     * Wires row overlay button clicks to toggle the underlying control.
+     *
+     * @param rowId row node id
+     * @param toggleAction action that flips the target control state
+     */
     private void wireOverlayRowToggle(String rowId, Runnable toggleAction) {
         Node rowNode = findById(rowId, Node.class);
         if (!(rowNode instanceof Parent parent)) {
@@ -677,6 +741,12 @@ public class SettingsController {
         }
     }
 
+    /**
+     * Finds the overlay button used to make entire settings rows clickable.
+     *
+     * @param root row root node to search recursively
+     * @return overlay button when found, otherwise {@code null}
+     */
     private JFXButton findRowOverlayButton(Parent root) {
         for (Node child : root.getChildrenUnmodifiable()) {
             if (child instanceof JFXButton button
@@ -693,6 +763,14 @@ public class SettingsController {
         return null;
     }
 
+    /**
+     * Resolves a node by id and type within the settings scene graph.
+     *
+     * @param nodeId node id to find
+     * @param nodeType expected node type
+     * @param <T> expected node subtype
+     * @return matching node instance or {@code null} when absent
+     */
     private <T extends Node> T findById(String nodeId, Class<T> nodeType) {
         if (nodeId == null || nodeType == null || rootContainer == null) {
             return null;
@@ -700,6 +778,15 @@ public class SettingsController {
         return findByIdRecursive(rootContainer, nodeId, nodeType);
     }
 
+    /**
+     * Recursively searches for a node by id and expected type.
+     *
+     * @param node current root node
+     * @param nodeId node id to match
+     * @param nodeType expected node type
+     * @param <T> expected node subtype
+     * @return matching node instance or {@code null} when absent
+     */
     private static <T extends Node> T findByIdRecursive(Node node, String nodeId, Class<T> nodeType) {
         if (nodeId.equals(node.getId()) && nodeType.isInstance(node)) {
             return nodeType.cast(node);
@@ -713,6 +800,12 @@ public class SettingsController {
         return null;
     }
 
+    /**
+     * Returns child nodes participating in recursive lookup for a node.
+     *
+     * @param node source node
+     * @return flattened child list for supported container types
+     */
     private static List<Node> childNodesOf(Node node) {
         if (node == null) {
             return List.of();
@@ -809,6 +902,13 @@ public class SettingsController {
         });
     }
 
+    /**
+     * Closes the settings popup, optionally prompting when restart-required
+     * settings are dirty.
+     *
+     * @param stage settings popup stage
+     * @param closingStage re-entry guard for close handling
+     */
     private void requestClose(Stage stage, AtomicBoolean closingStage) {
         if (stage == null) {
             return;
@@ -833,6 +933,12 @@ public class SettingsController {
                 .show();
     }
 
+    /**
+     * Hides the settings stage while guarding against recursive close handlers.
+     *
+     * @param stage settings popup stage
+     * @param closingStage re-entry guard for close handling
+     */
     private void hideStage(Stage stage, AtomicBoolean closingStage) {
         closingStage.set(true);
         try {
@@ -842,6 +948,11 @@ public class SettingsController {
         }
     }
 
+    /**
+     * Stores restart-request callback on root container properties.
+     *
+     * @param restartRequestHandler callback that requests app restart
+     */
     private void storeRestartRequestHandler(Runnable restartRequestHandler) {
         if (rootContainer == null) {
             return;
@@ -849,6 +960,11 @@ public class SettingsController {
         rootContainer.getProperties().put(RESTART_HANDLER_KEY, restartRequestHandler);
     }
 
+    /**
+     * Resolves restart-request callback from root container properties.
+     *
+     * @return configured callback, or a safe no-op fallback
+     */
     private Runnable resolveRestartRequestHandler() {
         if (rootContainer == null) {
             return NO_OP_RESTART_HANDLER;

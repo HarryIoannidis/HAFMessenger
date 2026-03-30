@@ -53,6 +53,12 @@ public final class RuntimeIssuePopupGate {
         return shouldShow.get();
     }
 
+    /**
+     * Normalizes the dedupe key used for popup rate-limiting.
+     *
+     * @param dedupeKey caller-provided key
+     * @return normalized key value with default fallback
+     */
     private static String normalizeKey(String dedupeKey) {
         if (dedupeKey == null || dedupeKey.isBlank()) {
             return "runtime-issue";

@@ -13,10 +13,6 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Verifies that multiple users on the same machine have isolated keystores
- * and do not overwrite each other's keys even if created on the same day.
- */
 class MultiUserKeystoreCollisionIT {
 
     Path tmpRoot;

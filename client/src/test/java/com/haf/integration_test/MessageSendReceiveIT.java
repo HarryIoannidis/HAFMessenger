@@ -18,9 +18,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Integration test for send→receive→decrypt roundtrip with FixedClockProvider.
- */
 class MessageSendReceiveIT {
 
     static class InMemoryWebSocketAdapter extends WebSocketAdapter {

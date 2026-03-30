@@ -73,6 +73,11 @@ public class DesktopNotificationService {
         }
     }
 
+    /**
+     * Lazily initializes and returns the shared system-tray icon.
+     *
+     * @return initialized tray icon, or {@code null} when tray support is unavailable
+     */
     private TrayIcon getOrCreateTrayIcon() {
         TrayIcon existing = trayIconRef.get();
         if (existing != null) {
@@ -111,6 +116,10 @@ public class DesktopNotificationService {
         }
     }
 
+    /**
+     * Executes and clears the pending click callback associated with the most
+     * recently shown notification.
+     */
     private void runClickAction() {
         Runnable action = pendingClickAction.getAndSet(null);
         if (action == null) {
@@ -123,6 +132,11 @@ public class DesktopNotificationService {
         }
     }
 
+    /**
+     * Resolves the tray icon image from resources, with a transparent fallback.
+     *
+     * @return tray image for {@link TrayIcon}
+     */
     private static Image resolveTrayImage() {
         URL iconUrl = DesktopNotificationService.class.getResource(UiConstants.IMAGE_APP_LOGO);
         if (iconUrl != null) {
@@ -131,6 +145,13 @@ public class DesktopNotificationService {
         return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     }
 
+    /**
+     * Attempts to show an OS-native notification command when available.
+     *
+     * @param title notification title
+     * @param message notification message body
+     * @return {@code true} when a native notification command was executed
+     */
     private boolean tryShowNativeNotification(String title, String message) {
         NativeNotifier notifier = resolveNativeNotifier();
         return switch (notifier) {
@@ -149,6 +170,11 @@ public class DesktopNotificationService {
         };
     }
 
+    /**
+     * Returns the cached native notifier strategy, detecting it on first use.
+     *
+     * @return resolved native notifier implementation
+     */
     private NativeNotifier resolveNativeNotifier() {
         NativeNotifier existing = nativeNotifierRef.get();
         if (existing != null) {
@@ -160,6 +186,11 @@ public class DesktopNotificationService {
         return nativeNotifierRef.get();
     }
 
+    /**
+     * Detects the most suitable native notification backend for the current OS.
+     *
+     * @return detected notifier implementation, or {@link NativeNotifier#NONE}
+     */
     private static NativeNotifier detectNativeNotifier() {
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (osName.contains("linux") && isCommandOnPath("notify-send")) {
@@ -171,6 +202,12 @@ public class DesktopNotificationService {
         return NativeNotifier.NONE;
     }
 
+    /**
+     * Checks whether a command is executable from the current {@code PATH}.
+     *
+     * @param command executable name to probe
+     * @return {@code true} when the command is present and executable
+     */
     private static boolean isCommandOnPath(String command) {
         String pathEnv = System.getenv("PATH");
         if (pathEnv == null || pathEnv.isBlank()) {
@@ -190,6 +227,12 @@ public class DesktopNotificationService {
         return false;
     }
 
+    /**
+     * Runs a native command with a short timeout and success exit-code check.
+     *
+     * @param command command tokens to execute
+     * @return {@code true} when process exits successfully before timeout
+     */
     private boolean runNativeCommand(List<String> command) {
         List<String> safeCommand = new ArrayList<>(command);
         try {
@@ -211,6 +254,12 @@ public class DesktopNotificationService {
         }
     }
 
+    /**
+     * Escapes text as an AppleScript string literal.
+     *
+     * @param text source text
+     * @return escaped string wrapped in double quotes
+     */
     private static String toAppleScriptString(String text) {
         String value = text == null ? "" : text;
         return "\"" + value

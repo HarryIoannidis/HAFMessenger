@@ -16,10 +16,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for {@link FileUploadDAO}.
- * Verifies that encrypted file blobs are persisted with all required metadata.
- */
 @ExtendWith(MockitoExtension.class)
 class FileUploadDAOTest {
 
