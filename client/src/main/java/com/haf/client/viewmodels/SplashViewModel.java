@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.Objects;
 
 public class SplashViewModel {
+    private static final int NETWORK_CHECK_MAX_ATTEMPTS = 3;
+    private static final long NETWORK_CHECK_RETRY_DELAY_MILLIS = 500L;
 
     @FunctionalInterface
     public interface ConfigLoader {
@@ -205,7 +207,7 @@ public class SplashViewModel {
                 delay(100L);
 
                 update(UiConstants.BOOTSTRAP_NETWORK, 0.8);
-                networkChecker.check();
+                verifyNetworkWithRetries();
 
                 update(UiConstants.BOOTSTRAP_READY, 1.0);
                 delay(200L);
@@ -254,6 +256,32 @@ public class SplashViewModel {
         Thread t = new Thread(task, "splash-bootstrap");
         t.setDaemon(true);
         t.start();
+    }
+
+    /**
+     * Verifies server reachability with a maximum number of retry attempts.
+     *
+     * @throws IOException when all retry attempts fail
+     */
+    private void verifyNetworkWithRetries() throws IOException {
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= NETWORK_CHECK_MAX_ATTEMPTS; attempt++) {
+            try {
+                networkChecker.check();
+                return;
+            } catch (IOException failure) {
+                lastFailure = failure;
+                if (attempt < NETWORK_CHECK_MAX_ATTEMPTS) {
+                    delay(NETWORK_CHECK_RETRY_DELAY_MILLIS);
+                }
+            }
+        }
+
+        throw new IOException(
+                "Initialization could not be completed after "
+                        + NETWORK_CHECK_MAX_ATTEMPTS
+                        + " network attempts.",
+                lastFailure);
     }
 
     /**

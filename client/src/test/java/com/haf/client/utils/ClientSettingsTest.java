@@ -99,6 +99,8 @@ class ClientSettingsTest {
 
         a.setGeneralConfirmExit(false);
         a.setGeneralConfirmLogout(false);
+        a.setGeneralConfirmDeleteChat(false);
+        a.setGeneralConfirmRemoveContact(false);
         a.setSearchResultsPerPage(80);
         a.setSearchMinimumQueryLength(5);
         a.setPrivacyHidePresenceIndicators(true);
@@ -155,6 +157,8 @@ class ClientSettingsTest {
 
         settings.setGeneralConfirmExit(false);
         settings.setGeneralConfirmLogout(false);
+        settings.setGeneralConfirmDeleteChat(false);
+        settings.setGeneralConfirmRemoveContact(false);
         settings.setChatSendOnEnter(false);
         settings.setChatUse24HourTime(false);
         settings.setSearchAutoOpenFilterOnFirstSearch(false);
@@ -174,6 +178,8 @@ class ClientSettingsTest {
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
         assertFalse(reloaded.isGeneralConfirmLogout());
+        assertFalse(reloaded.isGeneralConfirmDeleteChat());
+        assertFalse(reloaded.isGeneralConfirmRemoveContact());
         assertFalse(reloaded.isChatSendOnEnter());
         assertFalse(reloaded.isChatUse24HourTime());
         assertFalse(reloaded.isSearchAutoOpenFilterOnFirstSearch());
@@ -255,6 +261,8 @@ class ClientSettingsTest {
     private static void assertGeneralDefaults(ClientSettings defaults) {
         assertTrue(defaults.isGeneralConfirmExit());
         assertTrue(defaults.isGeneralConfirmLogout());
+        assertTrue(defaults.isGeneralConfirmDeleteChat());
+        assertTrue(defaults.isGeneralConfirmRemoveContact());
         assertTrue(defaults.isGeneralRememberWindowState());
         assertTrue(defaults.isGeneralRestoreLastTab());
     }
@@ -262,6 +270,8 @@ class ClientSettingsTest {
     private static void assertCustomizedUserSettings(ClientSettings settings) {
         assertFalse(settings.isGeneralConfirmExit());
         assertFalse(settings.isGeneralConfirmLogout());
+        assertFalse(settings.isGeneralConfirmDeleteChat());
+        assertFalse(settings.isGeneralConfirmRemoveContact());
         assertEquals(80, settings.getSearchResultsPerPage());
         assertEquals(5, settings.getSearchMinimumQueryLength());
         assertTrue(settings.isPrivacyHidePresenceIndicators());
@@ -274,6 +284,8 @@ class ClientSettingsTest {
     private static void assertDefaultUserSettings(ClientSettings settings) {
         assertTrue(settings.isGeneralConfirmExit());
         assertTrue(settings.isGeneralConfirmLogout());
+        assertTrue(settings.isGeneralConfirmDeleteChat());
+        assertTrue(settings.isGeneralConfirmRemoveContact());
         assertEquals(20, settings.getSearchResultsPerPage());
         assertEquals(3, settings.getSearchMinimumQueryLength());
         assertFalse(settings.isPrivacyHidePresenceIndicators());

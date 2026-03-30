@@ -142,7 +142,7 @@ public class SplashController {
         if (isNetworkFailure(root, normalized)) {
             return new FailurePresentation(
                     "Cannot reach server",
-                    "Network reachability check failed. " + details);
+                    "Initialization could not be completed. Network reachability check failed. " + details);
         }
 
         if (isResourceFailure(normalized)) {
@@ -159,7 +159,7 @@ public class SplashController {
 
         return new FailurePresentation(
                 "Startup failed",
-                "Initialization could not complete. " + details);
+                "Initialization could not be completed. " + details);
     }
 
     /**
