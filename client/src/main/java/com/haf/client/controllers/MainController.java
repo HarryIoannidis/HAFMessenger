@@ -409,7 +409,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Returns instant search debounce.
+     * Returns the shared debounce timer used for instant search scheduling.
+     *
+     * @return lazily initialized debounce timer instance
      */
     private PauseTransition getInstantSearchDebounce() {
         if (instantSearchDebounce == null) {
@@ -466,7 +468,11 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Returns whether search query too short.
+     * Checks whether a query is non-empty and shorter than the configured minimum
+     * search length.
+     *
+     * @param query search query to validate
+     * @return {@code true} when query should be treated as too short
      */
     private boolean isSearchQueryTooShort(String query) {
         String normalized = query == null ? "" : query.trim();
@@ -621,13 +627,18 @@ public class MainController implements SearchController.ContactActions {
     private void showProfilePanel(ContactInfo contact) {
         profileNameText.setText(contact.name());
         String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
-        profileActivenessText.setText(activenessLabel);
-        boolean hasActivenessLabel = !settings.isPrivacyHidePresenceIndicators() && !activenessLabel.isEmpty();
+        String resolvedActivenessLabel = settings.isPrivacyHidePresenceIndicators()
+                ? ContactInfo.hiddenActivityLabel()
+                : activenessLabel;
+        profileActivenessText.setText(resolvedActivenessLabel);
+        boolean hasActivenessLabel = !resolvedActivenessLabel.isEmpty();
         profileActivenessText.setVisible(hasActivenessLabel);
         profileActivenessText.setManaged(hasActivenessLabel);
-        profileActivenessCircle.setVisible(hasActivenessLabel);
-        profileActivenessCircle.setManaged(hasActivenessLabel);
-        if (hasActivenessLabel) {
+        boolean showActivenessCircle = hasActivenessLabel
+                && !ContactInfo.isHiddenActivityLabel(resolvedActivenessLabel);
+        profileActivenessCircle.setVisible(showActivenessCircle);
+        profileActivenessCircle.setManaged(showActivenessCircle);
+        if (showActivenessCircle) {
             try {
                 profileActivenessCircle.setFill(Color.web(contact.activenessColor()));
             } catch (IllegalArgumentException ex) {
@@ -1207,6 +1218,7 @@ public class MainController implements SearchController.ContactActions {
         applySearchFilterSettings();
         applySearchSortMemorySettings();
         applyContactCellSettings();
+        syncPresenceVisibilitySetting();
         syncStartupBlurLockFromSetting(false);
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
@@ -1219,8 +1231,12 @@ public class MainController implements SearchController.ContactActions {
             switch (key) {
                 case SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH -> applySearchFilterSettings();
                 case SEARCH_REMEMBER_SORT_OPTIONS -> applySearchSortMemorySettings();
-                case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP, PRIVACY_HIDE_PRESENCE_INDICATORS ->
+                case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP ->
                         applyContactCellSettings();
+                case PRIVACY_HIDE_PRESENCE_INDICATORS -> {
+                    applyContactCellSettings();
+                    syncPresenceVisibilitySetting();
+                }
                 case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
                     Stage stage = ViewRouter.getMainStage();
                     applyPrivacyBlur(stage == null || stage.isFocused());
@@ -1275,7 +1291,16 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Applies privacy blur.
+     * Synchronizes hide-presence preference with backend visibility policy.
+     */
+    private void syncPresenceVisibilitySetting() {
+        viewModel.syncPresenceVisibility(settings.isPrivacyHidePresenceIndicators());
+    }
+
+    /**
+     * Applies or clears the privacy blur effect based on focus and lock settings.
+     *
+     * @param focused whether the main stage is currently focused
      */
     private void applyPrivacyBlur(boolean focused) {
         if (rootContainer == null) {
@@ -1302,7 +1327,10 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Handles sync startup blur lock from setting.
+     * Applies startup blur-lock settings and optionally schedules the unlock popup.
+     *
+     * @param scheduleUnlockPopup {@code true} to queue unlock popup after initial
+     *                            render
      */
     private void syncStartupBlurLockFromSetting(boolean scheduleUnlockPopup) {
         if (!settings.isPrivacyBlurOnStartupUntilUnlock()) {
@@ -1373,7 +1401,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Handles restore window state.
+     * Restores persisted window bounds and maximized state when available.
+     *
+     * @param stage primary stage to restore
      */
     private void restoreWindowState(Stage stage) {
         ClientSettings.WindowState state = settings.readWindowState();
@@ -1396,7 +1426,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Persists window state.
+     * Persists current window bounds and maximized state when enabled.
+     *
+     * @param stage primary stage to persist
      */
     private void persistWindowState(Stage stage) {
         if (stage == null || !settings.isGeneralRememberWindowState()) {
@@ -1424,7 +1456,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Builds dots menu.
+     * Builds the overflow context menu shown from the top-right dots button.
+     *
+     * @return configured dots-menu context menu
      */
     private ContextMenu buildDotsMenu() {
         boolean blurLocked = startupBlurLocked;
@@ -1451,7 +1485,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Requests external link open.
+     * Requests opening an external URL, optionally showing a confirmation popup.
+     *
+     * @param url URL to open
      */
     private void requestExternalLinkOpen(String url) {
         if (url == null || url.isBlank()) {
@@ -1472,7 +1508,10 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Opens external link.
+     * Opens an external URL in the system browser and shows a fallback popup on
+     * failure.
+     *
+     * @param url URL to open
      */
     private void openExternalLink(String url) {
         try {
@@ -1564,7 +1603,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Relaunches client process.
+     * Launches a new client JVM process using the current runtime and classpath.
+     *
+     * @return {@code true} when process start succeeds, otherwise {@code false}
      */
     private boolean relaunchClientProcess() {
         try {
@@ -1886,7 +1927,17 @@ public class MainController implements SearchController.ContactActions {
      * handler.
      */
     private void registerPresenceListener() {
-        mainSessionService.registerPresenceListener(this::applyPresenceUpdate);
+        mainSessionService.registerPresenceListener(new MessagesViewModel.PresenceListener() {
+            @Override
+            public void onPresenceUpdate(String userId, boolean active) {
+                applyPresenceUpdate(userId, active, false);
+            }
+
+            @Override
+            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
+                applyPresenceUpdate(userId, active, hidden);
+            }
+        });
     }
 
     /**
@@ -1914,10 +1965,11 @@ public class MainController implements SearchController.ContactActions {
      * Schedules a presence update to run on the JavaFX application thread.
      *
      * @param userId user id whose presence changed
-     * @param active latest activity flag
+     * @param active visible activity flag
+     * @param hidden hidden-presence flag
      */
-    private void applyPresenceUpdate(String userId, boolean active) {
-        Platform.runLater(() -> updateContactPresence(userId, active));
+    private void applyPresenceUpdate(String userId, boolean active, boolean hidden) {
+        Platform.runLater(() -> updateContactPresence(userId, active, hidden));
     }
 
     /**
@@ -1946,10 +1998,11 @@ public class MainController implements SearchController.ContactActions {
      * Applies a contact presence change to the list and profile-strip state.
      *
      * @param userId user id whose presence changed
-     * @param active latest activity flag
+     * @param active visible activity flag
+     * @param hidden hidden-presence flag
      */
-    private void updateContactPresence(String userId, boolean active) {
-        ContactInfo updated = viewModel.updateContactPresence(userId, active);
+    private void updateContactPresence(String userId, boolean active, boolean hidden) {
+        ContactInfo updated = viewModel.updateContactPresence(userId, active, hidden);
         if (updated == null) {
             return;
         }
@@ -1973,6 +2026,7 @@ public class MainController implements SearchController.ContactActions {
      * chat recipient.
      *
      * @param senderId sender/contact id of the incoming message
+     * @return unread action to apply for the incoming message
      */
     private MainViewModel.IncomingUnreadAction updateUnreadForIncomingMessage(String senderId) {
         String activeChatRecipientId = contentLoader == null ? null : contentLoader.getCurrentChatRecipientId();
@@ -1980,7 +2034,12 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Handles maybe show incoming os notification.
+     * Shows a desktop notification for an incoming message when notification rules
+     * allow it.
+     *
+     * @param senderId sender/contact id of the incoming message
+     * @param message incoming message payload
+     * @param unreadAction unread action produced for this incoming event
      */
     private void maybeShowIncomingOsNotification(
             String senderId,
@@ -2002,7 +2061,12 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Returns whether show incoming os notification.
+     * Determines whether an incoming-message desktop notification should be shown.
+     *
+     * @param notificationsEnabled whether OS notifications are enabled in settings
+     * @param unreadAction unread action for the incoming event
+     * @param windowFocused whether the main window is currently focused
+     * @return {@code true} when a desktop notification should be shown
      */
     static boolean shouldShowIncomingOsNotification(
             boolean notificationsEnabled,
@@ -2015,7 +2079,12 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Resolves incoming os notification body.
+     * Resolves desktop-notification body text from message content and privacy
+     * settings.
+     *
+     * @param message incoming message payload
+     * @param showMessagePreview whether text previews are allowed in notifications
+     * @return notification body text
      */
     static String resolveIncomingOsNotificationBody(MessageVM message, boolean showMessagePreview) {
         if (message == null || message.type() == null) {
@@ -2036,7 +2105,10 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Normalizes notification text preview.
+     * Normalizes notification preview text into a single-line bounded string.
+     *
+     * @param text raw preview text
+     * @return normalized preview text suitable for desktop notifications
      */
     private static String normalizeNotificationTextPreview(String text) {
         if (text == null) {
@@ -2058,7 +2130,10 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Resolves incoming os notification title.
+     * Resolves desktop-notification title from contact data.
+     *
+     * @param contact sender contact information
+     * @return display title for the desktop notification
      */
     static String resolveIncomingOsNotificationTitle(ContactInfo contact) {
         if (contact != null && contact.name() != null && !contact.name().isBlank()) {
@@ -2068,7 +2143,9 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Focuses app and open sender chat.
+     * Focuses the client window and opens chat for the sender when possible.
+     *
+     * @param senderId sender/contact id to open
      */
     private void focusAppAndOpenSenderChat(String senderId) {
         if (senderId == null || senderId.isBlank()) {

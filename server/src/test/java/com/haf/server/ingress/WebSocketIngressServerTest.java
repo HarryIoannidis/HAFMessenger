@@ -118,6 +118,30 @@ class WebSocketIngressServerTest {
 
         verify(watcherConnection, times(1)).send(contains("\"type\":\"presence\""));
         verify(watcherConnection, times(1)).send(contains("\"active\":true"));
+        verify(watcherConnection, times(1)).send(contains("\"hidden\":false"));
+    }
+
+    @Test
+    void on_open_broadcasts_hidden_when_user_hides_presence() {
+        String userId = "user-hidden";
+        String watcherId = "watcher-1";
+        WebSocket watcherConnection = mock(WebSocket.class);
+
+        presenceRegistry.registerConnection(watcherId, watcherConnection);
+        presenceRegistry.setPresenceHidden(userId, true);
+
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer session-hidden");
+        when(sessionDAO.getUserIdForSession("session-hidden")).thenReturn(userId);
+        when(contactDAO.getWatcherUserIds(userId)).thenReturn(List.of(watcherId));
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
+
+        server.onOpen(webSocket, handshake);
+
+        verify(watcherConnection, times(1)).send(contains("\"type\":\"presence\""));
+        verify(watcherConnection, times(1)).send(contains("\"active\":false"));
+        verify(watcherConnection, times(1)).send(contains("\"hidden\":true"));
     }
 
     @Test
@@ -155,8 +179,39 @@ class WebSocketIngressServerTest {
         server.onOpen(webSocket, handshake);
 
         verify(webSocket, times(2)).send(contains("\"type\":\"presence\""));
-        verify(webSocket).send(contains("\"userId\":\"" + onlineContactId + "\",\"active\":true"));
-        verify(webSocket).send(contains("\"userId\":\"" + offlineContactId + "\",\"active\":false"));
+        verify(webSocket).send(contains("\"userId\":\"" + onlineContactId + "\",\"active\":true,\"hidden\":false"));
+        verify(webSocket).send(contains("\"userId\":\"" + offlineContactId + "\",\"active\":false,\"hidden\":false"));
+    }
+
+    @Test
+    void on_open_snapshot_masks_hidden_contact_activity() {
+        String userId = "user-a";
+        String hiddenContactId = "contact-hidden";
+        WebSocket hiddenContactConnection = mock(WebSocket.class);
+
+        presenceRegistry.registerConnection(hiddenContactId, hiddenContactConnection);
+        presenceRegistry.setPresenceHidden(hiddenContactId, true);
+
+        when(handshake.getFieldValue("Authorization")).thenReturn("Bearer session-hidden-snapshot");
+        when(sessionDAO.getUserIdForSession("session-hidden-snapshot")).thenReturn(userId);
+        when(mailboxRouter.subscribe(eq(userId), any()))
+                .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
+        when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
+        when(contactDAO.getContacts(userId)).thenReturn(List.of(
+                new ContactDAO.ContactRecord(
+                        hiddenContactId,
+                        "Hidden Contact",
+                        "003",
+                        "hidden@haf.gr",
+                        "SMINIAS",
+                        "6900000003",
+                        "2026-01-03")));
+
+        server.onOpen(webSocket, handshake);
+
+        verify(webSocket, times(1)).send(contains("\"type\":\"presence\""));
+        verify(webSocket, times(1))
+                .send(contains("\"userId\":\"" + hiddenContactId + "\",\"active\":false,\"hidden\":true"));
     }
 
     @Test

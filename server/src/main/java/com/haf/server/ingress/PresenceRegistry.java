@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PresenceRegistry {
 
     private final ConcurrentHashMap<String, Set<WebSocket>> connectionsByUser = new ConcurrentHashMap<>();
+    private final Set<String> hiddenPresenceUsers = ConcurrentHashMap.newKeySet();
 
     /**
      * Registers a connection for a user.
@@ -70,6 +71,58 @@ public final class PresenceRegistry {
         }
         Set<WebSocket> connections = connectionsByUser.get(userId);
         return connections != null && !connections.isEmpty();
+    }
+
+    /**
+     * Updates whether a user's presence should be hidden from other users.
+     *
+     * @param userId user id whose visibility setting is updated
+     * @param hidden {@code true} to hide presence visibility
+     */
+    public void setPresenceHidden(String userId, boolean hidden) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        if (hidden) {
+            hiddenPresenceUsers.add(userId);
+            return;
+        }
+        hiddenPresenceUsers.remove(userId);
+    }
+
+    /**
+     * Returns whether a user's presence is configured as hidden.
+     *
+     * @param userId user id to evaluate
+     * @return {@code true} when presence is hidden
+     */
+    public boolean isPresenceHidden(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return false;
+        }
+        return hiddenPresenceUsers.contains(userId);
+    }
+
+    /**
+     * Resolves activity visibility that should be exposed to other users.
+     *
+     * @param userId user id to evaluate
+     * @return {@code true} when user is active and not hiding presence
+     */
+    public boolean isVisibleActive(String userId) {
+        return isActive(userId) && !isPresenceHidden(userId);
+    }
+
+    /**
+     * Clears hidden-presence state for a user.
+     *
+     * @param userId user id to clear
+     */
+    public void clearPresenceHidden(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        hiddenPresenceUsers.remove(userId);
     }
 
     /**

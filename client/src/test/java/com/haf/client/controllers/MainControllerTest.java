@@ -290,6 +290,15 @@ class MainControllerTest {
         assertTrue(source.contains("Desktop.getDesktop().browse(new URI(url));"));
     }
 
+    @Test
+    void hide_presence_setting_shows_hidden_activity_and_syncs_visibility_policy() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("ContactInfo.hiddenActivityLabel()"));
+        assertTrue(source.contains("syncPresenceVisibilitySetting();"));
+        assertTrue(source.contains("viewModel.syncPresenceVisibility(settings.isPrivacyHidePresenceIndicators())"));
+    }
+
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
         @Override
         public CompletableFuture<String> fetchContacts() {
