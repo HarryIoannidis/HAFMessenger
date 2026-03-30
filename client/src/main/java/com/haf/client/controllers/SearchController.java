@@ -42,26 +42,53 @@ public class SearchController {
     public interface ContactActions {
 
         ContactActions NO_OP = new ContactActions() {
+            /**
+             * No-op contact existence check used when the search controller is not
+             * wired to the main contact state.
+             *
+             * @param userId ignored
+             * @return always {@code false}
+             */
             @Override
             public boolean hasContact(String userId) {
                 return false;
             }
 
+            /**
+             * No-op add-contact action used by the default detached implementation.
+             *
+             * @param result ignored
+             */
             @Override
             public void addContact(UserSearchResultDTO result) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
 
+            /**
+             * No-op remove-contact action used by the default detached implementation.
+             *
+             * @param userId ignored
+             */
             @Override
             public void removeContact(String userId) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
 
+            /**
+             * No-op start-chat action used by the default detached implementation.
+             *
+             * @param result ignored
+             */
             @Override
             public void startChatWith(UserSearchResultDTO result) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
 
+            /**
+             * No-op profile-open action used by the default detached implementation.
+             *
+             * @param result ignored
+             */
             @Override
             public void openProfile(UserSearchResultDTO result) {
                 // Intentionally no-op: default port implementation when Search is not wired.

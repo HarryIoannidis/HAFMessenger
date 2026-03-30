@@ -682,6 +682,11 @@ public class ChatController {
                 () -> openImagePreviewNow(message));
     }
 
+    /**
+     * Opens the preview popup immediately after confirmation has been handled.
+     *
+     * @param message image message to render in preview
+     */
     private void openImagePreviewNow(MessageVM message) {
         if (message == null || message.content() == null || message.content().isBlank()) {
             return;
@@ -729,6 +734,12 @@ public class ChatController {
                 () -> downloadImageFromMessageNow(message));
     }
 
+    /**
+     * Performs the attachment/image save flow immediately after confirmation has
+     * been handled.
+     *
+     * @param message message containing downloadable source metadata
+     */
     private void downloadImageFromMessageNow(MessageVM message) {
         if (message == null) {
             return;
@@ -772,6 +783,14 @@ public class ChatController {
         }
     }
 
+    /**
+     * Runs an attachment action and optionally gates it behind a privacy
+     * confirmation popup.
+     *
+     * @param title popup title when confirmation is enabled
+     * @param message popup body when confirmation is enabled
+     * @param action action to run when confirmed
+     */
     private void runWithAttachmentOpenConfirmation(String title, String message, Runnable action) {
         if (action == null) {
             return;

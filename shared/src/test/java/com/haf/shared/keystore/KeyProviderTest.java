@@ -9,9 +9,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class KeyProviderTest {
 
-    /**
-     * Mock KeyProvider for testing.
-     */
     static class MockKeyProvider implements KeyProvider {
         private final String senderId;
         private final PublicKey publicKey;

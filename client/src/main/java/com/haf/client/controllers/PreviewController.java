@@ -202,6 +202,9 @@ public class PreviewController {
         handleDownloadClickNow();
     }
 
+    /**
+     * Saves the current previewed image to user-selected destination immediately.
+     */
     private void handleDownloadClickNow() {
         if (!downloadAllowed) {
             return;

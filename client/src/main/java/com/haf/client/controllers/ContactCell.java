@@ -37,14 +37,29 @@ public class ContactCell extends ListCell<ContactInfo> {
     private JFXButton overlayButton;
     private PauseTransition contextMenuDelay;
 
+    /**
+     * Toggles visibility of unread badges for all contact cells.
+     *
+     * @param showUnreadBadges {@code true} to show unread badges
+     */
     public static void setShowUnreadBadges(boolean showUnreadBadges) {
         ContactCell.showUnreadBadges = showUnreadBadges;
     }
 
+    /**
+     * Sets the upper display cap used for unread badge counts.
+     *
+     * @param unreadBadgeCap maximum unread value shown before capping
+     */
     public static void setUnreadBadgeCap(int unreadBadgeCap) {
         ContactCell.unreadBadgeCap = Math.max(1, unreadBadgeCap);
     }
 
+    /**
+     * Toggles rendering of presence indicators for all contact cells.
+     *
+     * @param hidePresenceIndicators {@code true} to hide presence dots
+     */
     public static void setHidePresenceIndicators(boolean hidePresenceIndicators) {
         ContactCell.hidePresenceIndicators = hidePresenceIndicators;
     }

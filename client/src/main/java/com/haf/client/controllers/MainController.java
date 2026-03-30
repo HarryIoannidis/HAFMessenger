@@ -408,6 +408,9 @@ public class MainController implements SearchController.ContactActions {
         triggerSearchFlow();
     }
 
+    /**
+     * Returns instant search debounce.
+     */
     private PauseTransition getInstantSearchDebounce() {
         if (instantSearchDebounce == null) {
             instantSearchDebounce = new PauseTransition(Duration.millis(SEARCH_INSTANT_DEBOUNCE_MS));
@@ -462,6 +465,9 @@ public class MainController implements SearchController.ContactActions {
                 filterButton != null ? filterButton : searchActionButton);
     }
 
+    /**
+     * Returns whether search query too short.
+     */
     private boolean isSearchQueryTooShort(String query) {
         String normalized = query == null ? "" : query.trim();
         return !normalized.isBlank() && normalized.length() < settings.getSearchMinimumQueryLength();
@@ -1194,6 +1200,9 @@ public class MainController implements SearchController.ContactActions {
         applyPrivacyBlur(stage.isFocused());
     }
 
+    /**
+     * Applies immediate settings.
+     */
     private void applyImmediateSettings() {
         applySearchFilterSettings();
         applySearchSortMemorySettings();
@@ -1202,6 +1211,9 @@ public class MainController implements SearchController.ContactActions {
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
 
+    /**
+     * Registers settings listener.
+     */
     private void registerSettingsListener() {
         settings.addListener(key -> Platform.runLater(() -> {
             switch (key) {
@@ -1225,12 +1237,18 @@ public class MainController implements SearchController.ContactActions {
         }));
     }
 
+    /**
+     * Applies search filter settings.
+     */
     private void applySearchFilterSettings() {
         if (searchFilterUi != null) {
             searchFilterUi.setAutoOpenFilterOnFirstSearch(settings.isSearchAutoOpenFilterOnFirstSearch());
         }
     }
 
+    /**
+     * Applies search sort memory settings.
+     */
     private void applySearchSortMemorySettings() {
         if (searchFilterUi == null) {
             return;
@@ -1243,6 +1261,9 @@ public class MainController implements SearchController.ContactActions {
         searchFilterUi.setSelectedSortOptions(settings.getSearchSortOptions());
     }
 
+    /**
+     * Applies contact cell settings.
+     */
     private void applyContactCellSettings() {
         ContactCell.setShowUnreadBadges(settings.isNotificationsShowUnreadBadges());
         ContactCell.setUnreadBadgeCap(settings.getNotificationsBadgeCap());
@@ -1253,6 +1274,9 @@ public class MainController implements SearchController.ContactActions {
         refreshProfilePanelForSelectedContact();
     }
 
+    /**
+     * Applies privacy blur.
+     */
     private void applyPrivacyBlur(boolean focused) {
         if (rootContainer == null) {
             return;
@@ -1270,10 +1294,16 @@ public class MainController implements SearchController.ContactActions {
         rootContainer.setEffect(null);
     }
 
+    /**
+     * Handles sync startup blur lock from setting.
+     */
     private void syncStartupBlurLockFromSetting() {
         syncStartupBlurLockFromSetting(true);
     }
 
+    /**
+     * Handles sync startup blur lock from setting.
+     */
     private void syncStartupBlurLockFromSetting(boolean scheduleUnlockPopup) {
         if (!settings.isPrivacyBlurOnStartupUntilUnlock()) {
             startupBlurLocked = false;
@@ -1287,18 +1317,27 @@ public class MainController implements SearchController.ContactActions {
         }
     }
 
+    /**
+     * Handles lock startup privacy blur.
+     */
     private void lockStartupPrivacyBlur() {
         startupBlurLocked = true;
         Stage stage = ViewRouter.getMainStage();
         applyPrivacyBlur(stage == null || stage.isFocused());
     }
 
+    /**
+     * Handles unlock startup privacy blur.
+     */
     private void unlockStartupPrivacyBlur() {
         startupBlurLocked = false;
         Stage stage = ViewRouter.getMainStage();
         applyPrivacyBlur(stage == null || stage.isFocused());
     }
 
+    /**
+     * Handles schedule startup blur unlock popup after main render.
+     */
     private void scheduleStartupBlurUnlockPopupAfterMainRender() {
         if (!startupBlurLocked || startupBlurPopupQueued) {
             return;
@@ -1313,6 +1352,9 @@ public class MainController implements SearchController.ContactActions {
         }));
     }
 
+    /**
+     * Shows startup blur unlock popup.
+     */
     private void showStartupBlurUnlockPopup() {
         PopupMessageBuilder.create()
                 .popupKey("popup-privacy-startup-blur-unlock")
@@ -1325,6 +1367,9 @@ public class MainController implements SearchController.ContactActions {
                 .show();
     }
 
+    /**
+     * Handles restore window state.
+     */
     private void restoreWindowState(Stage stage) {
         ClientSettings.WindowState state = settings.readWindowState();
         if (stage == null || state == null) {
@@ -1345,6 +1390,9 @@ public class MainController implements SearchController.ContactActions {
         stage.setMaximized(state.maximized());
     }
 
+    /**
+     * Persists window state.
+     */
     private void persistWindowState(Stage stage) {
         if (stage == null || !settings.isGeneralRememberWindowState()) {
             return;
@@ -1370,6 +1418,9 @@ public class MainController implements SearchController.ContactActions {
         });
     }
 
+    /**
+     * Builds dots menu.
+     */
     private ContextMenu buildDotsMenu() {
         boolean blurLocked = startupBlurLocked;
         String blurActionIcon = blurLocked ? "mdi2l-lock-open-variant-outline" : "mdi2l-lock-outline";
@@ -1387,10 +1438,16 @@ public class MainController implements SearchController.ContactActions {
                 .build();
     }
 
+    /**
+     * Opens help center.
+     */
     private void openHelpCenter() {
         requestExternalLinkOpen(HELP_CENTER_URL);
     }
 
+    /**
+     * Requests external link open.
+     */
     private void requestExternalLinkOpen(String url) {
         if (url == null || url.isBlank()) {
             return;
@@ -1409,6 +1466,9 @@ public class MainController implements SearchController.ContactActions {
                 .show();
     }
 
+    /**
+     * Opens external link.
+     */
     private void openExternalLink(String url) {
         try {
             if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
@@ -1422,6 +1482,9 @@ public class MainController implements SearchController.ContactActions {
         }
     }
 
+    /**
+     * Shows external link open failed popup.
+     */
     private void showExternalLinkOpenFailedPopup() {
         PopupMessageBuilder.create()
                 .popupKey("popup-open-external-link-failed")
@@ -1467,6 +1530,9 @@ public class MainController implements SearchController.ContactActions {
         });
     }
 
+    /**
+     * Requests app restart.
+     */
     private void requestAppRestart() {
         if (!shutdownInProgress.compareAndSet(false, true)) {
             return;
@@ -1492,6 +1558,9 @@ public class MainController implements SearchController.ContactActions {
         });
     }
 
+    /**
+     * Relaunches client process.
+     */
     private boolean relaunchClientProcess() {
         try {
             String javaBin = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
@@ -1509,6 +1578,9 @@ public class MainController implements SearchController.ContactActions {
         }
     }
 
+    /**
+     * Shows restart failure popup.
+     */
     private void showRestartFailurePopup() {
         PopupMessageBuilder.create()
                 .popupKey("popup-restart-failed")
@@ -1902,6 +1974,9 @@ public class MainController implements SearchController.ContactActions {
         return viewModel.applyIncomingMessage(senderId, activeChatRecipientId);
     }
 
+    /**
+     * Handles maybe show incoming os notification.
+     */
     private void maybeShowIncomingOsNotification(
             String senderId,
             MessageVM message,
@@ -1921,6 +1996,9 @@ public class MainController implements SearchController.ContactActions {
                 () -> Platform.runLater(() -> focusAppAndOpenSenderChat(senderId)));
     }
 
+    /**
+     * Returns whether show incoming os notification.
+     */
     static boolean shouldShowIncomingOsNotification(
             boolean notificationsEnabled,
             MainViewModel.IncomingUnreadAction unreadAction,
@@ -1931,6 +2009,9 @@ public class MainController implements SearchController.ContactActions {
         return unreadAction == MainViewModel.IncomingUnreadAction.INCREMENT || !windowFocused;
     }
 
+    /**
+     * Resolves incoming os notification body.
+     */
     static String resolveIncomingOsNotificationBody(MessageVM message, boolean showMessagePreview) {
         if (message == null || message.type() == null) {
             return "sent a message";
@@ -1949,6 +2030,9 @@ public class MainController implements SearchController.ContactActions {
         };
     }
 
+    /**
+     * Normalizes notification text preview.
+     */
     private static String normalizeNotificationTextPreview(String text) {
         if (text == null) {
             return "";
@@ -1968,6 +2052,9 @@ public class MainController implements SearchController.ContactActions {
         return normalized.substring(0, maxLength - 3) + "...";
     }
 
+    /**
+     * Resolves incoming os notification title.
+     */
     static String resolveIncomingOsNotificationTitle(ContactInfo contact) {
         if (contact != null && contact.name() != null && !contact.name().isBlank()) {
             return contact.name().trim();
@@ -1975,6 +2062,9 @@ public class MainController implements SearchController.ContactActions {
         return "Unknown Contact";
     }
 
+    /**
+     * Focuses app and open sender chat.
+     */
     private void focusAppAndOpenSenderChat(String senderId) {
         if (senderId == null || senderId.isBlank()) {
             return;

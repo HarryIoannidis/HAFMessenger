@@ -68,20 +68,32 @@ public final class ClientSettings {
         private final Object defaultValue;
         private final ApplyMode applyMode;
 
+        /**
+         * Creates a new Key instance.
+         */
         Key(String preferenceKey, Object defaultValue, ApplyMode applyMode) {
             this.preferenceKey = preferenceKey;
             this.defaultValue = defaultValue;
             this.applyMode = applyMode;
         }
 
+        /**
+         * Handles preference key.
+         */
         public String preferenceKey() {
             return preferenceKey;
         }
 
+        /**
+         * Handles default value.
+         */
         public Object defaultValue() {
             return defaultValue;
         }
 
+        /**
+         * Applies mode.
+         */
         public ApplyMode applyMode() {
             return applyMode;
         }
@@ -92,6 +104,9 @@ public final class ClientSettings {
      */
     @FunctionalInterface
     public interface Listener {
+        /**
+         * Handles on setting changed.
+         */
         void onSettingChanged(Key key);
     }
 
@@ -113,6 +128,9 @@ public final class ClientSettings {
 
     private volatile boolean restartRequiredDirty;
 
+    /**
+     * Creates a new ClientSettings instance.
+     */
     private ClientSettings(String userId) {
         if (userId == null || userId.isBlank()) {
             this.prefs = null;
@@ -136,10 +154,16 @@ public final class ClientSettings {
         this.restartRequiredDirty = false;
     }
 
+    /**
+     * Handles defaults.
+     */
     public static ClientSettings defaults() {
         return new ClientSettings(null);
     }
 
+    /**
+     * Creates settings for user.
+     */
     public static ClientSettings forUser(String userId) {
         return new ClientSettings(userId);
     }
@@ -155,22 +179,34 @@ public final class ClientSettings {
         return forUser(profile.userId());
     }
 
+    /**
+     * Adds listener.
+     */
     public void addListener(Listener listener) {
         if (listener != null) {
             listeners.add(listener);
         }
     }
 
+    /**
+     * Removes listener.
+     */
     public void removeListener(Listener listener) {
         if (listener != null) {
             listeners.remove(listener);
         }
     }
 
+    /**
+     * Returns whether restart required dirty.
+     */
     public boolean isRestartRequiredDirty() {
         return restartRequiredDirty;
     }
 
+    /**
+     * Clears restart required dirty.
+     */
     public void clearRestartRequiredDirty() {
         for (Key key : Key.values()) {
             if (key.applyMode() == ApplyMode.RESTART_REQUIRED) {
@@ -180,98 +216,170 @@ public final class ClientSettings {
         restartRequiredDirty = false;
     }
 
+    /**
+     * Returns whether general confirm exit.
+     */
     public boolean isGeneralConfirmExit() {
         return getBoolean(Key.GENERAL_CONFIRM_EXIT);
     }
 
+    /**
+     * Updates general confirm exit.
+     */
     public void setGeneralConfirmExit(boolean enabled) {
         setBoolean(Key.GENERAL_CONFIRM_EXIT, enabled);
     }
 
+    /**
+     * Returns whether general confirm logout.
+     */
     public boolean isGeneralConfirmLogout() {
         return getBoolean(Key.GENERAL_CONFIRM_LOGOUT);
     }
 
+    /**
+     * Updates general confirm logout.
+     */
     public void setGeneralConfirmLogout(boolean enabled) {
         setBoolean(Key.GENERAL_CONFIRM_LOGOUT, enabled);
     }
 
+    /**
+     * Returns whether general remember window state.
+     */
     public boolean isGeneralRememberWindowState() {
         return getBoolean(Key.GENERAL_REMEMBER_WINDOW_STATE);
     }
 
+    /**
+     * Updates general remember window state.
+     */
     public void setGeneralRememberWindowState(boolean enabled) {
         setBoolean(Key.GENERAL_REMEMBER_WINDOW_STATE, enabled);
     }
 
+    /**
+     * Returns whether general restore last tab.
+     */
     public boolean isGeneralRestoreLastTab() {
         return getBoolean(Key.GENERAL_RESTORE_LAST_TAB);
     }
 
+    /**
+     * Updates general restore last tab.
+     */
     public void setGeneralRestoreLastTab(boolean enabled) {
         setBoolean(Key.GENERAL_RESTORE_LAST_TAB, enabled);
     }
 
+    /**
+     * Returns whether search instant on type.
+     */
     public boolean isSearchInstantOnType() {
         return getBoolean(Key.SEARCH_INSTANT_ON_TYPE);
     }
 
+    /**
+     * Updates search instant on type.
+     */
     public void setSearchInstantOnType(boolean enabled) {
         setBoolean(Key.SEARCH_INSTANT_ON_TYPE, enabled);
     }
 
+    /**
+     * Returns whether search auto open filter on first search.
+     */
     public boolean isSearchAutoOpenFilterOnFirstSearch() {
         return getBoolean(Key.SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH);
     }
 
+    /**
+     * Updates search auto open filter on first search.
+     */
     public void setSearchAutoOpenFilterOnFirstSearch(boolean enabled) {
         setBoolean(Key.SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH, enabled);
     }
 
+    /**
+     * Returns whether search require enter to search.
+     */
     public boolean isSearchRequireEnterToSearch() {
         return getBoolean(Key.SEARCH_REQUIRE_ENTER_TO_SEARCH);
     }
 
+    /**
+     * Updates search require enter to search.
+     */
     public void setSearchRequireEnterToSearch(boolean enabled) {
         setBoolean(Key.SEARCH_REQUIRE_ENTER_TO_SEARCH, enabled);
     }
 
+    /**
+     * Returns whether search infinite scroll.
+     */
     public boolean isSearchInfiniteScroll() {
         return getBoolean(Key.SEARCH_INFINITE_SCROLL);
     }
 
+    /**
+     * Updates search infinite scroll.
+     */
     public void setSearchInfiniteScroll(boolean enabled) {
         setBoolean(Key.SEARCH_INFINITE_SCROLL, enabled);
     }
 
+    /**
+     * Returns search minimum query length.
+     */
     public int getSearchMinimumQueryLength() {
         return getInt(Key.SEARCH_MINIMUM_QUERY_LENGTH);
     }
 
+    /**
+     * Updates search minimum query length.
+     */
     public void setSearchMinimumQueryLength(double value) {
         setInt(Key.SEARCH_MINIMUM_QUERY_LENGTH, clampToStep(value, 3, 5, 1));
     }
 
+    /**
+     * Returns search results per page.
+     */
     public int getSearchResultsPerPage() {
         return getInt(Key.SEARCH_RESULTS_PER_PAGE);
     }
 
+    /**
+     * Updates search results per page.
+     */
     public void setSearchResultsPerPage(double value) {
         setInt(Key.SEARCH_RESULTS_PER_PAGE, clampToStep(value, 10, 100, 10));
     }
 
+    /**
+     * Returns whether search preserve last query.
+     */
     public boolean isSearchPreserveLastQuery() {
         return getBoolean(Key.SEARCH_PRESERVE_LAST_QUERY);
     }
 
+    /**
+     * Updates search preserve last query.
+     */
     public void setSearchPreserveLastQuery(boolean enabled) {
         setBoolean(Key.SEARCH_PRESERVE_LAST_QUERY, enabled);
     }
 
+    /**
+     * Returns whether search remember sort options.
+     */
     public boolean isSearchRememberSortOptions() {
         return getBoolean(Key.SEARCH_REMEMBER_SORT_OPTIONS);
     }
 
+    /**
+     * Updates search remember sort options.
+     */
     public void setSearchRememberSortOptions(boolean enabled) {
         setBoolean(Key.SEARCH_REMEMBER_SORT_OPTIONS, enabled);
         if (!enabled) {
@@ -279,16 +387,25 @@ public final class ClientSettings {
         }
     }
 
+    /**
+     * Returns search sort options.
+     */
     public SearchSortViewModel.SortOptions getSearchSortOptions() {
         return SearchSortViewModel.normalize(searchSortOptions);
     }
 
+    /**
+     * Updates search sort options.
+     */
     public void setSearchSortOptions(SearchSortViewModel.SortOptions options) {
         SearchSortViewModel.SortOptions normalized = SearchSortViewModel.normalize(options);
         searchSortOptions = normalized;
         persistSearchSortOptions(normalized);
     }
 
+    /**
+     * Clears search sort options.
+     */
     public void clearSearchSortOptions() {
         searchSortOptions = SearchSortViewModel.SortOptions.DEFAULT;
         if (!persistent) {
@@ -298,158 +415,275 @@ public final class ClientSettings {
         prefs.remove(PREF_SEARCH_SORT_DIRECTION);
     }
 
+    /**
+     * Returns whether media hover zoom.
+     */
     public boolean isMediaHoverZoom() {
         return getBoolean(Key.MEDIA_HOVER_ZOOM);
     }
 
+    /**
+     * Updates media hover zoom.
+     */
     public void setMediaHoverZoom(boolean enabled) {
         setBoolean(Key.MEDIA_HOVER_ZOOM, enabled);
     }
 
+    /**
+     * Returns media hover zoom scale.
+     */
     public double getMediaHoverZoomScale() {
         return getDouble(Key.MEDIA_HOVER_ZOOM_SCALE);
     }
 
+    /**
+     * Updates media hover zoom scale.
+     */
     public void setMediaHoverZoomScale(double value) {
         setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 1.50, 0.05));
     }
 
+    /**
+     * Returns whether media show download button.
+     */
     public boolean isMediaShowDownloadButton() {
         return getBoolean(Key.MEDIA_SHOW_DOWNLOAD_BUTTON);
     }
 
+    /**
+     * Updates media show download button.
+     */
     public void setMediaShowDownloadButton(boolean enabled) {
         setBoolean(Key.MEDIA_SHOW_DOWNLOAD_BUTTON, enabled);
     }
 
+    /**
+     * Returns whether media open preview on image click.
+     */
     public boolean isMediaOpenPreviewOnImageClick() {
         return getBoolean(Key.MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK);
     }
 
+    /**
+     * Updates media open preview on image click.
+     */
     public void setMediaOpenPreviewOnImageClick(boolean enabled) {
         setBoolean(Key.MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK, enabled);
     }
 
+    /**
+     * Returns whether chat send on enter.
+     */
     public boolean isChatSendOnEnter() {
         return getBoolean(Key.CHAT_SEND_ON_ENTER);
     }
 
+    /**
+     * Updates chat send on enter.
+     */
     public void setChatSendOnEnter(boolean enabled) {
         setBoolean(Key.CHAT_SEND_ON_ENTER, enabled);
     }
 
+    /**
+     * Returns whether chat auto scroll to latest.
+     */
     public boolean isChatAutoScrollToLatest() {
         return getBoolean(Key.CHAT_AUTO_SCROLL_TO_LATEST);
     }
 
+    /**
+     * Updates chat auto scroll to latest.
+     */
     public void setChatAutoScrollToLatest(boolean enabled) {
         setBoolean(Key.CHAT_AUTO_SCROLL_TO_LATEST, enabled);
     }
 
+    /**
+     * Returns whether chat show message timestamps.
+     */
     public boolean isChatShowMessageTimestamps() {
         return getBoolean(Key.CHAT_SHOW_MESSAGE_TIMESTAMPS);
     }
 
+    /**
+     * Updates chat show message timestamps.
+     */
     public void setChatShowMessageTimestamps(boolean enabled) {
         setBoolean(Key.CHAT_SHOW_MESSAGE_TIMESTAMPS, enabled);
     }
 
+    /**
+     * Returns whether chat use24 hour time.
+     */
     public boolean isChatUse24HourTime() {
         return getBoolean(Key.CHAT_USE_24_HOUR_TIME);
     }
 
+    /**
+     * Updates chat use24 hour time.
+     */
     public void setChatUse24HourTime(boolean enabled) {
         setBoolean(Key.CHAT_USE_24_HOUR_TIME, enabled);
     }
 
+    /**
+     * Returns whether notifications show unread badges.
+     */
     public boolean isNotificationsShowUnreadBadges() {
         return getBoolean(Key.NOTIFICATIONS_SHOW_UNREAD_BADGES);
     }
 
+    /**
+     * Updates notifications show unread badges.
+     */
     public void setNotificationsShowUnreadBadges(boolean enabled) {
         setBoolean(Key.NOTIFICATIONS_SHOW_UNREAD_BADGES, enabled);
     }
 
+    /**
+     * Returns notifications badge cap.
+     */
     public int getNotificationsBadgeCap() {
         return getInt(Key.NOTIFICATIONS_BADGE_CAP);
     }
 
+    /**
+     * Updates notifications badge cap.
+     */
     public void setNotificationsBadgeCap(double value) {
         setInt(Key.NOTIFICATIONS_BADGE_CAP, clampToStep(value, 10, 100, 10));
     }
 
+    /**
+     * Returns whether notifications show runtime popups.
+     */
     public boolean isNotificationsShowRuntimePopups() {
         return getBoolean(Key.NOTIFICATIONS_SHOW_RUNTIME_POPUPS);
     }
 
+    /**
+     * Updates notifications show runtime popups.
+     */
     public void setNotificationsShowRuntimePopups(boolean enabled) {
         setBoolean(Key.NOTIFICATIONS_SHOW_RUNTIME_POPUPS, enabled);
     }
 
+    /**
+     * Returns whether notifications show os notifications.
+     */
     public boolean isNotificationsShowOsNotifications() {
         return getBoolean(Key.NOTIFICATIONS_SHOW_OS_NOTIFICATIONS);
     }
 
+    /**
+     * Updates notifications show os notifications.
+     */
     public void setNotificationsShowOsNotifications(boolean enabled) {
         setBoolean(Key.NOTIFICATIONS_SHOW_OS_NOTIFICATIONS, enabled);
     }
 
+    /**
+     * Returns whether privacy blur on focus loss.
+     */
     public boolean isPrivacyBlurOnFocusLoss() {
         return getBoolean(Key.PRIVACY_BLUR_ON_FOCUS_LOSS);
     }
 
+    /**
+     * Updates privacy blur on focus loss.
+     */
     public void setPrivacyBlurOnFocusLoss(boolean enabled) {
         setBoolean(Key.PRIVACY_BLUR_ON_FOCUS_LOSS, enabled);
     }
 
+    /**
+     * Returns privacy blur strength.
+     */
     public double getPrivacyBlurStrength() {
         return getDouble(Key.PRIVACY_BLUR_STRENGTH);
     }
 
+    /**
+     * Updates privacy blur strength.
+     */
     public void setPrivacyBlurStrength(double value) {
         setDouble(Key.PRIVACY_BLUR_STRENGTH, clampDecimal(value, 1.0, 10.0, 1.0));
     }
 
+    /**
+     * Returns whether privacy confirm attachment open.
+     */
     public boolean isPrivacyConfirmAttachmentOpen() {
         return getBoolean(Key.PRIVACY_CONFIRM_ATTACHMENT_OPEN);
     }
 
+    /**
+     * Updates privacy confirm attachment open.
+     */
     public void setPrivacyConfirmAttachmentOpen(boolean enabled) {
         setBoolean(Key.PRIVACY_CONFIRM_ATTACHMENT_OPEN, enabled);
     }
 
+    /**
+     * Returns whether privacy blur on startup until unlock.
+     */
     public boolean isPrivacyBlurOnStartupUntilUnlock() {
         return getBoolean(Key.PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK);
     }
 
+    /**
+     * Updates privacy blur on startup until unlock.
+     */
     public void setPrivacyBlurOnStartupUntilUnlock(boolean enabled) {
         setBoolean(Key.PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK, enabled);
     }
 
+    /**
+     * Returns whether privacy confirm external link open.
+     */
     public boolean isPrivacyConfirmExternalLinkOpen() {
         return getBoolean(Key.PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN);
     }
 
+    /**
+     * Updates privacy confirm external link open.
+     */
     public void setPrivacyConfirmExternalLinkOpen(boolean enabled) {
         setBoolean(Key.PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN, enabled);
     }
 
+    /**
+     * Returns whether privacy show notification message preview.
+     */
     public boolean isPrivacyShowNotificationMessagePreview() {
         return getBoolean(Key.PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW);
     }
 
+    /**
+     * Updates privacy show notification message preview.
+     */
     public void setPrivacyShowNotificationMessagePreview(boolean enabled) {
         setBoolean(Key.PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW, enabled);
     }
 
+    /**
+     * Returns whether privacy hide presence indicators.
+     */
     public boolean isPrivacyHidePresenceIndicators() {
         return getBoolean(Key.PRIVACY_HIDE_PRESENCE_INDICATORS);
     }
 
+    /**
+     * Updates privacy hide presence indicators.
+     */
     public void setPrivacyHidePresenceIndicators(boolean enabled) {
         setBoolean(Key.PRIVACY_HIDE_PRESENCE_INDICATORS, enabled);
     }
 
+    /**
+     * Handles read window state.
+     */
     public WindowState readWindowState() {
         if (!persistent) {
             return null;
@@ -465,6 +699,9 @@ public final class ClientSettings {
         return new WindowState(x, y, width, height, maximized);
     }
 
+    /**
+     * Handles write window state.
+     */
     public void writeWindowState(double x, double y, double width, double height, boolean maximized) {
         if (!persistent) {
             return;
@@ -476,6 +713,9 @@ public final class ClientSettings {
         prefs.putBoolean("window.maximized", maximized);
     }
 
+    /**
+     * Returns last active tab.
+     */
     public String getLastActiveTab() {
         if (!persistent) {
             return "messages";
@@ -484,6 +724,9 @@ public final class ClientSettings {
         return normalizeTab(stored);
     }
 
+    /**
+     * Updates last active tab.
+     */
     public void setLastActiveTab(String tab) {
         if (!persistent) {
             return;
@@ -491,6 +734,9 @@ public final class ClientSettings {
         prefs.put("main.last_active_tab", normalizeTab(tab));
     }
 
+    /**
+     * Normalizes tab.
+     */
     private static String normalizeTab(String tab) {
         if (Objects.equals("search", tab)) {
             return "search";
@@ -498,6 +744,9 @@ public final class ClientSettings {
         return "messages";
     }
 
+    /**
+     * Loads search sort options.
+     */
     private SearchSortViewModel.SortOptions loadSearchSortOptions() {
         if (!persistent) {
             return SearchSortViewModel.SortOptions.DEFAULT;
@@ -517,6 +766,9 @@ public final class ClientSettings {
         return new SearchSortViewModel.SortOptions(field, direction);
     }
 
+    /**
+     * Persists search sort options.
+     */
     private void persistSearchSortOptions(SearchSortViewModel.SortOptions options) {
         if (!persistent) {
             return;
@@ -526,6 +778,9 @@ public final class ClientSettings {
         prefs.put(PREF_SEARCH_SORT_DIRECTION, safe.direction().name());
     }
 
+    /**
+     * Parses sort field.
+     */
     private static SearchSortViewModel.Field parseSortField(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -537,6 +792,9 @@ public final class ClientSettings {
         }
     }
 
+    /**
+     * Parses sort direction.
+     */
     private static SearchSortViewModel.Direction parseSortDirection(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -548,33 +806,54 @@ public final class ClientSettings {
         }
     }
 
+    /**
+     * Returns boolean.
+     */
     private boolean getBoolean(Key key) {
         Object value = values.get(key);
         return value instanceof Boolean b ? b : (Boolean) key.defaultValue();
     }
 
+    /**
+     * Returns int.
+     */
     private int getInt(Key key) {
         Object value = values.get(key);
         return value instanceof Integer i ? i : (Integer) key.defaultValue();
     }
 
+    /**
+     * Returns double.
+     */
     private double getDouble(Key key) {
         Object value = values.get(key);
         return value instanceof Double d ? d : (Double) key.defaultValue();
     }
 
+    /**
+     * Updates boolean.
+     */
     private void setBoolean(Key key, boolean value) {
         setValue(key, value);
     }
 
+    /**
+     * Updates int.
+     */
     private void setInt(Key key, int value) {
         setValue(key, value);
     }
 
+    /**
+     * Updates double.
+     */
     private void setDouble(Key key, double value) {
         setValue(key, value);
     }
 
+    /**
+     * Updates value.
+     */
     private void setValue(Key key, Object value) {
         Object previous = values.put(key, value);
         if (Objects.equals(previous, value)) {
@@ -586,6 +865,9 @@ public final class ClientSettings {
         notifyListeners(key);
     }
 
+    /**
+     * Refreshes restart dirty flag.
+     */
     private void refreshRestartDirtyFlag() {
         for (Key key : Key.values()) {
             if (key.applyMode() != ApplyMode.RESTART_REQUIRED) {
@@ -599,6 +881,9 @@ public final class ClientSettings {
         restartRequiredDirty = false;
     }
 
+    /**
+     * Loads value.
+     */
     private Object loadValue(Key key) {
         if (!persistent) {
             return key.defaultValue();
@@ -617,6 +902,9 @@ public final class ClientSettings {
         return defaultValue;
     }
 
+    /**
+     * Persists value.
+     */
     private void persistValue(Key key, Object value) {
         if (!persistent) {
             return;
@@ -635,6 +923,9 @@ public final class ClientSettings {
         }
     }
 
+    /**
+     * Notifies listeners.
+     */
     private void notifyListeners(Key key) {
         for (Listener listener : listeners) {
             try {
@@ -645,6 +936,9 @@ public final class ClientSettings {
         }
     }
 
+    /**
+     * Handles clamp to step.
+     */
     private static int clampToStep(double value, int min, int max, int step) {
         int rounded = (int) Math.round(value);
         int clamped = Math.clamp(rounded, min, max);
@@ -653,6 +947,9 @@ public final class ClientSettings {
         return Math.clamp(result, min, max);
     }
 
+    /**
+     * Handles clamp decimal.
+     */
     private static double clampDecimal(double value, double min, double max, double step) {
         double clamped = Math.clamp(value, min, max);
         double steps = Math.round((clamped - min) / step);
@@ -660,6 +957,9 @@ public final class ClientSettings {
         return Math.clamp(result, min, max);
     }
 
+    /**
+     * Handles sanitize node.
+     */
     private static String sanitizeNode(String userId) {
         String sanitized = userId.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
         if (sanitized.isBlank()) {
