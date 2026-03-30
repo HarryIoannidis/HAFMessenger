@@ -4,7 +4,6 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.requests.AddContactRequest;
-import com.haf.shared.requests.PresenceVisibilityRequest;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.utils.JsonCodec;
@@ -74,16 +73,6 @@ public class MainViewModel {
          * @return future containing backend response payload
          */
         CompletableFuture<String> removeContact(String userId);
-
-        /**
-         * Synchronizes hide-presence preference for current authenticated user.
-         *
-         * @param hidePresenceIndicators desired hidden-presence state
-         * @return future containing backend response payload
-         */
-        default CompletableFuture<String> syncPresenceVisibility(boolean hidePresenceIndicators) {
-            return CompletableFuture.completedFuture("{}");
-        }
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainViewModel.class);
@@ -165,22 +154,6 @@ public class MainViewModel {
                 return NetworkSession.get().deleteAuthenticated(path);
             }
 
-            /**
-             * Synchronizes hide-presence preference with backend visibility policy.
-             *
-             * @param hidePresenceIndicators desired hidden-presence state
-             * @return future with backend response body
-             */
-            @Override
-            public CompletableFuture<String> syncPresenceVisibility(boolean hidePresenceIndicators) {
-                if (NetworkSession.get() == null) {
-                    return CompletableFuture.completedFuture("{}");
-                }
-
-                PresenceVisibilityRequest request = new PresenceVisibilityRequest(hidePresenceIndicators);
-                String body = JsonCodec.toJson(request);
-                return NetworkSession.get().postAuthenticated("/api/v1/presence/visibility", body);
-            }
         });
     }
 
@@ -274,7 +247,16 @@ public class MainViewModel {
      * Refreshes contacts list from backend snapshot.
      */
     public void fetchContacts() {
-        contactsGateway.fetchContacts()
+        fetchContactsAsync();
+    }
+
+    /**
+     * Refreshes contacts list from backend snapshot and returns completion future.
+     *
+     * @return completion future for the fetch/apply pipeline
+     */
+    public CompletableFuture<Void> fetchContactsAsync() {
+        return contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
                     LOGGER.error("Failed to load contacts", ex);
@@ -283,19 +265,6 @@ public class MainViewModel {
                             "Contacts could not be loaded",
                             "Failed to load contacts from server. " + resolveErrorMessage(ex, "Please retry."),
                             this::fetchContacts);
-                    return null;
-                });
-    }
-
-    /**
-     * Synchronizes hide-presence preference with backend visibility projection.
-     *
-     * @param hidePresenceIndicators desired hidden-presence state
-     */
-    public void syncPresenceVisibility(boolean hidePresenceIndicators) {
-        contactsGateway.syncPresenceVisibility(hidePresenceIndicators)
-                .exceptionally(ex -> {
-                    LOGGER.warn("Failed to sync hide-presence setting", ex);
                     return null;
                 });
     }
@@ -468,19 +437,6 @@ public class MainViewModel {
      * @return updated contact, or {@code null} when contact does not exist
      */
     public ContactInfo updateContactPresence(String userId, boolean active) {
-        return updateContactPresence(userId, active, false);
-    }
-
-    /**
-     * Updates contact presence visibility state and records a presence signal
-     * marker.
-     *
-     * @param userId contact id
-     * @param active visible presence flag
-     * @param hidden hidden-presence flag
-     * @return updated contact, or {@code null} when contact does not exist
-     */
-    public ContactInfo updateContactPresence(String userId, boolean active, boolean hidden) {
         int index = findContactIndex(userId);
         if (index < 0) {
             return null;
@@ -496,7 +452,6 @@ public class MainViewModel {
                 existing.telephone(),
                 existing.joinedDate(),
                 active,
-                hidden,
                 existing.unreadCount());
         contacts.set(index, updated);
         presenceSignalByUser.put(userId, presenceSignalCounter.incrementAndGet());
@@ -602,7 +557,6 @@ public class MainViewModel {
      * @param telephone  contact telephone
      * @param joinedDate joined-date text
      * @param active     visible presence flag
-     * @param hidden     hidden-presence flag
      */
     private void upsertContact(
             String userId,
@@ -612,8 +566,7 @@ public class MainViewModel {
             String email,
             String telephone,
             String joinedDate,
-            boolean active,
-            boolean hidden) {
+            boolean active) {
         int index = findContactIndex(userId);
         int unreadCount = index >= 0 ? contacts.get(index).unreadCount() : 0;
 
@@ -626,7 +579,6 @@ public class MainViewModel {
                 telephone,
                 joinedDate,
                 active,
-                hidden,
                 unreadCount);
         if (index >= 0) {
             contacts.set(index, contact);
@@ -672,8 +624,7 @@ public class MainViewModel {
                         contact.getEmail(),
                         contact.getTelephone(),
                         contact.getJoinedDate(),
-                        contact.isActive(),
-                        contact.isPresenceHidden());
+                        contact.isActive());
             }
         });
     }

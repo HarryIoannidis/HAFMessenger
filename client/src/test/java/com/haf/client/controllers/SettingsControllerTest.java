@@ -15,7 +15,6 @@ import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -193,7 +192,7 @@ class SettingsControllerTest {
         assertNotNull(instantToggle);
         assertNotNull(requireEnterToggle);
         assertFalse(instantToggle.isSelected());
-        assertFalse(requireEnterToggle.isSelected());
+        assertTrue(requireEnterToggle.isSelected());
 
         onFxThread(() -> {
             requireEnterToggle.setSelected(true);
@@ -392,7 +391,7 @@ class SettingsControllerTest {
     }
 
     @Test
-    void search_toggle_order_mutual_exclusion_and_dependent_slider_row_states_are_wired() throws IOException {
+    void search_toggle_order_and_dependent_slider_row_states_are_wired() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         int instantRowIndex = source.indexOf("\"searchInstantOnTypeRow\"");
@@ -412,6 +411,12 @@ class SettingsControllerTest {
                 "wireDependentSliderRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
         assertTrue(source.contains(
                 "wireDependentCheckboxRowState(\"chatShowMessageTimestampsCheck\", \"chatUse24HourTimeRow\");"));
+    }
+
+    @Test
+    void settings_controller_ui_components_are_wired_and_styled() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
         assertTrue(source.contains(
                 "wireSwitch(\"notificationsShowOsNotificationsRow\", \"notificationsShowOsNotificationsToggle\","));
         assertTrue(source.contains("SettingsRowBuilder.buildSwitchRow("));
@@ -428,6 +433,12 @@ class SettingsControllerTest {
                 .contains("wireSlider(\"searchMinimumQueryLengthSlider\", settings::setSearchMinimumQueryLength);"));
         assertTrue(source
                 .contains("wireInvertedCheckbox(\"searchAutoClearOnTabExitRow\", \"searchAutoClearOnTabExitCheck\","));
+    }
+
+    @Test
+    void privacy_safety_and_presence_sections_are_wired() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
         assertTrue(source.contains(
                 "wireSwitch(\"privacyBlurOnStartupUntilUnlockRow\", \"privacyBlurOnStartupUntilUnlockToggle\","));
         assertTrue(source.contains(

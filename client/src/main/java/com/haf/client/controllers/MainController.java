@@ -67,6 +67,7 @@ public class MainController implements SearchController.ContactActions {
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HELP_CENTER_URL = "https://localhost:8443";
+    private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
             new DesktopNotificationService();
 
@@ -203,6 +204,7 @@ public class MainController implements SearchController.ContactActions {
      */
     @FXML
     public void initialize() {
+        hideMainStageUntilInitialLoadCompletes();
         contentLoader = new MainContentLoader(contentPane, this, this::handleViewLoadFailure, settings);
         bindViewModel();
         bindSelectedContactProfileSync();
@@ -223,23 +225,7 @@ public class MainController implements SearchController.ContactActions {
         registerIncomingMessageListener();
         startMessageReceiving();
 
-        // Trigger pre-loading immediately
-        contentLoader.triggerPreloading();
-        scheduleSettingsPopupPreload();
-
-        // Fetch contacts from server
-        viewModel.fetchContacts();
-
-        // Restore tab based on settings policy.
-        if (settings.isGeneralRestoreLastTab() && "search".equals(settings.getLastActiveTab())) {
-            activateSearchTab();
-        } else {
-            activateMessagesTab();
-        }
-
-        if (startupBlurLocked) {
-            scheduleStartupBlurUnlockPopupAfterMainRender();
-        }
+        beginInitialMainLoadPipeline();
     }
 
     /**
@@ -628,14 +614,13 @@ public class MainController implements SearchController.ContactActions {
         profileNameText.setText(contact.name());
         String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
         String resolvedActivenessLabel = settings.isPrivacyHidePresenceIndicators()
-                ? ContactInfo.hiddenActivityLabel()
+                ? HIDDEN_ACTIVITY_LABEL
                 : activenessLabel;
         profileActivenessText.setText(resolvedActivenessLabel);
         boolean hasActivenessLabel = !resolvedActivenessLabel.isEmpty();
         profileActivenessText.setVisible(hasActivenessLabel);
         profileActivenessText.setManaged(hasActivenessLabel);
-        boolean showActivenessCircle = hasActivenessLabel
-                && !ContactInfo.isHiddenActivityLabel(resolvedActivenessLabel);
+        boolean showActivenessCircle = hasActivenessLabel && !settings.isPrivacyHidePresenceIndicators();
         profileActivenessCircle.setVisible(showActivenessCircle);
         profileActivenessCircle.setManaged(showActivenessCircle);
         if (showActivenessCircle) {
@@ -740,10 +725,75 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Preloads the Settings popup shortly after main-view startup so first open
-     * is instant.
+     * Starts initial main-screen loading work and reveals the main stage only after
+     * preload completion.
      */
-    private void scheduleSettingsPopupPreload() {
+    private void beginInitialMainLoadPipeline() {
+        CompletableFuture<Void> preloadViewsFuture = contentLoader.preloadAllViewsAsync();
+        CompletableFuture<Void> fetchContactsFuture = viewModel.fetchContactsAsync();
+        CompletableFuture<Void> preloadSettingsPopupFuture = preloadSettingsPopupAsync();
+        CompletableFuture<Void> activateInitialTabFuture = preloadViewsFuture
+                .handle((unused, throwable) -> null)
+                .thenCompose(ignored -> runOnFxThreadAsync(this::activateInitialTabForStartup));
+
+        CompletableFuture.allOf(preloadViewsFuture, fetchContactsFuture, preloadSettingsPopupFuture, activateInitialTabFuture)
+                .whenComplete((unused, throwable) -> Platform.runLater(() -> {
+                    if (throwable != null) {
+                        LOGGER.warn(
+                                "Main initial load completed with failures; revealing UI.",
+                                throwable);
+                    }
+                    if (startupBlurLocked) {
+                        scheduleStartupBlurUnlockPopupAfterMainRender();
+                    }
+                    revealMainStageAfterInitialLoad();
+                }));
+    }
+
+    /**
+     * Activates the initial tab after preloaded views are ready so first reveal
+     * shows fully initialized content.
+     */
+    private void activateInitialTabForStartup() {
+        if (settings.isGeneralRestoreLastTab() && "search".equals(settings.getLastActiveTab())) {
+            activateSearchTab();
+            return;
+        }
+        activateMessagesTab();
+    }
+
+    /**
+     * Runs an action on the JavaFX thread and completes once the action has
+     * finished.
+     *
+     * @param action UI action to execute
+     * @return future that completes when action execution completes
+     */
+    private static CompletableFuture<Void> runOnFxThreadAsync(Runnable action) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Runnable wrapped = () -> {
+            try {
+                action.run();
+                future.complete(null);
+            } catch (Throwable ex) {
+                future.completeExceptionally(ex);
+            }
+        };
+        if (Platform.isFxApplicationThread()) {
+            wrapped.run();
+        } else {
+            Platform.runLater(wrapped);
+        }
+        return future;
+    }
+
+    /**
+     * Preloads the Settings popup and completes regardless of preload outcome.
+     *
+     * @return completion future for settings-popup preload
+     */
+    private CompletableFuture<Void> preloadSettingsPopupAsync() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
         Platform.runLater(() -> {
             try {
                 ViewRouter.preloadPopup(
@@ -755,9 +805,38 @@ public class MainController implements SearchController.ContactActions {
                             controller.setRestartRequestHandler(this::requestAppRestart);
                         });
             } catch (RuntimeException ex) {
-                LOGGER.debug( "Settings popup preload skipped: {}", ex.getMessage());
+                LOGGER.debug("Settings popup preload skipped: {}", ex.getMessage());
+            } finally {
+                future.complete(null);
             }
         });
+        return future;
+    }
+
+    /**
+     * Makes the main stage transparent until initial preload work finishes.
+     */
+    private void hideMainStageUntilInitialLoadCompletes() {
+        if (rootContainer != null) {
+            rootContainer.setVisible(false);
+        }
+        Stage stage = ViewRouter.getMainStage();
+        if (stage != null) {
+            stage.setOpacity(0.0);
+        }
+    }
+
+    /**
+     * Reveals the main stage after initial preload work has completed.
+     */
+    private void revealMainStageAfterInitialLoad() {
+        if (rootContainer != null) {
+            rootContainer.setVisible(true);
+        }
+        Stage stage = ViewRouter.getMainStage();
+        if (stage != null) {
+            stage.setOpacity(1.0);
+        }
     }
 
     /**
@@ -1218,7 +1297,6 @@ public class MainController implements SearchController.ContactActions {
         applySearchFilterSettings();
         applySearchSortMemorySettings();
         applyContactCellSettings();
-        syncPresenceVisibilitySetting();
         syncStartupBlurLockFromSetting(false);
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
@@ -1233,10 +1311,7 @@ public class MainController implements SearchController.ContactActions {
                 case SEARCH_REMEMBER_SORT_OPTIONS -> applySearchSortMemorySettings();
                 case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP ->
                         applyContactCellSettings();
-                case PRIVACY_HIDE_PRESENCE_INDICATORS -> {
-                    applyContactCellSettings();
-                    syncPresenceVisibilitySetting();
-                }
+                case PRIVACY_HIDE_PRESENCE_INDICATORS -> applyContactCellSettings();
                 case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
                     Stage stage = ViewRouter.getMainStage();
                     applyPrivacyBlur(stage == null || stage.isFocused());
@@ -1288,13 +1363,6 @@ public class MainController implements SearchController.ContactActions {
             contactsList.refresh();
         }
         refreshProfilePanelForSelectedContact();
-    }
-
-    /**
-     * Synchronizes hide-presence preference with backend visibility policy.
-     */
-    private void syncPresenceVisibilitySetting() {
-        viewModel.syncPresenceVisibility(settings.isPrivacyHidePresenceIndicators());
     }
 
     /**
@@ -1930,12 +1998,7 @@ public class MainController implements SearchController.ContactActions {
         mainSessionService.registerPresenceListener(new MessagesViewModel.PresenceListener() {
             @Override
             public void onPresenceUpdate(String userId, boolean active) {
-                applyPresenceUpdate(userId, active, false);
-            }
-
-            @Override
-            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
-                applyPresenceUpdate(userId, active, hidden);
+                applyPresenceUpdate(userId, active);
             }
         });
     }
@@ -1966,10 +2029,9 @@ public class MainController implements SearchController.ContactActions {
      *
      * @param userId user id whose presence changed
      * @param active visible activity flag
-     * @param hidden hidden-presence flag
      */
-    private void applyPresenceUpdate(String userId, boolean active, boolean hidden) {
-        Platform.runLater(() -> updateContactPresence(userId, active, hidden));
+    private void applyPresenceUpdate(String userId, boolean active) {
+        Platform.runLater(() -> updateContactPresence(userId, active));
     }
 
     /**
@@ -1999,10 +2061,9 @@ public class MainController implements SearchController.ContactActions {
      *
      * @param userId user id whose presence changed
      * @param active visible activity flag
-     * @param hidden hidden-presence flag
      */
-    private void updateContactPresence(String userId, boolean active, boolean hidden) {
-        ContactInfo updated = viewModel.updateContactPresence(userId, active, hidden);
+    private void updateContactPresence(String userId, boolean active) {
+        ContactInfo updated = viewModel.updateContactPresence(userId, active);
         if (updated == null) {
             return;
         }

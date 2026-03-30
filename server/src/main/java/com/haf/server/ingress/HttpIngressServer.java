@@ -34,7 +34,6 @@ import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
-import com.haf.shared.requests.PresenceVisibilityRequest;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
@@ -95,7 +94,6 @@ public final class HttpIngressServer {
     private static final String USERS_PATH = "/api/v1/users";
     private static final String SEARCH_PATH = "/api/v1/search";
     private static final String CONTACTS_PATH = "/api/v1/contacts";
-    private static final String PRESENCE_VISIBILITY_PATH = "/api/v1/presence/visibility";
     private static final String HEALTH_PATH = "/api/v1/health";
     private static final String ADMIN_KEY_PATH = "/api/v1/config/admin-key";
     private static final String MESSAGING_CONFIG_PATH = "/api/v1/config/messaging";
@@ -155,15 +153,14 @@ public final class HttpIngressServer {
             return;
         }
 
-        boolean hidden = presenceRegistry.isPresenceHidden(contactId);
-        boolean active = presenceRegistry.isVisibleActive(contactId);
-        String payload = presenceJson(contactId, active, hidden);
+        boolean active = presenceRegistry.isActive(contactId);
+        String payload = presenceJson(contactId, active);
         for (WebSocket connection : presenceRegistry.getActiveConnections(callerId)) {
             try {
                 connection.send(payload);
             } catch (Exception ex) {
                 auditLogger.logError("contacts_presence_push_error", requestId, callerId, ex,
-                        Map.of("contactId", contactId, "active", active, "hidden", hidden));
+                        Map.of("contactId", contactId, "active", active));
             }
         }
     }
@@ -190,9 +187,8 @@ public final class HttpIngressServer {
             return;
         }
 
-        boolean hidden = presenceRegistry.isPresenceHidden(userId);
-        boolean active = presenceRegistry.isVisibleActive(userId);
-        String payload = presenceJson(userId, active, hidden);
+        boolean active = presenceRegistry.isActive(userId);
+        String payload = presenceJson(userId, active);
 
         try {
             List<String> watcherUserIds = contactDAO.getWatcherUserIds(userId);
@@ -205,7 +201,7 @@ public final class HttpIngressServer {
                         connection.send(payload);
                     } catch (Exception ex) {
                         auditLogger.logError("presence_visibility_push_error", requestId, watcherUserId, ex,
-                                Map.of("userId", userId, "active", active, "hidden", hidden));
+                                Map.of("userId", userId, "active", active));
                     }
                 }
             }
@@ -222,20 +218,7 @@ public final class HttpIngressServer {
      * @return serialized JSON payload
      */
     static String presenceJson(String userId, boolean active) {
-        return presenceJson(userId, active, false);
-    }
-
-    /**
-     * Builds compact presence JSON payload with hidden-presence metadata.
-     *
-     * @param userId user id to include
-     * @param active active flag value
-     * @param hidden hidden-presence flag value
-     * @return serialized JSON payload
-     */
-    static String presenceJson(String userId, boolean active, boolean hidden) {
-        return "{\"type\":\"presence\",\"userId\":\"" + escapeJson(userId) + "\",\"active\":" + active
-                + ",\"hidden\":" + hidden + "}";
+        return "{\"type\":\"presence\",\"userId\":\"" + escapeJson(userId) + "\",\"active\":" + active + "}";
     }
 
     /**
@@ -339,7 +322,6 @@ public final class HttpIngressServer {
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext(SEARCH_PATH, new SearchHandler());
         httpsServer.createContext(CONTACTS_PATH, new ContactsHandler());
-        httpsServer.createContext(PRESENCE_VISIBILITY_PATH, new PresenceVisibilityHandler());
         httpsServer.createContext(HEALTH_PATH, new HealthHandler());
         httpsServer.createContext(ADMIN_KEY_PATH, new AdminKeyHandler());
         httpsServer.createContext(MESSAGING_CONFIG_PATH, new MessagingConfigHandler());
@@ -754,9 +736,6 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                // Reset session-scoped presence visibility state for fresh login.
-                presenceRegistry.clearPresenceHidden(user.userId());
-
                 // Create session
                 String sessionId = sessionDAO.createSession(user.userId());
 
@@ -889,7 +868,6 @@ public final class HttpIngressServer {
 
                 sessionDAO.revokeSession(sessionId);
                 closeActivePresenceConnections(callerId, requestId);
-                presenceRegistry.clearPresenceHidden(callerId);
                 sendPlain(exchange, 200, "{\"success\":true}");
             } catch (Exception ex) {
                 auditLogger.logError("logout_error", requestId, null, ex);
@@ -1545,8 +1523,7 @@ public final class HttpIngressServer {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResultDTO> results = records.stream()
                     .map(r -> {
-                        boolean hidden = presenceRegistry.isPresenceHidden(r.userId());
-                        boolean active = presenceRegistry.isVisibleActive(r.userId());
+                        boolean active = presenceRegistry.isActive(r.userId());
                         return new UserSearchResultDTO(
                                 r.userId(),
                                 r.fullName(),
@@ -1555,8 +1532,7 @@ public final class HttpIngressServer {
                                 r.rank(),
                                 r.telephone(),
                                 r.joinedDate(),
-                                active,
-                                hidden);
+                                active);
                     })
                     .toList();
             sendPlain(exchange, 200, JsonCodec.toJson(ContactsResponse.success(results)));
@@ -1646,116 +1622,6 @@ public final class HttpIngressServer {
 
         /**
          * Sends JSON response for contacts endpoint.
-         *
-         * @param exchange HTTP exchange
-         * @param status   HTTP status code
-         * @param body     JSON body
-         * @throws IOException when response write fails
-         */
-        private void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
-            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
-            exchange.sendResponseHeaders(status, payload.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(payload);
-            }
-        }
-    }
-
-    /**
-     * Handles presence-visibility requests: {@code POST /api/v1/presence/visibility}.
-     */
-    private final class PresenceVisibilityHandler implements HttpHandler {
-
-        /**
-         * Handles authenticated updates for whether the caller hides presence.
-         *
-         * @param exchange HTTP exchange
-         * @throws IOException when response writing fails
-         */
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
-            applySecurityHeaders(exchange.getResponseHeaders());
-            String callerId = null;
-
-            try {
-                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
-                    sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
-                    return;
-                }
-
-                String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-                if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
-                    return;
-                }
-
-                String sessionId = authHeader.substring(BEARER_PREFIX.length());
-                callerId = sessionDAO.getUserIdForSession(sessionId);
-                if (callerId == null) {
-                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
-                    return;
-                }
-
-                PresenceVisibilityRequest request;
-                try {
-                    String body = readBody(exchange.getRequestBody());
-                    request = JsonCodec.fromJson(body, PresenceVisibilityRequest.class);
-                } catch (Exception ex) {
-                    sendPlain(exchange, 400, JSON_ERROR_PREFIX + "invalid request body" + JSON_ERROR_SUFFIX);
-                    return;
-                }
-
-                boolean hidePresenceIndicators = request != null && request.isHidePresenceIndicators();
-                presenceRegistry.setPresenceHidden(callerId, hidePresenceIndicators);
-                pushPresenceToWatchers(presenceRegistry, contactDAO, auditLogger, requestId, callerId);
-                sendPlain(exchange, 200, "{}");
-            } catch (Exception ex) {
-                auditLogger.logError("presence_visibility_error", requestId, callerId, ex);
-                sendPlain(exchange, 500, JSON_ERROR_PREFIX + INTERNAL_SERVER_ERROR + JSON_ERROR_SUFFIX);
-            } finally {
-                exchange.close();
-            }
-        }
-
-        /**
-         * Reads request body with hard byte-limit enforcement.
-         *
-         * @param body request body stream
-         * @return UTF-8 decoded body text
-         * @throws IOException when read fails or body exceeds configured limit
-         */
-        private String readBody(InputStream body) throws IOException {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[4096];
-            int read;
-            int total = 0;
-            while ((read = body.read(chunk)) != -1) {
-                total += read;
-                if (total > MAX_BODY_BYTES) {
-                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
-                }
-                buffer.write(chunk, 0, read);
-            }
-            return buffer.toString(StandardCharsets.UTF_8);
-        }
-
-        /**
-         * Applies baseline security headers for presence-visibility responses.
-         *
-         * @param headers response headers
-         */
-        private void applySecurityHeaders(Headers headers) {
-            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
-            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
-            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
-            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
-        }
-
-        /**
-         * Sends JSON response for presence-visibility endpoint.
          *
          * @param exchange HTTP exchange
          * @param status   HTTP status code

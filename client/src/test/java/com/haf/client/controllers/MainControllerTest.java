@@ -291,12 +291,15 @@ class MainControllerTest {
     }
 
     @Test
-    void hide_presence_setting_shows_hidden_activity_and_syncs_visibility_policy() throws IOException {
+    void hide_presence_setting_is_applied_locally_on_contact_cells_and_profile_pane() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("ContactInfo.hiddenActivityLabel()"));
-        assertTrue(source.contains("syncPresenceVisibilitySetting();"));
-        assertTrue(source.contains("viewModel.syncPresenceVisibility(settings.isPrivacyHidePresenceIndicators())"));
+        assertTrue(source.contains("ContactCell.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
+        assertTrue(source.contains("private static final String HIDDEN_ACTIVITY_LABEL = \"Hidden Activity\";"));
+        assertTrue(source.contains("settings.isPrivacyHidePresenceIndicators()\n"
+                + "                ? HIDDEN_ACTIVITY_LABEL\n"
+                + "                : activenessLabel"));
+        assertTrue(source.contains("hasActivenessLabel && !settings.isPrivacyHidePresenceIndicators()"));
     }
 
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {

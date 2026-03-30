@@ -34,7 +34,7 @@ public final class ClientSettings {
 
         SEARCH_INSTANT_ON_TYPE("search.instant_on_type", false, ApplyMode.IMMEDIATE),
         SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH("search.auto_open_filter_on_first_search", true, ApplyMode.IMMEDIATE),
-        SEARCH_REQUIRE_ENTER_TO_SEARCH("search.require_enter_to_search", false, ApplyMode.IMMEDIATE),
+        SEARCH_REQUIRE_ENTER_TO_SEARCH("search.require_enter_to_search", true, ApplyMode.IMMEDIATE),
         SEARCH_MINIMUM_QUERY_LENGTH("search.minimum_query_length", 3, ApplyMode.IMMEDIATE),
         SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
         SEARCH_RESULTS_PER_PAGE("search.results_per_page", 20, ApplyMode.IMMEDIATE),

@@ -366,11 +366,6 @@ public class ContactCell extends ListCell<ContactInfo> {
             return;
         }
         String activenessLabel = normalizeActivenessLabel(contact.activenessLabel());
-        if (ContactInfo.isHiddenActivityLabel(activenessLabel)) {
-            activenessCircle.setVisible(false);
-            activenessCircle.setManaged(false);
-            return;
-        }
         boolean hasActivenessLabel = !activenessLabel.isEmpty();
         activenessCircle.setVisible(hasActivenessLabel);
         activenessCircle.setManaged(hasActivenessLabel);

@@ -287,9 +287,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
                 return;
             }
 
-            boolean hidden = presenceRegistry.isPresenceHidden(userId);
-            boolean active = presenceRegistry.isVisibleActive(userId);
-            String payload = presenceJson(userId, active, hidden);
+            boolean active = presenceRegistry.isActive(userId);
+            String payload = presenceJson(userId, active);
             for (String watcherUserId : watcherUserIds) {
                 Set<WebSocket> watcherConnections = presenceRegistry.getActiveConnections(watcherUserId);
                 for (WebSocket watcherConnection : watcherConnections) {
@@ -334,9 +333,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
                     continue;
                 }
                 String contactId = contact.userId();
-                boolean hidden = presenceRegistry.isPresenceHidden(contactId);
-                boolean active = presenceRegistry.isVisibleActive(contactId);
-                conn.send(presenceJson(contactId, active, hidden));
+                boolean active = presenceRegistry.isActive(contactId);
+                conn.send(presenceJson(contactId, active));
             }
         } catch (Exception ex) {
             auditLogger.logError("ws_presence_snapshot_error", null, userId, ex);
@@ -358,12 +356,10 @@ public final class WebSocketIngressServer extends WebSocketServer {
      *
      * @param userId user id included in payload
      * @param active presence state flag
-     * @param hidden hidden-presence flag
      * @return compact JSON payload string
      */
-    private String presenceJson(String userId, boolean active, boolean hidden) {
-        return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active
-                + ",\"hidden\":" + hidden + "}";
+    private String presenceJson(String userId, boolean active) {
+        return "{\"type\":\"presence\",\"userId\":\"" + escape(userId) + "\",\"active\":" + active + "}";
     }
 
     /**

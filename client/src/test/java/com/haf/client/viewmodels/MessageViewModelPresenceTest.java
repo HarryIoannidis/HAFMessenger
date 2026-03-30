@@ -34,29 +34,22 @@ class MessageViewModelPresenceTest {
     }
 
     @Test
-    void hidden_presence_metadata_is_forwarded_to_listener_override() throws Exception {
+    void presence_listener_receives_multiple_updates() throws Exception {
         StubMessageReceiver receiver = new StubMessageReceiver();
         MessagesViewModel viewModel = new MessagesViewModel(new NoopMessageSender(), receiver);
 
         List<String> updates = new CopyOnWriteArrayList<>();
-        CountDownLatch latch = new CountDownLatch(1);
-        viewModel.addPresenceListener(new MessagesViewModel.PresenceListener() {
-            @Override
-            public void onPresenceUpdate(String userId, boolean active) {
-                // No-op: this test validates 3-arg override dispatch.
-            }
-
-            @Override
-            public void onPresenceUpdate(String userId, boolean active, boolean hidden) {
-                updates.add(userId + ":" + active + ":" + hidden);
-                latch.countDown();
-            }
+        CountDownLatch latch = new CountDownLatch(2);
+        viewModel.addPresenceListener((userId, active) -> {
+            updates.add(userId + ":" + active);
+            latch.countDown();
         });
 
-        receiver.emitPresence("user-123", false, true);
+        receiver.emitPresence("user-123", false);
+        receiver.emitPresence("user-123", true);
 
         assertTrue(latch.await(2, TimeUnit.SECONDS));
-        assertEquals(List.of("user-123:false:true"), updates);
+        assertEquals(List.of("user-123:false", "user-123:true"), updates);
     }
 
     private static final class NoopMessageSender implements MessageSender {
@@ -91,12 +84,8 @@ class MessageViewModelPresenceTest {
         }
 
         void emitPresence(String userId, boolean active) {
-            emitPresence(userId, active, false);
-        }
-
-        void emitPresence(String userId, boolean active, boolean hidden) {
             if (listener != null) {
-                listener.onPresenceUpdate(userId, active, hidden);
+                listener.onPresenceUpdate(userId, active);
             }
         }
     }
