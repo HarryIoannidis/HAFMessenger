@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <javafx.version>21.0.6</javafx.version>
+        <javafx.version>25.0.1</javafx.version>
     </properties>
 
     <dependencies>
@@ -51,14 +51,14 @@
         <dependency>
             <groupId>org.controlsfx</groupId>
             <artifactId>controlsfx</artifactId>
-            <version>11.2.1</version>
+            <version>11.2.3</version>
         </dependency>
 
         <!-- JavaFX Widgets-->
         <dependency>
             <groupId>net.synedra</groupId>
             <artifactId>validatorfx</artifactId>
-            <version>0.6.1</version>
+            <version>0.6.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.openjfx</groupId>
@@ -77,12 +77,12 @@
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-javafx</artifactId>
-            <version>12.3.1</version>
+            <version>12.4.0</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-materialdesign2-pack</artifactId>
-            <version>12.3.1</version>
+            <version>12.4.0</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.bootstrapfx</groupId>
@@ -122,6 +122,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <useModulePath>false</useModulePath>
                     <excludes><exclude>**/*IT.java</exclude></excludes>
                 </configuration>
             </plugin>
@@ -138,6 +139,7 @@
                             <goal>verify</goal>
                         </goals>
                         <configuration>
+                            <useModulePath>false</useModulePath>
                             <includes><include>**/*IT.java</include></includes>
                         </configuration>
                     </execution>
