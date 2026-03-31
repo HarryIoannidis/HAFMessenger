@@ -1,11 +1,13 @@
 package com.haf.client.utils;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
@@ -14,6 +16,7 @@ import org.kordamp.ikonli.javafx.FontIcon;
 public final class ContextMenuBuilder {
 
     private static final int DEFAULT_ICON_SIZE = 22;
+    private static final Duration DEFAULT_ACTION_DELAY = Duration.millis(70);
 
     private final ContextMenu menu;
 
@@ -72,8 +75,11 @@ public final class ContextMenuBuilder {
         MenuItem item = createIconMenuItem(iconLiteral, text);
         item.setDisable(disabled);
         item.setOnAction(event -> {
+            menu.hide();
             if (action != null) {
-                action.run();
+                PauseTransition actionDelay = new PauseTransition(DEFAULT_ACTION_DELAY);
+                actionDelay.setOnFinished(ignored -> action.run());
+                actionDelay.play();
             }
         });
         menu.getItems().add(item);
