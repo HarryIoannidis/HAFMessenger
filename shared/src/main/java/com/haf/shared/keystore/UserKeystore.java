@@ -147,6 +147,7 @@ public final class UserKeystore {
                     km = JsonCodec.fromJson(Files.readString(m), KeyMetadata.class);
                     ts = km.createdAtEpochSec();
                 } catch (Exception ignored) {
+                    // Ignore malformed metadata and fall back to directory timestamp.
                 }
             }
 
@@ -154,6 +155,7 @@ public final class UserKeystore {
                 try {
                     ts = Files.getLastModifiedTime(d).toMillis() / 1000L;
                 } catch (Exception ignored) {
+                    // Keep default timestamp when directory metadata is unavailable.
                 }
             }
 
@@ -164,19 +166,14 @@ public final class UserKeystore {
                 .filter(e -> e.meta != null && "CURRENT".equals(e.meta.status()))
                 .max(Comparator.comparingLong(e -> e.ts));
 
-        if (cur.isPresent()) {
-            return cur.get().dir();
-        }
-
         Optional<Entry> newestByMeta = entries.stream()
                 .filter(e -> e.meta != null)
                 .max(Comparator.comparingLong(e -> e.ts));
 
-        if (newestByMeta.isPresent()) {
-            return newestByMeta.get().dir();
-        }
-
-        return entries.stream().max(Comparator.comparingLong(e -> e.ts)).get().dir();
+        return cur.or(() -> newestByMeta)
+                .or(() -> entries.stream().max(Comparator.comparingLong(e -> e.ts)))
+                .orElseThrow(() -> new KeystoreOperationException("no selectable key entries in: " + root))
+                .dir();
     }
 
     /**
@@ -217,12 +214,14 @@ public final class UserKeystore {
                     km = JsonCodec.fromJson(Files.readString(m), KeyMetadata.class);
                     tsMeta = km.createdAtEpochSec();
                 } catch (Exception ignored) {
+                    // Ignore malformed metadata and rely on mtime fallback ordering.
                 }
             }
 
             try {
                 tsMtime = Files.getLastModifiedTime(d).toMillis();
             } catch (Exception ignored) {
+                // Keep MAX value so directories with unreadable mtime are deprioritized.
             }
 
             entries.add(new Entry(d, km, tsMeta, tsMtime));
