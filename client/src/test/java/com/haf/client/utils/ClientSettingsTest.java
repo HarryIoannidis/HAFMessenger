@@ -321,7 +321,7 @@ class ClientSettingsTest {
             probe.removeNode();
             usersNode.flush();
             return true;
-        } catch (Exception ex) {
+        } catch (Exception _) {
             return false;
         }
     }

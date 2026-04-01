@@ -173,7 +173,7 @@ public final class SearchSortViewModel {
         }
         try {
             return Integer.valueOf(trimmed);
-        } catch (NumberFormatException ex) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

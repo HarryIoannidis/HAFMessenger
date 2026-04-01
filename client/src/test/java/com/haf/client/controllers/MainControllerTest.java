@@ -306,9 +306,10 @@ class MainControllerTest {
 
         assertTrue(source.contains("ContactCell.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
         assertTrue(source.contains("private static final String HIDDEN_ACTIVITY_LABEL = \"Hidden Activity\";"));
-        assertTrue(source.contains("settings.isPrivacyHidePresenceIndicators()\n"
-                + "                ? HIDDEN_ACTIVITY_LABEL\n"
-                + "                : activenessLabel"));
+        assertTrue(source.contains("""
+                settings.isPrivacyHidePresenceIndicators()
+                                ? HIDDEN_ACTIVITY_LABEL
+                                : activenessLabel"""));
         assertTrue(source.contains("hasActivenessLabel && !settings.isPrivacyHidePresenceIndicators()"));
     }
 

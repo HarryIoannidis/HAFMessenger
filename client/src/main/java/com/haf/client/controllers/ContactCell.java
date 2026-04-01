@@ -392,7 +392,7 @@ public class ContactCell extends ListCell<ContactInfo> {
     private void applyActivenessColor(String color) {
         try {
             activenessCircle.setFill(Color.web(color));
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             activenessCircle.setFill(Color.GRAY);
         }
     }

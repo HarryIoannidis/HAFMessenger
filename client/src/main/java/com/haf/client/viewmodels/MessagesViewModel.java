@@ -638,7 +638,7 @@ public class MessagesViewModel {
                 action.run();
                 return;
             }
-        } catch (Throwable ex) {
+        } catch (Throwable _) {
             fxToolkitUnavailable = true;
             action.run();
             return;
@@ -656,7 +656,7 @@ public class MessagesViewModel {
                     completion.countDown();
                 }
             });
-        } catch (Throwable ex) {
+        } catch (Throwable _) {
             fxToolkitUnavailable = true;
             action.run();
             return;

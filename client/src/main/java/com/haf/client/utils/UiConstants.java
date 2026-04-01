@@ -21,6 +21,10 @@ public final class UiConstants {
     public static final String FXML_SETTINGS_ITEM_CELL = "/fxml/settings_item_cell.fxml";
     public static final String FXML_POPUP_MESSAGE = "/fxml/popup_message.fxml";
 
+    // Config resources
+    public static final String CONFIG_CLIENT_PROPERTIES = "/config/client.properties";
+    public static final String CONFIG_TRUSTSTORE = "/config/truststore.p12";
+
     // Images
     public static final String IMAGE_APP_LOGO = "/images/logo/app_logo.png";
     public static final String IMAGE_APP_LOGO_DOWNSCALE = "/images/logo/app_logo_downscale.png";

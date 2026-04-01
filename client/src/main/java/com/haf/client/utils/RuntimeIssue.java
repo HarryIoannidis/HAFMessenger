@@ -16,9 +16,9 @@ public record RuntimeIssue(
      * Canonical constructor that normalizes text fields and guarantees a non-null
      * retry callback.
      *
-     * @param dedupeKey stable key used for popup deduplication
-     * @param title user-facing issue title
-     * @param message user-facing issue details
+     * @param dedupeKey   stable key used for popup deduplication
+     * @param title       user-facing issue title
+     * @param message     user-facing issue details
      * @param retryAction callback executed when user clicks retry
      */
     public RuntimeIssue {
@@ -33,7 +33,7 @@ public record RuntimeIssue(
      * Normalizes a mandatory text field and falls back to a default label when
      * blank.
      *
-     * @param value input field value
+     * @param value    input field value
      * @param fallback fallback value for null/blank inputs
      * @return normalized non-blank value
      */
@@ -48,7 +48,7 @@ public record RuntimeIssue(
     /**
      * Trims nullable text and applies a fallback for empty values.
      *
-     * @param value input field value
+     * @param value    input field value
      * @param fallback fallback value for null/empty inputs
      * @return trimmed value or fallback
      */

@@ -60,6 +60,7 @@ public class PreviewController {
     private String imageUriOrPath;
     private String suggestedFileName;
     private boolean downloadAllowed;
+    private long activePreviewLoadId;
     private ClientSettings settings = ClientSettings.defaults();
 
     /**
@@ -123,6 +124,7 @@ public class PreviewController {
         if (previewImageView == null) {
             return;
         }
+        long previewLoadId = ++activePreviewLoadId;
 
         previewImageView.setImage(null);
         previewImageView.setFitWidth(0);
@@ -137,29 +139,73 @@ public class PreviewController {
             Image image = new Image(source, true);
             previewImageView.setImage(image);
             setSpinnerVisible(true);
-
-            if (image.getProgress() >= 1.0) {
-                setSpinnerVisible(false);
-                applyImageDimensions(image);
-                return;
-            }
-
             image.progressProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null && newVal.doubleValue() >= 1.0) {
-                    setSpinnerVisible(false);
-                    applyImageDimensions(image);
+                    runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
                 }
             });
             image.errorProperty().addListener((obs, wasError, isError) -> {
-                if (Boolean.TRUE.equals(isError)) {
-                    setSpinnerVisible(false);
+                if (Boolean.TRUE.equals(isError) && isCurrentPreviewLoad(previewLoadId, image)) {
+                    runOnFxThread(() -> setSpinnerVisible(false));
                 }
             });
+
+            // Close the listener-registration race: local images can complete
+            // between the initial progress check and listener attachment.
+            if (image.getProgress() >= 1.0) {
+                runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
+            } else if (image.isError()) {
+                runOnFxThread(() -> setSpinnerVisible(false));
+            }
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to load preview image", ex);
+            LOGGER.warn("Failed to load preview image", ex);
             setSpinnerVisible(false);
             showAttachmentError("Could not load image preview.");
         }
+    }
+
+    /**
+     * Applies completion UI updates only when the finished image belongs to
+     * the latest preview request.
+     *
+     * @param previewLoadId sequence id captured when load started
+     * @param image loaded image candidate
+     */
+    private void completePreviewLoadIfCurrent(long previewLoadId, Image image) {
+        if (!isCurrentPreviewLoad(previewLoadId, image)) {
+            return;
+        }
+        setSpinnerVisible(false);
+        applyImageDimensions(image);
+    }
+
+    /**
+     * Checks whether a callback still targets the current previewed image.
+     *
+     * @param previewLoadId sequence id captured when load started
+     * @param image image tied to callback invocation
+     * @return {@code true} when callback belongs to latest preview request
+     */
+    private boolean isCurrentPreviewLoad(long previewLoadId, Image image) {
+        return previewLoadId == activePreviewLoadId
+                && previewImageView != null
+                && previewImageView.getImage() == image;
+    }
+
+    /**
+     * Runs UI work on the JavaFX thread, immediately when already on FX thread.
+     *
+     * @param action UI action to run safely
+     */
+    private static void runOnFxThread(Runnable action) {
+        if (action == null) {
+            return;
+        }
+        if (Platform.isFxApplicationThread()) {
+            action.run();
+            return;
+        }
+        Platform.runLater(action);
     }
 
     /**
@@ -234,7 +280,7 @@ public class PreviewController {
             }
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to save image preview download", ex);
+            LOGGER.warn("Failed to save image preview download", ex);
             showAttachmentError("Could not save image. Please try again.");
         }
     }

@@ -11,7 +11,6 @@ import java.util.Locale;
  */
 public final class ImageSaveSupport {
 
-
     /**
      * Prevents instantiation of this utility class.
      */
@@ -65,14 +64,14 @@ public final class ImageSaveSupport {
                 Path path = Path.of(uri);
                 return Files.exists(path) ? path : null;
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             // Fallback to direct path parsing.
         }
 
         try {
             Path candidate = Path.of(imageUriOrPath);
             return Files.exists(candidate) ? candidate : null;
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             return null;
         }
     }
@@ -170,7 +169,7 @@ public final class ImageSaveSupport {
                     return sanitizeFileName(fromUri.getFileName().toString());
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             // Fallback to direct path parsing.
         }
 
@@ -179,7 +178,7 @@ public final class ImageSaveSupport {
             if (fromPath.getFileName() != null) {
                 return sanitizeFileName(fromPath.getFileName().toString());
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             return null;
         }
 

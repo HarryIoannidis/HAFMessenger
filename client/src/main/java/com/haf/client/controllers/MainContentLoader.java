@@ -519,7 +519,7 @@ final class MainContentLoader {
             } else {
                 Platform.runLater(action);
             }
-        } catch (IllegalStateException ex) {
+        } catch (IllegalStateException _) {
             action.run();
         }
     }

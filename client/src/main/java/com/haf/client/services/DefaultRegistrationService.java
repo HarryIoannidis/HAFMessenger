@@ -183,7 +183,7 @@ public class DefaultRegistrationService implements RegistrationService {
             }
 
             return new RegistrationResult.Rejected(resolveRejectedMessage(response));
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return new RegistrationResult.Failure("Registration interrupted.");
         } catch (RegistrationFlowException e) {
@@ -446,7 +446,7 @@ public class DefaultRegistrationService implements RegistrationService {
             Path root = KeystoreRoot.preferred(userId);
             FilePerms.ensureDir700(root);
             return root;
-        } catch (Exception e) {
+        } catch (Exception _) {
             try {
                 Path root = KeystoreRoot.userFallback(userId);
                 FilePerms.ensureDir700(root);

@@ -25,7 +25,7 @@ class SplashViewModelTest {
             Platform.startup(() -> {});
         } catch (IllegalStateException ignored) {
             // already started
-        } catch (Throwable ex) {
+        } catch (Throwable _) {
             javaFxAvailable = false;
         }
     }

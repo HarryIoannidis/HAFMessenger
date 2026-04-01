@@ -160,7 +160,7 @@ public final class SettingsRowBuilder {
      * style.
      *
      * @param sectionId section node id
-     * @param title section title
+     * @param title     section title
      * @return section header node
      */
     public static VBox buildSectionHeader(String sectionId, String title) {

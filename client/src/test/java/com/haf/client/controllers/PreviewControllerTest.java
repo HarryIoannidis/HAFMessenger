@@ -32,5 +32,10 @@ class PreviewControllerTest {
         assertTrue(source.contains("if (!settings.isMediaHoverZoom()) {"));
         assertTrue(source.contains("if (settings.isPrivacyConfirmAttachmentOpen()) {"));
         assertTrue(source.contains(".movable(spec.movable())"));
+        assertTrue(source.contains("long previewLoadId = ++activePreviewLoadId;"));
+        assertTrue(source.contains("completePreviewLoadIfCurrent(previewLoadId, image)"));
+        assertTrue(source.contains("previewLoadId == activePreviewLoadId"));
+        assertTrue(source.contains("runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));"));
+        assertTrue(source.contains("if (image.getProgress() >= 1.0) {"));
     }
 }
