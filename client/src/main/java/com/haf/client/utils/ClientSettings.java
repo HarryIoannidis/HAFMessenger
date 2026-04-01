@@ -63,7 +63,8 @@ public final class ClientSettings {
         PRIVACY_BLUR_ON_STARTUP_UNTIL_UNLOCK("privacy.blur_on_startup_until_unlock", false, ApplyMode.IMMEDIATE),
         PRIVACY_CONFIRM_ATTACHMENT_OPEN("privacy.confirm_attachment_open", false, ApplyMode.IMMEDIATE),
         PRIVACY_CONFIRM_EXTERNAL_LINK_OPEN("privacy.confirm_external_link_open", true, ApplyMode.IMMEDIATE),
-        PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW("privacy.show_notification_message_preview", false, ApplyMode.IMMEDIATE),
+        PRIVACY_SHOW_NOTIFICATION_MESSAGE_PREVIEW("privacy.show_notification_message_preview", false,
+                ApplyMode.IMMEDIATE),
         PRIVACY_HIDE_PRESENCE_INDICATORS("privacy.hide_presence_indicators", false, ApplyMode.IMMEDIATE);
 
         private final String preferenceKey;
@@ -107,7 +108,9 @@ public final class ClientSettings {
     @FunctionalInterface
     public interface Listener {
         /**
-         * Handles on setting changed.
+         * Invoked after a setting value changes.
+         *
+         * @param key changed setting key
          */
         void onSettingChanged(Key key);
     }
@@ -157,14 +160,19 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles defaults.
+     * Creates a non-persistent settings instance backed only by defaults.
+     *
+     * @return default in-memory settings instance
      */
     public static ClientSettings defaults() {
         return new ClientSettings(null);
     }
 
     /**
-     * Creates settings for user.
+     * Creates settings persisted under the given user id.
+     *
+     * @param userId current user id
+     * @return persistent settings instance for that user
      */
     public static ClientSettings forUser(String userId) {
         return new ClientSettings(userId);
@@ -172,6 +180,9 @@ public final class ClientSettings {
 
     /**
      * Resolves settings for current session user, or defaults when not logged in.
+     *
+     * @return current user's persistent settings, or defaults when no active user
+     *         exists
      */
     public static ClientSettings forCurrentUserOrDefaults() {
         UserProfileInfo profile = CurrentUserSession.get();
@@ -182,7 +193,9 @@ public final class ClientSettings {
     }
 
     /**
-     * Adds listener.
+     * Registers a listener for setting changes.
+     *
+     * @param listener listener to add; ignored when {@code null}
      */
     public void addListener(Listener listener) {
         if (listener != null) {
@@ -191,7 +204,9 @@ public final class ClientSettings {
     }
 
     /**
-     * Removes listener.
+     * Unregisters a previously registered listener.
+     *
+     * @param listener listener to remove; ignored when {@code null}
      */
     public void removeListener(Listener listener) {
         if (listener != null) {
@@ -207,7 +222,8 @@ public final class ClientSettings {
     }
 
     /**
-     * Clears restart required dirty.
+     * Marks the current restart-required values as applied and clears the dirty
+     * flag.
      */
     public void clearRestartRequiredDirty() {
         for (Key key : Key.values()) {
@@ -434,7 +450,7 @@ public final class ClientSettings {
     }
 
     /**
-     * Clears search sort options.
+     * Resets search sort options to defaults and removes persisted values.
      */
     public void clearSearchSortOptions() {
         searchSortOptions = SearchSortViewModel.SortOptions.DEFAULT;
@@ -712,7 +728,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles read window state.
+     * Reads persisted window state.
+     *
+     * @return stored window state, or {@code null} when persistence is disabled or
+     *         state is incomplete
      */
     public WindowState readWindowState() {
         if (!persistent) {
@@ -730,7 +749,13 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles write window state.
+     * Persists the current window state.
+     *
+     * @param x         window X coordinate
+     * @param y         window Y coordinate
+     * @param width     window width
+     * @param height    window height
+     * @param maximized whether the window is maximized
      */
     public void writeWindowState(double x, double y, double width, double height, boolean maximized) {
         if (!persistent) {
@@ -765,7 +790,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Normalizes tab.
+     * Normalizes a stored tab id to supported values.
+     *
+     * @param tab stored tab id
+     * @return normalized tab id ({@code messages} or {@code search})
      */
     private static String normalizeTab(String tab) {
         if (Objects.equals("search", tab)) {
@@ -775,7 +803,9 @@ public final class ClientSettings {
     }
 
     /**
-     * Loads search sort options.
+     * Loads persisted search sort options or returns defaults when missing/invalid.
+     *
+     * @return loaded sort options or defaults when unavailable
      */
     private SearchSortViewModel.SortOptions loadSearchSortOptions() {
         if (!persistent) {
@@ -797,7 +827,9 @@ public final class ClientSettings {
     }
 
     /**
-     * Persists search sort options.
+     * Persists normalized search sort options.
+     *
+     * @param options sort options to persist
      */
     private void persistSearchSortOptions(SearchSortViewModel.SortOptions options) {
         if (!persistent) {
@@ -809,7 +841,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Parses sort field.
+     * Parses a search sort field value from preferences.
+     *
+     * @param value raw stored value
+     * @return parsed field, or {@code null} when invalid
      */
     private static SearchSortViewModel.Field parseSortField(String value) {
         if (value == null || value.isBlank()) {
@@ -823,7 +858,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Parses sort direction.
+     * Parses a search sort direction value from preferences.
+     *
+     * @param value raw stored value
+     * @return parsed direction, or {@code null} when invalid
      */
     private static SearchSortViewModel.Direction parseSortDirection(String value) {
         if (value == null || value.isBlank()) {
@@ -882,7 +920,11 @@ public final class ClientSettings {
     }
 
     /**
-     * Updates value.
+     * Updates an in-memory value, persists it, and notifies listeners when it
+     * changes.
+     *
+     * @param key   setting key to update
+     * @param value new value
      */
     private void setValue(Key key, Object value) {
         Object previous = values.put(key, value);
@@ -896,7 +938,8 @@ public final class ClientSettings {
     }
 
     /**
-     * Refreshes restart dirty flag.
+     * Recomputes whether any restart-required setting differs from its applied
+     * baseline.
      */
     private void refreshRestartDirtyFlag() {
         for (Key key : Key.values()) {
@@ -912,7 +955,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Loads value.
+     * Loads a key value from preferences using the key's default type.
+     *
+     * @param key setting key to load
+     * @return loaded value or default value when not persisted
      */
     private Object loadValue(Key key) {
         if (!persistent) {
@@ -933,7 +979,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Persists value.
+     * Persists a key value according to its runtime type.
+     *
+     * @param key   setting key to persist
+     * @param value value to persist
      */
     private void persistValue(Key key, Object value) {
         if (!persistent) {
@@ -954,7 +1003,9 @@ public final class ClientSettings {
     }
 
     /**
-     * Notifies listeners.
+     * Notifies all listeners that a setting has changed.
+     *
+     * @param key changed setting key
      */
     private void notifyListeners(Key key) {
         for (Listener listener : listeners) {
@@ -967,7 +1018,13 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles clamp to step.
+     * Rounds and clamps an integer-like setting to a bounded step range.
+     *
+     * @param value raw value
+     * @param min   minimum allowed value
+     * @param max   maximum allowed value
+     * @param step  step size
+     * @return clamped and stepped integer value
      */
     private static int clampToStep(double value, int min, int max, int step) {
         int rounded = (int) Math.round(value);
@@ -978,7 +1035,13 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles clamp decimal.
+     * Rounds and clamps a decimal setting to a bounded step range.
+     *
+     * @param value raw value
+     * @param min   minimum allowed value
+     * @param max   maximum allowed value
+     * @param step  step size
+     * @return clamped and stepped decimal value
      */
     private static double clampDecimal(double value, double min, double max, double step) {
         double clamped = Math.clamp(value, min, max);
@@ -988,7 +1051,10 @@ public final class ClientSettings {
     }
 
     /**
-     * Handles sanitize node.
+     * Sanitizes a user id so it is safe to use as a Preferences node name.
+     *
+     * @param userId raw user id
+     * @return sanitized node-safe user id
      */
     private static String sanitizeNode(String userId) {
         String sanitized = userId.trim().replaceAll("[^a-zA-Z0-9._-]", "_");

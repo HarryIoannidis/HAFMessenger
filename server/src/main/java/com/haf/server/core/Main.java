@@ -46,7 +46,7 @@ public final class Main {
     /**
      * Starts the HAF server.
      */
-    public static void main() {
+    public static void main(String[] args) {
         new Main().start();
     }
 
