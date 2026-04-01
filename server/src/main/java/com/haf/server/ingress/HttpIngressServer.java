@@ -69,6 +69,9 @@ import java.util.concurrent.Executors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * Handles HTTPS API ingress for authentication, messaging, and attachments.
+ */
 @SuppressWarnings("java:S1075")
 public final class HttpIngressServer {
 

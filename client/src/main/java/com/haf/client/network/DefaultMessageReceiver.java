@@ -24,6 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles inbound encrypted messages, decryption, and acknowledgement flow.
+ */
 public class DefaultMessageReceiver implements MessageReceiver {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageReceiver.class);
 

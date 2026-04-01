@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Shared attachment limits and content-type allowlists.
+ * Defines shared attachment limits, MIME allowlists, and attachment content-type constants.
  */
 public final class AttachmentConstants {
 
@@ -38,7 +38,8 @@ public final class AttachmentConstants {
      * Normalizes MIME value by stripping parameters and lowercasing.
      *
      * @param mimeType MIME value to normalize
-     * @return normalized MIME type without parameters, or {@code null} when input is blank/null
+     * @return normalized MIME type without parameters, or {@code null} when input
+     *         is blank/null
      */
     public static String normalizeMimeType(String mimeType) {
         if (mimeType == null) {

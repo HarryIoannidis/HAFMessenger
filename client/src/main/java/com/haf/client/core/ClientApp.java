@@ -9,6 +9,9 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Bootstraps and launches the JavaFX client application.
+ */
 public class ClientApp extends Application {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientApp.class);

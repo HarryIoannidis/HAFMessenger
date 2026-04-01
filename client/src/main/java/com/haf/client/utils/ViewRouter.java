@@ -21,6 +21,9 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles JavaFX scene navigation and popup lifecycle management.
+ */
 public class ViewRouter {
 
     /**

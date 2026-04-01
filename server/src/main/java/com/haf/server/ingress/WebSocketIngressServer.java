@@ -30,6 +30,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Handles WebSocket ingress for mailbox delivery, acknowledgements, and presence.
+ */
 public final class WebSocketIngressServer extends WebSocketServer {
 
     private final MailboxRouter mailboxRouter;

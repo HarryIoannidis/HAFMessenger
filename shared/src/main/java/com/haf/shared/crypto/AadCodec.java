@@ -4,6 +4,9 @@ import com.haf.shared.dto.EncryptedMessage;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Builds canonical Additional Authenticated Data (AAD) bytes for encrypted messages.
+ */
 public final class AadCodec {
     /**
      * Prevents instantiation of this utility class.

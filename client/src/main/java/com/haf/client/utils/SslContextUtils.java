@@ -8,6 +8,9 @@ import java.io.InputStream;
 import java.security.KeyStore;
 import java.util.Properties;
 
+/**
+ * Provides SSLContext initialization utilities for trusted client-server communication.
+ */
 public class SslContextUtils {
 
     /**

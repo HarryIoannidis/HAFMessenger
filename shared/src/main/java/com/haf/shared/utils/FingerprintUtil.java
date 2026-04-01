@@ -4,6 +4,9 @@ import com.haf.shared.exceptions.CryptoOperationException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 
+/**
+ * Computes public-key fingerprints for identity verification.
+ */
 public final class FingerprintUtil {
     /**
      * Prevents instantiation of this utility class.

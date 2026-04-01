@@ -9,6 +9,9 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Provides edge-resize behavior for undecorated JavaFX windows.
+ */
 public final class WindowResizeHelper {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WindowResizeHelper.class);

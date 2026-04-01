@@ -29,6 +29,9 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles login transport and initializes authenticated client session state.
+ */
 public class DefaultLoginService implements LoginService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLoginService.class);

@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import com.haf.server.exceptions.DatabaseOperationException;
 
+/**
+ * Provides database access for contact relationships and contact listings.
+ */
 public class ContactDAO {
 
     private final HikariDataSource dataSource;

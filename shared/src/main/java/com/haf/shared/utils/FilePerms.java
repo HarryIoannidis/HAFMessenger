@@ -6,6 +6,9 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
 
+/**
+ * Applies restrictive filesystem permissions for keystore files and directories.
+ */
 public final class FilePerms {
     private static final Set<PosixFilePermission> DIR_700 =
             EnumSet.of(PosixFilePermission.OWNER_READ,

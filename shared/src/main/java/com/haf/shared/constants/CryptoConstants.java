@@ -1,5 +1,8 @@
 package com.haf.shared.constants;
 
+/**
+ * Defines shared cryptographic algorithm names and parameter sizes.
+ */
 public final class CryptoConstants {
     // AES
     public static final String AES = "AES";

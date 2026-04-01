@@ -12,6 +12,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Routes queued envelopes between persistence and active mailbox subscribers.
+ */
 public final class MailboxRouter implements AutoCloseable {
 
     private static final Duration TTL_CLEANUP_INTERVAL = Duration.ofMinutes(5);

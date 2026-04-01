@@ -15,6 +15,9 @@ import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
 import java.io.IOException;
 
+/**
+ * Defines the contract for encrypting and sending messages and attachment operations.
+ */
 public interface MessageSender {
 
     /**

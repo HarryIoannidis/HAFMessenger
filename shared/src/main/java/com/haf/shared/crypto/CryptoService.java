@@ -8,6 +8,9 @@ import java.security.GeneralSecurityException;
 import javax.crypto.KeyGenerator;
 import java.security.SecureRandom;
 
+/**
+ * Provides AES-GCM encryption helpers and random key/IV generation.
+ */
 public final class CryptoService {
     private static final SecureRandom secureRandom = new SecureRandom();
 

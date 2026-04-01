@@ -8,6 +8,9 @@ import java.util.Base64;
 import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.exceptions.KeystoreOperationException;
 
+/**
+ * Provides password-based sealing and unsealing for keystore material.
+ */
 public final class KeystoreSealing {
     private static final SecureRandom RNG = new SecureRandom();
 

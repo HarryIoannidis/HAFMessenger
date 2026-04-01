@@ -8,6 +8,9 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import java.io.File;
 
+/**
+ * Represents UI state and validation logic for the registration form.
+ */
 public class RegisterViewModel {
 
     // Allowed email domain
