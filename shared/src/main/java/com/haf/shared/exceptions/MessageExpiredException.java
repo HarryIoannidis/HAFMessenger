@@ -1,5 +1,8 @@
 package com.haf.shared.exceptions;
 
+/**
+ * Indicates that a message was rejected because its TTL has expired.
+ */
 public class MessageExpiredException extends Exception {
     /**
      * Creates a new MessageExpiredException.
@@ -27,4 +30,3 @@ public class MessageExpiredException extends Exception {
         super(message, cause);
     }
 }
-

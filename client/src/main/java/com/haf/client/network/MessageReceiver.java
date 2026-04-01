@@ -4,6 +4,9 @@ import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageDecryptionException;
 import java.io.IOException;
 
+/**
+ * Defines the contract for receiving, decrypting, and acknowledging incoming messages.
+ */
 public interface MessageReceiver {
     /**
      * Sets the message listener that will receive decrypted messages.

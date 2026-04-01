@@ -5,6 +5,9 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
+/**
+ * Represents UI state and validation logic for the login form.
+ */
 public class LoginViewModel {
 
     // Allowed email domain

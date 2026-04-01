@@ -14,6 +14,9 @@ import com.haf.shared.utils.FingerprintUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Bootstraps keystore directories and initial key material for a user.
+ */
 public final class KeystoreBootstrap {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KeystoreBootstrap.class);

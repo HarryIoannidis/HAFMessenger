@@ -2,6 +2,9 @@ package com.haf.shared.utils;
 
 import java.util.Base64;
 
+/**
+ * Converts key material between DER and PEM formats.
+ */
 public final class PemCodec {
     /**
      * Prevents instantiation of this utility class.

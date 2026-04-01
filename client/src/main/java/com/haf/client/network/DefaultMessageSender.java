@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 
+/**
+ * Encrypts and submits outbound messages and attachment API calls.
+ */
 public class DefaultMessageSender implements MessageSender {
 
     private final KeyProvider keyProvider;

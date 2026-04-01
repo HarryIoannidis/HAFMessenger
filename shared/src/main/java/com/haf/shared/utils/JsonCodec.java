@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haf.shared.exceptions.JsonCodecException;
 
+/**
+ * Provides strict JSON serialization and deserialization utilities for shared DTOs.
+ */
 public final class JsonCodec {
 
     /**

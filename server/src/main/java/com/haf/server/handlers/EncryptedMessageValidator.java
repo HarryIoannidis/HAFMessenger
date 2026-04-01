@@ -6,6 +6,9 @@ import com.haf.shared.utils.MessageValidator;
 import java.time.Duration;
 import java.util.Base64;
 
+/**
+ * Applies server-side policy checks to inbound encrypted messages.
+ */
 public final class EncryptedMessageValidator {
 
     private static final long MAX_MESSAGE_BYTES = 8L * 1024L * 1024L; // 8 MB

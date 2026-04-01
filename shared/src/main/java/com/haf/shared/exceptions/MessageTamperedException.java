@@ -2,6 +2,9 @@ package com.haf.shared.exceptions;
 
 import javax.crypto.AEADBadTagException;
 
+/**
+ * Indicates authentication failure or suspected message tampering.
+ */
 public class MessageTamperedException extends Exception {
     /**
      * Creates a new MessageTamperedException.
@@ -38,4 +41,3 @@ public class MessageTamperedException extends Exception {
         super(message, cause);
     }
 }
-

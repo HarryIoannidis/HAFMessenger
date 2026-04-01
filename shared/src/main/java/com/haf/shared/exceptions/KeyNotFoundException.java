@@ -1,5 +1,8 @@
 package com.haf.shared.exceptions;
 
+/**
+ * Indicates that a requested key could not be found.
+ */
 public class KeyNotFoundException extends Exception {
     /**
      * Creates a new KeyNotFoundException.
@@ -27,4 +30,3 @@ public class KeyNotFoundException extends Exception {
         super(message, cause);
     }
 }
-

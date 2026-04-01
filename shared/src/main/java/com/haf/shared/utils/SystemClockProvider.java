@@ -1,5 +1,8 @@
 package com.haf.shared.utils;
 
+/**
+ * Provides a singleton wall-clock implementation of ClockProvider.
+ */
 public final class SystemClockProvider implements ClockProvider {
     private static final SystemClockProvider INSTANCE = new SystemClockProvider();
 

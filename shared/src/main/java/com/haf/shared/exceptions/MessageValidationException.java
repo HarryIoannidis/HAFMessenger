@@ -3,6 +3,9 @@ package com.haf.shared.exceptions;
 import com.haf.shared.utils.MessageValidator;
 import java.util.List;
 
+/**
+ * Represents one or more protocol validation errors for an encrypted message.
+ */
 public class MessageValidationException extends Exception {
     private final List<MessageValidator.ErrorCode> errorCodes;
 
@@ -35,4 +38,3 @@ public class MessageValidationException extends Exception {
         return errorCodes;
     }
 }
-

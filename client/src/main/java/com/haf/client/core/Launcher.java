@@ -1,5 +1,8 @@
 package com.haf.client.core;
 
+/**
+ * Provides a thin entry point that delegates to ClientApp.
+ */
 public class Launcher {
     /**
      * Starts the JavaFX client application entry point.

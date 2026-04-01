@@ -4,6 +4,9 @@ import com.haf.shared.exceptions.CryptoOperationException;
 import java.security.*;
 import java.security.spec.*;
 
+/**
+ * Provides X25519 key generation and encoding helpers.
+ */
 public final class EccKeyIO {
     /**
      * Prevents instantiation of this utility class.

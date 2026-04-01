@@ -39,6 +39,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Bootstraps and runs the server runtime and ingress components.
+ */
 public final class Main {
 
     private static final Logger LOGGER = LogManager.getLogger(Main.class);

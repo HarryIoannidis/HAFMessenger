@@ -8,6 +8,9 @@ import org.apache.logging.log4j.message.StringMapMessage;
 import java.time.Instant;
 import java.util.Map;
 
+/**
+ * Emits structured audit events and updates server-side metrics.
+ */
 public final class AuditLogger {
 
     private static final Logger LOGGER = LogManager.getLogger("AuditLogger");

@@ -3,6 +3,9 @@ package com.haf.shared.keystore;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Resolves preferred filesystem locations for keystore storage.
+ */
 public final class KeystoreRoot {
     /**
      * Prevents instantiation of this utility class.

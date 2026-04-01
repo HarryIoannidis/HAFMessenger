@@ -3,6 +3,9 @@ package com.haf.shared.keystore;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import java.security.PublicKey;
 
+/**
+ * Defines the contract for resolving recipient keys and sender identity.
+ */
 public interface KeyProvider {
     /**
      * Retrieves the public key for a given recipient ID.
@@ -20,4 +23,3 @@ public interface KeyProvider {
      */
     String getSenderId();
 }
-

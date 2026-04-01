@@ -12,6 +12,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Enforces per-user ingress rate limits backed by database state.
+ */
 public final class RateLimiterService {
 
     private static final int WINDOW_SECONDS = 60;

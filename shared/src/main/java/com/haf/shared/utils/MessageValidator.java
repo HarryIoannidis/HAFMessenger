@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+/**
+ * Validates encrypted message envelopes against protocol and policy rules.
+ */
 public final class MessageValidator {
 
     /**

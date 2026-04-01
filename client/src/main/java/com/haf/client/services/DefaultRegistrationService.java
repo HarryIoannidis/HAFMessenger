@@ -27,6 +27,9 @@ import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles client registration flow, key generation, and payload submission.
+ */
 public class DefaultRegistrationService implements RegistrationService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRegistrationService.class);

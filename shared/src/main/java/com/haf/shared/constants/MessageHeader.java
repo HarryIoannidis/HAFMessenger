@@ -2,6 +2,9 @@ package com.haf.shared.constants;
 
 import java.util.Set;
 
+/**
+ * Defines wire-level message header constants and content-type policy.
+ */
 public final class MessageHeader {
     // Wire protocol
     public static final String VERSION = "1";
@@ -25,23 +28,15 @@ public final class MessageHeader {
     // Content types
     public static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "text/plain",
-            "text/markdown",
             "application/vnd.haf.attachment-inline+json",
             "application/vnd.haf.attachment-ref+json",
             "image/png",
             "image/jpeg",
             "image/gif",
             "image/webp",
-            "video/mp4",
-            "video/webm",
-            "video/ogg",
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/msword",
-            "application/vnd.ms-excel",
-            "application/vnd.ms-powerpoint",
             "application/octet-stream"
     );
 

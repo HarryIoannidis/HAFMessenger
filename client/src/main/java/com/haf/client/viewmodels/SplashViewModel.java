@@ -19,6 +19,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.time.Duration;
 import java.util.Objects;
 
+/**
+ * Coordinates startup checks and progress reporting for the splash screen.
+ */
 public class SplashViewModel {
     private static final int NETWORK_CHECK_MAX_ATTEMPTS = 3;
     private static final long NETWORK_CHECK_RETRY_DELAY_MILLIS = 500L;
