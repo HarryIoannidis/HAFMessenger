@@ -16,8 +16,9 @@ class SearchFilterUiTest {
     void first_search_trigger_opens_popup_without_executing_search() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();
-        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
-        });
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor,
+                () -> {
+                });
 
         flow.onSearchTrigger("john", null);
 
@@ -30,8 +31,9 @@ class SearchFilterUiTest {
     void first_search_executes_immediately_when_auto_open_filter_is_disabled() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();
-        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
-        });
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor,
+                () -> {
+                });
         flow.setAutoOpenFilterOnFirstSearch(false);
 
         flow.onSearchTrigger("john", null);
@@ -68,8 +70,9 @@ class SearchFilterUiTest {
     void subsequent_search_runs_immediately_after_first_apply() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();
-        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
-        });
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor,
+                () -> {
+                });
 
         flow.onSearchTrigger("john", null);
         popup.apply(SearchSortViewModel.SortOptions.DEFAULT);
@@ -84,8 +87,9 @@ class SearchFilterUiTest {
     void clear_reenables_gate_and_preserves_last_selected_sort() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();
-        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
-        });
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor,
+                () -> {
+                });
 
         SearchSortViewModel.SortOptions selected = new SearchSortViewModel.SortOptions(
                 SearchSortViewModel.Field.REG_NUMBER,
@@ -106,8 +110,9 @@ class SearchFilterUiTest {
     void externally_set_sort_options_are_used_when_popup_opens() {
         StubPopup popup = new StubPopup();
         StubSearchExecutor searchExecutor = new StubSearchExecutor();
-        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor, () -> {
-        });
+        SearchFilterController.FlowController flow = new SearchFilterController.FlowController(popup, searchExecutor,
+                () -> {
+                });
 
         SearchSortViewModel.SortOptions selected = new SearchSortViewModel.SortOptions(
                 SearchSortViewModel.Field.RANK,

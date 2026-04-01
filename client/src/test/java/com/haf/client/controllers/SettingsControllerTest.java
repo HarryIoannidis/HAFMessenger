@@ -37,7 +37,7 @@ class SettingsControllerTest {
         try {
             Platform.startup(() -> {
             });
-        } catch (IllegalStateException ignored) {
+        } catch (IllegalStateException _) {
             // Already initialized.
         } catch (RuntimeException ex) {
             Assumptions.assumeTrue(false, "JavaFX toolkit unavailable: " + ex.getMessage());
@@ -367,7 +367,8 @@ class SettingsControllerTest {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         assertTrue(source.contains("wireOverlayRowToggle(rowId, () -> toggle.setSelected(!toggle.isSelected()));"));
-        assertFalse(source.contains("wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));"));
+        assertFalse(
+                source.contains("wireOverlayRowToggle(rowId, () -> checkBox.setSelected(!checkBox.isSelected()));"));
     }
 
     @Test

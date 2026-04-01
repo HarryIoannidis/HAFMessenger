@@ -318,7 +318,7 @@ class SearchViewModelTest {
     private static boolean matchesOrder(SearchViewModel viewModel, List<String> expectedUserIds) {
         try {
             return expectedUserIds.equals(toUserIds(viewModel));
-        } catch (RuntimeException ex) {
+        } catch (RuntimeException _) {
             return false;
         }
     }

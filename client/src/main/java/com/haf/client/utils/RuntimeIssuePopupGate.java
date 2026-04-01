@@ -35,7 +35,7 @@ public final class RuntimeIssuePopupGate {
      * Checks whether a popup should be shown for the given key using explicit
      * timestamp.
      *
-     * @param dedupeKey popup dedupe key
+     * @param dedupeKey  popup dedupe key
      * @param nowEpochMs current timestamp in milliseconds
      * @return {@code true} when popup should be displayed
      */

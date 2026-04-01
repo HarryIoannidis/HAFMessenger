@@ -144,7 +144,7 @@ public class DefaultLoginService implements LoginService {
                 return new LoginResult.Rejected(resolveRejectedMessage(response));
             }
             return initializeSessionOrRetry(response, command, attempt);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return new LoginResult.Failure("Connection was interrupted.");
         } catch (Exception e) {
@@ -210,7 +210,7 @@ public class DefaultLoginService implements LoginService {
         try {
             sleeper.sleep(LOGIN_RETRY_DELAY_MS);
             return null;
-        } catch (InterruptedException interruptedException) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return new LoginResult.Failure("Connection was interrupted.");
         }

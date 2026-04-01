@@ -5,6 +5,8 @@ import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -226,47 +228,25 @@ class ChatControllerTest {
         assertEquals(true, ChatController.isOverAttachmentLimit(above10Mb));
     }
 
-    @Test
-    void resolve_interaction_target_uses_overlay_when_stack_wrapper_contains_ripple_button() throws IOException {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "if (firstChild instanceof StackPane stackPane)",
+            "Node rippleOverlay = findRippleOverlay(stackPane);",
+            "if (rippleOverlay != null) {",
+            "return rippleOverlay;",
+            "return firstChild;",
+            "return messageNode;",
+            "\"bubble-ripple-overlay\"",
+            "button.getStyleClass().contains(\"bubble-ripple-overlay\")",
+            "if (settings.isChatSendOnEnter()) {",
+            "if (settings.isChatAutoScrollToLatest()) {",
+            "if (!settings.isMediaOpenPreviewOnImageClick()) {",
+            "if (!settings.isPrivacyConfirmAttachmentOpen()) {",
+            ".movable(spec.movable())"
+    })
+    void controller_source_contains_expected_logic_and_behavior_wiring(String requiredCodeSnippet) throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("if (firstChild instanceof StackPane stackPane)"));
-        assertTrue(source.contains("Node rippleOverlay = findRippleOverlay(stackPane);"));
-        assertTrue(source.contains("if (rippleOverlay != null) {"));
-        assertTrue(source.contains("return rippleOverlay;"));
-    }
-
-    @Test
-    void resolve_interaction_target_keeps_first_child_and_non_row_fallback_behavior() throws IOException {
-        String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("return firstChild;"));
-        assertTrue(source.contains("return messageNode;"));
-    }
-
-    @Test
-    void ripple_overlay_detection_requires_overlay_style_class() throws IOException {
-        String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("\"bubble-ripple-overlay\""));
-        assertTrue(source.contains("button.getStyleClass().contains(\"bubble-ripple-overlay\")"));
-    }
-
-    @Test
-    void enter_send_and_auto_scroll_behaviors_are_gated_by_settings() throws IOException {
-        String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("if (settings.isChatSendOnEnter()) {"));
-        assertTrue(source.contains("if (settings.isChatAutoScrollToLatest()) {"));
-    }
-
-    @Test
-    void image_preview_opening_respects_media_and_privacy_settings() throws IOException {
-        String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("if (!settings.isMediaOpenPreviewOnImageClick()) {"));
-        assertTrue(source.contains("if (!settings.isPrivacyConfirmAttachmentOpen()) {"));
-        assertTrue(source.contains(".movable(spec.movable())"));
+        assertTrue(source.contains(requiredCodeSnippet), "Source should contain logic: " + requiredCodeSnippet);
     }
 
     private static final class StubChatAttachmentService implements ChatAttachmentService {

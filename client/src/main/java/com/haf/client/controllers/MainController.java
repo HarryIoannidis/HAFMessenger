@@ -626,7 +626,7 @@ public class MainController implements SearchController.ContactActions {
         if (showActivenessCircle) {
             try {
                 profileActivenessCircle.setFill(Color.web(contact.activenessColor()));
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 profileActivenessCircle.setFill(Color.GRAY);
             }
         }
@@ -775,7 +775,7 @@ public class MainController implements SearchController.ContactActions {
             try {
                 action.run();
                 future.complete(null);
-            } catch (Throwable ex) {
+            } catch (Exception ex) {
                 future.completeExceptionally(ex);
             }
         };

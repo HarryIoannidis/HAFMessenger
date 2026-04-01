@@ -269,7 +269,7 @@ public final class MessageValidator {
     private static byte[] safeB64(String s) {
         try {
             return Base64.getDecoder().decode(s);
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             return new byte[0];
         }
     }

@@ -76,7 +76,8 @@ public class DesktopNotificationService {
     /**
      * Lazily initializes and returns the shared system-tray icon.
      *
-     * @return initialized tray icon, or {@code null} when tray support is unavailable
+     * @return initialized tray icon, or {@code null} when tray support is
+     *         unavailable
      */
     private TrayIcon getOrCreateTrayIcon() {
         TrayIcon existing = trayIconRef.get();
@@ -148,7 +149,7 @@ public class DesktopNotificationService {
     /**
      * Attempts to show an OS-native notification command when available.
      *
-     * @param title notification title
+     * @param title   notification title
      * @param message notification message body
      * @return {@code true} when a native notification command was executed
      */
@@ -245,7 +246,7 @@ public class DesktopNotificationService {
                 return false;
             }
             return process.exitValue() == 0;
-        } catch (InterruptedException ex) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return false;
         } catch (Exception ex) {

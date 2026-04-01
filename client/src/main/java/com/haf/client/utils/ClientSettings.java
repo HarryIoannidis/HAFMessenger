@@ -817,7 +817,7 @@ public final class ClientSettings {
         }
         try {
             return SearchSortViewModel.Field.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }
@@ -831,7 +831,7 @@ public final class ClientSettings {
         }
         try {
             return SearchSortViewModel.Direction.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

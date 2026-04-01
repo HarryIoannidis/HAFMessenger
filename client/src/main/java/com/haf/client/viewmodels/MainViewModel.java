@@ -935,7 +935,7 @@ public class MainViewModel {
     private static void runOnUiThread(Runnable action) {
         try {
             Platform.runLater(action);
-        } catch (IllegalStateException ex) {
+        } catch (IllegalStateException _) {
             action.run();
         }
     }

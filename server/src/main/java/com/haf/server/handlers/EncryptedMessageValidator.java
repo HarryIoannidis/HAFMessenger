@@ -23,7 +23,7 @@ public final class EncryptedMessageValidator {
     public ValidationResult validate(EncryptedMessage message) {
         try {
             MessageValidator.validate(message);
-        } catch (MessageValidationException ex) {
+        } catch (MessageValidationException _) {
             return ValidationResult.invalid("STRUCTURAL_INVALID");
         }
 
@@ -50,7 +50,7 @@ public final class EncryptedMessageValidator {
         // Ensure Base64 decoding does not throw later.
         try {
             decoder.decode(message.getCiphertextB64());
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException _) {
             return ValidationResult.invalid("INVALID_BASE64");
         }
 

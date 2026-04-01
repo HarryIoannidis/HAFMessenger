@@ -29,7 +29,7 @@ public class ViewRouter {
     private ViewRouter() {
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(ViewRouter.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ViewRouter.class);
 
     static {
         try {
@@ -38,7 +38,7 @@ public class ViewRouter {
             Font.loadFont(ViewRouter.class.getResourceAsStream(UiConstants.FONT_MANROPE_BOLD),
                     UiConstants.FONT_SIZE_BOLD);
         } catch (Exception e) {
-            logger.warn( "Could not load fonts", e);
+            LOGGER.warn("Could not load fonts", e);
         }
     }
 
@@ -67,7 +67,7 @@ public class ViewRouter {
             }
 
             var resource = ViewRouter.class.getResource(fxmlPath);
-            logger.info( "Switching to FXML: {}", resource);
+            LOGGER.info("Switching to FXML: {}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
 
@@ -98,7 +98,7 @@ public class ViewRouter {
             }
 
             var resource = ViewRouter.class.getResource(fxmlPath);
-            logger.info( "Switching to transparent FXML: {}", resource);
+            LOGGER.info("Switching to transparent FXML: {}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
             boolean isSplash = fxmlPath.equals(UiConstants.FXML_SPLASH);
@@ -273,7 +273,7 @@ public class ViewRouter {
         Objects.requireNonNull(controllerType, "controllerType");
 
         if (mainStage == null) {
-            logger.warn("Skipping popup preload because main stage is not initialized.");
+            LOGGER.warn("Skipping popup preload because main stage is not initialized.");
             return;
         }
 
@@ -308,7 +308,7 @@ public class ViewRouter {
     private static <T> PopupEntry loadPopupEntry(String fxmlPath, Class<T> controllerType) {
         try {
             var resource = ViewRouter.class.getResource(fxmlPath);
-            logger.info( "Loading popup FXML: {}", resource);
+            LOGGER.info("Loading popup FXML: {}", resource);
             FXMLLoader loader = new FXMLLoader(resource);
             Parent root = loader.load();
             Object controller = loader.getController();
@@ -382,7 +382,7 @@ public class ViewRouter {
         try {
             root.snapshot(null, null);
         } catch (RuntimeException ex) {
-            logger.trace( "Popup warmup snapshot skipped: {}", ex.getMessage());
+            LOGGER.trace("Popup warmup snapshot skipped: {}", ex.getMessage());
         }
 
         if (!popupStage.isShowing()) {
@@ -393,7 +393,7 @@ public class ViewRouter {
                 popupStage.show();
                 popupStage.hide();
             } catch (RuntimeException ex) {
-                logger.trace( "Popup invisible show/hide warmup skipped: {}", ex.getMessage());
+                LOGGER.trace("Popup invisible show/hide warmup skipped: {}", ex.getMessage());
             } finally {
                 popupStage.setOpacity(previousOpacity);
                 if (mainStage != null) {

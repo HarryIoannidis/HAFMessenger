@@ -156,12 +156,14 @@ public final class HttpIngressServer {
         boolean active = presenceRegistry.isActive(contactId);
         String payload = presenceJson(contactId, active);
         for (WebSocket connection : presenceRegistry.getActiveConnections(callerId)) {
-            try {
-                connection.send(payload);
-            } catch (Exception ex) {
-                auditLogger.logError("contacts_presence_push_error", requestId, callerId, ex,
-                        Map.of("contactId", contactId, "active", active));
-            }
+            pushPresencePayload(
+                    connection,
+                    payload,
+                    auditLogger,
+                    "contacts_presence_push_error",
+                    requestId,
+                    callerId,
+                    Map.of("contactId", contactId, "active", active));
         }
     }
 
@@ -197,16 +199,44 @@ public final class HttpIngressServer {
             }
             for (String watcherUserId : watcherUserIds) {
                 for (WebSocket connection : presenceRegistry.getActiveConnections(watcherUserId)) {
-                    try {
-                        connection.send(payload);
-                    } catch (Exception ex) {
-                        auditLogger.logError("presence_visibility_push_error", requestId, watcherUserId, ex,
-                                Map.of("userId", userId, "active", active));
-                    }
+                    pushPresencePayload(
+                            connection,
+                            payload,
+                            auditLogger,
+                            "presence_visibility_push_error",
+                            requestId,
+                            watcherUserId,
+                            Map.of("userId", userId, "active", active));
                 }
             }
         } catch (Exception ex) {
             auditLogger.logError("presence_watchers_lookup_error", requestId, userId, ex);
+        }
+    }
+
+    /**
+     * Sends presence payload to one websocket connection and logs failures.
+     *
+     * @param connection  target websocket connection
+     * @param payload     presence payload
+     * @param auditLogger logger used for error diagnostics
+     * @param eventName   audit event name for send failures
+     * @param requestId   request identifier
+     * @param actorId     user id associated with the push context
+     * @param context     additional context fields to log with failures
+     */
+    private static void pushPresencePayload(
+            WebSocket connection,
+            String payload,
+            AuditLogger auditLogger,
+            String eventName,
+            String requestId,
+            String actorId,
+            Map<String, Object> context) {
+        try {
+            connection.send(payload);
+        } catch (Exception ex) {
+            auditLogger.logError(eventName, requestId, actorId, ex, context);
         }
     }
 
@@ -881,7 +911,7 @@ public final class HttpIngressServer {
          * Closes all active websocket connections for the logging-out user so
          * presence transitions to offline immediately.
          *
-         * @param callerId user id that just logged out
+         * @param callerId  user id that just logged out
          * @param requestId request id for structured error logs
          */
         private void closeActivePresenceConnections(String callerId, String requestId) {
@@ -1124,7 +1154,7 @@ public final class HttpIngressServer {
             Map<String, String> queryParams;
             try {
                 queryParams = parseQueryParams(exchange.getRequestURI().getRawQuery());
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_QUERY_PARAMS)));
                 return;
             }
@@ -1147,7 +1177,7 @@ public final class HttpIngressServer {
             int effectiveLimit;
             try {
                 effectiveLimit = resolveLimit(queryParams.get("limit"));
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_LIMIT)));
                 return;
             }
@@ -1156,7 +1186,7 @@ public final class HttpIngressServer {
             CursorKey cursor;
             try {
                 cursor = decodeCursor(cursorToken);
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_CURSOR)));
                 return;
             }
@@ -1709,7 +1739,7 @@ public final class HttpIngressServer {
 
             try {
                 dispatchRequest(exchange, callerId, method, suffix);
-            } catch (SecurityException ex) {
+            } catch (SecurityException _) {
                 sendJson(exchange, 403, jsonError("forbidden"));
             } catch (IllegalArgumentException ex) {
                 sendJson(exchange, 400, jsonError(ex.getMessage()));
@@ -1854,7 +1884,7 @@ public final class HttpIngressServer {
             byte[] decodedChunk;
             try {
                 decodedChunk = Base64.getDecoder().decode(request.getChunkDataB64());
-            } catch (IllegalArgumentException ex) {
+            } catch (IllegalArgumentException _) {
                 throw new IllegalArgumentException("chunkDataB64 is not valid base64");
             }
             if (decodedChunk.length == 0 || decodedChunk.length > config.getAttachmentChunkBytes()) {

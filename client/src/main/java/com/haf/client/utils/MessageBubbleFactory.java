@@ -54,7 +54,7 @@ public final class MessageBubbleFactory {
     /**
      * Creates a full-width row bubble with optional timestamp row.
      *
-     * @param message message to render
+     * @param message       message to render
      * @param showTimestamp whether to render timestamp metadata
      * @return rendered row node
      */
@@ -65,7 +65,7 @@ public final class MessageBubbleFactory {
     /**
      * Creates a full-width row bubble with optional timestamp row.
      *
-     * @param message message to render
+     * @param message       message to render
      * @param showTimestamp whether to render timestamp metadata
      * @param use24HourTime whether to format timestamp as 24-hour clock
      * @return rendered row node
@@ -136,10 +136,10 @@ public final class MessageBubbleFactory {
      * @param bubble        visual bubble under the overlay
      */
     private static void bridgeOverlayPseudoClasses(JFXButton rippleOverlay, VBox bubble) {
-        rippleOverlay.hoverProperty().addListener((obs, oldV, hovering) ->
-                bubble.pseudoClassStateChanged(HOVER_PSEUDO_CLASS, hovering));
-        rippleOverlay.pressedProperty().addListener((obs, oldV, pressed) ->
-                bubble.pseudoClassStateChanged(PRESSED_PSEUDO_CLASS, pressed));
+        rippleOverlay.hoverProperty()
+                .addListener((obs, oldV, hovering) -> bubble.pseudoClassStateChanged(HOVER_PSEUDO_CLASS, hovering));
+        rippleOverlay.pressedProperty()
+                .addListener((obs, oldV, pressed) -> bubble.pseudoClassStateChanged(PRESSED_PSEUDO_CLASS, pressed));
     }
 
     /**
@@ -252,8 +252,8 @@ public final class MessageBubbleFactory {
      * @param spinner   the loading spinner overlay
      */
     private static void loadImageContent(MessageVM message,
-                                         ImageView imageView,
-                                         ProgressIndicator spinner) {
+            ImageView imageView,
+            ProgressIndicator spinner) {
         if (message.content() == null || message.content().isBlank()) {
             return;
         }
@@ -274,7 +274,7 @@ public final class MessageBubbleFactory {
                     setSpinnerVisible(spinner, false);
                 }
             });
-        } catch (Exception ignored) {
+        } catch (Exception _) {
             /* broken URL – show empty view */
             setSpinnerVisible(spinner, false);
         }
