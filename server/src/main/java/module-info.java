@@ -1,6 +1,7 @@
 module server {
-    requires com.zaxxer.hikari;
     requires flyway.core;
+    requires password4j;
+    requires com.zaxxer.hikari;
     requires java.sql;
     requires jdk.httpserver;
     requires org.apache.logging.log4j;
@@ -8,7 +9,6 @@ module server {
     requires org.apache.logging.log4j.layout.template.json;
     requires org.java_websocket;
     requires io.github.cdimascio.dotenv.java;
-    requires password4j;
     requires org.slf4j;
     requires transitive shared;
 
