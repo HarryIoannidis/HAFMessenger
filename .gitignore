@@ -4,6 +4,7 @@ target/
 !**/src/test/**/target/
 .kotlin
 .logs/
+logs/
 
 ### IntelliJ IDEA ###
 .idea/

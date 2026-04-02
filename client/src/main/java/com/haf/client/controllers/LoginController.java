@@ -1,5 +1,6 @@
 package com.haf.client.controllers;
 
+import com.haf.client.security.RememberedCredentialsStore;
 import com.haf.client.services.DefaultLoginService;
 import com.haf.client.services.LoginService;
 import com.haf.client.utils.ClientSettings;
@@ -35,9 +36,6 @@ public class LoginController {
     private static final String SIGN_IN_TEXT = "Sign In";
     private static final String SIGNING_IN_TEXT = "Signing in...";
     private static final String LOADING_COMPONENTS_TEXT = "Loading components...";
-    static final String PREF_REMEMBER_ME = "remember_me";
-    static final String PREF_REMEMBERED_EMAIL = "remembered_email";
-
 
     // Window chrome and layout containers
     @FXML
@@ -85,6 +83,7 @@ public class LoginController {
 
     private final LoginViewModel viewModel = new LoginViewModel();
     private final LoginService loginService;
+    private final RememberedCredentialsStore rememberedCredentialsStore;
 
     private double xOffset;
     private double yOffset;
@@ -93,7 +92,7 @@ public class LoginController {
      * Creates a login controller using the default login service.
      */
     public LoginController() {
-        this(new DefaultLoginService());
+        this(new DefaultLoginService(), createRememberedCredentialsStore());
     }
 
     /**
@@ -102,7 +101,25 @@ public class LoginController {
      * @param loginService login service used for authentication calls
      */
     LoginController(LoginService loginService) {
+        this(loginService, createRememberedCredentialsStore());
+    }
+
+    /**
+     * Creates a login controller with injected login and remember-credentials
+     * services.
+     *
+     * @param loginService               login service used for authentication calls
+     * @param rememberedCredentialsStore credential persistence service
+     */
+    LoginController(LoginService loginService, RememberedCredentialsStore rememberedCredentialsStore) {
         this.loginService = Objects.requireNonNull(loginService, "loginService");
+        this.rememberedCredentialsStore = Objects.requireNonNull(
+                rememberedCredentialsStore,
+                "rememberedCredentialsStore");
+    }
+
+    private static RememberedCredentialsStore createRememberedCredentialsStore() {
+        return RememberedCredentialsStore.createDefault(Preferences.userNodeForPackage(LoginController.class));
     }
 
     /**
@@ -114,7 +131,7 @@ public class LoginController {
         setupListeners();
         setupPasswordToggle();
         setupWindowControls();
-        loadPreferences();
+        loadRememberedCredentials();
     }
 
     /**
@@ -337,10 +354,10 @@ public class LoginController {
             signInButton.setText(LOADING_COMPONENTS_TEXT);
             signInButton.applyCss();
             signInButton.layout();
-            savePreferences();
+            persistRememberedCredentials();
             // Allow one UI pulse so the loading label paints before heavy main-view load.
-            javafx.animation.PauseTransition switchDelay =
-                    new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+            javafx.animation.PauseTransition switchDelay = new javafx.animation.PauseTransition(
+                    javafx.util.Duration.millis(50));
             switchDelay.setOnFinished(event -> {
                 try {
                     ViewRouter.switchToTransparent(UiConstants.FXML_MAIN);
@@ -356,7 +373,8 @@ public class LoginController {
     }
 
     /**
-     * Displays a popup when main chat UI fails to load after successful authentication.
+     * Displays a popup when main chat UI fails to load after successful
+     * authentication.
      *
      * @param error scene-load error
      */
@@ -418,28 +436,35 @@ public class LoginController {
     /**
      * Loads remember-me preferences and restores saved email when enabled.
      */
-    private void loadPreferences() {
-        Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
-        boolean remember = prefs.getBoolean(PREF_REMEMBER_ME, false);
-        if (remember) {
-            String savedEmail = prefs.get(PREF_REMEMBERED_EMAIL, "");
-            viewModel.setEmail(savedEmail);
+    private void loadRememberedCredentials() {
+        try {
+            if (!rememberedCredentialsStore.isRememberCredentialsEnabled()) {
+                return;
+            }
+            String email = rememberedCredentialsStore.loadRememberedEmail();
+            String password = rememberedCredentialsStore.loadRememberedPassword(email);
+            viewModel.setEmail(email);
+            viewModel.setPassword(password);
             viewModel.rememberCredentialsProperty().set(true);
-            javafx.application.Platform.runLater(passwordField::requestFocus);
+            if (signInButton != null) {
+                javafx.application.Platform.runLater(signInButton::requestFocus);
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Failed to load remembered credentials: {}", ex.getMessage());
         }
     }
 
     /**
      * Persists remember-me choice and associated email.
      */
-    private void savePreferences() {
-        Preferences prefs = Preferences.userNodeForPackage(LoginController.class);
-        if (viewModel.isRememberCredentials()) {
-            prefs.put(PREF_REMEMBERED_EMAIL, viewModel.getEmail());
-            prefs.putBoolean(PREF_REMEMBER_ME, true);
-        } else {
-            prefs.remove(PREF_REMEMBERED_EMAIL);
-            prefs.putBoolean(PREF_REMEMBER_ME, false);
+    private void persistRememberedCredentials() {
+        try {
+            rememberedCredentialsStore.persistRememberedCredentials(
+                    viewModel.isRememberCredentials(),
+                    viewModel.getEmail(),
+                    viewModel.getPassword());
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Failed to persist remembered credentials: {}", ex.getMessage());
         }
     }
 

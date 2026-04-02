@@ -11,6 +11,8 @@ module client {
     requires org.kordamp.ikonli.materialdesign2;
     requires java.prefs;
     requires java.desktop;
+    requires com.sun.jna;
+    requires com.sun.jna.platform;
 
     exports com.haf.client.models;
     exports com.haf.client.controllers;

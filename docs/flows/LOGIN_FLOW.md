@@ -5,10 +5,12 @@ This document provides a deep-dive technical breakdown of the login orchestratio
 ## 1. UI Interaction & Form Verification (`LoginController`)
 
 - **Bidirectional Binding**: The JavaFX fields (`emailField`, `passwordField`) are bidirectionally bound to `LoginViewModel` properties.
+- **Remembered Prefill**: On screen initialization, `RememberedCredentialsStore` loads remembered email and password (if available) and pre-fills the form.
 - **Reactive UX**:
   - Typing in either field actively strips away `UiConstants.STYLE_TEXT_FIELD_ERROR` classes without waiting for a re-submit.
   - Pressing `Enter` on the email field shifts focus to the password field, and pressing `Enter` on the password field triggers the `handleSignIn()` method.
   - The controller handles a "password toggle" by maintaining a hidden standard `TextField` that mirrors the `PasswordField`, swapping their visibility and keeping the cursor caret position in sync.
+  - When remembered credentials are loaded, focus moves to the `Sign In` button for immediate keyboard submit.
 - **Hardware Acceleration**: If local validation (`viewModel.validate()`) fails, the controller executes a JavaFX `TranslateTransition` natively rendering a physical back-and-forth "shake" of the invalid fields.
 
 ## 2. Thread Hand-Off
@@ -38,6 +40,6 @@ The service emits a success code, popping execution back to the `LoginController
 
 - The button is swapped to say "Loading components...".
 - **Hardware Throttling**: The controller kicks off a JavaFX `PauseTransition` for precisely 50 milliseconds. This gives the GPU and Java scene graph exactly one "tick" to actually paint the UI text changes to the monitor *before* the application begins loading the heavy `MAIN` interface.
-- **Disk IO Preference**: During that 50ms pulse, `java.util.prefs.Preferences` drops down to write the "Remember Me" toggle state and cached username to the system's registry (or equivalent file system tier).
+- **Disk IO Preference**: During that 50ms pulse, `RememberedCredentialsStore` writes remember-toggle/email metadata to `java.util.prefs.Preferences`, while remembered password (when enabled) is stored through OS secure credential storage.
 - **Navigation Engine**: `ViewRouter.switchToTransparent(UiConstants.FXML_MAIN)` is invoked.
 - **View-Level Recovery**: If the Heavy Main view crashes while compiling/rendering `FXML_MAIN` (even though authentication succeeded), `showMainLoadFailurePopup` catches it natively, throwing an error dialog without completely terminating the JVM sequence.
