@@ -248,7 +248,7 @@ public class SettingsController {
                     SettingsRowBuilder.buildSectionSpacer("generalRememberSectionSpacer"),
                     SettingsRowBuilder.buildSectionHeader(
                             "generalRememberSection",
-                            "Remember"),
+                            "Persistence"),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalRememberWindowStateRow",
                             "generalRememberWindowStateToggle",
