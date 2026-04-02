@@ -16,17 +16,20 @@ Index the main source layout and notable classes without duplicating generated/b
 
 - Client notable classes:
   - Controllers: `MainController`, `ChatController`, `SearchController`, `SettingsController`
-  - ViewModels: `MessagesViewModel`, `ChatViewModel`, `SearchViewModel`, `MainViewModel`
-  - Network: `WebSocketAdapter`, `MessageSender`, `MessageReceiver`
+  - ViewModels: `MainViewModel`, `MessagesViewModel`, `ChatViewModel`, `SearchViewModel`
+  - Network: `WebSocketAdapter`, `DefaultMessageSender`, `DefaultMessageReceiver`, `MessageSender`, `MessageReceiver`
+  - Services: `DefaultLoginService`, `DefaultRegistrationService`, `DefaultMainSessionService`, `DesktopNotificationService`
+  - Security: `RememberedCredentialsStore`, `SecurePasswordVault`, `WindowsCredentialManagerPasswordVault`, `MacOsKeychainPasswordVault`, `LinuxSecretToolPasswordVault`
 - Server notable classes:
   - `Main`, `ServerConfig`
   - `HttpIngressServer`, `WebSocketIngressServer`
-  - `MailboxRouter`, `RateLimiterService`
+  - `MailboxRouter`, `RateLimiterService`, `PresenceRegistry`
+  - `MetricsRegistry`, `AuditLogger`, `EncryptedMessageValidator`
   - DAOs in `server.db`
 - Shared notable classes:
-  - `EncryptedMessage`, `EncryptedFileDTO`, request/response DTOs
-  - `MessageValidator`, `JsonCodec`, `MessageEncryptor`, `MessageDecryptor`
-  - `KeyProvider`, `UserKeystore`
+  - `EncryptedMessage`, `EncryptedFileDTO`, attachment payload DTOs, request/response DTOs
+  - `MessageValidator`, `JsonCodec`, `MessageEncryptor`, `MessageDecryptor`, `AttachmentPayloadCodec`
+  - `KeyProvider`, `UserKeystore`, `KeystoreBootstrap`
 
 ## Flow
 
@@ -37,11 +40,77 @@ Index the main source layout and notable classes without duplicating generated/b
 ## Error/Security Notes
 
 - This file documents source layout only; build artifacts under `target/` are excluded.
-- Keep class names synchronized with source tree on refactors (for example `MessagesViewModel`, not removed legacy names).
+- Keep class names synchronized with source tree on refactors (for example use `MessagesViewModel` consistently).
+
+## Full File Inventory
+
+- Client files (`src/main/java`):
+  - `module-info.java`
+  - Controllers: `ChatController.java`, `ContactCell.java`, `LoginController.java`, `MainContentLoader.java`, `MainController.java`, `PopupMessageController.java`, `PreviewController.java`, `ProfileController.java`, `RegisterController.java`, `SearchController.java`, `SearchFilterController.java`, `SettingsController.java`, `SplashController.java`
+  - Core: `ChatSession.java`, `ClientApp.java`, `CurrentUserSession.java`, `Launcher.java`, `NetworkSession.java`
+  - Crypto: `UserKeystoreKeyProvider.java`
+  - Exceptions: `HttpCommunicationException.java`, `RegistrationFlowException.java`, `SslConfigurationException.java`, `UiDispatchException.java`
+  - Models: `ContactInfo.java`, `MessageType.java`, `MessageVM.java`, `SettingsMenuItem.java`, `UserProfileInfo.java`
+  - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `WebSocketAdapter.java`
+  - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsCredentialManagerPasswordVault.java`
+  - Services: `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`
+  - Utils: `ClientSettings.java`, `ContextMenuBuilder.java`, `ImageSaveSupport.java`, `MessageBubbleFactory.java`, `PopupMessageBuilder.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SettingsRowBuilder.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
+  - ViewModels: `ChatViewModel.java`, `LoginViewModel.java`, `MainViewModel.java`, `MessagesViewModel.java`, `RegisterViewModel.java`, `SearchSortViewModel.java`, `SearchViewModel.java`, `SplashViewModel.java`
+- Client files (`src/test/java`):
+  - Controllers: `ChatControllerTest.java`, `ContactCellTest.java`, `LoginControllerTest.java`, `MainContentLoaderTest.java`, `MainControllerTest.java`, `PopupMessageControllerTest.java`, `PreviewControllerTest.java`, `RegisterControllerTest.java`, `SearchControllerTest.java`, `SearchFilterUiTest.java`, `SettingsControllerRememberCredentialsTest.java`, `SettingsControllerTest.java`, `SplashControllerTest.java`
+  - Crypto: `UserKeystoreKeyProviderTest.java`
+  - Network: `MessageReceiverTest.java`, `MessageSenderTest.java`, `WebSocketAdapterTest.java`
+  - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsCredentialManagerPasswordVaultTest.java`
+  - Services: `DefaultChatAttachmentServiceTest.java`, `DefaultLoginServiceTest.java`, `DefaultMainSessionServiceTest.java`, `DefaultRegistrationServiceTest.java`
+  - Utils: `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
+  - ViewModels: `ChatViewModelTest.java`, `LoginViewModelTest.java`, `MainViewModelTest.java`, `MessageViewModelAttachmentTest.java`, `MessageViewModelIncomingListenerTest.java`, `MessageViewModelPresenceTest.java`, `MessageViewModelRuntimeTest.java`, `RegisterViewModelTest.java`, `SearchViewModelTest.java`, `SplashViewModelTest.java`
+  - Integration tests: `AadConsistencyIT.java`, `MessageSendReceiveIT.java`, `MultiUserKeystoreCollisionIT.java`
+
+- Server files (`src/main/java`):
+  - `module-info.java`
+  - Config: `ServerConfig.java`
+  - Core: `Main.java`
+  - DB: `AttachmentDAO.java`, `ContactDAO.java`, `EnvelopeDAO.java`, `FileUploadDAO.java`, `SessionDAO.java`, `UserDAO.java`
+  - Exceptions: `ConfigurationException.java`, `DatabaseOperationException.java`, `RateLimitException.java`, `StartupException.java`
+  - Handlers: `EncryptedMessageValidator.java`
+  - Ingress: `HttpIngressServer.java`, `PresenceRegistry.java`, `WebSocketIngressServer.java`
+  - Metrics: `AuditLogger.java`, `MetricsRegistry.java`
+  - Router: `MailboxRouter.java`, `QueuedEnvelope.java`, `RateLimiterService.java`
+- Server files (`src/test/java`):
+  - Integration tests: `EnvelopeDAOIT.java`
+  - Config: `ServerConfigTest.java`
+  - Core: `MainTest.java`
+  - DB: `AttachmentDAOTest.java`, `ContactDAOTest.java`, `EnvelopeDAOTest.java`, `FileUploadDAOTest.java`, `SessionDAOTest.java`, `UserDAOTest.java`
+  - Handlers: `EncryptedMessageValidatorTest.java`
+  - Ingress: `HttpIngressServerTest.java`, `LoginPresenceGuardTest.java`, `PresencePushTest.java`, `WebSocketIngressServerTest.java`
+  - Metrics: `AuditLoggerTest.java`, `MetricsRegistryTest.java`
+  - Router: `MailboxRouterTest.java`, `QueuedEnvelopeTest.java`, `RateLimiterServiceTest.java`
+- Shared files (`src/main/java`):
+  - `module-info.java`
+  - Constants: `AttachmentConstants.java`, `CryptoConstants.java`, `MessageHeader.java`
+  - Crypto: `AadCodec.java`, `CryptoECC.java`, `CryptoService.java`, `MessageDecryptor.java`, `MessageEncryptor.java`
+  - DTO: `AttachmentInlinePayload.java`, `AttachmentReferencePayload.java`, `EncryptedFileDTO.java`, `EncryptedMessage.java`, `KeyMetadata.java`, `UserSearchResultDTO.java`
+  - Exceptions: `CryptoOperationException.java`, `JsonCodecException.java`, `KeyNotFoundException.java`, `KeystoreOperationException.java`, `MessageDecryptionException.java`, `MessageExpiredException.java`, `MessageTamperedException.java`, `MessageValidationException.java`
+  - Keystore: `KeyProvider.java`, `KeystoreBootstrap.java`, `KeystoreRoot.java`, `KeystoreSealing.java`, `UserKeystore.java`
+  - Requests: `AddContactRequest.java`, `AttachmentBindRequest.java`, `AttachmentChunkRequest.java`, `AttachmentCompleteRequest.java`, `AttachmentInitRequest.java`, `LoginRequest.java`, `RegisterRequest.java`
+  - Responses: `AttachmentBindResponse.java`, `AttachmentChunkResponse.java`, `AttachmentCompleteResponse.java`, `AttachmentDownloadResponse.java`, `AttachmentInitResponse.java`, `ContactsResponse.java`, `LoginResponse.java`, `MessagingPolicyResponse.java`, `PublicKeyResponse.java`, `RegisterResponse.java`, `UserSearchResponse.java`
+  - Utils: `AttachmentPayloadCodec.java`, `ClockProvider.java`, `EccKeyIO.java`, `FilePerms.java`, `FingerprintUtil.java`, `FixedClockProvider.java`, `JsonCodec.java`, `MessageValidator.java`, `PemCodec.java`, `SystemClockProvider.java`
+
+- Shared files (`src/test/java`):
+  - Integration tests: `KeystoreE2EIT.java`, `KeystorePermsE2EIT.java`, `KeystoreTamperIT.java`, `KeystoreWrongPassIT.java`
+  - Constants: `AttachmentConstantsTest.java`, `CryptoConstantsTest.java`, `MessageHeaderTest.java`
+  - Crypto: `AadBindingTest.java`, `AadCodecTest.java`, `CryptoECCTest.java`, `CryptoServiceTest.java`, `MessageDecryptorTest.java`, `MessageEncryptorTest.java`, `MessageFlowTest.java`
+  - DTO: `EncryptedFileDTOTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultDTOTest.java`
+  - Exceptions: `MessageExpiryTest.java`, `MessageTamperingTests.java`
+  - Keystore: `KeyProviderTest.java`, `KeystoreBootstrapIdempotentTest.java`, `KeystoreBootstrapTest.java`, `KeystoreRootTest.java`, `KeystoreSealingTest.java`, `UserKeystoreTest.java`
+  - Requests: `AddContactRequestTest.java`, `LoginRequestTest.java`
+  - Responses: `PublicKeyResponseTest.java`
+  - Utils: `AttachmentPayloadCodecTest.java`, `ClockProviderTest.java`, `EccKeyIOTest.java`, `FilePermsTest.java`, `FingerprintUtilTest.java`, `JsonCodecTest.java`, `MessageValidatorTest.java`, `PemCodecTest.java`
 
 ## Related Files
 
 - `client/src/main/java`
 - `server/src/main/java`
 - `shared/src/main/java`
+- `docs/client/REMEMBERED_CREDENTIALS_SECURITY.md`
 - `docs/misc/STRUCTURE.md`

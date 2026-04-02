@@ -93,7 +93,7 @@ public class MessagesViewModel {
     private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
 
     /**
-     * Creates a MessageViewModel.
+     * Creates a MessagesViewModel.
      */
     public MessagesViewModel(MessageSender messageSender, MessageReceiver messageReceiver) {
         this.messageSender = messageSender;
@@ -286,15 +286,15 @@ public class MessagesViewModel {
      * Determines whether an inline attachment is expected to fit comfortably within
      * the websocket inbound frame budget after JSON + crypto/Base64 expansion.
      *
-     * @param fileName attachment filename metadata
-     * @param mediaType normalized MIME type metadata
+     * @param fileName     attachment filename metadata
+     * @param mediaType    normalized MIME type metadata
      * @param fileBytesLen plaintext attachment byte length
      * @return {@code true} when inline transport is expected to fit safely
      */
     private boolean canSendInlineWithinWsBudget(String fileName, String mediaType, int fileBytesLen) {
         long estimatedInlinePayloadBytes = estimateInlinePayloadBytes(fileName, mediaType, fileBytesLen);
         long estimatedWireBytes = estimateEncryptedEnvelopeWireBytes(estimatedInlinePayloadBytes);
-        long budget = Math.max(1L, MAX_WS_INBOUND_MESSAGE_BYTES - INLINE_WIRE_HEADROOM_BYTES);
+        long budget = Math.max(1L, (long) MAX_WS_INBOUND_MESSAGE_BYTES - (long) INLINE_WIRE_HEADROOM_BYTES);
         return estimatedWireBytes <= budget;
     }
 
@@ -302,8 +302,8 @@ public class MessagesViewModel {
      * Estimates the UTF-8 byte size of the inline attachment JSON payload before
      * encryption.
      *
-     * @param fileName attachment filename metadata
-     * @param mediaType normalized MIME type metadata
+     * @param fileName     attachment filename metadata
+     * @param mediaType    normalized MIME type metadata
      * @param fileBytesLen plaintext attachment byte length
      * @return estimated payload bytes
      */
