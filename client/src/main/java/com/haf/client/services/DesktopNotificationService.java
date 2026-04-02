@@ -55,7 +55,11 @@ public class DesktopNotificationService {
         String safeTitle = title == null || title.isBlank() ? UiConstants.APP_TITLE : title.trim();
         String safeMessage = message == null || message.isBlank() ? "New message received" : message.trim();
 
-        if (tryShowNativeNotification(safeTitle, safeMessage)) {
+        NativeNotifier notifier = resolveNativeNotifier();
+        if (notifier != NativeNotifier.NONE) {
+            if (!tryShowNativeNotification(safeTitle, safeMessage)) {
+                LOGGER.debug("Native notification command did not report success; skipping tray fallback.");
+            }
             return;
         }
 
