@@ -2,36 +2,113 @@
 
 ## Purpose
 
-Describe the real repository structure and module boundaries used in this codebase.
+Describe the actual repository layout and module boundaries used in this codebase.
 
 ## Current Implementation
 
 ```text
 HAFMessenger/
   client/
-    src/main/java
-    src/main/resources
-    src/test/java
+    pom.xml
+    src/main/java/
+      module-info.java
+      com/haf/client/
+        controllers/
+        core/
+        crypto/
+        exceptions/
+        models/
+        network/
+        security/
+        services/
+        utils/
+        viewmodels/
+    src/main/resources/
+      config/
+      css/
+      fonts/
+      fxml/
+      images/
+    src/test/java/com/haf/client/
+      controllers/
+      crypto/
+      network/
+      security/
+      services/
+      utils/
+      viewmodels/
+
   server/
-    src/main/java
-    src/main/resources
-    src/test/java
+    pom.xml
+    src/main/java/
+      module-info.java
+      com/haf/server/
+        config/
+        core/
+        db/
+        exceptions/
+        handlers/
+        ingress/
+        metrics/
+        router/
+    src/main/resources/
+      config/
+      db/
+      log4j2.xml
+    src/test/java/com/haf/server/
+      config/
+      core/
+      db/
+      handlers/
+      ingress/
+      metrics/
+      router/
+
   shared/
-    src/main/java
-    src/test/java
+    pom.xml
+    src/main/java/
+      module-info.java
+      com/haf/shared/
+        constants/
+        crypto/
+        dto/
+        exceptions/
+        keystore/
+        requests/
+        responses/
+        utils/
+    src/test/java/com/haf/shared/
+      constants/
+      crypto/
+      dto/
+      exceptions/
+      keystore/
+      requests/
+      responses/
+      utils/
+
   docs/
     client/
+      scenes/
+    flows/
+    misc/
     server/
     shared/
-    misc/
+
+  .mvn/
+    wrapper/
+
+  logs/ (runtime output, git-ignored)
   pom.xml
   mvnw
   mvnw.cmd
+  README.md
+  .gitignore
 ```
 
 ## Key Types/Interfaces
 
-- Client packages: `controllers`, `viewmodels`, `services`, `network`, `crypto`, `utils`, `models`, `core`, `exceptions`.
+- Client packages: `controllers`, `viewmodels`, `services`, `network`, `crypto`, `security`, `utils`, `models`, `core`, `exceptions`.
 - Server packages: `config`, `core`, `ingress`, `router`, `db`, `handlers`, `metrics`, `exceptions`.
 - Shared packages: `dto`, `requests`, `responses`, `constants`, `crypto`, `keystore`, `utils`, `exceptions`.
 
@@ -39,12 +116,12 @@ HAFMessenger/
 
 1. Parent Maven POM builds `shared`, then `client` and `server`.
 2. `client` and `server` consume shared contracts.
-3. Runtime flow is client UI/network -> server ingress/router/dao -> client receive/decrypt.
+3. Runtime flow is client UI/network -> server ingress/router/db -> client receive/decrypt.
 
 ## Error/Security Notes
 
-- There is no `scripts/` directory in current repo state; docs should not assume it exists.
 - Keep dependency direction strict (`client/server` depend on `shared`; not vice versa).
+- `logs/` is runtime output and should not be committed.
 
 ## Related Files
 
@@ -55,3 +132,4 @@ HAFMessenger/
 - `client/src/main/java/module-info.java`
 - `server/src/main/java/module-info.java`
 - `shared/src/main/java/module-info.java`
+- `.gitignore`

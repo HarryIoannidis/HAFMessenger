@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.models.SettingsMenuItem;
+import com.haf.client.security.RememberedCredentialsStore;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.SettingsRowBuilder;
 import com.haf.client.utils.PopupMessageBuilder;
@@ -25,11 +26,12 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.prefs.Preferences;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -44,7 +46,6 @@ public class SettingsController {
     private static final Logger LOGGER = LoggerFactory.getLogger(SettingsController.class);
     private static final String RESTART_HANDLER_KEY = "settings.restartRequestHandler";
     private static final String DISABLED_ROW_STYLE_CLASS = "settings-row-disabled";
-    private static final Preferences LOGIN_PREFS = Preferences.userNodeForPackage(LoginController.class);
     private static final Runnable NO_OP_RESTART_HANDLER = () -> {
     };
 
@@ -98,6 +99,7 @@ public class SettingsController {
     private double yOffset;
 
     private ClientSettings settings = ClientSettings.defaults();
+    private final RememberedCredentialsStore rememberedCredentialsStore;
 
     private final Map<String, VBox> panesById = new LinkedHashMap<>();
     private final List<SettingsMenuItem> menuItems = List.of(
@@ -107,6 +109,19 @@ public class SettingsController {
             new SettingsMenuItem("Chat", "mdi2m-message-text-outline", "chatSettingsPane"),
             new SettingsMenuItem("Notifications", "mdi2b-bell-outline", "notificationsSettingsPane"),
             new SettingsMenuItem("Privacy", "mdi2s-shield-lock-outline", "privacySettingsPane"));
+
+    /**
+     * Creates a settings controller with default remember-credentials backing.
+     */
+    public SettingsController() {
+        this(RememberedCredentialsStore.createDefault(Preferences.userNodeForPackage(LoginController.class)));
+    }
+
+    SettingsController(RememberedCredentialsStore rememberedCredentialsStore) {
+        this.rememberedCredentialsStore = Objects.requireNonNull(
+                rememberedCredentialsStore,
+                "rememberedCredentialsStore");
+    }
 
     /**
      * Initializes settings popup controls and generated row content.
@@ -244,7 +259,7 @@ public class SettingsController {
                             "generalRememberCredentialsRow",
                             "generalRememberCredentialsToggle",
                             "Remember Credentials",
-                            "Keep your login email prefilled between app launches.",
+                            "Keep login email prefilled and password in OS secure storage between launches.",
                             isRememberCredentialsEnabled()),
                     SettingsRowBuilder.buildSwitchRow(
                             "generalRestoreLastTabRow",
@@ -502,7 +517,7 @@ public class SettingsController {
         wireSwitch("generalRememberWindowStateRow", "generalRememberWindowStateToggle",
                 settings::setGeneralRememberWindowState);
         wireSwitch("generalRememberCredentialsRow", "generalRememberCredentialsToggle",
-                SettingsController::setRememberCredentialsEnabled);
+                this::setRememberCredentialsEnabled);
         wireSwitch("generalRestoreLastTabRow", "generalRestoreLastTabToggle", settings::setGeneralRestoreLastTab);
 
         wireSwitch("searchInstantOnTypeRow", "searchInstantOnTypeToggle", settings::setSearchInstantOnType);
@@ -597,20 +612,18 @@ public class SettingsController {
      *
      * @return {@code true} when remember-me is enabled
      */
-    private static boolean isRememberCredentialsEnabled() {
-        return LOGIN_PREFS.getBoolean(LoginController.PREF_REMEMBER_ME, false);
+    private boolean isRememberCredentialsEnabled() {
+        return rememberedCredentialsStore.isRememberCredentialsEnabled();
     }
 
     /**
-     * Stores remember-me preference and clears remembered email when disabled.
+     * Stores remember-me preference and clears remembered credentials when
+     * disabled.
      *
      * @param enabled desired remember-me state
      */
-    private static void setRememberCredentialsEnabled(boolean enabled) {
-        LOGIN_PREFS.putBoolean(LoginController.PREF_REMEMBER_ME, enabled);
-        if (!enabled) {
-            LOGIN_PREFS.remove(LoginController.PREF_REMEMBERED_EMAIL);
-        }
+    private void setRememberCredentialsEnabled(boolean enabled) {
+        rememberedCredentialsStore.setRememberCredentialsEnabled(enabled);
     }
 
     /**
