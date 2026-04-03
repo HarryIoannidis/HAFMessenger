@@ -29,8 +29,6 @@ public class ProfileController {
     @FXML
     private HBox titleBar;
     @FXML
-    private JFXButton minimizeButton;
-    @FXML
     private JFXButton closeButton;
 
     // Profile detail text nodes
@@ -168,9 +166,6 @@ public class ProfileController {
                 return;
             }
 
-            if (minimizeButton != null) {
-                minimizeButton.setOnAction(e -> stage.setIconified(true));
-            }
             if (closeButton != null) {
                 closeButton.setOnAction(e -> stage.hide());
             }

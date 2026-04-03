@@ -41,8 +41,6 @@ public class PreviewController {
     @FXML
     private HBox titleBar;
     @FXML
-    private JFXButton minimizeButton;
-    @FXML
     private JFXButton closeButton;
 
     // Preview content and actions
@@ -286,7 +284,7 @@ public class PreviewController {
     }
 
     /**
-     * Configures drag/move/minimize/close behavior for the preview window.
+     * Configures drag/move/close behavior for the preview window.
      */
     private void setupWindowControls() {
         Platform.runLater(() -> {
@@ -299,9 +297,6 @@ public class PreviewController {
             stage.setMinWidth(280);
             stage.setMinHeight(220);
 
-            if (minimizeButton != null) {
-                minimizeButton.setOnAction(e -> stage.setIconified(true));
-            }
             if (closeButton != null) {
                 closeButton.setOnAction(e -> stage.hide());
             }

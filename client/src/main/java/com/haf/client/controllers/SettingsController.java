@@ -55,8 +55,6 @@ public class SettingsController {
     @FXML
     private HBox titleBar;
     @FXML
-    private JFXButton minimizeButton;
-    @FXML
     private JFXButton closeButton;
 
     // Settings layout controls
@@ -852,9 +850,6 @@ public class SettingsController {
             }
             AtomicBoolean closingStage = new AtomicBoolean(false);
 
-            if (minimizeButton != null) {
-                minimizeButton.setOnAction(e -> stage.setIconified(true));
-            }
             if (closeButton != null) {
                 closeButton.setOnAction(e -> requestClose(stage, closingStage));
             }
