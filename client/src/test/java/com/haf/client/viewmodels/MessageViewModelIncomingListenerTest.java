@@ -10,8 +10,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class MessageViewModelIncomingListenerTest {
 
@@ -37,9 +41,27 @@ class MessageViewModelIncomingListenerTest {
         viewModel.addIncomingMessageListener((senderId, message) -> seen.add(message));
         viewModel.sendTextMessage("bob", "hello");
 
+        awaitCondition(() -> viewModel.getMessages("bob").size() == 1);
         assertTrue(seen.isEmpty());
         assertEquals(1, viewModel.getMessages("bob").size());
         assertTrue(viewModel.getMessages("bob").getFirst().isOutgoing());
+    }
+
+    private static void awaitCondition(BooleanSupplier condition) {
+        long timeoutAt = System.currentTimeMillis() + 2_500L;
+        CountDownLatch latch = new CountDownLatch(1);
+        while (System.currentTimeMillis() < timeoutAt) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            try {
+                latch.await(10, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                fail("Interrupted while waiting for condition", ex);
+            }
+        }
+        fail("Condition not met within timeout");
     }
 
     private static final class NoopMessageSender implements MessageSender {

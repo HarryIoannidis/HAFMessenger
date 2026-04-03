@@ -49,12 +49,12 @@ Index the main source layout and notable classes without duplicating generated/b
   - Controllers: `ChatController.java`, `ContactCell.java`, `LoginController.java`, `MainContentLoader.java`, `MainController.java`, `PopupMessageController.java`, `PreviewController.java`, `ProfileController.java`, `RegisterController.java`, `SearchController.java`, `SearchFilterController.java`, `SettingsController.java`, `SplashController.java`
   - Core: `ChatSession.java`, `ClientApp.java`, `CurrentUserSession.java`, `Launcher.java`, `NetworkSession.java`
   - Crypto: `UserKeystoreKeyProvider.java`
-  - Exceptions: `HttpCommunicationException.java`, `RegistrationFlowException.java`, `SslConfigurationException.java`, `UiDispatchException.java`
+  - Exceptions: `ClientConfigurationException.java`, `HttpCommunicationException.java`, `RegistrationFlowException.java`, `SslConfigurationException.java`, `UiDispatchException.java`
   - Models: `ContactInfo.java`, `MessageType.java`, `MessageVM.java`, `SettingsMenuItem.java`, `UserProfileInfo.java`
   - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `WebSocketAdapter.java`
   - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsCredentialManagerPasswordVault.java`
   - Services: `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`
-  - Utils: `ClientSettings.java`, `ContextMenuBuilder.java`, `ImageSaveSupport.java`, `MessageBubbleFactory.java`, `PopupMessageBuilder.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SettingsRowBuilder.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
+  - Utils: `ClientRuntimeConfig.java`, `ClientSettings.java`, `ContextMenuBuilder.java`, `ImageSaveSupport.java`, `MessageBubbleFactory.java`, `PopupMessageBuilder.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SettingsRowBuilder.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
   - ViewModels: `ChatViewModel.java`, `LoginViewModel.java`, `MainViewModel.java`, `MessagesViewModel.java`, `RegisterViewModel.java`, `SearchSortViewModel.java`, `SearchViewModel.java`, `SplashViewModel.java`
 - Client files (`src/test/java`):
   - Controllers: `ChatControllerTest.java`, `ContactCellTest.java`, `LoginControllerTest.java`, `MainContentLoaderTest.java`, `MainControllerTest.java`, `PopupMessageControllerTest.java`, `PreviewControllerTest.java`, `RegisterControllerTest.java`, `SearchControllerTest.java`, `SearchFilterUiTest.java`, `SettingsControllerRememberCredentialsTest.java`, `SettingsControllerTest.java`, `SplashControllerTest.java`
@@ -62,7 +62,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Network: `MessageReceiverTest.java`, `MessageSenderTest.java`, `WebSocketAdapterTest.java`
   - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsCredentialManagerPasswordVaultTest.java`
   - Services: `DefaultChatAttachmentServiceTest.java`, `DefaultLoginServiceTest.java`, `DefaultMainSessionServiceTest.java`, `DefaultRegistrationServiceTest.java`
-  - Utils: `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
+  - Utils: `ClientRuntimeConfigTest.java`, `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
   - ViewModels: `ChatViewModelTest.java`, `LoginViewModelTest.java`, `MainViewModelTest.java`, `MessageViewModelAttachmentTest.java`, `MessageViewModelIncomingListenerTest.java`, `MessageViewModelPresenceTest.java`, `MessageViewModelRuntimeTest.java`, `RegisterViewModelTest.java`, `SearchViewModelTest.java`, `SplashViewModelTest.java`
   - Integration tests: `AadConsistencyIT.java`, `MessageSendReceiveIT.java`, `MultiUserKeystoreCollisionIT.java`
 

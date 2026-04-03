@@ -169,23 +169,39 @@ public class MessagesViewModel {
     }
 
     /**
-     * Sends a plain-text message and adds it locally as outgoing bubble.
+     * Sends a plain-text message asynchronously and adds it locally as outgoing
+     * bubble.
      */
     public void sendTextMessage(String recipientId, String text) {
         String contactId = normalizeContactId(recipientId);
+        MessageVM pendingVm = MessageVM.outgoingLoadingText(text, LocalDateTime.now());
+        runOnUiThread(() -> {
+            getMessages(contactId).add(pendingVm);
+            status.set("Sending message to " + contactId + "…");
+        });
+        CompletableFuture.runAsync(() -> sendTextMessageInternal(contactId, text, pendingVm));
+    }
+
+    /**
+     * Performs text-message encryption + network send work off the UI thread.
+     *
+     * @param contactId normalized recipient/contact id
+     * @param text      message body to send
+     * @param pendingVm optimistic pending bubble to resolve on success/failure
+     */
+    private void sendTextMessageInternal(String contactId, String text, MessageVM pendingVm) {
         try {
             byte[] payload = text.getBytes(StandardCharsets.UTF_8);
             messageSender.sendMessage(payload, contactId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
 
-            MessageVM vm = MessageVM.outgoingText(text, LocalDateTime.now());
+            MessageVM vm = MessageVM.outgoingText(text, pendingVm.timestamp());
             runOnUiThread(() -> {
-                getMessages(contactId).add(vm);
-                status.set("Message sent to " + contactId);
+                replaceLoadingMessage(contactId, pendingVm, vm, "Message sent to " + contactId);
             });
             clearFailedSendRetryAction();
         } catch (Exception e) {
             String outgoingText = text;
-            captureFailedSendRetryAction(() -> sendTextMessage(contactId, outgoingText));
+            captureFailedSendRetryAction(() -> retryPendingTextMessage(contactId, outgoingText, pendingVm));
             runOnUiThread(() -> status.set("Failed to send: " + e.getMessage()));
             publishRuntimeIssue(
                     "messaging.send.failed",
@@ -193,6 +209,24 @@ public class MessagesViewModel {
                     "Could not send your message. " + resolveErrorMessage(e, "Please retry."),
                     this::retryLastFailedOperation);
         }
+    }
+
+    /**
+     * Retries a failed text send while preserving the existing pending bubble.
+     *
+     * @param contactId normalized recipient/contact id
+     * @param text      message body to resend
+     * @param pendingVm pending bubble to keep/reuse during retry
+     */
+    private void retryPendingTextMessage(String contactId, String text, MessageVM pendingVm) {
+        runOnUiThread(() -> {
+            ObservableList<MessageVM> messages = getMessages(contactId);
+            if (!messages.contains(pendingVm)) {
+                messages.add(pendingVm);
+            }
+            status.set("Retrying message to " + contactId + "…");
+        });
+        CompletableFuture.runAsync(() -> sendTextMessageInternal(contactId, text, pendingVm));
     }
 
     /**

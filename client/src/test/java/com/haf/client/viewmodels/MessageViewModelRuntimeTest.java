@@ -3,6 +3,7 @@ package com.haf.client.viewmodels;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
 import com.haf.client.utils.RuntimeIssue;
+import com.haf.client.models.MessageVM;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
 import org.junit.jupiter.api.Test;
@@ -31,9 +32,13 @@ class MessageViewModelRuntimeTest {
 
         viewModel.sendTextMessage("bob", "hello");
 
+        awaitCondition(() -> sender.sendCalls.get() == 1 && !issues.isEmpty());
         assertEquals(1, sender.sendCalls.get());
-        assertTrue(viewModel.getMessages("bob").isEmpty());
-        assertFalse(issues.isEmpty());
+        assertEquals(1, viewModel.getMessages("bob").size());
+        MessageVM pending = viewModel.getMessages("bob").getFirst();
+        assertTrue(pending.isOutgoing());
+        assertTrue(pending.isLoading());
+        assertEquals("hello", pending.content());
         RuntimeIssue issue = issues.getFirst();
         assertEquals("messaging.send.failed", issue.dedupeKey());
 
@@ -41,7 +46,8 @@ class MessageViewModelRuntimeTest {
         awaitCondition(() -> sender.sendCalls.get() == 2
                 && receiver.startCalls.get() == 1
                 && receiver.stopCalls.get() == 1
-                && viewModel.getMessages("bob").size() == 1);
+                && viewModel.getMessages("bob").size() == 1
+                && !viewModel.getMessages("bob").getFirst().isLoading());
 
         assertEquals("hello", viewModel.getMessages("bob").getFirst().content());
         assertTrue(viewModel.getMessages("bob").getFirst().isOutgoing());

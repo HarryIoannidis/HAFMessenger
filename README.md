@@ -8,10 +8,11 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 
 - Architecture: JavaFX 25 desktop client + plain Java server + shared contract/crypto module.
 - Build: Maven multi-module (`shared`, `client`, `server`).
-- Transport: TLS 1.3 HTTPS + WSS.
+- Transport: TLS 1.3 with mode-aware messaging receive transport (dev: WSS push, prod: HTTPS polling).
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
-- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V11`).
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V12`).
 - Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
+- Runtime mode control: server mode is controlled by `HAF_APP_IS_DEV`; client mode by `app.isDev`.
 
 ## Key Types/Interfaces
 
@@ -27,7 +28,7 @@ This repository contains a Java 21 secure messaging system for HAF workflows, sp
 1. Client authenticates via HTTPS and stores a session id.
 2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
 3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
-4. Receiver consumes pushed/polled envelopes, validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.
+4. Receiver consumes envelopes via mode-aware transport (dev websocket push, prod HTTPS polling), validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.
 5. Attachments follow init/chunk/complete/bind/download endpoints and inherit policy/TTL controls.
 
 ## Error/Security Notes

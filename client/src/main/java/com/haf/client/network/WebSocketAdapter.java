@@ -18,18 +18,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.Objects;
 import java.util.function.Consumer;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.exceptions.SslConfigurationException;
 
 /**
  * WebSocket adapter for client-server communication over TLS.
- * Features implement exponential backoff and certificate pinning.
+ * Features implement exponential backoff and mode-aware trust configuration.
  */
 public class WebSocketAdapter {
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketAdapter.class);
 
     private final URI serverUri;
+    private final URI httpBaseUri;
     private final String sessionId;
     private final HttpClient httpClient;
     private WebSocket webSocket;
@@ -120,7 +122,20 @@ public class WebSocketAdapter {
      * @param sessionId the authentication session ID to be passed as a bearer token
      */
     public WebSocketAdapter(URI serverUri, String sessionId) {
-        this(serverUri, sessionId, createDefaultHttpClient(),
+        this(serverUri, deriveLegacyHttpBaseUri(serverUri), sessionId, createDefaultHttpClient(),
+                CompletableFuture::runAsync,
+                Thread::sleep);
+    }
+
+    /**
+     * Creates a WebSocketAdapter with explicit HTTP base URI for authenticated REST helper calls.
+     *
+     * @param serverUri WebSocket server URI (for WSS transport)
+     * @param httpBaseUri HTTPS server base URI (for REST helper methods)
+     * @param sessionId bearer session id
+     */
+    public WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId) {
+        this(serverUri, httpBaseUri, sessionId, createDefaultHttpClient(),
                 CompletableFuture::runAsync,
                 Thread::sleep);
     }
@@ -133,7 +148,21 @@ public class WebSocketAdapter {
      * @param httpClient injected HTTP client used by transport operations
      */
     WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient) {
-        this(serverUri, sessionId, httpClient,
+        this(serverUri, deriveLegacyHttpBaseUri(serverUri), sessionId, httpClient,
+                CompletableFuture::runAsync,
+                Thread::sleep);
+    }
+
+    /**
+     * Test seam constructor with explicit HTTP base URI and injected HTTP client.
+     *
+     * @param serverUri WebSocket server URI
+     * @param httpBaseUri HTTPS server base URI for REST helper calls
+     * @param sessionId bearer session id
+     * @param httpClient injected HTTP client used by transport operations
+     */
+    WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId, HttpClient httpClient) {
+        this(serverUri, httpBaseUri, sessionId, httpClient,
                 CompletableFuture::runAsync,
                 Thread::sleep);
     }
@@ -149,7 +178,28 @@ public class WebSocketAdapter {
      */
     WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient,
             AsyncRunner asyncRunner, DelayStrategy delayStrategy) {
+        this(serverUri,
+                deriveLegacyHttpBaseUri(serverUri),
+                sessionId,
+                httpClient,
+                asyncRunner,
+                delayStrategy);
+    }
+
+    /**
+     * Internal constructor with injectable async and delay strategies.
+     *
+     * @param serverUri WebSocket server URI
+     * @param httpBaseUri HTTPS base URI used by authenticated REST helper methods
+     * @param sessionId bearer session id
+     * @param httpClient injected HTTP client
+     * @param asyncRunner async execution strategy for reconnect attempts
+     * @param delayStrategy delay strategy used by reconnect backoff
+     */
+    WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId, HttpClient httpClient,
+            AsyncRunner asyncRunner, DelayStrategy delayStrategy) {
         this.serverUri = Objects.requireNonNull(serverUri, "serverUri");
+        this.httpBaseUri = normalizeHttpBaseUri(httpBaseUri);
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.asyncRunner = Objects.requireNonNull(asyncRunner, "asyncRunner");
@@ -180,7 +230,8 @@ public class WebSocketAdapter {
      */
     private static SSLContext createDefaultSslContext() {
         try {
-            return SslContextUtils.getTrustingSslContext();
+            ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
+            return SslContextUtils.getSslContextForMode(runtimeConfig.isDev());
         } catch (Exception e) {
             throw new SslConfigurationException("Failed to create SSL context", e);
         }
@@ -193,14 +244,30 @@ public class WebSocketAdapter {
      * @return the SSL parameters
      */
     private static SSLParameters createDefaultSslParameters() {
-        SSLParameters params = new SSLParameters();
-        params.setProtocols(new String[] { "TLSv1.3" });
-        params.setCipherSuites(new String[] {
-                "TLS_AES_256_GCM_SHA384",
-                "TLS_CHACHA20_POLY1305_SHA256"
-        });
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        return params;
+        return SslContextUtils.createHttpsSslParameters();
+    }
+
+    private static URI deriveLegacyHttpBaseUri(URI serverUri) {
+        URI wsUri = Objects.requireNonNull(serverUri, "serverUri");
+        try {
+            return new URI("https",
+                    wsUri.getUserInfo(),
+                    wsUri.getHost(),
+                    8443,
+                    null,
+                    null,
+                    null);
+        } catch (java.net.URISyntaxException e) {
+            throw new IllegalArgumentException("Failed to construct legacy HTTPS base URI", e);
+        }
+    }
+
+    private static URI normalizeHttpBaseUri(URI httpBaseUri) {
+        URI uri = Objects.requireNonNull(httpBaseUri, "httpBaseUri");
+        if (uri.getScheme() == null || uri.getHost() == null) {
+            throw new IllegalArgumentException("HTTP base URI must include scheme and host");
+        }
+        return uri;
     }
 
     /**
@@ -248,22 +315,14 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Executes an authenticated GET request against the server using the trusting
+     * Executes an authenticated GET request against the server using the configured
      * HttpClient.
      *
      * @param path The API path to request (e.g., "/api/v1/users/{id}/key")
      * @return CompletableFuture containing the response body string
      */
     public CompletableFuture<String> getAuthenticated(String path) {
-        // Must rewrite scheme from wss to https for standard HTTP calls
-        URI requestUri = serverUri.resolve(path);
-        try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
-                    requestUri.getPath(),
-                    requestUri.getQuery(), requestUri.getFragment());
-        } catch (java.net.URISyntaxException e) {
-            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
-        }
+        URI requestUri = buildAuthenticatedRequestUri(path);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
@@ -275,7 +334,7 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Executes an authenticated POST request against the server using the trusting
+     * Executes an authenticated POST request against the server using the configured
      * HttpClient.
      *
      * @param path The API path to request
@@ -283,14 +342,7 @@ public class WebSocketAdapter {
      * @return CompletableFuture containing the response body string
      */
     public CompletableFuture<String> postAuthenticated(String path, String body) {
-        URI requestUri = serverUri.resolve(path);
-        try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
-                    requestUri.getPath(),
-                    requestUri.getQuery(), requestUri.getFragment());
-        } catch (java.net.URISyntaxException e) {
-            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
-        }
+        URI requestUri = buildAuthenticatedRequestUri(path);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
@@ -304,21 +356,14 @@ public class WebSocketAdapter {
 
     /**
      * Executes an authenticated DELETE request against the server using the
-     * trusting
+     * configured
      * HttpClient.
      *
      * @param path The API path to request
      * @return CompletableFuture containing the response body string
      */
     public CompletableFuture<String> deleteAuthenticated(String path) {
-        URI requestUri = serverUri.resolve(path);
-        try {
-            requestUri = new URI("https", requestUri.getUserInfo(), requestUri.getHost(), 8443,
-                    requestUri.getPath(),
-                    requestUri.getQuery(), requestUri.getFragment());
-        } catch (java.net.URISyntaxException e) {
-            throw new IllegalArgumentException("Failed to construct HTTPS URI", e);
-        }
+        URI requestUri = buildAuthenticatedRequestUri(path);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
@@ -327,6 +372,13 @@ public class WebSocketAdapter {
                 .build();
 
         return sendWithRetry(request, "DELETE");
+    }
+
+    private URI buildAuthenticatedRequestUri(String path) {
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("Path must not be blank");
+        }
+        return httpBaseUri.resolve(path);
     }
 
     /**

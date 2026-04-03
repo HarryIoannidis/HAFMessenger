@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.utils.SslContextUtils;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.constants.CryptoConstants;
 import javafx.beans.property.DoubleProperty;
@@ -192,7 +193,7 @@ public class SplashViewModel {
             @Override
             protected Void call() throws Exception {
                 update(UiConstants.BOOTSTRAP_STARTING, 0.0);
-                delay(1000L);
+                delay(2000L);
 
                 update(UiConstants.BOOTSTRAP_CONFIG, 0.1);
                 String detectedVersion = configLoader.loadVersion();
@@ -386,6 +387,7 @@ public class SplashViewModel {
             requireResource(UiConstants.IMAGE_APP_LOGO_DOWNSCALE, "Application logo downscale");
             requireResource(UiConstants.IMAGE_APP_LOGO_UPSCALE, "Application logo upscale");
             requireResource(UiConstants.IMAGE_APP_LOGO_SVG, "Application logo SVG");
+            requireResource(UiConstants.IMAGE_APP_LOGO_ICO, "Application logo ICO");
             requireResource(UiConstants.IMAGE_LOGO_PNG, "Logo PNG");
             requireResource(UiConstants.IMAGE_AVATAR, "Avatar image");
             requireResource(UiConstants.IMAGE_EMPTY_CHAT, "Empty chat image");
@@ -448,33 +450,26 @@ public class SplashViewModel {
      */
     private static NetworkChecker defaultNetworkChecker() {
         return () -> {
-            String endpoint = loadServerUrl();
-            if (endpoint == null || endpoint.isBlank()) {
-                // No endpoint configured: skip reachability check
-                return;
-            }
+            ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
+            URI serverBaseUri = runtimeConfig.healthCheckBaseUri();
 
             javax.net.ssl.SSLContext sslContext;
             try {
-                sslContext = SslContextUtils.getTrustingSslContext();
+                sslContext = SslContextUtils.getSslContextForMode(runtimeConfig.isDev());
             } catch (Exception e) {
                 throw new IOException("Failed to initialize SSL context for network check", e);
             }
 
-            String healthEndpoint = endpoint;
-            if (healthEndpoint.endsWith("/")) {
-                healthEndpoint += "api/v1/health";
-            } else {
-                healthEndpoint += "/api/v1/health";
-            }
+            URI healthEndpoint = serverBaseUri.resolve("/api/v1/health");
 
             try (
                     HttpClient client = HttpClient.newBuilder()
                             .sslContext(sslContext)
+                            .sslParameters(SslContextUtils.createHttpsSslParameters())
                             .connectTimeout(Duration.ofSeconds(2))
                             .build()) {
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(healthEndpoint))
+                        .uri(healthEndpoint)
                         .method("HEAD", HttpRequest.BodyPublishers.noBody())
                         .timeout(Duration.ofSeconds(3))
                         .build();
@@ -490,37 +485,6 @@ public class SplashViewModel {
                 throw new IOException("Interrupted while checking server reachability", e);
             }
         };
-    }
-
-    /**
-     * Loads the server URL from client.properties, falling back to
-     * system property {@code haf.server.url} and then environment variable
-     * {@code HAF_SERVER_URL}.
-     *
-     * @return the server URL, or {@code null} if none configured
-     */
-    private static String loadServerUrl() {
-        // 1. Try client.properties
-        try (java.io.InputStream in = SplashViewModel.class.getResourceAsStream("/config/client.properties")) {
-            if (in != null) {
-                java.util.Properties props = new java.util.Properties();
-                props.load(in);
-                String url = props.getProperty("server.url");
-                if (url != null && !url.isBlank()) {
-                    return url;
-                }
-            }
-        } catch (IOException ignored) {
-            // Fall through to next source
-        }
-
-        // 2. Try system property / environment variable
-        String fromSysProp = System.getProperty("haf.server.url");
-        if (fromSysProp != null && !fromSysProp.isBlank()) {
-            return fromSysProp;
-        }
-
-        return System.getenv("HAF_SERVER_URL");
     }
 
 }

@@ -8,8 +8,9 @@ Document server runtime configuration loaded by `ServerConfig`.
 
 - `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
 - Required vars include DB, TLS keystore, key passphrase, and search cursor secret.
+- `HAF_APP_IS_DEV` is required and authoritative for server runtime mode (`true` or `false` only).
 - Optional vars control pool sizing, ports, search limits, and attachment policy.
-- Required keys currently include `HAF_DB_URL`, `HAF_DB_USER`, `HAF_DB_PASS`, `HAF_KEY_PASS`, `HAF_TLS_KEYSTORE_PATH`, `HAF_TLS_KEYSTORE_PASS`, and `HAF_SEARCH_CURSOR_SECRET`.
+- Required keys currently include `HAF_DB_URL`, `HAF_DB_USER`, `HAF_DB_PASS`, `HAF_KEY_PASS`, `HAF_TLS_KEYSTORE_PATH`, `HAF_TLS_KEYSTORE_PASS`, `HAF_SEARCH_CURSOR_SECRET`, and `HAF_APP_IS_DEV`.
 - Defaults include HTTP `8443`, WS `8444`, search page size `20`, and search max page size `50`.
 
 ## Key Types/Interfaces
@@ -21,9 +22,10 @@ Document server runtime configuration loaded by `ServerConfig`.
 
 1. Load env map and optional `variables.env` file.
 2. Parse required/optional values with defaults and normalized types.
-3. Apply TLS keystore compatibility fallback for `server/...` path variants.
-4. Validate search and attachment constraints.
-5. Expose typed getters used by server bootstrap and ingress.
+3. Parse `HAF_APP_IS_DEV` as strict boolean and fail fast on missing/invalid values.
+4. Apply TLS keystore compatibility fallback for `server/...` path variants.
+5. Validate search and attachment constraints.
+6. Expose typed getters used by server bootstrap and ingress.
 
 ## Error/Security Notes
 

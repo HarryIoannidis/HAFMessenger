@@ -1,14 +1,17 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.dto.UserSearchResultDTO;
 import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.exceptions.MessageExpiredException;
 import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
+import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
@@ -20,7 +23,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,11 +38,15 @@ import org.slf4j.LoggerFactory;
  */
 public class DefaultMessageReceiver implements MessageReceiver {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageReceiver.class);
+    private static final int HTTP_POLL_BATCH_LIMIT = 100;
+    private static final long HTTP_POLL_INTERVAL_MS = 2000L;
+    private static final int HTTP_POLL_ERROR_NOTIFY_THRESHOLD = 3;
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
     private final WebSocketAdapter webSocketAdapter;
     private final String localRecipientId;
+    private final ClientRuntimeConfig.MessagingTransportMode transportMode;
     private MessageListener messageListener;
 
     // Tracks envelopeIds already processed to avoid duplicate delivery on
@@ -43,6 +56,11 @@ public class DefaultMessageReceiver implements MessageReceiver {
     // Pending ACKs: senderId → list of envelope IDs awaiting acknowledgement.
     // Envelopes are only ACKed when the user opens the corresponding chat.
     private final ConcurrentHashMap<String, List<String>> pendingAcks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Boolean> knownPresenceByUser = new ConcurrentHashMap<>();
+    private final Object pollingLock = new Object();
+    private ScheduledExecutorService pollingExecutor;
+    private volatile boolean httpPollingActive;
+    private final AtomicInteger pollFailureCount = new AtomicInteger();
 
     /**
      * Creates a DefaultMessageReceiver with the specified dependencies.
@@ -56,10 +74,29 @@ public class DefaultMessageReceiver implements MessageReceiver {
      */
     public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
             WebSocketAdapter webSocketAdapter, String localRecipientId) {
+        this(keyProvider, clockProvider, webSocketAdapter, localRecipientId,
+                ClientRuntimeConfig.MessagingTransportMode.WEBSOCKET);
+    }
+
+    /**
+     * Creates a DefaultMessageReceiver with an explicit transport mode.
+     *
+     * @param keyProvider      key provider
+     * @param clockProvider    clock provider
+     * @param webSocketAdapter adapter exposing authenticated HTTPS and optional WSS
+     * @param localRecipientId local recipient id
+     * @param transportMode    runtime transport mode
+     */
+    public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
+            WebSocketAdapter webSocketAdapter, String localRecipientId,
+            ClientRuntimeConfig.MessagingTransportMode transportMode) {
         this.keyProvider = keyProvider;
         this.clockProvider = clockProvider;
         this.webSocketAdapter = webSocketAdapter;
         this.localRecipientId = localRecipientId;
+        this.transportMode = transportMode == null
+                ? ClientRuntimeConfig.MessagingTransportMode.WEBSOCKET
+                : transportMode;
     }
 
     /**
@@ -82,11 +119,22 @@ public class DefaultMessageReceiver implements MessageReceiver {
         if (messageListener == null) {
             throw new IllegalStateException("MessageListener must be set before starting");
         }
-
-        // Register message handler with WebSocketAdapter
-        webSocketAdapter.connect(
-                this::handleIncomingMessage,
-                this::handleError);
+        stopHttpPolling();
+        if (transportMode == ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING) {
+            startHttpPolling();
+            return;
+        }
+        try {
+            // Register message handler with WebSocketAdapter.
+            webSocketAdapter.connect(
+                    this::handleIncomingMessage,
+                    this::handleError);
+            pollFailureCount.set(0);
+        } catch (IOException connectError) {
+            LOGGER.info("WebSocket receiver unavailable ({}). Falling back to HTTP mailbox polling.",
+                    connectError.getMessage());
+            startHttpPolling();
+        }
     }
 
     /**
@@ -94,7 +142,150 @@ public class DefaultMessageReceiver implements MessageReceiver {
      */
     @Override
     public void stop() {
+        stopHttpPolling();
         webSocketAdapter.close();
+    }
+
+    /**
+     * Starts background HTTP polling fallback when WebSocket transport cannot be
+     * established.
+     */
+    private void startHttpPolling() {
+        synchronized (pollingLock) {
+            if (httpPollingActive) {
+                return;
+            }
+            httpPollingActive = true;
+            pollFailureCount.set(0);
+            pollingExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread thread = new Thread(r, "message-http-poller");
+                thread.setDaemon(true);
+                return thread;
+            });
+            pollingExecutor.scheduleWithFixedDelay(
+                    this::pollMailboxSafely,
+                    0L,
+                    HTTP_POLL_INTERVAL_MS,
+                    TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /**
+     * Stops the HTTP polling fallback worker, if active.
+     */
+    private void stopHttpPolling() {
+        synchronized (pollingLock) {
+            httpPollingActive = false;
+            pollFailureCount.set(0);
+            if (pollingExecutor != null) {
+                pollingExecutor.shutdownNow();
+                pollingExecutor = null;
+            }
+        }
+    }
+
+    /**
+     * Executes one polling cycle with guarded error handling.
+     */
+    private void pollMailboxSafely() {
+        if (!httpPollingActive) {
+            return;
+        }
+        try {
+            pollCycleOnce();
+            pollFailureCount.set(0);
+        } catch (Exception pollError) {
+            int failures = pollFailureCount.incrementAndGet();
+            LOGGER.debug("HTTP mailbox poll failed: {}", pollError.getMessage());
+            if (failures == HTTP_POLL_ERROR_NOTIFY_THRESHOLD) {
+                notifyError(new IOException("HTTP mailbox polling failed. " + pollError.getMessage(), pollError));
+            }
+        }
+    }
+
+    /**
+     * Executes one full HTTPS polling cycle (messages + presence snapshot).
+     *
+     * @throws IOException when polling request fails
+     */
+    private void pollCycleOnce() throws IOException {
+        IOException failure = null;
+        try {
+            pollMailboxMessagesOnce();
+        } catch (IOException e) {
+            failure = e;
+        }
+
+        try {
+            pollContactsPresenceOnce();
+        } catch (IOException e) {
+            if (failure == null) {
+                failure = e;
+            } else {
+                failure.addSuppressed(e);
+            }
+        }
+
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    /**
+     * Fetches pending mailbox envelopes over authenticated HTTP and processes them
+     * through the same envelope pipeline used by WebSocket delivery.
+     *
+     * @throws IOException when polling request fails
+     */
+    private void pollMailboxMessagesOnce() throws IOException {
+        String responseJson = requestWithIoMapping(
+                webSocketAdapter.getAuthenticated("/api/v1/messages?limit=" + HTTP_POLL_BATCH_LIMIT),
+                "Failed to poll mailbox");
+        java.util.Map<?, ?> response = JsonCodec.fromJson(responseJson, java.util.Map.class);
+        Object messagesNode = response.get("messages");
+        if (!(messagesNode instanceof List<?> messages) || messages.isEmpty()) {
+            return;
+        }
+
+        for (Object messageNode : messages) {
+            if (messageNode == null) {
+                continue;
+            }
+            handleIncomingMessage(JsonCodec.toJson(messageNode));
+        }
+    }
+
+    /**
+     * Fetches contact snapshot over HTTPS and emits presence transitions only when
+     * state changed since the previous snapshot.
+     *
+     * @throws IOException when polling request fails
+     */
+    private void pollContactsPresenceOnce() throws IOException {
+        String responseJson = requestWithIoMapping(
+                webSocketAdapter.getAuthenticated("/api/v1/contacts"),
+                "Failed to poll contacts");
+        ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
+        if (response == null || response.getContacts() == null) {
+            return;
+        }
+
+        java.util.Set<String> seenUsers = new java.util.HashSet<>();
+        for (UserSearchResultDTO contact : response.getContacts()) {
+            if (contact == null || contact.getUserId() == null || contact.getUserId().isBlank()) {
+                continue;
+            }
+            String userId = contact.getUserId().trim();
+            boolean active = contact.isActive();
+            seenUsers.add(userId);
+
+            Boolean previous = knownPresenceByUser.put(userId, active);
+            if ((previous == null || previous.booleanValue() != active) && messageListener != null) {
+                messageListener.onPresenceUpdate(userId, active);
+            }
+        }
+
+        knownPresenceByUser.keySet().removeIf(userId -> !seenUsers.contains(userId));
     }
 
     /**
@@ -107,16 +298,16 @@ public class DefaultMessageReceiver implements MessageReceiver {
             parseAndProcessEnvelope(json);
         } catch (MessageTamperedException e) {
             acknowledgeTamperedEnvelope(json);
-            LOGGER.warn( "Undecryptable envelope; acknowledging to prevent endless retries.");
+            LOGGER.warn("Undecryptable envelope; acknowledging to prevent endless retries.");
             notifyError(e);
         } catch (KeystoreOperationException e) {
-            LOGGER.warn( "Keystore decryption failed: {}", e.getMessage());
+            LOGGER.warn("Keystore decryption failed: {}", e.getMessage());
             notifyError(new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
         } catch (MessageValidationException | MessageExpiredException e) {
-            LOGGER.debug( "Rejected incoming envelope: {}", e.getMessage());
+            LOGGER.debug("Rejected incoming envelope: {}", e.getMessage());
             notifyError(e);
         } catch (Exception e) {
-            LOGGER.warn( "Failed to process inbound message: {}", e.getMessage());
+            LOGGER.warn("Failed to process inbound message: {}", e.getMessage());
             notifyError(new IOException("Failed to process message: " + e.getMessage(), e));
         }
     }
@@ -311,7 +502,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
                     .thenComparing(Comparator.comparingLong(KeyMetadata::createdAtEpochSec).reversed()));
             return metadataList;
         } catch (Exception e) {
-            LOGGER.debug( "Unable to enumerate fallback keys: {}", e.getMessage());
+            LOGGER.debug("Unable to enumerate fallback keys: {}", e.getMessage());
             return List.of();
         }
     }
@@ -339,7 +530,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @throws Exception when validation/decryption fails
      */
     @Override
-    public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage) throws com.haf.shared.exceptions.MessageDecryptionException {
+    public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage)
+            throws com.haf.shared.exceptions.MessageDecryptionException {
         if (encryptedMessage == null) {
             throw new IllegalArgumentException("encryptedMessage is required");
         }
@@ -362,7 +554,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         if (senderId == null) {
             return;
         }
-        if (!webSocketAdapter.isConnected()) {
+        if (!webSocketAdapter.isConnected() && !httpPollingActive) {
             LOGGER.debug("Deferring ACK for sender {} while websocket is disconnected", senderId);
             return;
         }
@@ -424,7 +616,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param error the error that occurred
      */
     private void handleError(Throwable error) {
-        LOGGER.warn( "WebSocket receiver error: {}", error.getMessage());
+        LOGGER.warn("WebSocket receiver error: {}", error.getMessage());
         if (messageListener != null) {
             messageListener.onError(error);
         }
@@ -462,11 +654,22 @@ public class DefaultMessageReceiver implements MessageReceiver {
             sb.append('\"').append(envelopeIds.get(i)).append('\"');
         }
         sb.append("]}");
-        webSocketAdapter.sendText(sb.toString());
+        if (webSocketAdapter.isConnected()) {
+            webSocketAdapter.sendText(sb.toString());
+            return;
+        }
+
+        if (!httpPollingActive) {
+            throw new IOException("Messaging transport is not connected");
+        }
+        requestWithIoMapping(
+                webSocketAdapter.postAuthenticated("/api/v1/messages/ack", sb.toString()),
+                "Failed to acknowledge mailbox envelopes");
     }
 
     /**
-     * Acknowledges tampered envelopes immediately so server-side retry queues do not
+     * Acknowledges tampered envelopes immediately so server-side retry queues do
+     * not
      * replay them endlessly.
      *
      * @param rawEnvelopeJson raw websocket envelope JSON
@@ -499,6 +702,29 @@ public class DefaultMessageReceiver implements MessageReceiver {
             return envelopeId == null ? null : String.valueOf(envelopeId);
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    /**
+     * Resolves async HTTP helper futures while normalizing nested exceptions into
+     * IOExceptions.
+     *
+     * @param future  asynchronous HTTP future
+     * @param message fallback error message
+     * @return completed future body
+     * @throws IOException when request fails
+     */
+    private String requestWithIoMapping(CompletableFuture<String> future, String message) throws IOException {
+        try {
+            return future.join();
+        } catch (CompletionException completionException) {
+            Throwable cause = completionException.getCause();
+            if (cause instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw new IOException(message, cause != null ? cause : completionException);
+        } catch (Exception exception) {
+            throw new IOException(message, exception);
         }
     }
 }

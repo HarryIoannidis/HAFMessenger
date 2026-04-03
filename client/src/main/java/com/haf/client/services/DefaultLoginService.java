@@ -8,6 +8,7 @@ import com.haf.client.models.UserProfileInfo;
 import com.haf.client.network.DefaultMessageReceiver;
 import com.haf.client.network.DefaultMessageSender;
 import com.haf.client.network.WebSocketAdapter;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.viewmodels.MessagesViewModel;
 import com.haf.shared.exceptions.CryptoOperationException;
@@ -40,9 +41,6 @@ public class DefaultLoginService implements LoginService {
     static final int LOGIN_HTTP_TIMEOUT_SECONDS = 10;
     static final int LOGIN_RETRY_DELAY_MS = 400;
 
-    private static final URI LOGIN_URI = URI.create("https://localhost:8443/api/v1/login");
-    private static final URI WEBSOCKET_URI = URI.create("wss://localhost:8444/");
-
     @FunctionalInterface
     interface LoginGateway {
         /**
@@ -67,7 +65,8 @@ public class DefaultLoginService implements LoginService {
          * @throws IOException              when key-store or network I/O fails
          * @throws CryptoOperationException when cryptographic setup fails
          */
-        void initialize(String userId, String sessionId, String passphrase) throws IOException, CryptoOperationException;
+        void initialize(String userId, String sessionId, String passphrase)
+                throws IOException, CryptoOperationException;
     }
 
     @FunctionalInterface
@@ -178,7 +177,7 @@ public class DefaultLoginService implements LoginService {
             return new LoginResult.Success();
         } catch (Exception ex) {
             if (isLastAttempt(attempt)) {
-                LOGGER.error( "Failed to initialize WebSocket session", ex);
+                LOGGER.error("Failed to initialize WebSocket session", ex);
                 return new LoginResult.Failure("Failed to initialize secure session locally.");
             }
             LOGGER.warn("Secure session initialization failed on attempt {}/{}, retrying...",
@@ -196,7 +195,7 @@ public class DefaultLoginService implements LoginService {
      */
     private LoginResult handleRequestFailure(int attempt, Exception error) {
         if (isLastAttempt(attempt)) {
-            LOGGER.error( "Login failed", error);
+            LOGGER.error("Login failed", error);
             return new LoginResult.Failure("Connection failed. Please try again.");
         }
         LOGGER.warn("Login attempt {}/{} failed, retrying...", attempt, MAX_LOGIN_ATTEMPTS, error);
@@ -276,17 +275,19 @@ public class DefaultLoginService implements LoginService {
      */
     private static HttpResponse<String> sendLoginRequest(LoginCommand command)
             throws IOException, InterruptedException {
+        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         LoginRequest request = new LoginRequest();
         request.setEmail(command.email());
         request.setPassword(command.password());
         String json = JsonCodec.toJson(request);
 
         HttpClient client = HttpClient.newBuilder()
-                .sslContext(SslContextUtils.getTrustingSslContext())
+                .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                .sslParameters(SslContextUtils.createHttpsSslParameters())
                 .build();
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(LOGIN_URI)
+                .uri(resolveLoginUri(runtimeConfig))
                 .timeout(Duration.ofSeconds(LOGIN_HTTP_TIMEOUT_SECONDS))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -305,23 +306,40 @@ public class DefaultLoginService implements LoginService {
      */
     private static void initializeSecureSession(String userId, String sessionId, String passphraseStr)
             throws IOException, CryptoOperationException {
+        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         ClockProvider clockProvider = SystemClockProvider.getInstance();
         char[] passphrase = passphraseStr.toCharArray();
         try {
             UserKeystoreKeyProvider keyProvider = new UserKeystoreKeyProvider(userId, passphrase);
 
-            WebSocketAdapter wsAdapter = new WebSocketAdapter(WEBSOCKET_URI, sessionId);
+            WebSocketAdapter wsAdapter = new WebSocketAdapter(
+                    resolveWebSocketUri(runtimeConfig),
+                    resolveServerBaseUri(runtimeConfig),
+                    sessionId);
             keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));
 
             DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, wsAdapter);
             DefaultMessageReceiver receiver = new DefaultMessageReceiver(keyProvider, clockProvider, wsAdapter,
-                    keyProvider.getSenderId());
+                    keyProvider.getSenderId(),
+                    runtimeConfig.messagingTransportMode());
 
             NetworkSession.set(wsAdapter);
             ChatSession.set(new MessagesViewModel(sender, receiver));
         } catch (GeneralSecurityException e) {
             throw new CryptoOperationException("Keystore initialization failed", e);
         }
+    }
+
+    static URI resolveServerBaseUri(ClientRuntimeConfig runtimeConfig) {
+        return runtimeConfig.serverBaseUri();
+    }
+
+    static URI resolveLoginUri(ClientRuntimeConfig runtimeConfig) {
+        return resolveServerBaseUri(runtimeConfig).resolve("/api/v1/login");
+    }
+
+    static URI resolveWebSocketUri(ClientRuntimeConfig runtimeConfig) {
+        return runtimeConfig.webSocketBaseUri();
     }
 
     /**

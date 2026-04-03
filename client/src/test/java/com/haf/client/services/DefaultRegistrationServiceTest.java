@@ -1,5 +1,6 @@
 package com.haf.client.services;
 
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.dto.EncryptedFileDTO;
 import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.utils.EccKeyIO;
@@ -16,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -24,6 +26,33 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DefaultRegistrationServiceTest {
+
+    @Test
+    void endpoint_resolution_uses_localhost_in_dev_mode() {
+        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(new Properties());
+
+        assertEquals(
+                URI.create("https://localhost:8443/api/v1/config/admin-key"),
+                DefaultRegistrationService.resolveAdminKeyUri(config));
+        assertEquals(
+                URI.create("https://localhost:8443/api/v1/register"),
+                DefaultRegistrationService.resolveRegisterUri(config));
+    }
+
+    @Test
+    void endpoint_resolution_uses_prod_endpoints_when_dev_is_disabled() {
+        Properties properties = new Properties();
+        properties.setProperty("app.isDev", "false");
+        properties.setProperty("server.url.prod", "https://prod.example.test");
+        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
+
+        assertEquals(
+                URI.create("https://prod.example.test/api/v1/config/admin-key"),
+                DefaultRegistrationService.resolveAdminKeyUri(config));
+        assertEquals(
+                URI.create("https://prod.example.test/api/v1/register"),
+                DefaultRegistrationService.resolveRegisterUri(config));
+    }
 
     @Test
     void register_happy_path_returns_success_and_persists_keystore() {

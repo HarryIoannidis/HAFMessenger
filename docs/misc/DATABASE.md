@@ -18,7 +18,7 @@ Document the current relational schema and DAO responsibilities used by the serv
   - `contacts`
   - `message_attachments`
   - `message_attachment_chunks`
-- Latest migrations include search indexes and attachment tables (`V10`, `V11`).
+- Latest migrations include search indexes, attachment tables, and session activity tracking (`V10`, `V11`, `V12`).
 - Migration execution is part of server startup (`Main.runFlywayMigrations(...)`) before ingress servers start.
 
 ## Key Types/Interfaces
@@ -42,6 +42,7 @@ Document the current relational schema and DAO responsibilities used by the serv
 4. `AttachmentDAO` handles init/chunk/complete/bind/download lifecycle for encrypted attachments.
 5. Scheduled cleanup removes expired uploads/envelopes according to TTL policy.
 6. Metrics/audit layers observe DAO-side outcomes (ingress rejects, cleanup counts, delivery latency).
+7. Session presence/duplicate-login logic uses `sessions.last_seen_at` and database-time comparisons.
 
 ## Error/Security Notes
 
@@ -58,3 +59,4 @@ Document the current relational schema and DAO responsibilities used by the serv
 - `server/src/main/java/com/haf/server/db/UserDAO.java`
 - `server/src/main/resources/db/migration/V1__create_users_table.sql`
 - `server/src/main/resources/db/migration/V11__create_message_attachments_tables.sql`
+- `server/src/main/resources/db/migration/V12__add_sessions_last_seen.sql`

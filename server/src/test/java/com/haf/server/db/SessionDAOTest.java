@@ -85,6 +85,35 @@ class SessionDAOTest {
     }
 
     @Test
+    void getUserIdForSessionAndTouch_returns_user_for_active_session() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SELECT user_id FROM sessions"))).thenReturn(preparedStatement);
+        when(connection.prepareStatement(contains("SET last_seen_at"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getString("user_id")).thenReturn("user-123");
+        when(preparedStatement.executeUpdate()).thenReturn(1);
+
+        String userId = dao.getUserIdForSessionAndTouch("session-123");
+
+        assertEquals("user-123", userId);
+        verify(preparedStatement, times(1)).executeQuery();
+        verify(preparedStatement, times(1)).executeUpdate();
+    }
+
+    @Test
+    void isUserRecentlyActive_returns_true_when_recent_session_exists() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("DATE_SUB(CURRENT_TIMESTAMP"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+
+        boolean active = dao.isUserRecentlyActive("user-123", 8);
+
+        assertTrue(active);
+    }
+
+    @Test
     void revokeSession_executes_update() throws SQLException {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(contains("UPDATE sessions"))).thenReturn(preparedStatement);

@@ -24,6 +24,7 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
+        env.put("HAF_APP_IS_DEV", "true");
         env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
 
         ServerConfig config = ServerConfig.fromEnv(env);
@@ -34,6 +35,7 @@ class ServerConfigTest {
         assertEquals(20, config.getDbPoolSize()); // default
         assertEquals(tempDir, config.getKeystoreRoot());
         assertEquals(tempDir.resolve("keystore.p12"), config.getTlsKeystorePath());
+        assertTrue(config.isDevMode());
         assertEquals(20, config.getSearchPageSize());
         assertEquals(50, config.getSearchMaxPageSize());
         assertEquals(3, config.getSearchMinQueryLength());
@@ -62,6 +64,32 @@ class ServerConfigTest {
         ServerConfig config = ServerConfig.fromEnv(env);
         assertEquals(9000, config.getHttpPort());
         assertEquals(9001, config.getWsPort());
+    }
+
+    @Test
+    void load_uses_explicit_app_is_dev_flag_when_provided() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_APP_IS_DEV", "false");
+
+        ServerConfig config = ServerConfig.fromEnv(env);
+
+        assertFalse(config.isDevMode());
+    }
+
+    @Test
+    void load_fails_when_app_is_dev_is_invalid() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_APP_IS_DEV", "nope");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_fails_when_app_is_dev_missing() {
+        Map<String, String> env = createMinimalEnv();
+        env.remove("HAF_APP_IS_DEV");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @Test
@@ -148,6 +176,7 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
+        env.put("HAF_APP_IS_DEV", "true");
         env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
         return env;
     }

@@ -30,6 +30,7 @@ public final class UiConstants {
     public static final String IMAGE_APP_LOGO_DOWNSCALE = "/images/logo/app_logo_downscale.png";
     public static final String IMAGE_APP_LOGO_UPSCALE = "/images/logo/app_logo_upscale.png";
     public static final String IMAGE_APP_LOGO_SVG = "/images/logo/app_logo.svg";
+    public static final String IMAGE_APP_LOGO_ICO = "/images/logo/app_logo.ico";
     public static final String IMAGE_LOGO_PNG = "/images/logo/logoPNG.png";
     public static final String IMAGE_AVATAR = "/images/misc/avatar.png";
     public static final String IMAGE_EMPTY_CHAT = "/images/misc/empty_chat.png";

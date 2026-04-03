@@ -11,6 +11,7 @@ import com.haf.client.services.DesktopNotificationService;
 import com.haf.client.services.MainSessionService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ClientSettings;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.RuntimeIssue;
@@ -66,7 +67,6 @@ public class MainController implements SearchController.ContactActions {
     private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
-    private static final String HELP_CENTER_URL = "https://localhost:8443";
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
             new DesktopNotificationService();
@@ -1549,7 +1549,8 @@ public class MainController implements SearchController.ContactActions {
      * Opens help center.
      */
     private void openHelpCenter() {
-        requestExternalLinkOpen(HELP_CENTER_URL);
+        String helpCenterUrl = ClientRuntimeConfig.load().helpCenterBaseUri().toString();
+        requestExternalLinkOpen(helpCenterUrl);
     }
 
     /**

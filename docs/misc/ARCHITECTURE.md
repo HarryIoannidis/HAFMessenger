@@ -10,7 +10,7 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 - Server: layered plain Java service (`ingress`, `router`, `db`, `metrics`, `config`, `handlers`).
 - Shared: DTOs, requests/responses, constants, crypto, keystore, validation, and utility contracts.
 - Dependency direction: `client -> shared`, `server -> shared`; no direct `client -> server` compile dependency.
-- Runtime transport split: HTTPS ingress for REST operations and WSS for mailbox/presence push events.
+- Runtime transport split: HTTPS ingress for REST operations in all modes, with WSS mailbox/presence push enabled in dev mode and HTTPS polling receive mode in prod.
 
 ## Key Types/Interfaces
 
@@ -21,9 +21,9 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 ## Flow
 
 1. UI interaction enters controller layer and delegates to ViewModels/services.
-2. Client network layer sends authenticated HTTPS/WSS calls.
+2. Client network layer sends authenticated HTTPS calls in all modes and WSS calls in dev mode.
 3. Server ingress validates/authenticates requests and passes envelopes to router/services.
-4. Router dispatches active-recipient websocket pushes and supports undelivered mailbox polling.
+4. Router dispatches websocket pushes for active dev-mode recipients and supports mailbox polling fetch/ack paths.
 5. DAOs persist and retrieve encrypted metadata/payload blobs.
 6. Shared contracts/crypto guarantee wire compatibility and deterministic validation in both modules.
 

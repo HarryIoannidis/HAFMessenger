@@ -7,7 +7,7 @@ Define current client messaging interfaces used by ViewModels/controllers.
 ## Current Implementation
 
 - `MessageSender` supports plaintext send, encrypt-only, send-encrypted, and attachment-related REST operations.
-- `MessageReceiver` supports websocket receive lifecycle plus envelope acknowledgement and detached decrypt helper.
+- `MessageReceiver` supports mode-aware receive lifecycle (dev websocket, prod HTTPS polling), envelope acknowledgement, and detached decrypt helper.
 - Implementations are `DefaultMessageSender` and `DefaultMessageReceiver`.
 
 ## Key Types/Interfaces
@@ -28,8 +28,8 @@ Define current client messaging interfaces used by ViewModels/controllers.
 
 1. Outbound UI actions call `MessageSender` APIs.
 2. Sender builds/validates encrypted envelopes and submits authenticated HTTPS calls.
-3. Receiver consumes websocket traffic, decrypts valid envelopes, and emits listener callbacks.
-4. Receiver acks envelope ids to mark delivery on server side.
+3. Receiver consumes websocket envelopes in dev mode or HTTPS polling snapshots in prod mode, decrypts valid envelopes, and emits listener callbacks.
+4. Receiver acks envelope ids to mark delivery on server side (websocket ACK when connected, HTTPS ACK in polling mode).
 
 ## Error/Security Notes
 

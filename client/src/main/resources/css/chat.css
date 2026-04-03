@@ -91,6 +91,14 @@
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.15, 0, 2);
 }
 
+.bubble-out-pending {
+    -fx-background-color: #A5AFB8;
+}
+
+.bubble-out-pending:hover {
+    -fx-background-color: #98A3AD;
+}
+
 .bubble-in {
     -fx-background-color: #E8E8E8;
     -fx-background-radius: 12px 12px 12px 2px;
@@ -116,6 +124,10 @@
     -jfx-rippler-fill: rgba(255, 255, 255, 0.45);
 }
 
+.bubble-ripple-out-pending {
+    -jfx-rippler-fill: rgba(255, 255, 255, 0.35);
+}
+
 .bubble-ripple-in {
     -fx-background-radius: 12px 12px 12px 2px;
     -fx-border-radius: 12px 12px 12px 2px;
@@ -127,6 +139,10 @@
     -fx-font-size: 16px;
 }
 
+.bubble-text-out-pending {
+    -fx-fill: rgba(255, 255, 255, 0.95);
+}
+
 .bubble-text-in {
     -fx-fill: #212121;
     -fx-font-size: 16px;
@@ -135,6 +151,10 @@
 .bubble-time-out {
     -fx-fill: rgba(255, 255, 255, 0.7);
     -fx-font-size: 14px;
+}
+
+.bubble-time-out-pending {
+    -fx-fill: rgba(255, 255, 255, 0.82);
 }
 
 .bubble-time-in {

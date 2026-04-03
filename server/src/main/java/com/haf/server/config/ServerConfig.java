@@ -25,6 +25,8 @@ public final class ServerConfig {
     private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
     private static final long DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS = AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS;
 
+    private static final String HAF_APP_IS_DEV = "HAF_APP_IS_DEV";
+
     private final String dbUrl;
     private final String dbUser;
     private final String dbPassword;
@@ -36,6 +38,7 @@ public final class ServerConfig {
     private final Path tlsKeystorePath;
     private final char[] tlsKeystorePassword;
 
+    private final boolean devMode;
     private final int httpPort;
     private final int wsPort;
     private final String adminPublicKeyPem;
@@ -108,6 +111,7 @@ public final class ServerConfig {
         this.tlsKeystorePath = tls;
         this.tlsKeystorePassword = require(env, "HAF_TLS_KEYSTORE_PASS").toCharArray();
 
+        this.devMode = parseBoolean(require(env, HAF_APP_IS_DEV), HAF_APP_IS_DEV);
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
         this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
         this.adminPublicKeyPem = env.getOrDefault("HAF_ADMIN_PUBLIC_KEY", null);
@@ -200,6 +204,13 @@ public final class ServerConfig {
      */
     public int getHttpPort() {
         return httpPort;
+    }
+
+    /**
+     * Returns whether the runtime is configured for development mode.
+     */
+    public boolean isDevMode() {
+        return devMode;
     }
 
     /**
@@ -319,6 +330,24 @@ public final class ServerConfig {
     }
 
     /**
+     * Parses a boolean value from a candidate string.
+     *
+     * @param candidate raw candidate value
+     * @param key configuration key for diagnostics
+     * @return parsed boolean value
+     */
+    private static boolean parseBoolean(String candidate, String key) {
+        String normalized = candidate.trim();
+        if ("true".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        throw new ConfigurationException("Invalid boolean value for " + key + ": " + candidate);
+    }
+
+    /**
      * Parses a long value from a candidate string.
      *
      * @param candidate raw candidate value from environment input
@@ -423,6 +452,7 @@ public final class ServerConfig {
                 "dbUrl='" + dbUrl + '\'' +
                 ", dbUser='" + dbUser + '\'' +
                 ", dbPoolSize=" + dbPoolSize +
+                ", devMode=" + devMode +
                 ", httpPort=" + httpPort +
                 ", wsPort=" + wsPort +
                 ", keystoreRoot=" + keystoreRoot +

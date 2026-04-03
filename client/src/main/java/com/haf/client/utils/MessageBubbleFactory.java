@@ -1,6 +1,7 @@
 package com.haf.client.utils;
 
 import com.haf.client.models.MessageVM;
+import com.haf.client.models.MessageType;
 import com.jfoenix.controls.JFXButton;
 import javafx.beans.binding.Bindings;
 import javafx.css.PseudoClass;
@@ -88,6 +89,9 @@ public final class MessageBubbleFactory {
         }, row.widthProperty()));
         bubble.setPadding(new Insets(14));
         bubble.getStyleClass().add(message.isOutgoing() ? "bubble-out" : "bubble-in");
+        if (isPendingOutgoingText(message)) {
+            bubble.getStyleClass().add("bubble-out-pending");
+        }
         bubble.setCursor(Cursor.HAND);
 
         // Message content
@@ -124,6 +128,9 @@ public final class MessageBubbleFactory {
         rippleOverlay.prefHeightProperty().bind(bubble.heightProperty());
         rippleOverlay.getStyleClass().add("bubble-ripple-overlay");
         rippleOverlay.getStyleClass().add(message.isOutgoing() ? "bubble-ripple-out" : "bubble-ripple-in");
+        if (isPendingOutgoingText(message)) {
+            rippleOverlay.getStyleClass().add("bubble-ripple-out-pending");
+        }
         bridgeOverlayPseudoClasses(rippleOverlay, bubble);
         return rippleOverlay;
     }
@@ -175,6 +182,9 @@ public final class MessageBubbleFactory {
                 bubble.maxWidthProperty()));
         text.getStyleClass().add(
                 message.isOutgoing() ? "bubble-text-out" : "bubble-text-in");
+        if (isPendingOutgoingText(message)) {
+            text.getStyleClass().add("bubble-text-out-pending");
+        }
         return text;
     }
 
@@ -347,10 +357,27 @@ public final class MessageBubbleFactory {
         Text ts = new Text(time);
         ts.getStyleClass().add(
                 message.isOutgoing() ? "bubble-time-out" : "bubble-time-in");
+        if (isPendingOutgoingText(message)) {
+            ts.getStyleClass().add("bubble-time-out-pending");
+        }
 
         HBox row = new HBox(ts);
         row.setAlignment(Pos.CENTER_RIGHT);
         VBox.setMargin(row, new Insets(2, 0, 0, 0));
         return row;
+    }
+
+    /**
+     * Checks whether a message is an outgoing text bubble currently waiting for
+     * send completion.
+     *
+     * @param message message candidate
+     * @return {@code true} when outgoing text is pending send
+     */
+    private static boolean isPendingOutgoingText(MessageVM message) {
+        return message != null
+                && message.isOutgoing()
+                && message.type() == MessageType.TEXT
+                && message.isLoading();
     }
 }

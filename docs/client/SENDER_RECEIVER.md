@@ -12,7 +12,8 @@ Describe concrete messaging implementations used by the client runtime.
   - validates envelopes with `MessageValidator`
   - sends via authenticated HTTPS helper in `WebSocketAdapter`
 - `DefaultMessageReceiver`:
-  - consumes websocket payloads
+  - consumes websocket payloads in dev mode
+  - consumes HTTPS polling snapshots (`/api/v1/messages`, `/api/v1/contacts`) in prod mode
   - validates and decrypts envelopes
   - dispatches callbacks (`onMessage`, `onError`, `onPresenceUpdate`)
   - performs envelope acknowledgement flow
@@ -29,9 +30,9 @@ Describe concrete messaging implementations used by the client runtime.
 
 1. Sender builds encrypted envelope and posts to `/api/v1/messages`.
 2. Server returns envelope metadata (`envelopeId`, `expiresAt`).
-3. Receiver gets inbound envelope events over websocket.
+3. Receiver gets inbound envelope events over websocket (dev) or HTTPS polling (prod).
 4. Receiver decrypts and notifies UI-facing listener.
-5. Receiver acknowledges delivered envelope ids.
+5. Receiver acknowledges delivered envelope ids via authenticated ACK path.
 
 ## Error/Security Notes
 

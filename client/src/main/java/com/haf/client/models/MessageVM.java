@@ -37,6 +37,18 @@ public record MessageVM(
     }
 
     /**
+     * Convenience factory for outgoing text placeholders while message send is in
+     * progress.
+     *
+     * @param text      text payload
+     * @param timestamp message timestamp
+     * @return outgoing loading-text message view-model
+     */
+    public static MessageVM outgoingLoadingText(String text, LocalDateTime timestamp) {
+        return new MessageVM(true, MessageType.TEXT, text, null, null, null, timestamp, true);
+    }
+
+    /**
      * Convenience factory for incoming text messages.
      *
      * @param text      text payload
