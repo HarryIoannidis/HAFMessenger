@@ -1,6 +1,7 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.dto.EncryptedMessage;
@@ -19,8 +20,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageReceiverTest {
@@ -30,8 +34,15 @@ class MessageReceiverTest {
         private boolean connected = false;
 
         private final java.util.List<String> sentMessages = new java.util.ArrayList<>();
+        private final java.util.List<String> postedBodies = new java.util.ArrayList<>();
+        private final java.util.List<String> postedPaths = new java.util.ArrayList<>();
+        private final java.util.List<String> getPaths = new java.util.ArrayList<>();
+        private final ArrayDeque<String> messagePollResponses = new ArrayDeque<>();
+        private final ArrayDeque<String> contactsPollResponses = new ArrayDeque<>();
         private boolean failNextSend;
         private int closeCalls;
+        private java.io.IOException connectFailure;
+        private int connectCalls;
 
         MockWebSocketAdapter() {
             super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
@@ -40,8 +51,33 @@ class MessageReceiverTest {
         @Override
         public void connect(java.util.function.Consumer<String> onMessage,
                 java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
+            connectCalls++;
+            if (connectFailure != null) {
+                throw connectFailure;
+            }
             this.messageConsumer = onMessage;
             connected = true;
+        }
+
+        @Override
+        public CompletableFuture<String> getAuthenticated(String path) {
+            getPaths.add(path);
+            String response;
+            if (path != null && path.startsWith("/api/v1/messages")) {
+                response = messagePollResponses.isEmpty() ? "{\"messages\":[]}" : messagePollResponses.removeFirst();
+            } else if (path != null && path.startsWith("/api/v1/contacts")) {
+                response = contactsPollResponses.isEmpty() ? "{\"contacts\":[]}" : contactsPollResponses.removeFirst();
+            } else {
+                response = "{}";
+            }
+            return CompletableFuture.completedFuture(response);
+        }
+
+        @Override
+        public CompletableFuture<String> postAuthenticated(String path, String body) {
+            postedPaths.add(path);
+            postedBodies.add(body);
+            return CompletableFuture.completedFuture("{\"acknowledged\":true}");
         }
 
         @Override
@@ -68,7 +104,8 @@ class MessageReceiverTest {
         }
 
         void simulateIncomingMessage(String json, String envelopeId) {
-            String wrappedJson = "{\"type\":\"message\",\"envelopeId\":\"" + envelopeId + "\",\"payload\":" + json + "}";
+            String wrappedJson = "{\"type\":\"message\",\"envelopeId\":\"" + envelopeId + "\",\"payload\":" + json
+                    + "}";
             if (messageConsumer != null) {
                 messageConsumer.accept(wrappedJson);
             }
@@ -90,6 +127,34 @@ class MessageReceiverTest {
 
         int getCloseCalls() {
             return closeCalls;
+        }
+
+        void failConnectWith(java.io.IOException error) {
+            this.connectFailure = error;
+        }
+
+        void enqueuePollResponse(String responseJson) {
+            messagePollResponses.addLast(responseJson);
+        }
+
+        void enqueueContactsPollResponse(String responseJson) {
+            contactsPollResponses.addLast(responseJson);
+        }
+
+        java.util.List<String> getPostedBodies() {
+            return postedBodies;
+        }
+
+        java.util.List<String> getPostedPaths() {
+            return postedPaths;
+        }
+
+        java.util.List<String> getGetPaths() {
+            return getPaths;
+        }
+
+        int getConnectCalls() {
+            return connectCalls;
         }
     }
 
@@ -135,7 +200,8 @@ class MessageReceiverTest {
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
                 receivedMessages.add(plaintext);
             }
 
@@ -258,7 +324,8 @@ class MessageReceiverTest {
     void receives_presence_event_with_extra_hidden_field() throws Exception {
         messageReceiver.start();
 
-        webSocketAdapter.simulateIncomingRaw("{\"type\":\"presence\",\"userId\":\"user-42\",\"active\":false,\"hidden\":true}");
+        webSocketAdapter
+                .simulateIncomingRaw("{\"type\":\"presence\",\"userId\":\"user-42\",\"active\":false,\"hidden\":true}");
 
         assertEquals(0, receivedMessages.size());
         assertEquals(0, receivedErrors.size());
@@ -374,6 +441,116 @@ class MessageReceiverTest {
     }
 
     @Test
+    void start_falls_back_to_http_polling_when_websocket_connect_fails() throws Exception {
+        webSocketAdapter.failConnectWith(new java.io.IOException("WebSocket connection timeout"));
+
+        byte[] payload = "fallback-http".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+
+        String envelopeJson = "{\"type\":\"message\",\"envelopeId\":\"env-http-1\",\"payload\":"
+                + JsonCodec.toJson(encrypted) + "}";
+        webSocketAdapter.enqueuePollResponse("{\"messages\":[" + envelopeJson + "]}");
+
+        messageReceiver.start();
+
+        waitForCondition(() -> !receivedMessages.isEmpty(), 1500L);
+        assertEquals(1, receivedMessages.size());
+        assertArrayEquals(payload, receivedMessages.get(0));
+        assertTrue(webSocketAdapter.getGetPaths().stream().anyMatch(path -> path.startsWith("/api/v1/messages")));
+    }
+
+    @Test
+    void prod_mode_uses_https_polling_without_attempting_websocket_connect() throws Exception {
+        MessageReceiver pollingReceiver = new DefaultMessageReceiver(
+                keyProvider,
+                clockProvider,
+                webSocketAdapter,
+                recipientKeyId,
+                ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING);
+        pollingReceiver.setMessageListener(new MessageReceiver.MessageListener() {
+            @Override
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
+                receivedMessages.add(plaintext);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                receivedErrors.add(error);
+            }
+        });
+
+        pollingReceiver.start();
+        waitForCondition(() -> !webSocketAdapter.getGetPaths().isEmpty(), 1500L);
+
+        assertEquals(0, webSocketAdapter.getConnectCalls());
+        assertTrue(webSocketAdapter.getGetPaths().stream().anyMatch(path -> path.startsWith("/api/v1/messages")));
+    }
+
+    @Test
+    void acknowledge_uses_http_endpoint_when_fallback_polling_is_active() throws Exception {
+        webSocketAdapter.failConnectWith(new java.io.IOException("WebSocket connection timeout"));
+
+        byte[] payload = "fallback-ack".getBytes(StandardCharsets.UTF_8);
+        MessageEncryptor encryptor = new MessageEncryptor(
+                recipientKp.getPublic(), senderKeyId, recipientKeyId, clockProvider);
+        EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+
+        String envelopeJson = "{\"type\":\"message\",\"envelopeId\":\"env-http-ack\",\"payload\":"
+                + JsonCodec.toJson(encrypted) + "}";
+        webSocketAdapter.enqueuePollResponse("{\"messages\":[" + envelopeJson + "]}");
+
+        messageReceiver.start();
+        waitForCondition(() -> !receivedMessages.isEmpty(), 1500L);
+
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+
+        assertEquals(List.of("/api/v1/messages/ack"), webSocketAdapter.getPostedPaths());
+        assertEquals(List.of("{\"envelopeIds\":[\"env-http-ack\"]}"), webSocketAdapter.getPostedBodies());
+    }
+
+    @Test
+    void polling_emits_presence_updates_only_when_state_changes() throws Exception {
+        MessageReceiver pollingReceiver = new DefaultMessageReceiver(
+                keyProvider,
+                clockProvider,
+                webSocketAdapter,
+                recipientKeyId,
+                ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING);
+        pollingReceiver.setMessageListener(new MessageReceiver.MessageListener() {
+            @Override
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
+                receivedMessages.add(plaintext);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                receivedErrors.add(error);
+            }
+
+            @Override
+            public void onPresenceUpdate(String userId, boolean active) {
+                presenceUpdates.add(userId + ":" + active);
+            }
+        });
+
+        webSocketAdapter.enqueueContactsPollResponse(
+                "{\"contacts\":[{\"userId\":\"u-42\",\"fullName\":\"User\",\"active\":true}]}");
+        webSocketAdapter.enqueueContactsPollResponse(
+                "{\"contacts\":[{\"userId\":\"u-42\",\"fullName\":\"User\",\"active\":true}]}");
+        webSocketAdapter.enqueueContactsPollResponse(
+                "{\"contacts\":[{\"userId\":\"u-42\",\"fullName\":\"User\",\"active\":false}]}");
+
+        pollingReceiver.start();
+        waitForCondition(() -> presenceUpdates.size() >= 2, 6500L);
+
+        assertEquals(List.of("u-42:true", "u-42:false"), presenceUpdates);
+    }
+
+    @Test
     void stop_closes_underlying_adapter() throws Exception {
         messageReceiver.start();
 
@@ -381,5 +558,17 @@ class MessageReceiverTest {
 
         assertEquals(1, webSocketAdapter.getCloseCalls());
         assertFalse(webSocketAdapter.isConnected());
+    }
+
+    private static void waitForCondition(BooleanSupplier condition, long timeoutMs) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            latch.await(20L, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+        fail("Condition not met within timeout");
     }
 }

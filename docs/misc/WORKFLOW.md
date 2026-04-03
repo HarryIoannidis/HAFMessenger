@@ -22,8 +22,8 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 
 1. Compose message in UI -> ViewModel -> `MessageSender`.
 2. Encrypt payload and send envelope to `/api/v1/messages`.
-3. Server validates and stores envelope, then pushes/serves mailbox updates.
-4. Receiver validates/decrypts envelope and updates chat state.
+3. Server validates and stores envelope, then pushes in dev mode or serves polling updates for prod clients.
+4. Receiver validates/decrypts envelope and updates chat state using mode-aware transport.
 5. Client acknowledges delivered envelope IDs to avoid re-delivery.
 
 ## Error/Security Notes

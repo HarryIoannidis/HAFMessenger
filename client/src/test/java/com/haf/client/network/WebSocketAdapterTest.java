@@ -60,6 +60,24 @@ class WebSocketAdapterTest {
     }
 
     @Test
+    void get_authenticated_uses_explicit_http_base_uri_when_provided() {
+        FakeHttpClient client = new FakeHttpClient();
+        URI wsUri = URI.create("wss://prod-ws.example.test/ws");
+        URI httpBaseUri = URI.create("https://prod-api.example.test:9443");
+        client.enqueueResponse(response(200, "{\"ok\":true}", httpBaseUri.resolve("/api/v1/ping")));
+
+        WebSocketAdapter adapter = new WebSocketAdapter(wsUri, httpBaseUri, "session-explicit", client);
+        adapter.getAuthenticated("/api/v1/ping").join();
+
+        HttpRequest request = client.requests.getFirst();
+        assertEquals("https", request.uri().getScheme());
+        assertEquals("prod-api.example.test", request.uri().getHost());
+        assertEquals(9443, request.uri().getPort());
+        assertEquals("/api/v1/ping", request.uri().getPath());
+        assertEquals("Bearer session-explicit", request.headers().firstValue("Authorization").orElse(null));
+    }
+
+    @Test
     void post_authenticated_sets_json_content_type_and_bearer() {
         FakeHttpClient client = new FakeHttpClient();
         client.enqueueResponse(response(200, "{}", URI.create("https://localhost:8443/api/v1/test")));

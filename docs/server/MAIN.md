@@ -11,7 +11,8 @@ Document server bootstrap and shutdown orchestration performed by `Main`.
   - run Flyway migrations
   - build datasource/scheduler
   - initialize services/DAOs/router/ingress servers
-  - start mailbox router + websocket + HTTPS ingress
+  - start mailbox router + HTTPS ingress
+  - start websocket ingress only when `HAF_APP_IS_DEV=true`
 - Scheduled jobs include metrics snapshots and attachment cleanup.
 - Scheduler cadence is 60 seconds for metrics snapshots and 300 seconds for expired attachment cleanup.
 
@@ -27,8 +28,8 @@ Document server bootstrap and shutdown orchestration performed by `Main`.
 
 1. `Main.main(...)` calls `start()`.
 2. Configuration, migrations, and dependency graph are initialized.
-3. Runtime services and ingress endpoints start (`MailboxRouter`, WSS, then HTTPS).
-4. Websocket startup is awaited (10s budget) before final HTTP start.
+3. Runtime services and ingress endpoints start (`MailboxRouter`, conditional WSS, then HTTPS).
+4. Websocket startup is awaited (10s budget) only when dev mode is enabled.
 5. Shutdown hook closes servers/router/scheduler/datasource.
 
 ## Error/Security Notes
@@ -36,6 +37,7 @@ Document server bootstrap and shutdown orchestration performed by `Main`.
 - Any startup failure is logged and wrapped in `StartupException`.
 - TLS context is initialized with strict protocol/cipher policy.
 - Shutdown path cancels scheduled jobs and attempts graceful close before datasource teardown.
+- In production mode (`HAF_APP_IS_DEV=false`), websocket startup is skipped by design.
 
 ## Related Files
 

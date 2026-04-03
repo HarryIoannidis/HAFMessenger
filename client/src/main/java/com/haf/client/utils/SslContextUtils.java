@@ -2,6 +2,7 @@ package com.haf.client.utils;
 
 import com.haf.client.exceptions.SslConfigurationException;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,7 +24,8 @@ public class SslContextUtils {
         throw new IllegalStateException("Utility class");
     }
 
-    private static SSLContext sslContext;
+    private static SSLContext devSslContext;
+    private static SSLContext strictSslContext;
 
     /**
      * Loads the custom truststore and returns an SSLContext that trusts our
@@ -31,8 +33,8 @@ public class SslContextUtils {
      * The truststore password is read from /config/client.properties.
      */
     public static synchronized SSLContext getTrustingSslContext() {
-        if (sslContext != null) {
-            return sslContext;
+        if (devSslContext != null) {
+            return devSslContext;
         }
 
         try {
@@ -53,13 +55,52 @@ public class SslContextUtils {
             tmf.init(trustStore);
 
             // Create and initialize the SSLContext
-            sslContext = SSLContext.getInstance("TLSv1.3");
-            sslContext.init(null, tmf.getTrustManagers(), null);
+            devSslContext = SSLContext.getInstance("TLSv1.3");
+            devSslContext.init(null, tmf.getTrustManagers(), null);
 
-            return sslContext;
+            return devSslContext;
         } catch (Exception e) {
             throw new SslConfigurationException("Failed to initialize custom SSLContext", e);
         }
+    }
+
+    /**
+     * Returns strict TLS SSLContext backed by the default JVM trust store.
+     *
+     * @return strict SSL context
+     */
+    public static synchronized SSLContext getStrictSslContext() {
+        if (strictSslContext != null) {
+            return strictSslContext;
+        }
+        try {
+            strictSslContext = SSLContext.getDefault();
+            return strictSslContext;
+        } catch (Exception e) {
+            throw new SslConfigurationException("Failed to initialize strict SSLContext", e);
+        }
+    }
+
+    /**
+     * Returns SSLContext for runtime mode.
+     *
+     * @param isDev whether dev mode is active
+     * @return mode-specific SSL context
+     */
+    public static SSLContext getSslContextForMode(boolean isDev) {
+        return isDev ? getTrustingSslContext() : getStrictSslContext();
+    }
+
+    /**
+     * Creates TLS parameters with HTTPS endpoint identification enabled.
+     *
+     * @return HTTPS-capable SSL parameters
+     */
+    public static SSLParameters createHttpsSslParameters() {
+        SSLParameters parameters = new SSLParameters();
+        parameters.setProtocols(new String[] { "TLSv1.3" });
+        parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        return parameters;
     }
 
     /**

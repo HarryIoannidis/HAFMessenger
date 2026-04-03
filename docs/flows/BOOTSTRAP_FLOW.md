@@ -36,8 +36,10 @@ The background task executes 4 sequential gating steps. If any step fails, the b
 
 ### Stage D: Backend Network Probe (60% → 80%)
 
-- The JVM parses the target server URL by checking `client.properties`, cascading to system properties (`-Dhaf.server.url`), and finally environment variables (`HAF_SERVER_URL`).
-- It constructs a custom Java 11 `HttpClient` using a trusting SSL context and tight boundaries: 2 seconds connection timeout, 3 seconds response timeout.
+- The JVM loads `ClientRuntimeConfig` from `client.properties` and resolves the health-check base URI by runtime mode.
+- In dev mode, health URL resolution supports `server.url` in properties, then `-Dhaf.server.url`, then `HAF_SERVER_URL` (fallback `https://localhost:8443`).
+- In prod mode, health URL resolution uses `server.url.prod` with strict HTTPS validation.
+- It constructs a Java 11 `HttpClient` with mode-aware SSL context (`SslContextUtils.getSslContextForMode(...)`) and tight boundaries: 2 seconds connection timeout, 3 seconds response timeout.
 - Instead of a full `GET`, it fires a lightweight HTTP `HEAD` request to `[SERVER]/api/v1/health`.
 - **Retries:** It allows exactly `3` attempts with a 500-millisecond backoff. If it receives a 400+ status code or timeout, it fails completely.
 

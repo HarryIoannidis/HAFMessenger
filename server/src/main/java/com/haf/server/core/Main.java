@@ -85,9 +85,11 @@ public final class Main {
             HttpIngressServer httpServer = new HttpIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
                     sessionDAO, fileUploadDAO, attachmentDAO, contactDAO, presenceRegistry);
-            WebSocketIngressServer webSocketServer = new WebSocketIngressServer(
-                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO,
-                    contactDAO, presenceRegistry);
+            final WebSocketIngressServer webSocketServer = config.isDevMode()
+                    ? new WebSocketIngressServer(
+                            config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO,
+                            contactDAO, presenceRegistry)
+                    : null;
 
             metricsFutureRef[0] = scheduler.scheduleAtFixedRate(
                     () -> auditLogger.logMetricsSnapshot(metricsRegistry.snapshot()),
@@ -110,7 +112,9 @@ public final class Main {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     LOGGER.info("Shutdown initiated");
-                    webSocketServer.stop();
+                    if (webSocketServer != null) {
+                        webSocketServer.stop();
+                    }
                     httpServer.stop();
                     mailboxRouter.close();
                     metricsFuture.cancel(true);
@@ -126,11 +130,17 @@ public final class Main {
             }));
 
             mailboxRouter.start();
-            webSocketServer.start();
-            webSocketServer.awaitStartup(Duration.ofSeconds(10));
+            if (webSocketServer != null) {
+                webSocketServer.start();
+                webSocketServer.awaitStartup(Duration.ofSeconds(10));
+            }
             httpServer.start();
 
-            LOGGER.info("Servers started on HTTP {} / WS {}", config.getHttpPort(), config.getWsPort());
+            if (webSocketServer != null) {
+                LOGGER.info("Servers started on HTTP {} / WS {}", config.getHttpPort(), config.getWsPort());
+            } else {
+                LOGGER.info("Server started on HTTP {} (WS disabled: HAF_APP_IS_DEV=false)", config.getHttpPort());
+            }
 
             awaitShutdown(shutdownLatch);
         } catch (Exception e) {

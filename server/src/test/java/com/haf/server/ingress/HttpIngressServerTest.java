@@ -117,6 +117,7 @@ class HttpIngressServerTest {
         presenceRegistry = new PresenceRegistry();
 
         when(config.getHttpPort()).thenReturn(0);
+        lenient().when(config.isDevMode()).thenReturn(true);
         lenient().when(config.getAdminPublicKeyPem())
                 .thenReturn("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----");
 
@@ -196,6 +197,85 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void ingress_fetches_pending_messages_for_authenticated_user() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        EncryptedMessage message = validMessage("sender-1", "recipient-1");
+        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
+        when(mailboxRouter.fetchUndelivered("recipient-1", 2)).thenReturn(
+                List.of(new QueuedEnvelope("env-fetch-1", message, 10L, 20L)));
+
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/messages?limit=2", "");
+        authenticate(exchange, "session-fetch", "recipient-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(200, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"messages\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"envelopeId\":\"env-fetch-1\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"type\":\"message\""));
+        verify(mailboxRouter, times(1)).fetchUndelivered("recipient-1", 2);
+    }
+
+    @Test
+    void ingress_acknowledges_messages_for_authenticated_user() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
+        when(mailboxRouter.acknowledgeOwned("recipient-1", List.of("env-a", "env-b")))
+                .thenReturn(true);
+
+        ExchangeHarness exchange = newExchange(
+                "POST",
+                "/api/v1/messages/ack",
+                "{\"envelopeIds\":[\"env-a\",\"env-b\"]}");
+        authenticate(exchange, "session-ack", "recipient-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(200, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"acknowledged\":true"));
+        verify(mailboxRouter, times(1)).acknowledgeOwned("recipient-1", List.of("env-a", "env-b"));
+    }
+
+    @Test
+    void ingress_fetch_pending_messages_is_rate_limited() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(15));
+
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/messages?limit=2", "");
+        authenticate(exchange, "session-fetch-limit", "recipient-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":15"));
+        verify(mailboxRouter, never()).fetchUndelivered(anyString(), anyInt());
+    }
+
+    @Test
+    void ingress_acknowledge_messages_is_rate_limited() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(12));
+
+        ExchangeHarness exchange = newExchange(
+                "POST",
+                "/api/v1/messages/ack",
+                "{\"envelopeIds\":[\"env-a\"]}");
+        authenticate(exchange, "session-ack-limit", "recipient-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":12"));
+        verify(mailboxRouter, never()).acknowledgeOwned(anyString(), any());
+    }
+
+    @Test
     void registration_rejects_non_post_method() throws Exception {
         HttpHandler handler = createHandler("RegistrationHandler");
         ExchangeHarness exchange = newExchange("GET", "/api/v1/register", "{}");
@@ -235,6 +315,26 @@ class HttpIngressServerTest {
         String password = "correct horse battery staple";
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
         presenceRegistry.registerConnection(userId, mock(WebSocket.class));
+
+        HttpHandler handler = createHandler("LoginHandler");
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
+                "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(409, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("Account is already logged in."));
+        verify(sessionDAO, never()).createSession(anyString());
+    }
+
+    @Test
+    void login_rejects_when_account_is_recently_active_in_prod_mode() throws Exception {
+        String userId = "user-1";
+        String email = "pilot@haf.gr";
+        String password = "correct horse battery staple";
+        when(config.isDevMode()).thenReturn(false);
+        when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
+        when(sessionDAO.isUserRecentlyActive(eq(userId), anyLong())).thenReturn(true);
 
         HttpHandler handler = createHandler("LoginHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
@@ -596,6 +696,26 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void contacts_get_uses_recent_session_presence_in_prod_mode() throws Exception {
+        when(config.isDevMode()).thenReturn(false);
+        when(sessionDAO.isUserRecentlyActive(eq("u-2"), anyLong())).thenReturn(true);
+
+        HttpHandler handler = createHandler("ContactsHandler");
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/contacts", "");
+        authenticate(exchange, "sess-contacts-prod", "caller");
+
+        when(contactDAO.getContacts("caller")).thenReturn(List.of(
+                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
+                        "2026-01-01")));
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(200, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"userId\":\"u-2\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"active\":true"));
+    }
+
+    @Test
     void contacts_post_adds_contact() throws Exception {
         HttpHandler handler = createHandler("ContactsHandler");
         AddContactRequest request = new AddContactRequest("u-2");
@@ -827,7 +947,7 @@ class HttpIngressServerTest {
 
     private void authenticate(ExchangeHarness exchange, String sessionId, String userId) {
         exchange.requestHeaders().add("Authorization", "Bearer " + sessionId);
-        when(sessionDAO.getUserIdForSession(sessionId)).thenReturn(userId);
+        when(sessionDAO.getUserIdForSessionAndTouch(sessionId)).thenReturn(userId);
     }
 
     private static EncryptedMessage validMessage(String senderId, String recipientId) {

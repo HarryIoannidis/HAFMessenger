@@ -125,6 +125,7 @@ public final class HttpIngressServer {
     private static final String INVALID_CONTACT_ID = "invalid contactId";
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
     private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
+    private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
     private static final Argon2Function ARGON2 = Argon2Function.getInstance(
@@ -269,6 +270,25 @@ public final class HttpIngressServer {
     }
 
     /**
+     * Resolves user active state using runtime mode policy.
+     *
+     * Dev mode uses websocket presence registry.
+     * Prod mode uses recent HTTPS session activity.
+     *
+     * @param userId user id to evaluate
+     * @return {@code true} when user is currently active
+     */
+    private boolean isUserActiveForRuntime(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return false;
+        }
+        if (config.isDevMode()) {
+            return presenceRegistry.isActive(userId);
+        }
+        return sessionDAO.isUserRecentlyActive(userId, PROD_ACTIVE_WINDOW_SECONDS);
+    }
+
+    /**
      * Escapes a string for safe JSON literal embedding.
      *
      * @param value raw input value
@@ -385,6 +405,11 @@ public final class HttpIngressServer {
      * Handles HTTP requests.
      */
     private final class IngressHandler implements HttpHandler {
+        private static final String MESSAGES_ACK_PATH = MESSAGES_PATH + "/ack";
+        private static final int DEFAULT_FETCH_LIMIT = 100;
+        private static final int MAX_FETCH_LIMIT = 500;
+        private static final String ENVELOPE_IDS_REQUIRED = "envelopeIds is required";
+        private static final String INVALID_LIMIT = "invalid limit";
 
         /**
          * Handles an HTTP request.
@@ -399,61 +424,40 @@ public final class HttpIngressServer {
             exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            // Extract Authorization header
-            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
+            AuthResult authResult = resolveAuthenticatedCaller(exchange);
+            if (!authResult.authenticated()) {
+                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + authResult.error() + JSON_ERROR_SUFFIX);
                 return;
             }
-
-            // Retrieve User ID from Session DAO
-            String sessionId = authHeader.substring(BEARER_PREFIX.length());
-            String userId = sessionDAO.getUserIdForSession(sessionId);
-            if (userId == null) {
-                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
-                return;
-            }
+            String userId = authResult.callerId();
 
             exchange.getResponseHeaders().add("X-User-Id", userId);
 
             try {
-                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
+                String method = exchange.getRequestMethod();
+                String path = normalizePath(exchange.getRequestURI().getPath());
+
+                if (METHOD_POST.equalsIgnoreCase(method) && MESSAGES_PATH.equals(path)) {
+                    handleIngress(exchange, requestId, userId, start);
+                    return;
+                }
+                if (METHOD_GET.equalsIgnoreCase(method) && MESSAGES_PATH.equals(path)) {
+                    handleFetchUndelivered(exchange, requestId, userId);
+                    return;
+                }
+                if (METHOD_POST.equalsIgnoreCase(method) && MESSAGES_ACK_PATH.equals(path)) {
+                    handleAcknowledge(exchange, requestId, userId);
                     return;
                 }
 
-                String body = readBody(exchange.getRequestBody());
-                EncryptedMessage message = JsonCodec.fromJson(body, EncryptedMessage.class);
-
-                EncryptedMessageValidator.ValidationResult validationResult = validator.validate(message);
-                if (!validationResult.valid()) {
-                    auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
-                            validationResult.reason());
-                    respond(exchange, requestId, 400,
-                            JSON_ERROR_PREFIX + validationResult.reason() + JSON_ERROR_SUFFIX);
+                if (!MESSAGES_PATH.equals(path) && !MESSAGES_ACK_PATH.equals(path)) {
+                    respond(exchange, requestId, 404, JSON_ERROR_PREFIX + INVALID_REQUEST_PATH + JSON_ERROR_SUFFIX);
                     return;
                 }
 
-                RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
-                if (!rateDecision.allowed()) {
-                    auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
-                    respond(exchange, requestId, 429,
-                            "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds()
-                                    + "}");
-                    return;
-                }
-
-                QueuedEnvelope envelope = mailboxRouter.ingress(message);
-                auditLogger.logIngressAccepted(
-                        requestId,
-                        userId,
-                        message.getRecipientId(),
-                        202,
-                        Duration.ofNanos(System.nanoTime() - start).toMillis());
-
-                String response = JsonCodec
-                        .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
-                respond(exchange, requestId, 202, response);
+                respond(exchange, requestId, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
+            } catch (IllegalArgumentException ex) {
+                respond(exchange, requestId, 400, JSON_ERROR_PREFIX + escapeJson(ex.getMessage()) + JSON_ERROR_SUFFIX);
             } catch (Exception ex) {
                 auditLogger.logError("ingress_http_error", requestId, userId, ex);
                 metricsRegistry.incrementRejects();
@@ -461,6 +465,221 @@ public final class HttpIngressServer {
             } finally {
                 exchange.close();
             }
+        }
+
+        /**
+         * Handles authenticated message ingress via HTTP POST.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request identifier
+         * @param userId    authenticated caller id
+         * @param start     request start time in nanos
+         * @throws IOException when request handling fails
+         */
+        private void handleIngress(HttpExchange exchange, String requestId, String userId, long start)
+                throws IOException {
+            String body = readBody(exchange.getRequestBody());
+            EncryptedMessage message = JsonCodec.fromJson(body, EncryptedMessage.class);
+
+            EncryptedMessageValidator.ValidationResult validationResult = validator.validate(message);
+            if (!validationResult.valid()) {
+                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
+                        validationResult.reason());
+                respond(exchange, requestId, 400,
+                        JSON_ERROR_PREFIX + validationResult.reason() + JSON_ERROR_SUFFIX);
+                return;
+            }
+
+            RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
+            if (!rateDecision.allowed()) {
+                auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
+                respond(exchange, requestId, 429,
+                        "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds()
+                                + "}");
+                return;
+            }
+
+            QueuedEnvelope envelope = mailboxRouter.ingress(message);
+            auditLogger.logIngressAccepted(
+                    requestId,
+                    userId,
+                    message.getRecipientId(),
+                    202,
+                    Duration.ofNanos(System.nanoTime() - start).toMillis());
+
+            String response = JsonCodec
+                    .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
+            respond(exchange, requestId, 202, response);
+        }
+
+        /**
+         * Handles authenticated undelivered-envelope fetches for HTTP-polling
+         * fallback clients.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request identifier
+         * @param userId    authenticated caller id
+         * @throws IOException when response write fails
+         */
+        private void handleFetchUndelivered(HttpExchange exchange, String requestId, String userId) throws IOException {
+            if (!allowRateLimitedRequest(exchange, requestId, userId)) {
+                return;
+            }
+            int limit = resolveFetchLimit(exchange.getRequestURI().getRawQuery());
+            List<QueuedEnvelope> pending = mailboxRouter.fetchUndelivered(userId, limit);
+            List<Map<String, Object>> envelopes = pending.stream()
+                    .map(this::toEnvelopeResponse)
+                    .toList();
+            respond(exchange, requestId, 200, JsonCodec.toJson(Map.of("messages", envelopes)));
+        }
+
+        /**
+         * Handles authenticated envelope acknowledgements for HTTP-polling fallback
+         * clients.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request identifier
+         * @param userId    authenticated caller id
+         * @throws IOException when response write fails
+         */
+        private void handleAcknowledge(HttpExchange exchange, String requestId, String userId) throws IOException {
+            if (!allowRateLimitedRequest(exchange, requestId, userId)) {
+                return;
+            }
+            String body = readBody(exchange.getRequestBody());
+            Map<?, ?> ackMap = JsonCodec.fromJson(body, Map.class);
+            List<String> envelopeIds = extractEnvelopeIds(ackMap == null ? null : ackMap.get("envelopeIds"));
+            if (envelopeIds.isEmpty()) {
+                throw new IllegalArgumentException(ENVELOPE_IDS_REQUIRED);
+            }
+
+            boolean acknowledged = mailboxRouter.acknowledgeOwned(userId, envelopeIds);
+            respond(exchange, requestId, 200, "{\"acknowledged\":" + acknowledged + "}");
+        }
+
+        /**
+         * Applies per-user rate limiting using the same policy as message ingress.
+         *
+         * @param exchange  HTTP exchange
+         * @param requestId request id for audit logging
+         * @param userId    authenticated user id
+         * @return {@code true} when request is allowed
+         * @throws IOException when rate-limit response write fails
+         */
+        private boolean allowRateLimitedRequest(HttpExchange exchange, String requestId, String userId)
+                throws IOException {
+            RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
+            if (rateDecision.allowed()) {
+                return true;
+            }
+            auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
+            respond(exchange, requestId, 429,
+                    "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds() + "}");
+            return false;
+        }
+
+        /**
+         * Converts queued envelope to the wire format shared with WebSocket consumers.
+         *
+         * @param envelope queued envelope
+         * @return map payload serializable by JsonCodec
+         */
+        private Map<String, Object> toEnvelopeResponse(QueuedEnvelope envelope) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "message");
+            payload.put("envelopeId", envelope.envelopeId());
+            payload.put("payload", envelope.payload());
+            payload.put("expiresAt", envelope.expiresAtEpochMs());
+            return payload;
+        }
+
+        /**
+         * Resolves fetch limit from query-string parameters.
+         *
+         * @param rawQuery raw query string
+         * @return bounded limit value
+         */
+        private int resolveFetchLimit(String rawQuery) {
+            Map<String, String> params = parseQueryParams(rawQuery);
+            String rawLimit = params.get("limit");
+            if (rawLimit == null || rawLimit.isBlank()) {
+                return DEFAULT_FETCH_LIMIT;
+            }
+            try {
+                return Math.clamp(Integer.parseInt(rawLimit), 1, MAX_FETCH_LIMIT);
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException(INVALID_LIMIT, ex);
+            }
+        }
+
+        /**
+         * Parses first-value-wins query parameters from raw URI query text.
+         *
+         * @param rawQuery raw query string
+         * @return decoded key-value map
+         */
+        private Map<String, String> parseQueryParams(String rawQuery) {
+            Map<String, String> params = new HashMap<>();
+            if (rawQuery == null || rawQuery.isBlank()) {
+                return params;
+            }
+            String[] pairs = rawQuery.split("&");
+            for (String pair : pairs) {
+                if (pair == null || pair.isBlank()) {
+                    continue;
+                }
+                int equalsIndex = pair.indexOf('=');
+                String rawKey = equalsIndex >= 0 ? pair.substring(0, equalsIndex) : pair;
+                String rawValue = equalsIndex >= 0 ? pair.substring(equalsIndex + 1) : "";
+                String key = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
+                String value = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+                params.putIfAbsent(key, value);
+            }
+            return params;
+        }
+
+        /**
+         * Extracts non-empty envelope id strings from parsed ack payload.
+         *
+         * @param idsRaw raw envelopeIds node
+         * @return normalized envelope id list
+         */
+        private List<String> extractEnvelopeIds(Object idsRaw) {
+            if (!(idsRaw instanceof List<?> ids) || ids.isEmpty()) {
+                return List.of();
+            }
+            return ids.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(id -> !id.isBlank())
+                    .toList();
+        }
+
+        /**
+         * Normalizes request paths by stripping a trailing slash.
+         *
+         * @param path raw request path
+         * @return normalized path
+         */
+        private String normalizePath(String path) {
+            if (path == null || path.isBlank()) {
+                return "";
+            }
+            if (path.length() > 1 && path.endsWith("/")) {
+                return path.substring(0, path.length() - 1);
+            }
+            return path;
+        }
+
+        /**
+         * Escapes text for safe inclusion in compact JSON string literals.
+         *
+         * @param value source text
+         * @return escaped text
+         */
+        private String escapeJson(String value) {
+            return value == null ? INTERNAL_SERVER_ERROR : value.replace("\"", "\\\"");
         }
 
         /**
@@ -763,7 +982,7 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                if (isDuplicateLoginAttempt(presenceRegistry, user.userId())) {
+                if (isDuplicateLoginAttemptForRuntime(user.userId())) {
                     respond(exchange, requestId, 409,
                             JsonCodec.toJson(LoginResponse.error(ACCOUNT_ALREADY_LOGGED_IN)));
                     return;
@@ -801,6 +1020,16 @@ public final class HttpIngressServer {
          */
         private boolean isBlank(String value) {
             return value == null || value.isBlank();
+        }
+
+        /**
+         * Checks duplicate-login state using runtime mode policy.
+         *
+         * @param userId user attempting login
+         * @return {@code true} when user is considered currently active
+         */
+        private boolean isDuplicateLoginAttemptForRuntime(String userId) {
+            return isUserActiveForRuntime(userId);
         }
 
         /**
@@ -886,18 +1115,13 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-                if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + MISSING_OR_INVALID_AUTH + JSON_ERROR_SUFFIX);
+                AuthResult authResult = resolveAuthenticatedCaller(exchange);
+                if (!authResult.authenticated()) {
+                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + authResult.error() + JSON_ERROR_SUFFIX);
                     return;
                 }
-
-                String sessionId = authHeader.substring(BEARER_PREFIX.length());
-                String callerId = sessionDAO.getUserIdForSession(sessionId);
-                if (callerId == null) {
-                    sendPlain(exchange, 401, JSON_ERROR_PREFIX + INVALID_SESSION + JSON_ERROR_SUFFIX);
-                    return;
-                }
+                String sessionId = authResult.sessionId();
+                String callerId = authResult.callerId();
 
                 sessionDAO.revokeSession(sessionId);
                 closeActivePresenceConnections(callerId, requestId);
@@ -1141,18 +1365,12 @@ public final class HttpIngressServer {
                 return;
             }
 
-            // Authenticate via session
-            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(MISSING_OR_INVALID_AUTH)));
+            AuthResult authResult = resolveAuthenticatedCaller(exchange);
+            if (!authResult.authenticated()) {
+                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(authResult.error())));
                 return;
             }
-            String sessionId = authHeader.substring(BEARER_PREFIX.length());
-            String callerId = sessionDAO.getUserIdForSession(sessionId);
-            if (callerId == null) {
-                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(INVALID_SESSION)));
-                return;
-            }
+            String callerId = authResult.callerId();
 
             Map<String, String> queryParams;
             try {
@@ -1512,18 +1730,12 @@ public final class HttpIngressServer {
             exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            // Authenticate via session
-            String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-            if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-                sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(MISSING_OR_INVALID_AUTH)));
+            AuthResult authResult = resolveAuthenticatedCaller(exchange);
+            if (!authResult.authenticated()) {
+                sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(authResult.error())));
                 return;
             }
-            String sessionId = authHeader.substring(BEARER_PREFIX.length());
-            String callerId = sessionDAO.getUserIdForSession(sessionId);
-            if (callerId == null) {
-                sendPlain(exchange, 401, JsonCodec.toJson(ContactsResponse.error(INVALID_SESSION)));
-                return;
-            }
+            String callerId = authResult.callerId();
 
             String method = exchange.getRequestMethod();
 
@@ -1556,7 +1768,7 @@ public final class HttpIngressServer {
             List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResultDTO> results = records.stream()
                     .map(r -> {
-                        boolean active = presenceRegistry.isActive(r.userId());
+                        boolean active = isUserActiveForRuntime(r.userId());
                         return new UserSearchResultDTO(
                                 r.userId(),
                                 r.fullName(),
@@ -2025,7 +2237,45 @@ public final class HttpIngressServer {
     }
 
     /**
-     * Authenticates caller from bearer session token.
+     * Auth resolution result.
+     *
+     * @param sessionId bearer session id
+     * @param callerId  resolved caller id
+     * @param error     error message when authentication fails
+     */
+    private record AuthResult(String sessionId, String callerId, String error) {
+        /**
+         * Indicates whether auth resolution succeeded.
+         *
+         * @return {@code true} when no auth error exists
+         */
+        private boolean authenticated() {
+            return error == null;
+        }
+    }
+
+    /**
+     * Resolves caller from bearer session token and touches session activity.
+     *
+     * @param exchange HTTP exchange
+     * @return auth result containing either caller/session or an auth error reason
+     */
+    private AuthResult resolveAuthenticatedCaller(HttpExchange exchange) {
+        String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            return new AuthResult(null, null, MISSING_OR_INVALID_AUTH);
+        }
+
+        String sessionId = authHeader.substring(BEARER_PREFIX.length());
+        String callerId = sessionDAO.getUserIdForSessionAndTouch(sessionId);
+        if (callerId == null) {
+            return new AuthResult(sessionId, null, INVALID_SESSION);
+        }
+        return new AuthResult(sessionId, callerId, null);
+    }
+
+    /**
+     * Authenticates caller for helpers that emit generic JSON error payloads.
      *
      * @param exchange HTTP exchange
      * @return caller user id, or {@code null} when authentication fails (response
@@ -2033,19 +2283,12 @@ public final class HttpIngressServer {
      * @throws IOException when error response cannot be written
      */
     private String authenticateCaller(HttpExchange exchange) throws IOException {
-        String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            sendJson(exchange, 401, jsonError(MISSING_OR_INVALID_AUTH));
+        AuthResult authResult = resolveAuthenticatedCaller(exchange);
+        if (!authResult.authenticated()) {
+            sendJson(exchange, 401, jsonError(authResult.error()));
             return null;
         }
-
-        String sessionId = authHeader.substring(BEARER_PREFIX.length());
-        String callerId = sessionDAO.getUserIdForSession(sessionId);
-        if (callerId == null) {
-            sendJson(exchange, 401, jsonError(INVALID_SESSION));
-            return null;
-        }
-        return callerId;
+        return authResult.callerId();
     }
 
     /**

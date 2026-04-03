@@ -5,10 +5,8 @@ import com.haf.server.metrics.AuditLogger;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -27,7 +25,7 @@ public final class SessionDAO {
      */
     private static final String INSERT_SQL = """
             INSERT INTO sessions (session_id, user_id, jwt_token, expires_at)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))
             """;
 
     /**
@@ -52,7 +50,6 @@ public final class SessionDAO {
         String sessionId = UUID.randomUUID().toString();
         // Placeholder JWT token until real JWT signing is implemented
         String jwtToken = "jwt-placeholder-" + sessionId;
-        Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
 
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
@@ -60,7 +57,6 @@ public final class SessionDAO {
             ps.setString(1, sessionId);
             ps.setString(2, userId);
             ps.setString(3, jwtToken);
-            ps.setTimestamp(4, Timestamp.from(expiresAt));
 
             ps.executeUpdate();
 
@@ -77,7 +73,28 @@ public final class SessionDAO {
      */
     private static final String SELECT_USER_SQL = """
             SELECT user_id FROM sessions
-            WHERE session_id = ? AND expires_at > ? AND revoked = FALSE
+            WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked = FALSE
+            """;
+
+    /**
+     * SQL query for touching active-session last activity timestamp.
+     */
+    private static final String TOUCH_SESSION_SQL = """
+            UPDATE sessions
+            SET last_seen_at = CURRENT_TIMESTAMP
+            WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked = FALSE
+            """;
+
+    /**
+     * SQL query for checking whether a user has a recently active session.
+     */
+    private static final String SELECT_RECENT_ACTIVE_SQL = """
+            SELECT 1 FROM sessions
+            WHERE user_id = ?
+              AND expires_at > CURRENT_TIMESTAMP
+              AND revoked = FALSE
+              AND last_seen_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
+            LIMIT 1
             """;
 
     /**
@@ -103,7 +120,6 @@ public final class SessionDAO {
                 PreparedStatement ps = connection.prepareStatement(SELECT_USER_SQL)) {
 
             ps.setString(1, sessionId);
-            ps.setTimestamp(2, Timestamp.from(Instant.now()));
 
             try (var rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -114,6 +130,92 @@ public final class SessionDAO {
             auditLogger.logError("db_verify_session", null, "unknown", ex);
         }
         return null;
+    }
+
+    /**
+     * Retrieves the user id for a valid session and updates its last-seen
+     * timestamp.
+     *
+     * @param sessionId caller session id
+     * @return user id when session is valid, otherwise {@code null}
+     */
+    public String getUserIdForSessionAndTouch(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return null;
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            String userId = loadUserIdForActiveSession(connection, sessionId);
+            if (userId == null) {
+                return null;
+            }
+            if (touchSession(connection, sessionId)) {
+                return userId;
+            }
+            return null;
+        } catch (SQLException ex) {
+            auditLogger.logError("db_verify_touch_session", null, "unknown", ex);
+            return null;
+        }
+    }
+
+    /**
+     * Returns whether the user has at least one recently active valid session.
+     *
+     * @param userId        user identifier
+     * @param withinSeconds activity recency threshold in seconds
+     * @return {@code true} when a recently active session exists
+     */
+    public boolean isUserRecentlyActive(String userId, long withinSeconds) {
+        if (userId == null || userId.isBlank() || withinSeconds <= 0) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(SELECT_RECENT_ACTIVE_SQL)) {
+            ps.setString(1, userId);
+            ps.setLong(2, withinSeconds);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException ex) {
+            auditLogger.logError("db_recent_active_session", null, userId, ex);
+            return false;
+        }
+    }
+
+    /**
+     * Loads user id for an active non-revoked session.
+     *
+     * @param connection open SQL connection
+     * @param sessionId  session id to verify
+     * @return user id when session is valid, otherwise {@code null}
+     * @throws SQLException when SQL operations fail
+     */
+    private String loadUserIdForActiveSession(Connection connection, String sessionId)
+            throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_USER_SQL)) {
+            ps.setString(1, sessionId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("user_id");
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Updates {@code last_seen_at} for a valid non-revoked session.
+     *
+     * @param connection open SQL connection
+     * @param sessionId  session id to touch
+     * @return {@code true} when exactly one session row was touched
+     * @throws SQLException when SQL operations fail
+     */
+    private boolean touchSession(Connection connection, String sessionId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(TOUCH_SESSION_SQL)) {
+            ps.setString(1, sessionId);
+            return ps.executeUpdate() == 1;
+        }
     }
 
     /**

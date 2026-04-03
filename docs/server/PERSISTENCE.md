@@ -8,7 +8,7 @@ Document current DAO responsibilities and encrypted-data persistence behavior.
 
 - `EnvelopeDAO`: encrypted message envelopes and delivery lifecycle.
 - `UserDAO`: auth/profile/search/public-key lookup paths.
-- `SessionDAO`: session creation/validation/revocation.
+- `SessionDAO`: session creation/validation/revocation plus session activity touch and recent-activity checks used by prod presence/duplicate-login policy.
 - `FileUploadDAO` + `AttachmentDAO`: encrypted upload and attachment lifecycle.
 - `ContactDAO`: contacts list management.
 - DAO methods are invoked from ingress/router layers; there is no direct UI-to-DB path in architecture.
@@ -33,6 +33,7 @@ Document current DAO responsibilities and encrypted-data persistence behavior.
 
 - DAO layer stores encrypted bytes opaquely and does not decrypt payloads.
 - SQL errors are wrapped and surfaced via typed exceptions/logging.
+- Session activity checks and touches use database-side `CURRENT_TIMESTAMP` comparisons to avoid timezone skew between app and DB runtimes.
 
 ## Related Files
 

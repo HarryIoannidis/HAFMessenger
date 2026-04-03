@@ -28,6 +28,16 @@ class MessageBubbleFactoryTest {
     }
 
     @Test
+    void outgoing_pending_text_bubbles_apply_pending_style_overrides() throws IOException {
+        String source = Files.readString(FACTORY_SOURCE);
+
+        assertTrue(source.contains("bubble.getStyleClass().add(\"bubble-out-pending\");"));
+        assertTrue(source.contains("rippleOverlay.getStyleClass().add(\"bubble-ripple-out-pending\");"));
+        assertTrue(source.contains("text.getStyleClass().add(\"bubble-text-out-pending\");"));
+        assertTrue(source.contains("ts.getStyleClass().add(\"bubble-time-out-pending\");"));
+    }
+
+    @Test
     void overlay_hover_and_pressed_states_are_forwarded_to_bubble() throws IOException {
         String source = Files.readString(FACTORY_SOURCE);
 

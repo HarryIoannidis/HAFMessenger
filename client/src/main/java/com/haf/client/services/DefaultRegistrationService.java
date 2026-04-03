@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.exceptions.RegistrationFlowException;
+import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.crypto.CryptoECC;
 import com.haf.shared.crypto.CryptoService;
@@ -33,10 +34,6 @@ import org.slf4j.LoggerFactory;
 public class DefaultRegistrationService implements RegistrationService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRegistrationService.class);
-
-
-    private static final URI ADMIN_KEY_URI = URI.create("https://localhost:8443/api/v1/config/admin-key");
-    private static final URI REGISTER_URI = URI.create("https://localhost:8443/api/v1/register");
 
     @FunctionalInterface
     interface KeyPairProvider {
@@ -311,9 +308,11 @@ public class DefaultRegistrationService implements RegistrationService {
      * @throws RegistrationFlowException when SSL context initialization fails
      */
     private static HttpClient createHttpClient() throws RegistrationFlowException {
+        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         try {
             return HttpClient.newBuilder()
-                    .sslContext(SslContextUtils.getTrustingSslContext())
+                    .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                    .sslParameters(SslContextUtils.createHttpsSslParameters())
                     .build();
         } catch (Exception ex) {
             throw new RegistrationFlowException("Failed to create HTTP client for registration", ex);
@@ -330,9 +329,10 @@ public class DefaultRegistrationService implements RegistrationService {
      */
     private static String fetchAdminPublicKeyPem(HttpClient client)
             throws InterruptedException, RegistrationFlowException {
+        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         try {
             HttpRequest adminKeyRequest = HttpRequest.newBuilder()
-                    .uri(ADMIN_KEY_URI)
+                    .uri(resolveAdminKeyUri(runtimeConfig))
                     .GET()
                     .build();
             HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest, HttpResponse.BodyHandlers.ofString());
@@ -366,10 +366,11 @@ public class DefaultRegistrationService implements RegistrationService {
      */
     private static HttpResponse<String> sendRegistrationRequest(HttpClient client, RegisterRequest request)
             throws InterruptedException, RegistrationFlowException {
+        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         try {
             String json = JsonCodec.toJson(request);
             HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(REGISTER_URI)
+                    .uri(resolveRegisterUri(runtimeConfig))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
@@ -379,6 +380,18 @@ public class DefaultRegistrationService implements RegistrationService {
         } catch (Exception ex) {
             throw new RegistrationFlowException("Failed to submit registration request", ex);
         }
+    }
+
+    static URI resolveServerBaseUri(ClientRuntimeConfig runtimeConfig) {
+        return runtimeConfig.serverBaseUri();
+    }
+
+    static URI resolveAdminKeyUri(ClientRuntimeConfig runtimeConfig) {
+        return resolveServerBaseUri(runtimeConfig).resolve("/api/v1/config/admin-key");
+    }
+
+    static URI resolveRegisterUri(ClientRuntimeConfig runtimeConfig) {
+        return resolveServerBaseUri(runtimeConfig).resolve("/api/v1/register");
     }
 
     /**

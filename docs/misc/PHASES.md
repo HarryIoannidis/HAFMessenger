@@ -9,7 +9,7 @@ Track implementation status by phase while separating completed functionality fr
 Completed/active areas in current codebase:
 
 - Phase 1-4 foundations: shared wire format, validation, crypto, keystore workflows, client send/receive integration.
-- Server ingress/routing/persistence: HTTPS/WSS ingress, mailbox routing, rate limiting, DAO persistence, audit/metrics.
+- Server ingress/routing/persistence: HTTPS ingress (all modes), dev websocket ingress, mailbox routing, rate limiting, DAO persistence, audit/metrics.
 - UI expansion: chat/search/profile/preview/settings controllers and corresponding ViewModels.
 - Attachment transport: init/chunk/complete/bind/download endpoint and client integration.
 
