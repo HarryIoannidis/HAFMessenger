@@ -3,6 +3,7 @@ package com.haf.client.services;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.utils.ClientRuntimeConfig;
+import com.haf.shared.exceptions.CryptoOperationException;
 import com.haf.shared.responses.LoginResponse;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +56,7 @@ class DefaultLoginServiceTest {
         AtomicInteger bootstrapCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
                     return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));
                 },
@@ -77,7 +78,7 @@ class DefaultLoginServiceTest {
         AtomicInteger sleepCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     int currentAttempt = attempts.incrementAndGet();
                     if (currentAttempt == 1) {
                         throw new RuntimeException("temporary outage");
@@ -101,7 +102,7 @@ class DefaultLoginServiceTest {
         AtomicInteger sleepCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
                     throw new RuntimeException("network down");
                 },
@@ -124,7 +125,7 @@ class DefaultLoginServiceTest {
         AtomicInteger sleepCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
                     return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));
                 },
@@ -144,12 +145,37 @@ class DefaultLoginServiceTest {
     }
 
     @Test
+    void login_key_mismatch_failure_returns_actionable_message() {
+        AtomicInteger attempts = new AtomicInteger();
+
+        DefaultLoginService service = new DefaultLoginService(
+                (command, takeoverPayload) -> {
+                    attempts.incrementAndGet();
+                    return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));
+                },
+                (userId, sessionId, passphrase) -> {
+                    throw new CryptoOperationException(DefaultLoginService.KEY_MISMATCH_FAILURE_MESSAGE);
+                },
+                millis -> {
+                });
+
+        LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
+
+        LoginService.LoginResult.TakeoverRequired takeoverRequired = assertInstanceOf(
+                LoginService.LoginResult.TakeoverRequired.class,
+                result);
+        assertEquals(LoginService.TakeoverReason.KEY_MISMATCH, takeoverRequired.reason());
+        assertEquals(DefaultLoginService.KEY_MISMATCH_FAILURE_MESSAGE, takeoverRequired.message());
+        assertEquals(1, attempts.get());
+    }
+
+    @Test
     void login_backend_rejection_returns_rejected_without_retry() {
         AtomicInteger attempts = new AtomicInteger();
         AtomicInteger bootstrapCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
                     return response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials")));
                 },
@@ -171,7 +197,7 @@ class DefaultLoginServiceTest {
         AtomicInteger bootstrapCalls = new AtomicInteger();
 
         DefaultLoginService service = new DefaultLoginService(
-                command -> {
+                (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
                     return response(409, JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
                 },
@@ -181,16 +207,48 @@ class DefaultLoginServiceTest {
 
         LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
 
-        LoginService.LoginResult.Rejected rejected = assertInstanceOf(LoginService.LoginResult.Rejected.class, result);
-        assertEquals("Account is already logged in.", rejected.message());
+        LoginService.LoginResult.TakeoverRequired takeoverRequired = assertInstanceOf(
+                LoginService.LoginResult.TakeoverRequired.class,
+                result);
+        assertEquals(LoginService.TakeoverReason.DUPLICATE_SESSION, takeoverRequired.reason());
+        assertEquals("Account is already logged in.", takeoverRequired.message());
         assertEquals(1, attempts.get());
         assertEquals(0, bootstrapCalls.get());
     }
 
     @Test
+    void perform_key_takeover_submits_takeover_payload_and_bootstraps_session() {
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicInteger bootstrapCalls = new AtomicInteger();
+
+        DefaultLoginService service = new DefaultLoginService(
+                (command, takeoverPayload) -> {
+                    attempts.incrementAndGet();
+                    if (takeoverPayload == null
+                            || takeoverPayload.publicKeyPem() == null
+                            || takeoverPayload.publicKeyPem().isBlank()
+                            || takeoverPayload.fingerprint() == null
+                            || takeoverPayload.fingerprint().isBlank()) {
+                        return response(400, JsonCodec.toJson(LoginResponse.error("missing takeover payload")));
+                    }
+                    return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));
+                },
+                (userId, sessionId, passphrase) -> bootstrapCalls.incrementAndGet(),
+                millis -> {
+                });
+
+        LoginService.LoginResult result = service.performKeyTakeover(
+                new LoginService.LoginCommand("user@haf.gr", "password"));
+
+        assertInstanceOf(LoginService.LoginResult.Success.class, result);
+        assertEquals(1, attempts.get());
+        assertEquals(1, bootstrapCalls.get());
+    }
+
+    @Test
     void login_success_stores_current_user_profile() {
         DefaultLoginService service = new DefaultLoginService(
-                command -> response(200, JsonCodec.toJson(LoginResponse.success(
+                (command, takeoverPayload) -> response(200, JsonCodec.toJson(LoginResponse.success(
                         "u1",
                         "s1",
                         "User Name",
@@ -221,7 +279,7 @@ class DefaultLoginServiceTest {
         CurrentUserSession.set(new UserProfileInfo(
                 "old", "Old", "Rank", "REG", "2025-01-01", "old@haf.gr", "6999999999", true));
         DefaultLoginService service = new DefaultLoginService(
-                command -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),
+                (command, takeoverPayload) -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),
                 (userId, sessionId, passphrase) -> {
                 },
                 millis -> {

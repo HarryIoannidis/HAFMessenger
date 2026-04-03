@@ -1,5 +1,6 @@
 package com.haf.client.network;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AttachmentBindRequest;
@@ -26,6 +27,7 @@ import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageSenderTest {
@@ -69,6 +71,14 @@ class MessageSenderTest {
 
         @Override
         public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
+            return postAuthenticated(path, jsonBody, Map.of());
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
+                String path,
+                String jsonBody,
+                Map<String, String> extraHeaders) {
             if ("/api/v1/messages".equals(path)) {
                 try {
                     sendText(jsonBody);
@@ -121,6 +131,14 @@ class MessageSenderTest {
 
         @Override
         public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
+            return postAuthenticated(path, jsonBody, Map.of());
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
+                String path,
+                String jsonBody,
+                Map<String, String> extraHeaders) {
             if (postResponses.containsKey(path)) {
                 return java.util.concurrent.CompletableFuture.completedFuture(postResponses.get(path));
             }
@@ -226,6 +244,41 @@ class MessageSenderTest {
 
         assertEquals("env-2", result.envelopeId());
         assertEquals(0L, result.expiresAtEpochMs());
+    }
+
+    @Test
+    void send_message_retries_once_when_recipient_key_is_stale() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        ApiStubWebSocketAdapter apiAdapter = new ApiStubWebSocketAdapter() {
+            @Override
+            public java.util.concurrent.CompletableFuture<String> postAuthenticated(
+                    String path,
+                    String jsonBody,
+                    Map<String, String> extraHeaders) {
+                if (!"/api/v1/messages".equals(path)) {
+                    return super.postAuthenticated(path, jsonBody, extraHeaders);
+                }
+                if (attempts.getAndIncrement() == 0) {
+                    return java.util.concurrent.CompletableFuture.failedFuture(
+                            new HttpCommunicationException(
+                                    "stale key",
+                                    409,
+                                    "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}"));
+                }
+                return java.util.concurrent.CompletableFuture
+                        .completedFuture("{\"envelopeId\":\"env-retry\",\"expiresAt\":9999}");
+            }
+        };
+        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
+
+        MessageSender.SendResult result = sender.sendMessageWithResult(
+                "hello".getBytes(StandardCharsets.UTF_8),
+                "recipient-123",
+                "text/plain",
+                60);
+
+        assertEquals("env-retry", result.envelopeId());
+        assertEquals(2, attempts.get());
     }
 
     @Test

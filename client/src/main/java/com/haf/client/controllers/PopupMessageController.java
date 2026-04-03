@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 public class PopupMessageController {
 
     private static final String STARTUP_PRIVACY_UNLOCK_POPUP_KEY = "popup-privacy-startup-blur-unlock";
+    private static final String SESSION_REVOKED_POPUP_KEY = "popup-session-revoked";
 
     // Popup window chrome
     @FXML
@@ -94,7 +95,7 @@ public class PopupMessageController {
             }
         }
         if (closeButton != null) {
-            boolean showCloseButton = !STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(spec.popupKey());
+            boolean showCloseButton = !isCloseDisabledPopup(spec.popupKey());
             closeButton.setVisible(showCloseButton);
             closeButton.setManaged(showCloseButton);
         }
@@ -160,6 +161,17 @@ public class PopupMessageController {
             stage.setX(event.getScreenX() - xOffset);
             stage.setY(event.getScreenY() - yOffset);
         });
+    }
+
+    /**
+     * Returns whether popup close button should be hidden for the given popup key.
+     *
+     * @param popupKey popup key being rendered
+     * @return {@code true} when close button must stay hidden
+     */
+    private static boolean isCloseDisabledPopup(String popupKey) {
+        return STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(popupKey)
+                || SESSION_REVOKED_POPUP_KEY.equals(popupKey);
     }
 
     /**

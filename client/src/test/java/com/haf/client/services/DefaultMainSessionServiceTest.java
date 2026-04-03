@@ -31,6 +31,7 @@ class DefaultMainSessionServiceTest {
         assertEquals(1, sessionChannel.presenceRemoveCalls.get());
         assertEquals(1, sessionChannel.incomingAddCalls.get());
         assertEquals(1, sessionChannel.incomingRemoveCalls.get());
+        assertEquals(1, sessionChannel.stopReceivingCalls.get());
         assertTrue(context.networkCleared);
         assertTrue(context.chatCleared);
         assertTrue(context.currentUserProfileCleared);
@@ -111,6 +112,7 @@ class DefaultMainSessionServiceTest {
         private final AtomicInteger incomingRemoveCalls = new AtomicInteger();
         private final AtomicReference<MessagesViewModel.IncomingMessageListener> lastIncomingAdded = new AtomicReference<>();
         private final AtomicReference<MessagesViewModel.IncomingMessageListener> lastIncomingRemoved = new AtomicReference<>();
+        private final AtomicInteger stopReceivingCalls = new AtomicInteger();
 
         @Override
         public void addPresenceListener(MessagesViewModel.PresenceListener listener) {
@@ -134,6 +136,11 @@ class DefaultMainSessionServiceTest {
         public void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
             incomingRemoveCalls.incrementAndGet();
             lastIncomingRemoved.set(listener);
+        }
+
+        @Override
+        public void stopReceiving() {
+            stopReceivingCalls.incrementAndGet();
         }
     }
 

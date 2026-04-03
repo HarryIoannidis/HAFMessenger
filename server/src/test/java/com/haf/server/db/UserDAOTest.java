@@ -224,6 +224,29 @@ class UserDAOTest {
         verify(auditLogger, times(1)).logError(eq("db_find_public_key"), isNull(), eq("user-1"), any());
     }
 
+    @Test
+    void updatePublicKey_updates_row_successfully() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SET public_key_pem"))).thenReturn(existsStatement);
+
+        dao.updatePublicKey("user-1", "PEM", "fp-1");
+
+        verify(existsStatement).setString(1, "PEM");
+        verify(existsStatement).setString(2, "fp-1");
+        verify(existsStatement).setString(3, "user-1");
+        verify(existsStatement).executeUpdate();
+    }
+
+    @Test
+    void updatePublicKey_wraps_sql_errors() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SET public_key_pem"))).thenReturn(existsStatement);
+        when(existsStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.updatePublicKey("user-1", "PEM", "fp-1"));
+        verify(auditLogger, times(1)).logError(eq("db_update_public_key"), isNull(), eq("user-1"), any());
+    }
+
     // ── searchUsers tests ────────────────────────────────────────────────
 
     @Test

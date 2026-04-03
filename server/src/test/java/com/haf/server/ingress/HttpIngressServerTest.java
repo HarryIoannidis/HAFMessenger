@@ -22,6 +22,8 @@ import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.requests.RegisterRequest;
 import com.haf.shared.responses.UserSearchResponse;
+import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -194,6 +196,23 @@ class HttpIngressServerTest {
         assertEquals(202, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"envelopeId\":\"env-1\""));
         verify(mailboxRouter, times(1)).ingress(any(EncryptedMessage.class));
+    }
+
+    @Test
+    void ingress_rejects_stale_recipient_key_fingerprint_header() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        EncryptedMessage message = validMessage("sender-1", "recipient-1");
+        when(userDAO.getPublicKey("recipient-1")).thenReturn(new UserDAO.PublicKeyRecord("pem", "fp-current"));
+
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
+        exchange.requestHeaders().add("X-Recipient-Key-Fingerprint", "fp-stale");
+        authenticate(exchange, "session-ok", "sender-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(409, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("stale_recipient_key"));
+        verify(mailboxRouter, never()).ingress(any(EncryptedMessage.class));
     }
 
     @Test
@@ -399,6 +418,64 @@ class HttpIngressServerTest {
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"session-1\""));
         verify(sessionDAO, times(1)).createSession(userId);
+    }
+
+    @Test
+    void login_force_takeover_rotates_key_revokes_sessions_and_creates_new_session() throws Exception {
+        String userId = "user-1";
+        String email = "pilot@haf.gr";
+        String password = "correct horse battery staple";
+        var takeoverPair = EccKeyIO.generate();
+        String takeoverPem = EccKeyIO.publicPem(takeoverPair.getPublic());
+        String takeoverFp = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(takeoverPair.getPublic()));
+
+        when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
+        when(sessionDAO.createSession(userId)).thenReturn("session-takeover");
+
+        WebSocket oldConnection = mock(WebSocket.class);
+        presenceRegistry.registerConnection(userId, oldConnection);
+
+        HttpHandler handler = createHandler("LoginHandler");
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
+                "{"
+                        + "\"email\":\"" + email + "\","
+                        + "\"password\":\"" + password + "\","
+                        + "\"forceTakeover\":true,"
+                        + "\"takeoverPublicKeyPem\":\"" + takeoverPem.replace("\n", "\\n") + "\","
+                        + "\"takeoverPublicKeyFingerprint\":\"" + takeoverFp + "\""
+                        + "}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(200, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"session-takeover\""));
+        verify(userDAO, times(1)).updatePublicKey(userId, takeoverPem.trim(), takeoverFp);
+        verify(sessionDAO, times(1)).revokeAllSessionsByUserId(userId);
+        verify(sessionDAO, times(1)).createSession(userId);
+        verify(oldConnection, times(1)).closeConnection(1000, "takeover");
+    }
+
+    @Test
+    void login_force_takeover_rejects_when_key_fields_missing() throws Exception {
+        String userId = "user-1";
+        String email = "pilot@haf.gr";
+        String password = "correct horse battery staple";
+
+        when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
+
+        HttpHandler handler = createHandler("LoginHandler");
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
+                "{"
+                        + "\"email\":\"" + email + "\","
+                        + "\"password\":\"" + password + "\","
+                        + "\"forceTakeover\":true"
+                        + "}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(400, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("takeoverPublicKeyPem"));
+        verify(sessionDAO, never()).createSession(anyString());
     }
 
     @Test

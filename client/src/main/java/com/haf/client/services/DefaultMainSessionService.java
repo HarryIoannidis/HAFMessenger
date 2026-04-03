@@ -1,5 +1,6 @@
 package com.haf.client.services;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
@@ -63,6 +64,11 @@ public class DefaultMainSessionService implements MainSessionService {
          * @param listener listener to unregister
          */
         void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener);
+
+        /**
+         * Stops active message-receiving transport for the current chat session.
+         */
+        void stopReceiving();
     }
 
     interface SessionContext {
@@ -226,6 +232,15 @@ public class DefaultMainSessionService implements MainSessionService {
      * cleanup.
      */
     private void performLogout() {
+        SessionChannel channel = sessionContext.sessionChannel();
+        if (channel != null) {
+            try {
+                channel.stopReceiving();
+            } catch (RuntimeException ex) {
+                LOGGER.warn("Error stopping message receiver on logout; continuing cleanup", ex);
+            }
+        }
+
         NetworkGateway gateway = sessionContext.networkGateway();
         if (gateway != null) {
             try {
@@ -234,7 +249,11 @@ public class DefaultMainSessionService implements MainSessionService {
                 Thread.currentThread().interrupt();
                 LOGGER.warn( "Logout API call interrupted; continuing with local logout", ex);
             } catch (ExecutionException | TimeoutException ex) {
-                LOGGER.warn( "Logout API call failed; continuing with local logout", ex);
+                if (isExpectedInvalidSessionLogoutFailure(ex)) {
+                    LOGGER.info("Logout API call returned invalid-session after revoke/takeover; continuing local logout");
+                } else {
+                    LOGGER.warn( "Logout API call failed; continuing with local logout", ex);
+                }
             }
 
             try {
@@ -249,6 +268,27 @@ public class DefaultMainSessionService implements MainSessionService {
         sessionContext.clearNetworkSession();
         sessionContext.clearChatSession();
         sessionContext.clearCurrentUserProfile();
+    }
+
+    /**
+     * Checks whether logout failure is an expected invalid-session outcome.
+     *
+     * This occurs when another device has already revoked this session and local
+     * cleanup is still in progress.
+     *
+     * @param error logout failure to inspect
+     * @return {@code true} when failure represents expected 401/403 invalid session
+     */
+    private static boolean isExpectedInvalidSessionLogoutFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                return statusCode == 401 || statusCode == 403;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**
@@ -356,6 +396,14 @@ public class DefaultMainSessionService implements MainSessionService {
                 @Override
                 public void removeIncomingMessageListener(MessagesViewModel.IncomingMessageListener listener) {
                     messageViewModel.removeIncomingMessageListener(listener);
+                }
+
+                /**
+                 * Stops message receiving on the active message view-model.
+                 */
+                @Override
+                public void stopReceiving() {
+                    messageViewModel.stopReceiving();
                 }
             };
         }

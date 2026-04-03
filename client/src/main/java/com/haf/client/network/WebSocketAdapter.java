@@ -16,6 +16,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import com.haf.client.utils.ClientRuntimeConfig;
@@ -342,14 +343,34 @@ public class WebSocketAdapter {
      * @return CompletableFuture containing the response body string
      */
     public CompletableFuture<String> postAuthenticated(String path, String body) {
+        return postAuthenticated(path, body, Map.of());
+    }
+
+    /**
+     * Executes an authenticated POST request against the server using optional
+     * additional headers.
+     *
+     * @param path         The API path to request
+     * @param body         The JSON body to send
+     * @param extraHeaders optional extra headers
+     * @return CompletableFuture containing the response body string
+     */
+    public CompletableFuture<String> postAuthenticated(String path, String body, Map<String, String> extraHeaders) {
         URI requestUri = buildAuthenticatedRequestUri(path);
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(requestUri)
                 .header("Authorization", "Bearer " + sessionId)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (extraHeaders != null && !extraHeaders.isEmpty()) {
+            extraHeaders.forEach((name, value) -> {
+                if (name != null && !name.isBlank() && value != null) {
+                    builder.header(name, value);
+                }
+            });
+        }
+        HttpRequest request = builder.build();
 
         return sendWithRetry(request, "POST");
     }

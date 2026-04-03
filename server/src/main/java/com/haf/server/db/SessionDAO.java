@@ -107,6 +107,15 @@ public final class SessionDAO {
             """;
 
     /**
+     * SQL query for revoking all sessions for a user.
+     */
+    private static final String REVOKE_ALL_SESSIONS_FOR_USER_SQL = """
+            UPDATE sessions
+            SET revoked = TRUE
+            WHERE user_id = ?
+            """;
+
+    /**
      * Retrieves the user ID for a given valid session ID.
      *
      * @param sessionId the session ID
@@ -237,6 +246,26 @@ public final class SessionDAO {
         } catch (SQLException ex) {
             auditLogger.logError("db_revoke_session", null, sessionId, ex);
             throw new DatabaseOperationException("Failed to revoke session", ex);
+        }
+    }
+
+    /**
+     * Revokes all sessions for the given user.
+     *
+     * @param userId user whose sessions should be revoked
+     * @throws DatabaseOperationException if revoke fails
+     */
+    public void revokeAllSessionsByUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(REVOKE_ALL_SESSIONS_FOR_USER_SQL)) {
+            ps.setString(1, userId);
+            ps.executeUpdate();
+        } catch (SQLException ex) {
+            auditLogger.logError("db_revoke_all_sessions", null, userId, ex);
+            throw new DatabaseOperationException("Failed to revoke all sessions for user", ex);
         }
     }
 }

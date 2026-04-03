@@ -135,6 +135,27 @@ class SessionDAOTest {
     }
 
     @Test
+    void revokeAllSessionsByUserId_executes_update() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("WHERE user_id"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenReturn(2);
+
+        assertDoesNotThrow(() -> dao.revokeAllSessionsByUserId("user-123"));
+        verify(preparedStatement).setString(1, "user-123");
+        verify(preparedStatement, times(1)).executeUpdate();
+    }
+
+    @Test
+    void revokeAllSessionsByUserId_throws_on_sql_exception() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("WHERE user_id"))).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
+
+        assertThrows(DatabaseOperationException.class, () -> dao.revokeAllSessionsByUserId("user-123"));
+        verify(auditLogger, times(1)).logError(eq("db_revoke_all_sessions"), isNull(), eq("user-123"), any());
+    }
+
+    @Test
     void constructor_rejects_null_datasource() {
         assertThrows(NullPointerException.class, () -> new SessionDAO(null, auditLogger));
     }
