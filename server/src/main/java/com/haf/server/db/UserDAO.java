@@ -78,6 +78,15 @@ public final class UserDAO {
             """;
 
     /**
+     * SQL query for rotating stored public key material by user id.
+     */
+    private static final String UPDATE_PUBLIC_KEY_SQL = """
+            UPDATE users
+            SET public_key_pem = ?, public_key_fingerprint = ?
+            WHERE user_id = ?
+            """;
+
+    /**
      * Represents a user record returned by {@link #findByEmail(String)}.
      */
     public record UserRecord(String userId, String passwordHash,
@@ -236,6 +245,27 @@ public final class UserDAO {
         } catch (SQLException e) {
             auditLogger.logError("db_find_public_key", null, userId, e);
             throw new DatabaseOperationException("Failed to fetch public key for user: " + userId, e);
+        }
+    }
+
+    /**
+     * Updates the public key material for a user account.
+     *
+     * @param userId      user id whose key should be rotated
+     * @param publicKeyPem PEM-encoded X25519 public key
+     * @param fingerprint SHA-256 fingerprint of the public key
+     * @throws DatabaseOperationException when update fails
+     */
+    public void updatePublicKey(String userId, String publicKeyPem, String fingerprint) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(UPDATE_PUBLIC_KEY_SQL)) {
+            ps.setString(1, publicKeyPem);
+            ps.setString(2, fingerprint);
+            ps.setString(3, userId);
+            ps.executeUpdate();
+        } catch (SQLException ex) {
+            auditLogger.logError("db_update_public_key", null, userId, ex);
+            throw new DatabaseOperationException("Failed to update public key for user: " + userId, ex);
         }
     }
 

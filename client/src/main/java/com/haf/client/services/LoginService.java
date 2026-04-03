@@ -14,10 +14,28 @@ public interface LoginService {
      */
     LoginResult login(LoginCommand command);
 
+    /**
+     * Performs explicit account takeover by rotating local key material and
+     * re-authenticating.
+     *
+     * @param command login credentials
+     * @return result of takeover flow
+     */
+    LoginResult performKeyTakeover(LoginCommand command);
+
     record LoginCommand(String email, String password) {
     }
 
-    sealed interface LoginResult permits LoginResult.Success, LoginResult.Rejected, LoginResult.Failure {
+    /**
+     * Typed reason for takeover-required login outcomes.
+     */
+    enum TakeoverReason {
+        DUPLICATE_SESSION,
+        KEY_MISMATCH
+    }
+
+    sealed interface LoginResult permits LoginResult.Success, LoginResult.Rejected, LoginResult.Failure,
+            LoginResult.TakeoverRequired {
         record Success() implements LoginResult {
         }
 
@@ -25,6 +43,9 @@ public interface LoginService {
         }
 
         record Failure(String message) implements LoginResult {
+        }
+
+        record TakeoverRequired(TakeoverReason reason, String message) implements LoginResult {
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.exceptions.UiDispatchException;
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
@@ -145,6 +146,15 @@ public class MessagesViewModel {
              */
             @Override
             public void onError(Throwable error) {
+                if (isRevokedSessionError(error)) {
+                    publishRuntimeIssue(
+                            "messaging.session.revoked",
+                            "Session expired",
+                            "You were logged out because this account was accessed from another device.",
+                            () -> {
+                            });
+                    return;
+                }
                 runOnUiThread(() -> status.set("Error: " + error.getMessage()));
                 publishRuntimeIssue(
                         "messaging.receiver.error",
@@ -652,6 +662,30 @@ public class MessagesViewModel {
             return fallback;
         }
         return message;
+    }
+
+    /**
+     * Detects revoked/invalid-session errors from authenticated messaging flows.
+     *
+     * @param error runtime error candidate
+     * @return {@code true} when caller session is no longer valid
+     */
+    private static boolean isRevokedSessionError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                if (statusCode == 401 || statusCode == 403) {
+                    return true;
+                }
+            }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains("invalid session")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**

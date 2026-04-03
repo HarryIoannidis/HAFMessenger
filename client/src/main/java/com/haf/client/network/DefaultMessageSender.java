@@ -1,5 +1,6 @@
 package com.haf.client.network;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
@@ -16,6 +17,8 @@ import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.utils.ClockProvider;
+import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
 import java.io.IOException;
@@ -28,6 +31,8 @@ import java.util.concurrent.CompletionException;
  * Encrypts and submits outbound messages and attachment API calls.
  */
 public class DefaultMessageSender implements MessageSender {
+    private static final String RECIPIENT_KEY_FINGERPRINT_HEADER = "X-Recipient-Key-Fingerprint";
+    private static final String STALE_RECIPIENT_KEY_CODE = "stale_recipient_key";
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
@@ -81,8 +86,17 @@ public class DefaultMessageSender implements MessageSender {
     @Override
     public SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType, long ttlSeconds)
             throws MessageValidationException, KeyNotFoundException, IOException {
-        EncryptedMessage encryptedMessage = encryptMessage(payload, recipientId, contentType, ttlSeconds);
-        return sendEncryptedMessage(encryptedMessage);
+        PreparedEncryptedMessage prepared = prepareEncryptedMessage(payload, recipientId, contentType, ttlSeconds);
+        try {
+            return sendEncryptedMessageWithFingerprint(prepared.encryptedMessage(), prepared.recipientFingerprint());
+        } catch (IOException firstFailure) {
+            if (!isStaleRecipientKeyFailure(firstFailure)) {
+                throw firstFailure;
+            }
+            PreparedEncryptedMessage retried =
+                    prepareEncryptedMessage(payload, recipientId, contentType, ttlSeconds);
+            return sendEncryptedMessageWithFingerprint(retried.encryptedMessage(), retried.recipientFingerprint());
+        }
     }
 
     /**
@@ -102,6 +116,28 @@ public class DefaultMessageSender implements MessageSender {
     @Override
     public EncryptedMessage encryptMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds)
             throws MessageValidationException, KeyNotFoundException, IOException {
+        return prepareEncryptedMessage(payload, recipientId, contentType, ttlSeconds).encryptedMessage();
+    }
+
+    /**
+     * Encrypts plaintext payload and returns envelope plus recipient key
+     * fingerprint used during encryption.
+     *
+     * @param payload     plaintext bytes to encrypt
+     * @param recipientId recipient identifier
+     * @param contentType payload MIME content type
+     * @param ttlSeconds  envelope time-to-live in seconds
+     * @return prepared encrypted message with recipient key fingerprint
+     * @throws MessageValidationException if generated envelope violates validation
+     *                                    rules
+     * @throws KeyNotFoundException       if recipient key cannot be resolved
+     * @throws IOException                if encryption fails unexpectedly
+     */
+    private PreparedEncryptedMessage prepareEncryptedMessage(
+            byte[] payload,
+            String recipientId,
+            String contentType,
+            long ttlSeconds) throws MessageValidationException, KeyNotFoundException, IOException {
 
         if (payload == null) {
             throw new IllegalArgumentException("Payload cannot be null");
@@ -118,12 +154,13 @@ public class DefaultMessageSender implements MessageSender {
             PublicKey recipientPublicKey = keyProvider.getRecipientPublicKey(recipientId);
             MessageEncryptor encryptor = new MessageEncryptor(recipientPublicKey, senderId, recipientId, clockProvider);
             EncryptedMessage encryptedMessage = encryptor.encrypt(payload, contentType, ttlSeconds);
+            String recipientFingerprint = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(recipientPublicKey));
 
             List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
             if (!errors.isEmpty()) {
                 throw new MessageValidationException(errors);
             }
-            return encryptedMessage;
+            return new PreparedEncryptedMessage(encryptedMessage, recipientFingerprint);
         } catch (KeyNotFoundException | MessageValidationException e) {
             throw e;
         } catch (Exception e) {
@@ -141,6 +178,20 @@ public class DefaultMessageSender implements MessageSender {
      */
     @Override
     public SendResult sendEncryptedMessage(EncryptedMessage encryptedMessage) throws IOException {
+        return sendEncryptedMessageWithFingerprint(encryptedMessage, null);
+    }
+
+    /**
+     * Sends an encrypted message with optional recipient fingerprint header.
+     *
+     * @param encryptedMessage       encrypted message envelope
+     * @param recipientKeyFingerprint optional recipient key fingerprint
+     * @return send result containing envelope id and expiration timestamp
+     * @throws IOException if transport fails or server returns invalid response
+     */
+    private SendResult sendEncryptedMessageWithFingerprint(
+            EncryptedMessage encryptedMessage,
+            String recipientKeyFingerprint) throws IOException {
         if (encryptedMessage == null) {
             throw new IllegalArgumentException("Encrypted message cannot be null");
         }
@@ -148,7 +199,10 @@ public class DefaultMessageSender implements MessageSender {
         String json = JsonCodec.toJson(encryptedMessage);
         String response;
         try {
-            response = webSocketAdapter.postAuthenticated("/api/v1/messages", json).join();
+            Map<String, String> headers = recipientKeyFingerprint == null || recipientKeyFingerprint.isBlank()
+                    ? Map.of()
+                    : Map.of(RECIPIENT_KEY_FINGERPRINT_HEADER, recipientKeyFingerprint);
+            response = webSocketAdapter.postAuthenticated("/api/v1/messages", json, headers).join();
         } catch (CompletionException ex) {
             Throwable cause = ex.getCause();
             if (cause instanceof IOException ioException) {
@@ -172,6 +226,40 @@ public class DefaultMessageSender implements MessageSender {
         }
 
         return new SendResult(envelopeId, expiresAt);
+    }
+
+    /**
+     * Detects stale-recipient-key failures returned by message ingress.
+     *
+     * @param error send failure candidate
+     * @return {@code true} when failure indicates recipient key mismatch
+     */
+    private static boolean isStaleRecipientKeyFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                if (communicationException.getStatusCode() == 409) {
+                    String responseBody = communicationException.getResponseBody();
+                    if (responseBody != null
+                            && (responseBody.contains(STALE_RECIPIENT_KEY_CODE)
+                                    || responseBody.contains("recipient key is stale"))) {
+                        return true;
+                    }
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Prepared encrypted message payload with recipient key fingerprint used for
+     * encryption.
+     *
+     * @param encryptedMessage    encrypted envelope
+     * @param recipientFingerprint recipient key fingerprint
+     */
+    private record PreparedEncryptedMessage(EncryptedMessage encryptedMessage, String recipientFingerprint) {
     }
 
     /**

@@ -40,7 +40,7 @@ class LoginControllerTest {
 
     @Test
     void build_login_command_maps_view_model_values() throws Exception {
-        LoginService fakeService = command -> new LoginService.LoginResult.Failure("unused");
+        LoginService fakeService = failingLoginService();
         LoginController controller = new LoginController(fakeService);
 
         LoginViewModel viewModel = readField(controller, "viewModel", LoginViewModel.class);
@@ -56,7 +56,7 @@ class LoginControllerTest {
 
     @Test
     void load_remembered_credentials_prefills_view_model_fields() throws Exception {
-        LoginService fakeService = command -> new LoginService.LoginResult.Failure("unused");
+        LoginService fakeService = failingLoginService();
         Preferences prefs = newTestNode();
         prefs.putBoolean(PREF_REMEMBER_ME, true);
         prefs.put(PREF_REMEMBERED_EMAIL, "pilot@haf.gr");
@@ -76,7 +76,7 @@ class LoginControllerTest {
 
     @Test
     void persist_remembered_credentials_uses_current_view_model_values() throws Exception {
-        LoginService fakeService = command -> new LoginService.LoginResult.Failure("unused");
+        LoginService fakeService = failingLoginService();
         Preferences prefs = newTestNode();
         FakeVault vault = new FakeVault();
         RememberedCredentialsStore rememberedStore = new RememberedCredentialsStore(prefs, vault);
@@ -110,6 +110,20 @@ class LoginControllerTest {
     private Preferences newTestNode() {
         testNode = Preferences.userRoot().node("/com/haf/client/test/login-controller-" + UUID.randomUUID());
         return testNode;
+    }
+
+    private static LoginService failingLoginService() {
+        return new LoginService() {
+            @Override
+            public LoginResult login(LoginCommand command) {
+                return new LoginResult.Failure("unused");
+            }
+
+            @Override
+            public LoginResult performKeyTakeover(LoginCommand command) {
+                return new LoginResult.Failure("unused");
+            }
+        };
     }
 
     private static final class FakeVault implements SecurePasswordVault {

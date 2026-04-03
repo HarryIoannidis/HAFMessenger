@@ -36,6 +36,8 @@ import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -57,6 +59,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
@@ -109,6 +112,7 @@ public final class HttpIngressServer {
     private static final String CONTENT_TYPE = "Content-Type";
     private static final String APPLICATION_JSON = "application/json";
     private static final String AUTHORIZATION = "Authorization";
+    private static final String RECIPIENT_KEY_FINGERPRINT_HEADER = "X-Recipient-Key-Fingerprint";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
@@ -125,6 +129,10 @@ public final class HttpIngressServer {
     private static final String INVALID_CONTACT_ID = "invalid contactId";
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
     private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
+    private static final String TAKEOVER_FIELDS_REQUIRED =
+            "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true";
+    private static final String TAKEOVER_FINGERPRINT_MISMATCH = "takeover key fingerprint mismatch";
+    private static final String STALE_RECIPIENT_KEY_ERROR = "recipient key is stale";
     private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
@@ -286,6 +294,28 @@ public final class HttpIngressServer {
             return presenceRegistry.isActive(userId);
         }
         return sessionDAO.isUserRecentlyActive(userId, PROD_ACTIVE_WINDOW_SECONDS);
+    }
+
+    /**
+     * Closes all active websocket presence connections for a user in development
+     * mode.
+     *
+     * @param userId    user id whose sockets should be closed
+     * @param requestId request id for error diagnostics
+     * @param reason    websocket close reason
+     */
+    private void closeUserPresenceConnections(String userId, String requestId, String reason) {
+        if (!config.isDevMode() || userId == null || userId.isBlank()) {
+            return;
+        }
+        Set<WebSocket> activeConnections = presenceRegistry.getActiveConnections(userId);
+        for (WebSocket connection : activeConnections) {
+            try {
+                connection.closeConnection(1000, reason);
+            } catch (Exception ex) {
+                auditLogger.logError("presence_ws_close_error", requestId, userId, ex, Map.of("reason", reason));
+            }
+        }
     }
 
     /**
@@ -490,6 +520,12 @@ public final class HttpIngressServer {
                 return;
             }
 
+            if (isRecipientKeyFingerprintStale(exchange, message)) {
+                respond(exchange, requestId, 409,
+                        "{\"error\":\"" + STALE_RECIPIENT_KEY_ERROR + "\",\"code\":\"stale_recipient_key\"}");
+                return;
+            }
+
             RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
             if (!rateDecision.allowed()) {
                 auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
@@ -510,6 +546,32 @@ public final class HttpIngressServer {
             String response = JsonCodec
                     .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
             respond(exchange, requestId, 202, response);
+        }
+
+        /**
+         * Compares caller-provided recipient fingerprint header against current
+         * recipient key fingerprint.
+         *
+         * Missing header is treated as backward-compatible no-op.
+         *
+         * @param exchange HTTP exchange carrying optional fingerprint header
+         * @param message  validated encrypted message payload
+         * @return {@code true} when caller used a stale recipient key fingerprint
+         */
+        private boolean isRecipientKeyFingerprintStale(HttpExchange exchange, EncryptedMessage message) {
+            String providedFingerprint = exchange.getRequestHeaders().getFirst(RECIPIENT_KEY_FINGERPRINT_HEADER);
+            if (providedFingerprint == null || providedFingerprint.isBlank() || message == null) {
+                return false;
+            }
+            String recipientId = message.getRecipientId();
+            if (recipientId == null || recipientId.isBlank()) {
+                return false;
+            }
+            UserDAO.PublicKeyRecord recipientKey = userDAO.getPublicKey(recipientId);
+            if (recipientKey == null || recipientKey.fingerprint() == null || recipientKey.fingerprint().isBlank()) {
+                return false;
+            }
+            return !recipientKey.fingerprint().trim().equalsIgnoreCase(providedFingerprint.trim());
         }
 
         /**
@@ -982,10 +1044,18 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                if (isDuplicateLoginAttemptForRuntime(user.userId())) {
+                boolean forceTakeover = Boolean.TRUE.equals(request.getForceTakeover());
+
+                if (!forceTakeover && isDuplicateLoginAttemptForRuntime(user.userId())) {
                     respond(exchange, requestId, 409,
                             JsonCodec.toJson(LoginResponse.error(ACCOUNT_ALREADY_LOGGED_IN)));
                     return;
+                }
+
+                if (forceTakeover) {
+                    validateTakeoverKeyRequest(request);
+                    applyForcedTakeover(user.userId(), request.getTakeoverPublicKeyPem(),
+                            request.getTakeoverPublicKeyFingerprint(), requestId);
                 }
 
                 // Create session
@@ -1004,11 +1074,66 @@ public final class HttpIngressServer {
                                 user.telephone(),
                                 user.joinedDate(),
                                 user.status())));
+            } catch (IllegalArgumentException ex) {
+                respond(exchange, requestId, 400, JsonCodec.toJson(LoginResponse.error(ex.getMessage())));
             } catch (Exception ex) {
                 auditLogger.logError("login_error", requestId, null, ex);
                 respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error(INTERNAL_SERVER_ERROR)));
             } finally {
                 exchange.close();
+            }
+        }
+
+        /**
+         * Validates required takeover key fields and fingerprint consistency.
+         *
+         * @param request login request payload
+         */
+        private void validateTakeoverKeyRequest(LoginRequest request) {
+            String takeoverPublicKeyPem = request.getTakeoverPublicKeyPem();
+            String takeoverFingerprint = request.getTakeoverPublicKeyFingerprint();
+            if (isBlank(takeoverPublicKeyPem) || isBlank(takeoverFingerprint)) {
+                throw new IllegalArgumentException(TAKEOVER_FIELDS_REQUIRED);
+            }
+
+            String normalizedProvidedFingerprint = takeoverFingerprint.trim();
+            String normalizedCalculatedFingerprint = calculateFingerprint(takeoverPublicKeyPem);
+            if (!normalizedCalculatedFingerprint.equalsIgnoreCase(normalizedProvidedFingerprint)) {
+                throw new IllegalArgumentException(TAKEOVER_FINGERPRINT_MISMATCH);
+            }
+        }
+
+        /**
+         * Applies forced takeover effects: key rotation, session revocation, and
+         * dev-mode websocket connection closure.
+         *
+         * @param userId         authenticated user id
+         * @param publicKeyPem   takeover public key PEM
+         * @param fingerprint    takeover key fingerprint
+         * @param requestId      request id used in audit logs
+         */
+        private void applyForcedTakeover(
+                String userId,
+                String publicKeyPem,
+                String fingerprint,
+                String requestId) {
+            userDAO.updatePublicKey(userId, publicKeyPem.trim(), fingerprint.trim());
+            sessionDAO.revokeAllSessionsByUserId(userId);
+            closeUserPresenceConnections(userId, requestId, "takeover");
+        }
+
+        /**
+         * Computes SHA-256 fingerprint for a PEM-encoded public key.
+         *
+         * @param publicKeyPem public key in PEM format
+         * @return lowercase fingerprint hex
+         */
+        private String calculateFingerprint(String publicKeyPem) {
+            try {
+                PublicKey publicKey = EccKeyIO.publicFromPem(publicKeyPem);
+                return FingerprintUtil.sha256Hex(EccKeyIO.publicDer(publicKey));
+            } catch (Exception ex) {
+                throw new IllegalArgumentException("invalid takeoverPublicKeyPem", ex);
             }
         }
 
@@ -1124,35 +1249,13 @@ public final class HttpIngressServer {
                 String callerId = authResult.callerId();
 
                 sessionDAO.revokeSession(sessionId);
-                closeActivePresenceConnections(callerId, requestId);
+                closeUserPresenceConnections(callerId, requestId, "logout");
                 sendPlain(exchange, 200, "{\"success\":true}");
             } catch (Exception ex) {
                 auditLogger.logError("logout_error", requestId, null, ex);
                 sendPlain(exchange, 500, JSON_ERROR_PREFIX + INTERNAL_SERVER_ERROR + JSON_ERROR_SUFFIX);
             } finally {
                 exchange.close();
-            }
-        }
-
-        /**
-         * Closes all active websocket connections for the logging-out user so
-         * presence transitions to offline immediately.
-         *
-         * @param callerId  user id that just logged out
-         * @param requestId request id for structured error logs
-         */
-        private void closeActivePresenceConnections(String callerId, String requestId) {
-            if (callerId == null || callerId.isBlank()) {
-                return;
-            }
-
-            Set<WebSocket> activeConnections = presenceRegistry.getActiveConnections(callerId);
-            for (WebSocket connection : activeConnections) {
-                try {
-                    connection.closeConnection(1000, "logout");
-                } catch (Exception ex) {
-                    auditLogger.logError("logout_ws_close_error", requestId, callerId, ex);
-                }
             }
         }
 

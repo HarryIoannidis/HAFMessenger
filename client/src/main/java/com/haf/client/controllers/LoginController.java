@@ -36,6 +36,7 @@ public class LoginController {
     private static final String SIGN_IN_TEXT = "Sign In";
     private static final String SIGNING_IN_TEXT = "Signing in...";
     private static final String LOADING_COMPONENTS_TEXT = "Loading components...";
+    private static final String TAKEOVER_POPUP_KEY = "popup-login-takeover";
 
     // Window chrome and layout containers
     @FXML
@@ -339,6 +340,10 @@ public class LoginController {
             handleRejectedLoginResponse(rejected.message());
             return;
         }
+        if (result instanceof LoginService.LoginResult.TakeoverRequired takeoverRequired) {
+            handleTakeoverRequired(takeoverRequired);
+            return;
+        }
         if (result instanceof LoginService.LoginResult.Failure failure) {
             handleFailureResult(failure.message());
             return;
@@ -418,6 +423,93 @@ public class LoginController {
             return;
         }
         handleLoginError(message);
+    }
+
+    /**
+     * Displays explicit takeover confirmation UI when login cannot continue without
+     * rotating account key material on this device.
+     *
+     * @param takeoverRequired takeover-required login result
+     */
+    private void handleTakeoverRequired(LoginService.LoginResult.TakeoverRequired takeoverRequired) {
+        javafx.application.Platform.runLater(() -> {
+            viewModel.loadingProperty().set(false);
+            signInButton.setText(SIGN_IN_TEXT);
+
+            String triggerMessage = switch (takeoverRequired.reason()) {
+                case DUPLICATE_SESSION -> "This account is already active on another device.";
+                case KEY_MISMATCH -> "This device has secure keys that do not match the account on the server.";
+            };
+            String serverMessage = takeoverRequired.message() == null || takeoverRequired.message().isBlank()
+                    ? ""
+                    : "\n\nServer: " + takeoverRequired.message().trim();
+
+            PopupMessageBuilder.create()
+                    .popupKey(TAKEOVER_POPUP_KEY)
+                    .title("Continue Login On This Device?")
+                    .message(triggerMessage
+                            + "\n\nContinuing will log out other devices and rotate this account key to this device."
+                            + "\nOld encrypted messages may be unreadable here after takeover."
+                            + serverMessage)
+                    .actionText("Continue")
+                    .cancelText("Cancel")
+                    .showCancel(true)
+                    .onAction(this::startTakeoverFlow)
+                    .onCancel(this::resetLoginUiState)
+                    .show();
+        });
+    }
+
+    /**
+     * Starts asynchronous forced takeover flow after user confirmation.
+     */
+    private void startTakeoverFlow() {
+        viewModel.loadingProperty().set(true);
+        signInButton.setText(SIGNING_IN_TEXT);
+        Thread takeoverThread = new Thread(this::performTakeoverTask, "login-takeover-thread");
+        takeoverThread.setDaemon(true);
+        takeoverThread.start();
+    }
+
+    /**
+     * Executes forced takeover login in a background thread.
+     */
+    private void performTakeoverTask() {
+        LoginService.LoginResult result = loginService.performKeyTakeover(buildLoginCommand());
+        handleTakeoverResult(result);
+    }
+
+    /**
+     * Handles forced-takeover completion result.
+     *
+     * @param result takeover result
+     */
+    private void handleTakeoverResult(LoginService.LoginResult result) {
+        if (result instanceof LoginService.LoginResult.Success) {
+            handleLoginSuccess();
+            return;
+        }
+        if (result instanceof LoginService.LoginResult.Rejected rejected) {
+            handleRejectedLoginResponse(rejected.message());
+            return;
+        }
+        if (result instanceof LoginService.LoginResult.Failure failure) {
+            handleLoginError(failure.message());
+            return;
+        }
+        if (result instanceof LoginService.LoginResult.TakeoverRequired takeoverRequired) {
+            handleLoginError(takeoverRequired.message());
+            return;
+        }
+        handleLoginError("Connection failed. Please try again.");
+    }
+
+    /**
+     * Resets login button/loading state when takeover prompt is dismissed.
+     */
+    private void resetLoginUiState() {
+        viewModel.loadingProperty().set(false);
+        signInButton.setText(SIGN_IN_TEXT);
     }
 
     /**

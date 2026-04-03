@@ -24,6 +24,8 @@ class PopupMessageControllerTest {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         assertTrue(source.contains("STARTUP_PRIVACY_UNLOCK_POPUP_KEY"));
-        assertTrue(source.contains("boolean showCloseButton = !STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(spec.popupKey());"));
+        assertTrue(source.contains("SESSION_REVOKED_POPUP_KEY"));
+        assertTrue(source.contains("boolean showCloseButton = !isCloseDisabledPopup(spec.popupKey());"));
+        assertTrue(source.contains("|| SESSION_REVOKED_POPUP_KEY.equals(popupKey);"));
     }
 }

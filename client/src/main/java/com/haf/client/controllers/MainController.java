@@ -68,6 +68,7 @@ public class MainController implements SearchController.ContactActions {
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
+    private static final String POPUP_SESSION_REVOKED = "popup-session-revoked";
     private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
             new DesktopNotificationService();
 
@@ -147,6 +148,7 @@ public class MainController implements SearchController.ContactActions {
     private final RuntimeIssuePopupGate chatAutoRetryGate = new RuntimeIssuePopupGate(
             CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean revokedSessionHandlingInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
@@ -1910,6 +1912,10 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
         Runnable task = () -> {
+            if (isRevokedSessionIssue(issue)) {
+                handleRevokedSessionIssue();
+                return;
+            }
             if (isMessagingRuntimeIssue(issue)) {
                 handleMessagingRuntimeIssue(issue);
                 return;
@@ -1936,6 +1942,57 @@ public class MainController implements SearchController.ContactActions {
         } else {
             Platform.runLater(task);
         }
+    }
+
+    /**
+     * Checks whether runtime issue indicates revoked/invalid authenticated session.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when issue key marks revoked-session handling
+     */
+    private static boolean isRevokedSessionIssue(RuntimeIssue issue) {
+        return issue != null && "messaging.session.revoked".equals(issue.dedupeKey());
+    }
+
+    /**
+     * Shows blocking revoked-session popup and routes the user to login after
+     * confirmation.
+     */
+    private void handleRevokedSessionIssue() {
+        if (!runtimeIssuePopupGate.shouldShow("messaging.session.revoked")) {
+            return;
+        }
+        PopupMessageBuilder.create()
+                .popupKey(POPUP_SESSION_REVOKED)
+                .title("Session Ended")
+                .message("You were logged out because this account was accessed from another device.")
+                .actionText("Go to Login")
+                .singleAction(true)
+                .movable(false)
+                .onAction(this::completeRevokedSessionLogout)
+                .onCancel(this::completeRevokedSessionLogout)
+                .show();
+    }
+
+    /**
+     * Performs one-time local logout cleanup and routes application to login view.
+     */
+    private void completeRevokedSessionLogout() {
+        if (!revokedSessionHandlingInProgress.compareAndSet(false, true)) {
+            return;
+        }
+        mainSessionService.logout().whenComplete((unused, throwable) -> Platform.runLater(() -> {
+            if (throwable != null) {
+                LOGGER.info("Session revoke cleanup completed with non-fatal errors: {}", throwable.getMessage());
+            }
+            try {
+                ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
+            } catch (Exception ex) {
+                LOGGER.error("Failed to route to login after revoked session cleanup", ex);
+            } finally {
+                revokedSessionHandlingInProgress.set(false);
+            }
+        }));
     }
 
     /**

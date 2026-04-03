@@ -1,6 +1,7 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
@@ -195,6 +196,12 @@ public class DefaultMessageReceiver implements MessageReceiver {
             pollCycleOnce();
             pollFailureCount.set(0);
         } catch (Exception pollError) {
+            if (isAuthenticationFailure(pollError)) {
+                LOGGER.info("Stopping HTTP mailbox polling after authentication failure: {}", pollError.getMessage());
+                stopHttpPolling();
+                notifyError(pollError);
+                return;
+            }
             int failures = pollFailureCount.incrementAndGet();
             LOGGER.debug("HTTP mailbox poll failed: {}", pollError.getMessage());
             if (failures == HTTP_POLL_ERROR_NOTIFY_THRESHOLD) {
@@ -726,5 +733,25 @@ public class DefaultMessageReceiver implements MessageReceiver {
         } catch (Exception exception) {
             throw new IOException(message, exception);
         }
+    }
+
+    /**
+     * Detects authentication failures produced by authenticated HTTP polling calls.
+     *
+     * @param error polling error candidate
+     * @return {@code true} when the cause chain indicates 401/403 auth failure
+     */
+    private static boolean isAuthenticationFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                if (statusCode == 401 || statusCode == 403) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

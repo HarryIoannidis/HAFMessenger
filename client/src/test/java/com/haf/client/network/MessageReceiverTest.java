@@ -1,6 +1,7 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.keystore.UserKeystore;
@@ -43,6 +44,7 @@ class MessageReceiverTest {
         private int closeCalls;
         private java.io.IOException connectFailure;
         private int connectCalls;
+        private RuntimeException getFailure;
 
         MockWebSocketAdapter() {
             super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
@@ -62,6 +64,9 @@ class MessageReceiverTest {
         @Override
         public CompletableFuture<String> getAuthenticated(String path) {
             getPaths.add(path);
+            if (getFailure != null) {
+                return CompletableFuture.failedFuture(getFailure);
+            }
             String response;
             if (path != null && path.startsWith("/api/v1/messages")) {
                 response = messagePollResponses.isEmpty() ? "{\"messages\":[]}" : messagePollResponses.removeFirst();
@@ -155,6 +160,10 @@ class MessageReceiverTest {
 
         int getConnectCalls() {
             return connectCalls;
+        }
+
+        void failGetWith(RuntimeException failure) {
+            this.getFailure = failure;
         }
     }
 
@@ -558,6 +567,49 @@ class MessageReceiverTest {
 
         assertEquals(1, webSocketAdapter.getCloseCalls());
         assertFalse(webSocketAdapter.isConnected());
+    }
+
+    @Test
+    void polling_stops_and_reports_single_authentication_failure() throws Exception {
+        MessageReceiver pollingReceiver = new DefaultMessageReceiver(
+                keyProvider,
+                clockProvider,
+                webSocketAdapter,
+                recipientKeyId,
+                ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING);
+        pollingReceiver.setMessageListener(new MessageReceiver.MessageListener() {
+            @Override
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
+                receivedMessages.add(plaintext);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                receivedErrors.add(error);
+            }
+        });
+
+        webSocketAdapter.failGetWith(new HttpCommunicationException("Unauthorized", 401, "{\"error\":\"invalid session\"}"));
+
+        pollingReceiver.start();
+        waitForCondition(() -> !receivedErrors.isEmpty(), 2500L);
+
+        assertEquals(1, receivedErrors.size(), "Auth failures should be surfaced once without repeated spam");
+        assertTrue(isAuthenticationFailure(receivedErrors.getFirst()));
+        assertTrue(webSocketAdapter.getGetPaths().size() <= 2, "Polling should stop after first failed cycle");
+    }
+
+    private static boolean isAuthenticationFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                return statusCode == 401 || statusCode == 403;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static void waitForCondition(BooleanSupplier condition, long timeoutMs) throws InterruptedException {
