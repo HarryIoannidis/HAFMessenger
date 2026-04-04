@@ -17,6 +17,7 @@ import com.haf.shared.utils.FilePerms;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
@@ -25,6 +26,8 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -227,13 +230,13 @@ class MessageReceiverTest {
     }
 
     @AfterEach
-    void cleanup() throws Exception {
+    void cleanup() throws IOException {
         if (tmpRoot != null) {
             try (var w = Files.walk(tmpRoot)) {
                 w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
                     try {
                         Files.deleteIfExists(p);
-                    } catch (Exception ignored) {
+                    } catch (IOException ignored) {
                         // ignore
                     }
                 });
@@ -613,13 +616,16 @@ class MessageReceiverTest {
     }
 
     private static void waitForCondition(BooleanSupplier condition, long timeoutMs) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-        while (System.currentTimeMillis() < deadline) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+        long pollIntervalNanos = TimeUnit.MILLISECONDS.toNanos(20L);
+        while (System.nanoTime() < deadline) {
             if (condition.getAsBoolean()) {
                 return;
             }
-            latch.await(20L, java.util.concurrent.TimeUnit.MILLISECONDS);
+            LockSupport.parkNanos(pollIntervalNanos);
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Interrupted while waiting for test condition");
+            }
         }
         fail("Condition not met within timeout");
     }
