@@ -176,6 +176,7 @@ public class ChatController {
         loadInitialMessages();
         setupMessageListener();
         viewModel.acknowledgeActiveRecipient();
+        scrollToLatestIfEnabled();
     }
 
     /**
@@ -255,10 +256,7 @@ public class ChatController {
                 chatBox.getChildren().add(createMessageNode(vm));
             }
         }
-        chatScrollPane.layout();
-        if (settings.isChatAutoScrollToLatest()) {
-            chatScrollPane.setVvalue(1.0);
-        }
+        scrollToLatestIfEnabled();
     }
 
     /**
@@ -276,14 +274,37 @@ public class ChatController {
                 hasIncomingMessages = true;
             }
         }
-        chatScrollPane.layout();
-        if (settings.isChatAutoScrollToLatest()) {
-            chatScrollPane.setVvalue(1.0);
-        }
+        scrollToLatestIfEnabled();
 
         if (hasIncomingMessages) {
             viewModel.acknowledgeRecipient(activeRecipient);
         }
+    }
+
+    /**
+     * Scrolls chat viewport to latest message and repeats once on next pulse to
+     * handle delayed layout/scene attachment.
+     */
+    private void scrollToLatestIfEnabled() {
+        if (chatScrollPane == null) {
+            return;
+        }
+        if (settings.isChatAutoScrollToLatest()) {
+            scrollToLatestNow();
+            Platform.runLater(this::scrollToLatestNow);
+        }
+    }
+
+    /**
+     * Applies CSS/layout and moves the chat viewport to the bottom.
+     */
+    private void scrollToLatestNow() {
+        if (chatScrollPane == null) {
+            return;
+        }
+        chatScrollPane.applyCss();
+        chatScrollPane.layout();
+        chatScrollPane.setVvalue(1.0);
     }
 
     /**
