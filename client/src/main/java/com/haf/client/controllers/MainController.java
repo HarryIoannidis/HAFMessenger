@@ -149,6 +149,7 @@ public class MainController implements SearchController.ContactActions {
             CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final AtomicBoolean revokedSessionHandlingInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean logoutInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
@@ -1636,6 +1637,7 @@ public class MainController implements SearchController.ContactActions {
      */
     private void handleLogout() {
         LOGGER.info("Logging out...");
+        logoutInProgress.set(true);
         persistWindowState(ViewRouter.getMainStage());
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
@@ -1652,6 +1654,7 @@ public class MainController implements SearchController.ContactActions {
         if (!shutdownInProgress.compareAndSet(false, true)) {
             return;
         }
+        logoutInProgress.set(true);
         persistWindowState(ViewRouter.getMainStage());
 
         mainSessionService.logout().whenComplete((unused, throwable) -> {
@@ -1913,6 +1916,10 @@ public class MainController implements SearchController.ContactActions {
         }
         Runnable task = () -> {
             if (isRevokedSessionIssue(issue)) {
+                if (shouldSuppressRevokedSessionPopup()) {
+                    LOGGER.debug("Suppressing revoked-session popup during local logout/shutdown flow.");
+                    return;
+                }
                 handleRevokedSessionIssue();
                 return;
             }
@@ -1952,6 +1959,14 @@ public class MainController implements SearchController.ContactActions {
      */
     private static boolean isRevokedSessionIssue(RuntimeIssue issue) {
         return issue != null && "messaging.session.revoked".equals(issue.dedupeKey());
+    }
+
+    /**
+     * Returns whether revoked-session popups should be suppressed because local
+     * logout/restart/exit handling is already active.
+     */
+    private boolean shouldSuppressRevokedSessionPopup() {
+        return logoutInProgress.get() || shutdownInProgress.get();
     }
 
     /**

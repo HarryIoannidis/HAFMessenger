@@ -110,6 +110,13 @@
     -fx-background-color: #d01020;
 }
 
+.title-bar-button-close:armed,
+.title-bar-button-close:pressed,
+.title-bar-button-close:hover:armed,
+.title-bar-button-close:hover:pressed {
+    -fx-background-color: #d01020;
+}
+
 
 .title-bar-button-close .image-view {
     -fx-fit-width: 16;
