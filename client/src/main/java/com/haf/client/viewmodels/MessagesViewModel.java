@@ -205,9 +205,7 @@ public class MessagesViewModel {
             messageSender.sendMessage(payload, contactId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
 
             MessageVM vm = MessageVM.outgoingText(text, pendingVm.timestamp());
-            runOnUiThread(() -> {
-                replaceLoadingMessage(contactId, pendingVm, vm, "Message sent to " + contactId);
-            });
+            runOnUiThread(() -> replaceLoadingMessage(contactId, pendingVm, vm, "Message sent to " + contactId));
             clearFailedSendRetryAction();
         } catch (Exception e) {
             String outgoingText = text;
