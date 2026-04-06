@@ -153,6 +153,33 @@ public class ChatViewModel {
     }
 
     /**
+     * Registers a listener for image-preview fallback events (image payload shown
+     * as file bubble).
+     *
+     * @param listener fallback listener to register; ignored when no backing
+     *                 messages view-model exists
+     */
+    public void addImagePreviewFallbackListener(MessagesViewModel.ImagePreviewFallbackListener listener) {
+        if (messageViewModel == null) {
+            return;
+        }
+        messageViewModel.addImagePreviewFallbackListener(listener);
+    }
+
+    /**
+     * Unregisters a previously registered image-preview fallback listener.
+     *
+     * @param listener listener to remove; ignored when no backing messages
+     *                 view-model exists
+     */
+    public void removeImagePreviewFallbackListener(MessagesViewModel.ImagePreviewFallbackListener listener) {
+        if (messageViewModel == null) {
+            return;
+        }
+        messageViewModel.removeImagePreviewFallbackListener(listener);
+    }
+
+    /**
      * Sends the current draft text to the active recipient and clears the draft.
      */
     public void sendCurrentDraft() {

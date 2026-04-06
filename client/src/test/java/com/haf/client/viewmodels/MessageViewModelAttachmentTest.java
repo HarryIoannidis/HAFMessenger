@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,7 +47,7 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("image.png");
-        Files.write(file, new byte[256]);
+        Files.write(file, pseudoPngBytes(256));
 
         viewModel.sendAttachment("bob", file, "image/png");
         awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
@@ -88,7 +89,7 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("large-photo.png");
-        Files.write(file, new byte[2_600_000]);
+        Files.write(file, pseudoPngBytes(2_600_000));
 
         viewModel.sendAttachment("bob", file, "image/png");
         awaitCondition(() -> sender.bindCalls == 1 && viewModel.getMessages("bob").size() == 1);
@@ -143,7 +144,7 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         Path file = tempDir.resolve("photo.png");
-        Files.write(file, new byte[2_048]);
+        Files.write(file, pseudoPngBytes(2_048));
 
         viewModel.sendAttachment("bob", file, "image/png");
 
@@ -230,7 +231,7 @@ class MessageViewModelAttachmentTest {
         sender.downloadDelayMs = 120L;
 
         StubReceiver receiver = new StubReceiver();
-        receiver.detachedDecryptResult = new byte[] { 1, 2, 3, 4 };
+        receiver.detachedDecryptResult = pseudoPngBytes(64);
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
@@ -270,6 +271,66 @@ class MessageViewModelAttachmentTest {
         assertFalse(resolved.isLoading());
         assertNotNull(resolved.content());
         assertEquals("photo.png", resolved.fileName());
+    }
+
+    @Test
+    void declared_image_payload_with_webp_signature_renders_as_file() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("cloud.png");
+        Files.write(file, pseudoWebpBytes(128));
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+
+        MessageVM message = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.FILE, message.type());
+        assertNotNull(message.localPath());
+        assertEquals("cloud.png", message.fileName());
+    }
+
+    @Test
+    void declared_image_payload_with_webp_signature_emits_image_fallback_notice() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        List<MessagesViewModel.ImagePreviewFallbackNotice> notices = new CopyOnWriteArrayList<>();
+        viewModel.addImagePreviewFallbackListener(notices::add);
+
+        Path file = tempDir.resolve("cloud.png");
+        Files.write(file, pseudoWebpBytes(128));
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1 && notices.size() == 1);
+
+        MessagesViewModel.ImagePreviewFallbackNotice notice = notices.getFirst();
+        assertEquals("bob", notice.contactId());
+        assertTrue(notice.outgoing());
+        assertEquals("cloud.png", notice.fileName());
+        assertEquals("image/png", notice.declaredMediaType());
+        assertEquals("webp", notice.detectedPayloadSignature());
+    }
+
+    @Test
+    void renderable_image_payload_does_not_emit_image_fallback_notice() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        List<MessagesViewModel.ImagePreviewFallbackNotice> notices = new CopyOnWriteArrayList<>();
+        viewModel.addImagePreviewFallbackListener(notices::add);
+
+        Path file = tempDir.resolve("renderable.png");
+        Files.write(file, pseudoPngBytes(256));
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+
+        assertTrue(notices.isEmpty());
     }
 
     @Test
@@ -354,6 +415,34 @@ class MessageViewModelAttachmentTest {
         m.setContentType("application/pdf");
         m.setContentLength(1);
         return JsonCodec.toJson(m).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] pseudoPngBytes(int size) {
+        int length = Math.max(size, 8);
+        byte[] bytes = new byte[length];
+        bytes[0] = (byte) 0x89;
+        bytes[1] = 0x50;
+        bytes[2] = 0x4E;
+        bytes[3] = 0x47;
+        bytes[4] = 0x0D;
+        bytes[5] = 0x0A;
+        bytes[6] = 0x1A;
+        bytes[7] = 0x0A;
+        return bytes;
+    }
+
+    private static byte[] pseudoWebpBytes(int size) {
+        int length = Math.max(size, 12);
+        byte[] bytes = new byte[length];
+        bytes[0] = 'R';
+        bytes[1] = 'I';
+        bytes[2] = 'F';
+        bytes[3] = 'F';
+        bytes[8] = 'W';
+        bytes[9] = 'E';
+        bytes[10] = 'B';
+        bytes[11] = 'P';
+        return bytes;
     }
 
     private static void awaitCondition(BooleanSupplier condition) {

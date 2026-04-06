@@ -74,12 +74,46 @@ public class MessagesViewModel {
         void onIncomingMessage(String senderId, MessageVM message);
     }
 
+    @FunctionalInterface
+    public interface ImagePreviewFallbackListener {
+        /**
+         * Receives an event when an image payload is intentionally rendered as a
+         * generic file attachment because in-app preview is not supported/safe.
+         *
+         * @param notice fallback notice describing why preview was downgraded
+         */
+        void onImageFallback(ImagePreviewFallbackNotice notice);
+    }
+
+    /**
+     * Immutable event emitted when an image-like payload is displayed as a file
+     * bubble instead of an image preview.
+     *
+     * @param contactId                normalized contact id for the chat timeline
+     * @param outgoing                 {@code true} for local/outgoing messages
+     * @param fileName                 display file name shown in the file bubble
+     * @param declaredMediaType        normalized media type declared by metadata
+     * @param detectedPayloadSignature detected payload signature (`png`, `jpeg`,
+     *                                 `gif`, `webp`, `unknown`)
+     */
+    public record ImagePreviewFallbackNotice(
+            String contactId,
+            boolean outgoing,
+            String fileName,
+            String declaredMediaType,
+            String detectedPayloadSignature) {
+    }
+
+    private record DecodedMessage(MessageVM message, ImagePreviewFallbackNotice fallbackNotice) {
+    }
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
 
     private final StringProperty status = new SimpleStringProperty("Ready");
     private final List<PresenceListener> presenceListeners = new CopyOnWriteArrayList<>();
     private final List<IncomingMessageListener> incomingMessageListeners = new CopyOnWriteArrayList<>();
+    private final List<ImagePreviewFallbackListener> imagePreviewFallbackListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
 
@@ -122,10 +156,13 @@ public class MessagesViewModel {
                         return;
                     }
 
-                    MessageVM vm = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
+                    DecodedMessage decoded = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
                     runOnUiThread(() -> {
-                        getMessages(contactId).add(vm);
-                        notifyIncomingMessageListeners(contactId, vm);
+                        getMessages(contactId).add(decoded.message());
+                        if (decoded.fallbackNotice() != null) {
+                            notifyImagePreviewFallbackListeners(decoded.fallbackNotice());
+                        }
+                        notifyIncomingMessageListeners(contactId, decoded.message());
                         status.set("Message received from " + contactId);
                     });
                 } catch (Exception ex) {
@@ -283,9 +320,12 @@ public class MessagesViewModel {
                     && canSendInlineWithinWsBudget(fileName, mediaType, fileBytes.length);
             if (canInline) {
                 sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
-                MessageVM outgoing = toAttachmentVm(true, fileBytes, mediaType, fileName, timestamp);
+                DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
                 runOnUiThread(() -> {
-                    getMessages(contactId).add(outgoing);
+                    getMessages(contactId).add(outgoing.message());
+                    if (outgoing.fallbackNotice() != null) {
+                        notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+                    }
                     status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
                 });
             } else {
@@ -298,30 +338,54 @@ public class MessagesViewModel {
 
                 sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
 
-                MessageVM outgoing = toAttachmentVm(true, fileBytes, mediaType, fileName, timestamp);
+                DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
                 MessageVM resolvedLoadingVm = loadingVm;
-                runOnUiThread(() -> replaceLoadingMessage(
-                        contactId,
-                        resolvedLoadingVm,
-                        outgoing,
-                        buildAttachmentDeliveredStatus(contactId, mediaType, true)));
+                runOnUiThread(() -> {
+                    replaceLoadingMessage(
+                            contactId,
+                            resolvedLoadingVm,
+                            outgoing.message(),
+                            buildAttachmentDeliveredStatus(contactId, mediaType, true));
+                    if (outgoing.fallbackNotice() != null) {
+                        notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+                    }
+                });
             }
 
             clearFailedSendRetryAction();
         } catch (Exception ex) {
-            MessageVM staleLoadingVm = loadingVm;
-            if (staleLoadingVm != null) {
-                runOnUiThread(() -> removeLoadingMessage(contactId, staleLoadingVm));
-            }
-            String retryMediaTypeHint = mediaTypeHint;
-            captureFailedSendRetryAction(() -> sendAttachment(contactId, filePath, retryMediaTypeHint));
-            runOnUiThread(() -> status.set("Failed to send attachment: " + ex.getMessage()));
-            publishRuntimeIssue(
-                    "messaging.attachment.send.failed",
-                    "Attachment could not be sent",
-                    "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
-                    this::retryLastFailedOperation);
+            handleAttachmentSendFailure(contactId, filePath, mediaTypeHint, loadingVm, ex);
         }
+    }
+
+    /**
+     * Handles attachment-send failures by removing stale loading placeholders,
+     * recording retry actions, updating status text, and publishing a runtime
+     * issue.
+     *
+     * @param contactId     normalized recipient/contact id
+     * @param filePath      selected attachment path
+     * @param mediaTypeHint original MIME hint from UI
+     * @param loadingVm     loading placeholder currently displayed, when any
+     * @param ex            failure that interrupted send flow
+     */
+    private void handleAttachmentSendFailure(String contactId,
+            Path filePath,
+            String mediaTypeHint,
+            MessageVM loadingVm,
+            Exception ex) {
+        MessageVM staleLoadingVm = loadingVm;
+        if (staleLoadingVm != null) {
+            runOnUiThread(() -> removeLoadingMessage(contactId, staleLoadingVm));
+        }
+        String retryMediaTypeHint = mediaTypeHint;
+        captureFailedSendRetryAction(() -> sendAttachment(contactId, filePath, retryMediaTypeHint));
+        runOnUiThread(() -> status.set("Failed to send attachment: " + ex.getMessage()));
+        publishRuntimeIssue(
+                "messaging.attachment.send.failed",
+                "Attachment could not be sent",
+                "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
+                this::retryLastFailedOperation);
     }
 
     /**
@@ -504,6 +568,29 @@ public class MessagesViewModel {
     }
 
     /**
+     * Registers a listener notified when an image payload is downgraded to a file
+     * bubble due to unsupported/mismatched preview format.
+     *
+     * @param listener listener to register; ignored when {@code null}
+     */
+    public void addImagePreviewFallbackListener(ImagePreviewFallbackListener listener) {
+        if (listener != null) {
+            imagePreviewFallbackListeners.add(listener);
+        }
+    }
+
+    /**
+     * Unregisters a previously registered image-preview fallback listener.
+     *
+     * @param listener listener to remove; ignored when {@code null}
+     */
+    public void removeImagePreviewFallbackListener(ImagePreviewFallbackListener listener) {
+        if (listener != null) {
+            imagePreviewFallbackListeners.remove(listener);
+        }
+    }
+
+    /**
      * Registers a listener for recoverable runtime issues that should be surfaced
      * in UI.
      *
@@ -582,6 +669,25 @@ public class MessagesViewModel {
         for (IncomingMessageListener listener : incomingMessageListeners) {
             try {
                 listener.onIncomingMessage(senderId, message);
+            } catch (Exception ignored) {
+                // A bad listener must not break dispatching for others.
+            }
+        }
+    }
+
+    /**
+     * Notifies listeners when an image-like payload was rendered as a generic file
+     * attachment.
+     *
+     * @param notice fallback event payload
+     */
+    private void notifyImagePreviewFallbackListeners(ImagePreviewFallbackNotice notice) {
+        if (notice == null) {
+            return;
+        }
+        for (ImagePreviewFallbackListener listener : imagePreviewFallbackListeners) {
+            try {
+                listener.onImageFallback(notice);
             } catch (Exception ignored) {
                 // A bad listener must not break dispatching for others.
             }
@@ -812,12 +918,17 @@ public class MessagesViewModel {
 
         CompletableFuture.runAsync(() -> {
             try {
-                MessageVM loaded = decodeAttachmentReference(reference, timestamp);
-                runOnUiThread(() -> replaceLoadingMessage(
-                        senderId,
-                        loadingVm,
-                        loaded,
-                        buildAttachmentDeliveredStatus(senderId, mediaType, false)));
+                DecodedMessage loaded = decodeAttachmentReference(senderId, reference, timestamp);
+                runOnUiThread(() -> {
+                    replaceLoadingMessage(
+                            senderId,
+                            loadingVm,
+                            loaded.message(),
+                            buildAttachmentDeliveredStatus(senderId, mediaType, false));
+                    if (loaded.fallbackNotice() != null) {
+                        notifyImagePreviewFallbackListeners(loaded.fallbackNotice());
+                    }
+                });
             } catch (Exception ex) {
                 runOnUiThread(() -> replaceLoadingWithFailure(senderId, loadingVm, timestamp, mediaType, ex));
             }
@@ -1003,10 +1114,10 @@ public class MessagesViewModel {
      * @param contentType      payload MIME/content type; defaults to
      *                         {@code text/plain} when {@code null}
      * @param timestampEpochMs server timestamp in epoch milliseconds
-     * @return message model ready for timeline rendering
+     * @return decoded message plus optional image-preview fallback notice
      * @throws Exception when attachment decoding or reference resolution fails
      */
-    private MessageVM decodeIncoming(byte[] plaintext,
+    private DecodedMessage decodeIncoming(byte[] plaintext,
             String senderId,
             String contentType,
             long timestampEpochMs) throws Exception {
@@ -1019,44 +1130,52 @@ public class MessagesViewModel {
         if (AttachmentConstants.CONTENT_TYPE_INLINE.equals(contentType)) {
             AttachmentInlinePayload payload = AttachmentPayloadCodec.fromInlineJson(plaintext);
             byte[] fileBytes = Base64.getDecoder().decode(payload.getDataB64());
-            return toAttachmentVm(false, fileBytes, payload.getMediaType(), payload.getFileName(), timestamp);
+            return decodeAttachment(senderId, false, fileBytes, payload.getMediaType(), payload.getFileName(),
+                    timestamp);
         }
 
         if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
             AttachmentReferencePayload ref = AttachmentPayloadCodec.fromReferenceJson(plaintext);
-            return decodeAttachmentReference(ref, timestamp);
+            return decodeAttachmentReference(senderId, ref, timestamp);
         }
 
         if (contentType.startsWith("text/")) {
             String text = new String(plaintext, StandardCharsets.UTF_8);
-            return new MessageVM(false, MessageType.TEXT, text, null, null, null, timestamp, false);
+            return new DecodedMessage(
+                    new MessageVM(false, MessageType.TEXT, text, null, null, null, timestamp, false),
+                    null);
         }
 
         if (contentType.startsWith("image/")) {
-            String localPath = writeTempFile(plaintext, "haf-img-", extensionFor(contentType));
             String fileName = senderId + "-image" + extensionFor(contentType);
-            return new MessageVM(false, MessageType.IMAGE, localPath, null, fileName, null, timestamp, false);
+            return decodeAttachment(senderId, false, plaintext, contentType, fileName, timestamp);
         }
 
         String ext = extensionFor(contentType);
         String fileName = senderId + "-attachment" + ext;
         String fileSize = formatSize(plaintext.length);
         String localPath = writeTempFile(plaintext, "haf-file-", ext);
-        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
+        return new DecodedMessage(
+                new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false),
+                null);
     }
 
     /**
      * Downloads and decrypts a referenced attachment, then converts it into a
      * timeline message model.
      *
+     * @param senderId  sender/contact id owning the timeline message
      * @param ref       reference payload carrying attachment id and display
      *                  metadata
      * @param timestamp timestamp to apply to the produced message model
-     * @return decoded attachment message model
+     * @return decoded attachment message plus optional image-preview fallback
+     *         notice
      * @throws Exception when download payload is invalid or decrypt/parse
      *                   operations fail
      */
-    private MessageVM decodeAttachmentReference(AttachmentReferencePayload ref, LocalDateTime timestamp)
+    private DecodedMessage decodeAttachmentReference(String senderId,
+            AttachmentReferencePayload ref,
+            LocalDateTime timestamp)
             throws Exception {
         AttachmentDownloadResponse downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
         ensureNoError(downloadResponse.getError());
@@ -1069,7 +1188,7 @@ public class MessagesViewModel {
                 new String(encryptedBlob, StandardCharsets.UTF_8),
                 EncryptedMessage.class);
         byte[] fileBytes = messageReceiver.decryptDetachedMessage(encryptedMessage);
-        return toAttachmentVm(false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);
+        return decodeAttachment(senderId, false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);
     }
 
     /**
@@ -1225,7 +1344,7 @@ public class MessagesViewModel {
             String fileName,
             long fileSizeBytes,
             LocalDateTime timestamp) {
-        if (isImageMediaType(mediaType)) {
+        if (isImageMediaType(mediaType) && !isUnsupportedPreviewImageType(mediaType)) {
             String imageName = sanitizeImageName(fileName, mediaType);
             return outgoing
                     ? MessageVM.outgoingLoadingImage(imageName, timestamp)
@@ -1278,7 +1397,7 @@ public class MessagesViewModel {
      * @return attachment noun in lowercase
      */
     private static String attachmentNoun(String mediaType) {
-        return isImageMediaType(mediaType) ? "image" : "file";
+        return isImageMediaType(mediaType) && !isUnsupportedPreviewImageType(mediaType) ? "image" : "file";
     }
 
     /**
@@ -1313,6 +1432,34 @@ public class MessagesViewModel {
     }
 
     /**
+     * Converts attachment bytes and metadata into a rendered message plus optional
+     * fallback notice when image preview was downgraded to file.
+     *
+     * @param contactId normalized contact id owning the timeline bucket
+     * @param outgoing  whether message is local/outgoing
+     * @param fileBytes attachment payload bytes
+     * @param mediaType declared MIME/content type
+     * @param fileName  display file name
+     * @param timestamp message timestamp
+     * @return decoded message and optional image-preview fallback event
+     */
+    private static DecodedMessage decodeAttachment(String contactId,
+            boolean outgoing,
+            byte[] fileBytes,
+            String mediaType,
+            String fileName,
+            LocalDateTime timestamp) {
+        ImagePreviewFallbackNotice notice = buildImagePreviewFallbackNotice(
+                contactId,
+                outgoing,
+                mediaType,
+                fileName,
+                fileBytes);
+        MessageVM message = toAttachmentVm(outgoing, fileBytes, mediaType, fileName, timestamp);
+        return new DecodedMessage(message, notice);
+    }
+
+    /**
      * Converts attachment bytes and metadata into the appropriate image/file
      * message model for UI rendering.
      *
@@ -1329,17 +1476,155 @@ public class MessagesViewModel {
             String mediaType,
             String fileName,
             LocalDateTime timestamp) {
-        if (isImageMediaType(mediaType)) {
-            String localPath = writeTempFile(fileBytes, "haf-img-", extensionFor(mediaType));
+        if (isImageMediaType(mediaType) && isRenderablePreviewImagePayload(mediaType, fileBytes)) {
+            String localPath = writeTempFile(fileBytes, "haf-img-", imagePayloadExtension(fileBytes, mediaType));
             String imageName = sanitizeImageName(fileName, mediaType);
             return new MessageVM(outgoing, MessageType.IMAGE, localPath, null, imageName, null, timestamp, false);
         }
 
-        String ext = extensionFor(mediaType);
+        String ext = fallbackAttachmentExtension(fileBytes, mediaType);
         String localPath = writeTempFile(fileBytes, "haf-file-", ext);
         String safeFileName = sanitizeDisplayName(fileName, "attachment" + ext);
         return new MessageVM(outgoing, MessageType.FILE, null, localPath, safeFileName, formatSize(fileBytes.length),
                 timestamp, false);
+    }
+
+    /**
+     * Builds a fallback notice when image preview is downgraded to generic file
+     * rendering.
+     *
+     * @param contactId normalized chat contact id
+     * @param outgoing  whether message is outgoing
+     * @param mediaType declared media type
+     * @param fileName  display file name
+     * @param fileBytes attachment bytes
+     * @return fallback notice, or {@code null} when image preview is renderable
+     */
+    private static ImagePreviewFallbackNotice buildImagePreviewFallbackNotice(String contactId,
+            boolean outgoing,
+            String mediaType,
+            String fileName,
+            byte[] fileBytes) {
+        if (!isImageMediaType(mediaType) || isRenderablePreviewImagePayload(mediaType, fileBytes)) {
+            return null;
+        }
+        String normalizedMediaType = AttachmentConstants.normalizeMimeType(mediaType);
+        String detectedSignature = detectImageSignature(fileBytes);
+        if (detectedSignature == null || detectedSignature.isBlank()) {
+            detectedSignature = "unknown";
+        }
+        String safeFileName = sanitizeDisplayName(fileName, "image" + extensionFor(mediaType));
+        return new ImagePreviewFallbackNotice(
+                normalizeContactId(contactId),
+                outgoing,
+                safeFileName,
+                normalizedMediaType,
+                detectedSignature);
+    }
+
+    /**
+     * Returns true when the declared media type is known to be unsupported by the
+     * JavaFX preview pipeline.
+     *
+     * @param mediaType declared media type
+     * @return {@code true} when preview should not attempt image rendering
+     */
+    private static boolean isUnsupportedPreviewImageType(String mediaType) {
+        String normalized = AttachmentConstants.normalizeMimeType(mediaType);
+        return "image/webp".equals(normalized);
+    }
+
+    /**
+     * Returns whether attachment bytes are suitable for JavaFX image preview.
+     *
+     * @param mediaType declared media type
+     * @param fileBytes attachment bytes
+     * @return {@code true} when payload should be rendered as image
+     */
+    private static boolean isRenderablePreviewImagePayload(String mediaType, byte[] fileBytes) {
+        if (isUnsupportedPreviewImageType(mediaType)) {
+            return false;
+        }
+        String signature = detectImageSignature(fileBytes);
+        return "png".equals(signature) || "jpeg".equals(signature) || "gif".equals(signature);
+    }
+
+    /**
+     * Resolves best extension for persisted preview image temp file.
+     *
+     * @param fileBytes payload bytes
+     * @param mediaType declared media type
+     * @return extension for temp file names
+     */
+    private static String imagePayloadExtension(byte[] fileBytes, String mediaType) {
+        String signature = detectImageSignature(fileBytes);
+        return switch (signature) {
+            case "png" -> ".png";
+            case "jpeg" -> ".jpg";
+            case "gif" -> ".gif";
+            default -> extensionFor(mediaType);
+        };
+    }
+
+    /**
+     * Resolves extension for non-preview attachment temp file persistence.
+     *
+     * @param fileBytes payload bytes
+     * @param mediaType declared media type
+     * @return extension for persisted file attachment
+     */
+    private static String fallbackAttachmentExtension(byte[] fileBytes, String mediaType) {
+        String signature = detectImageSignature(fileBytes);
+        if ("webp".equals(signature)) {
+            return ".webp";
+        }
+        return extensionFor(mediaType);
+    }
+
+    /**
+     * Detects lightweight image signatures from raw payload bytes.
+     *
+     * @param fileBytes payload bytes
+     * @return signature id (`png`, `jpeg`, `gif`, `webp`) or {@code null}
+     */
+    private static String detectImageSignature(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length < 12) {
+            return null;
+        }
+        if ((fileBytes[0] & 0xFF) == 0x89
+                && fileBytes[1] == 0x50
+                && fileBytes[2] == 0x4E
+                && fileBytes[3] == 0x47
+                && fileBytes[4] == 0x0D
+                && fileBytes[5] == 0x0A
+                && fileBytes[6] == 0x1A
+                && fileBytes[7] == 0x0A) {
+            return "png";
+        }
+        if ((fileBytes[0] & 0xFF) == 0xFF
+                && (fileBytes[1] & 0xFF) == 0xD8
+                && (fileBytes[2] & 0xFF) == 0xFF) {
+            return "jpeg";
+        }
+        if ((fileBytes[0] == 'G')
+                && (fileBytes[1] == 'I')
+                && (fileBytes[2] == 'F')
+                && (fileBytes[3] == '8')
+                && (fileBytes[4] == '7' || fileBytes[4] == '9')
+                && (fileBytes[5] == 'a')) {
+            return "gif";
+        }
+        if ((fileBytes[0] == 'R')
+                && (fileBytes[1] == 'I')
+                && (fileBytes[2] == 'F')
+                && (fileBytes[3] == 'F')
+                && (fileBytes[8] == 'W')
+                && (fileBytes[9] == 'E')
+                && (fileBytes[10] == 'B')
+                && (fileBytes[11] == 'P')) {
+            return "webp";
+        }
+        return null;
     }
 
     /**

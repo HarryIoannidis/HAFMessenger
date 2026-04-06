@@ -3,6 +3,8 @@ package com.haf.client.controllers;
 import com.haf.client.services.ChatAttachmentService;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
+import com.haf.client.utils.UiConstants;
+import com.haf.client.viewmodels.MessagesViewModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -217,6 +219,42 @@ class ChatControllerTest {
     }
 
     @Test
+    void image_fallback_spec_uses_close_and_dont_show_again_actions() {
+        MessagesViewModel.ImagePreviewFallbackNotice notice = new MessagesViewModel.ImagePreviewFallbackNotice(
+                "bob",
+                true,
+                "cloud.png",
+                "image/png",
+                "webp");
+        AtomicInteger dontShowCalls = new AtomicInteger();
+
+        var spec = ChatController.buildImageFallbackNoticeSpec(notice, dontShowCalls::incrementAndGet);
+
+        assertEquals(UiConstants.POPUP_IMAGE_FALLBACK_NOTICE, spec.popupKey());
+        assertEquals("Image sent as file", spec.title());
+        assertEquals("Don't show again", spec.actionText());
+        assertEquals("Close", spec.cancelText());
+        assertTrue(spec.showCancel());
+        assertTrue(spec.message().contains("labeled as PNG"));
+        assertTrue(spec.message().contains("WEBP"));
+        spec.onAction().run();
+        assertEquals(1, dontShowCalls.get());
+    }
+
+    @Test
+    void image_fallback_message_handles_unknown_signature() {
+        MessagesViewModel.ImagePreviewFallbackNotice notice = new MessagesViewModel.ImagePreviewFallbackNotice(
+                "bob",
+                false,
+                "mystery.png",
+                "image/png",
+                "unknown");
+
+        String message = ChatController.buildImageFallbackMessage(notice);
+        assertTrue(message.contains("could not be recognized"));
+    }
+
+    @Test
     void over_attachment_limit_detects_files_larger_than_10mb() throws Exception {
         Path exact10Mb = tempDir.resolve("exact.bin");
         Path above10Mb = tempDir.resolve("above.bin");
@@ -242,7 +280,8 @@ class ChatControllerTest {
             "if (settings.isChatAutoScrollToLatest()) {",
             "if (!settings.isMediaOpenPreviewOnImageClick()) {",
             "if (!settings.isPrivacyConfirmAttachmentOpen()) {",
-            ".movable(spec.movable())"
+            ".movable(spec.movable())",
+            "settings.setMediaShowImageFallbackPopup(false)"
     })
     void controller_source_contains_expected_logic_and_behavior_wiring(String requiredCodeSnippet) throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
