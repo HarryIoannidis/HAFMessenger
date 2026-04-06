@@ -27,6 +27,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -95,6 +96,8 @@ public class RegisterController {
     @FXML
     private Text gotoSignInButton;
     @FXML
+    private Text strengthText;
+    @FXML
     private Text errorText;
     @FXML
     private ComboBox<String> rankComboBox;
@@ -152,6 +155,13 @@ public class RegisterController {
     private final RegisterViewModel viewModel = new RegisterViewModel();
     private final RegistrationService registrationService;
 
+    private static final String PASSWORD_STRENGTH_WEAK_TEXT = "Weak";
+    private static final String PASSWORD_STRENGTH_MEDIUM_TEXT = "Medium";
+    private static final String PASSWORD_STRENGTH_STRONG_TEXT = "Strong";
+    private static final Color PASSWORD_STRENGTH_WEAK_COLOR = Color.web("#d01020");
+    private static final Color PASSWORD_STRENGTH_MEDIUM_COLOR = Color.web("#d07a00");
+    private static final Color PASSWORD_STRENGTH_STRONG_COLOR = Color.web("#2f9e44");
+
     private double xOffset;
     private double yOffset;
 
@@ -181,6 +191,7 @@ public class RegisterController {
         bindViewModel();
         setupListeners();
         setupPasswordToggle();
+        setupPasswordStrengthIndicator();
         setupWindowControls();
         setupDragAndDrop();
         initializeStep();
@@ -333,6 +344,125 @@ public class RegisterController {
         if (togglePasswordConfButton != null) {
             togglePasswordConfButton.setOnAction(event -> handleTogglePasswordConf());
         }
+    }
+
+    /**
+     * Configures live password strength indicator behavior.
+     */
+    private void setupPasswordStrengthIndicator() {
+        if (strengthText != null) {
+            strengthText.setVisible(false);
+            strengthText.setManaged(false);
+            strengthText.setText("");
+        }
+
+        viewModel.passwordProperty().addListener((obs, oldVal, newVal) -> updatePasswordStrengthIndicator(newVal));
+
+        passwordField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused && (passwordVisibleField == null || !passwordVisibleField.isFocused())) {
+                clearPasswordStrengthOutline();
+            }
+        });
+        if (passwordVisibleField != null) {
+            passwordVisibleField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+                if (!isFocused && !passwordField.isFocused()) {
+                    clearPasswordStrengthOutline();
+                }
+            });
+        }
+    }
+
+    /**
+     * Updates password strength text and outline color while typing.
+     *
+     * @param password current password value
+     */
+    private void updatePasswordStrengthIndicator(String password) {
+        if (strengthText == null) {
+            return;
+        }
+        if (password == null || password.isEmpty()) {
+            strengthText.setVisible(false);
+            strengthText.setManaged(false);
+            strengthText.setText("");
+            clearPasswordStrengthOutline();
+            return;
+        }
+
+        int strengthCounter = countPasswordStrengthRules(password);
+        if (strengthCounter <= 1) {
+            applyPasswordStrengthStyle(PASSWORD_STRENGTH_WEAK_TEXT, PASSWORD_STRENGTH_WEAK_COLOR);
+            return;
+        }
+        if (strengthCounter <= 3) {
+            applyPasswordStrengthStyle(PASSWORD_STRENGTH_MEDIUM_TEXT, PASSWORD_STRENGTH_MEDIUM_COLOR);
+            return;
+        }
+        applyPasswordStrengthStyle(PASSWORD_STRENGTH_STRONG_TEXT, PASSWORD_STRENGTH_STRONG_COLOR);
+    }
+
+    /**
+     * Applies strength style to text and password fields.
+     *
+     * @param strengthLabel label text
+     * @param color strength color
+     */
+    private void applyPasswordStrengthStyle(String strengthLabel, Color color) {
+        strengthText.setVisible(true);
+        strengthText.setManaged(true);
+        strengthText.setText(strengthLabel);
+        strengthText.setFill(color);
+        String borderStyle = "-fx-border-color: " + toHex(color) + "; -fx-border-width: 2;";
+        passwordField.setStyle(borderStyle);
+        if (passwordVisibleField != null) {
+            passwordVisibleField.setStyle(borderStyle);
+        }
+    }
+
+    /**
+     * Clears transient strength outline from password fields.
+     */
+    private void clearPasswordStrengthOutline() {
+        passwordField.setStyle("");
+        if (passwordVisibleField != null) {
+            passwordVisibleField.setStyle("");
+        }
+    }
+
+    /**
+     * Counts satisfied strong-password rules.
+     *
+     * @param password current password
+     * @return satisfied rule count (0-4)
+     */
+    private int countPasswordStrengthRules(String password) {
+        int score = 0;
+        if (password.length() >= 8) {
+            score++;
+        }
+        if (password.chars().anyMatch(Character::isUpperCase)) {
+            score++;
+        }
+        if (password.chars().anyMatch(Character::isDigit)) {
+            score++;
+        }
+        if (password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch))) {
+            score++;
+        }
+        return score;
+    }
+
+    /**
+     * Converts JavaFX color to CSS hex.
+     *
+     * @param color source color
+     * @return hex CSS color
+     */
+    private String toHex(Color color) {
+        int r = (int) Math.round(color.getRed() * 255);
+        int g = (int) Math.round(color.getGreen() * 255);
+        int b = (int) Math.round(color.getBlue() * 255);
+        return String.format("#%02x%02x%02x", r, g, b);
     }
 
     /**

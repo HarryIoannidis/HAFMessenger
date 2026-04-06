@@ -28,6 +28,8 @@ import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.responses.PublicKeyResponse;
 import com.haf.shared.requests.LoginRequest;
 import com.haf.shared.responses.LoginResponse;
+import com.haf.shared.requests.RefreshTokenRequest;
+import com.haf.shared.responses.RefreshTokenResponse;
 import com.haf.shared.requests.RegisterRequest;
 import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.responses.UserSearchResponse;
@@ -55,6 +57,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.InetAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -96,6 +99,7 @@ public final class HttpIngressServer {
     private static final String MESSAGES_PATH = "/api/v1/messages";
     private static final String REGISTER_PATH = "/api/v1/register";
     private static final String LOGIN_PATH = "/api/v1/login";
+    private static final String TOKEN_REFRESH_PATH = "/api/v1/token/refresh";
     private static final String LOGOUT_PATH = "/api/v1/logout";
     private static final String USERS_PATH = "/api/v1/users";
     private static final String SEARCH_PATH = "/api/v1/search";
@@ -128,6 +132,7 @@ public final class HttpIngressServer {
     private static final String INVALID_REQUEST_PATH = "invalid request path";
     private static final String INVALID_CONTACT_ID = "invalid contactId";
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
+    private static final String TOO_MANY_LOGIN_ATTEMPTS = "Too many login attempts";
     private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
     private static final String TAKEOVER_FIELDS_REQUIRED =
             "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true";
@@ -401,6 +406,7 @@ public final class HttpIngressServer {
         httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
         httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
         httpsServer.createContext(LOGIN_PATH, new LoginHandler());
+        httpsServer.createContext(TOKEN_REFRESH_PATH, new TokenRefreshHandler());
         httpsServer.createContext(LOGOUT_PATH, new LogoutHandler());
         httpsServer.createContext(USERS_PATH, new UserKeyHandler());
         httpsServer.createContext(SEARCH_PATH, new SearchHandler());
@@ -885,12 +891,32 @@ public final class HttpIngressServer {
                 return "email is required";
             if (isBlank(r.getPassword()))
                 return "password is required";
-            if (r.getPassword().length() < 6)
-                return "password must be at least 6 characters";
+            String passwordValidation = validateStrongPassword(r.getPassword());
+            if (passwordValidation != null)
+                return passwordValidation;
             if (isBlank(r.getPublicKeyPem()))
                 return "publicKeyPem is required";
             if (isBlank(r.getPublicKeyFingerprint()))
                 return "publicKeyFingerprint is required";
+            return null;
+        }
+
+        /**
+         * Validates strong password policy.
+         *
+         * @param password password value
+         * @return validation error, or {@code null} when valid
+         */
+        private String validateStrongPassword(String password) {
+            if (password == null || password.length() < 8) {
+                return "password must be at least 8 characters";
+            }
+            boolean hasUppercase = password.chars().anyMatch(Character::isUpperCase);
+            boolean hasNumber = password.chars().anyMatch(Character::isDigit);
+            boolean hasSpecial = password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
+            if (!hasUppercase || !hasNumber || !hasSpecial) {
+                return "password must include at least 1 uppercase letter, 1 number, and 1 special character";
+            }
             return null;
         }
 
@@ -1013,11 +1039,22 @@ public final class HttpIngressServer {
 
                 String body = readBody(exchange.getRequestBody());
                 LoginRequest request = JsonCodec.fromJson(body, LoginRequest.class);
+                String sourceIp = resolveClientIp(exchange);
 
                 // Validate required fields
                 if (isBlank(request.getEmail()) || isBlank(request.getPassword())) {
                     respond(exchange, requestId, 400,
                             JsonCodec.toJson(LoginResponse.error("email and password are required")));
+                    return;
+                }
+
+                RateLimitDecision loginRateDecision = rateLimiterService.checkAndConsumeLoginAttempt(
+                        requestId,
+                        request.getEmail(),
+                        sourceIp);
+                if (!loginRateDecision.allowed()) {
+                    respond(exchange, requestId, 429, JsonCodec.toJson(
+                            LoginResponse.error(TOO_MANY_LOGIN_ATTEMPTS, loginRateDecision.retryAfterSeconds())));
                     return;
                 }
 
@@ -1059,14 +1096,18 @@ public final class HttpIngressServer {
                 }
 
                 // Create session
-                String sessionId = sessionDAO.createSession(user.userId());
+                SessionDAO.SessionTokens sessionTokens = sessionDAO.createSessionTokens(user.userId());
+                rateLimiterService.clearLoginAttempts(request.getEmail(), sourceIp);
 
                 auditLogger.logLogin(requestId, user.userId(), request.getEmail());
 
                 respond(exchange, requestId, 200,
                         JsonCodec.toJson(LoginResponse.success(
                                 user.userId(),
-                                sessionId,
+                                sessionTokens.accessToken(),
+                                sessionTokens.refreshToken(),
+                                sessionTokens.accessExpiresAtEpochSeconds(),
+                                sessionTokens.refreshExpiresAtEpochSeconds(),
                                 user.fullName(),
                                 user.rank(),
                                 user.regNumber(),
@@ -1211,6 +1252,125 @@ public final class HttpIngressServer {
 
             exchange.sendResponseHeaders(status, payload.length);
 
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(payload);
+            }
+        }
+    }
+
+    /**
+     * Handles token refresh requests.
+     */
+    private final class TokenRefreshHandler implements HttpHandler {
+
+        /**
+         * Handles refresh-token rotation requests.
+         *
+         * @param exchange HTTP exchange
+         * @throws IOException when response write fails
+         */
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
+            applySecurityHeaders(exchange.getResponseHeaders());
+
+            try {
+                if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    respond(exchange, requestId, 405, JsonCodec.toJson(RefreshTokenResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+
+                String body = readBody(exchange.getRequestBody());
+                RefreshTokenRequest request = JsonCodec.fromJson(body, RefreshTokenRequest.class);
+                if (request == null || isBlank(request.getRefreshToken())) {
+                    respond(exchange, requestId, 400,
+                            JsonCodec.toJson(RefreshTokenResponse.error("refreshToken is required")));
+                    return;
+                }
+
+                SessionDAO.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
+                if (rotated == null) {
+                    respond(exchange, requestId, 401,
+                            JsonCodec.toJson(RefreshTokenResponse.error(INVALID_SESSION)));
+                    return;
+                }
+
+                respond(exchange, requestId, 200, JsonCodec.toJson(
+                        RefreshTokenResponse.success(
+                                rotated.accessToken(),
+                                rotated.refreshToken(),
+                                rotated.accessExpiresAtEpochSeconds(),
+                                rotated.refreshExpiresAtEpochSeconds())));
+            } catch (Exception ex) {
+                auditLogger.logError("token_refresh_error", requestId, null, ex);
+                respond(exchange, requestId, 500, JsonCodec.toJson(RefreshTokenResponse.error(INTERNAL_SERVER_ERROR)));
+            } finally {
+                exchange.close();
+            }
+        }
+
+        /**
+         * Checks whether string is null or blank.
+         *
+         * @param value value to check
+         * @return true when value is blank
+         */
+        private boolean isBlank(String value) {
+            return value == null || value.isBlank();
+        }
+
+        /**
+         * Reads request body with limit enforcement.
+         *
+         * @param body request stream
+         * @return body text
+         * @throws IOException when read fails
+         */
+        private String readBody(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
+
+        /**
+         * Applies baseline security headers.
+         *
+         * @param headers response headers
+         */
+        private void applySecurityHeaders(Headers headers) {
+            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
+            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
+            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
+            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
+        }
+
+        /**
+         * Sends JSON response with request id propagation.
+         *
+         * @param exchange HTTP exchange
+         * @param requestId request id
+         * @param status status code
+         * @param body body JSON
+         * @throws IOException on write failure
+         */
+        private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            Headers responseHeaders = exchange.getResponseHeaders();
+            responseHeaders.add(CONTENT_TYPE, APPLICATION_JSON);
+            if (!responseHeaders.containsKey(X_REQUEST_ID)) {
+                responseHeaders.add(X_REQUEST_ID, requestId);
+            }
+            exchange.sendResponseHeaders(status, payload.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(payload);
             }
@@ -2337,6 +2497,36 @@ public final class HttpIngressServer {
             }
             return buffer.toString(StandardCharsets.UTF_8);
         }
+    }
+
+    /**
+     * Resolves source IP for rate-limit keying.
+     *
+     * @param exchange HTTP exchange
+     * @return normalized source IP token
+     */
+    private static String resolveClientIp(HttpExchange exchange) {
+        if (exchange == null) {
+            return "unknown";
+        }
+        String forwardedFor = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            String first = forwardedFor.split(",")[0].trim();
+            if (!first.isBlank()) {
+                return first;
+            }
+        }
+        if (exchange.getRemoteAddress() != null) {
+            InetAddress address = exchange.getRemoteAddress().getAddress();
+            if (address != null && address.getHostAddress() != null && !address.getHostAddress().isBlank()) {
+                return address.getHostAddress();
+            }
+            if (exchange.getRemoteAddress().getHostString() != null
+                    && !exchange.getRemoteAddress().getHostString().isBlank()) {
+                return exchange.getRemoteAddress().getHostString();
+            }
+        }
+        return "unknown";
     }
 
     /**

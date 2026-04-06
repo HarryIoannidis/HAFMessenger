@@ -14,7 +14,7 @@ import java.io.File;
 public class RegisterViewModel {
 
     // Allowed email domain
-    private static final int MIN_PASSWORD_LENGTH = 6;
+    private static final int MIN_PASSWORD_LENGTH = 8;
 
     // Error messages
     public static final String ERROR_ALL_FIELDS_EMPTY = "Please fill in all fields.";
@@ -30,6 +30,8 @@ public class RegisterViewModel {
     public static final String ERROR_PASSWORD_EMPTY = "Please enter a password.";
     public static final String ERROR_PASSWORD_TOO_SHORT = "Password must be at least " + MIN_PASSWORD_LENGTH
             + " characters.";
+    public static final String ERROR_PASSWORD_WEAK =
+            "Password must include at least 1 uppercase letter, 1 number, and 1 special character.";
     public static final String ERROR_PASSWORD_CONF_EMPTY = "Please confirm your password.";
     public static final String ERROR_PASSWORDS_MISMATCH = "Passwords do not match.";
 
@@ -476,6 +478,9 @@ public class RegisterViewModel {
         if (passVal.length() < MIN_PASSWORD_LENGTH) {
             return setFieldError(passwordError, ERROR_PASSWORD_TOO_SHORT);
         }
+        if (!isStrongPassword(passVal)) {
+            return setFieldError(passwordError, ERROR_PASSWORD_WEAK);
+        }
 
         if (!passVal.equals(passConfVal)) {
             passwordError.set(true);
@@ -485,6 +490,19 @@ public class RegisterViewModel {
         }
         return true;
 
+    }
+
+    /**
+     * Validates required password complexity rules.
+     *
+     * @param password password to validate
+     * @return {@code true} when password includes uppercase, number, and special
+     */
+    private boolean isStrongPassword(String password) {
+        boolean hasUppercase = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasNumber = password.chars().anyMatch(Character::isDigit);
+        boolean hasSpecial = password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
+        return hasUppercase && hasNumber && hasSpecial;
     }
 
     /**

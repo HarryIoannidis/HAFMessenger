@@ -14,11 +14,12 @@ Document the current relational schema and DAO responsibilities used by the serv
   - `message_envelopes`
   - `audit_logs`
   - `rate_limits`
+  - `login_rate_limits`
   - `file_uploads`
   - `contacts`
   - `message_attachments`
   - `message_attachment_chunks`
-- Latest migrations include search indexes, attachment tables, and session activity tracking (`V10`, `V11`, `V12`).
+- Latest migrations include search indexes, attachment tables, session activity tracking, and JWT/refresh session hardening (`V10`, `V11`, `V12`, `V13`).
 - Migration execution is part of server startup (`Main.runFlywayMigrations(...)`) before ingress servers start.
 
 ## Key Types/Interfaces
@@ -43,13 +44,14 @@ Document the current relational schema and DAO responsibilities used by the serv
 5. Scheduled cleanup removes expired uploads/envelopes according to TTL policy.
 6. Metrics/audit layers observe DAO-side outcomes (ingress rejects, cleanup counts, delivery latency).
 7. Session presence/duplicate-login logic uses `sessions.last_seen_at` and database-time comparisons.
+8. Session rows persist `access_jti` and `refresh_token_hash` (no plaintext refresh tokens).
 
 ## Error/Security Notes
 
 - Server stores encrypted payloads opaquely; no decrypt in DAO layer.
 - SQL is executed through `PreparedStatement` patterns.
 - Session and auth checks gate protected endpoints before DAO mutation paths.
-- Rate-limit state is stored server-side in `rate_limits`.
+- Message and login rate-limit state is stored server-side in `rate_limits` and `login_rate_limits`.
 
 ## Related Files
 
@@ -60,3 +62,4 @@ Document the current relational schema and DAO responsibilities used by the serv
 - `server/src/main/resources/db/migration/V1__create_users_table.sql`
 - `server/src/main/resources/db/migration/V11__create_message_attachments_tables.sql`
 - `server/src/main/resources/db/migration/V12__add_sessions_last_seen.sql`
+- `server/src/main/resources/db/migration/V13__harden_sessions_and_add_login_rate_limits.sql`

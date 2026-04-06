@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.responses.ContactsResponse;
@@ -143,6 +144,24 @@ class MainViewModelTest {
         issues.getFirst().retryAction().run();
 
         awaitCondition(() -> fetchCalls.get() >= 2);
+    }
+
+    @Test
+    void fetch_contacts_invalid_session_emits_revoked_session_issue() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.failedFuture(
+                        new HttpCommunicationException(
+                                "HTTP GET failed with status 401: {\"error\":\"invalid session\"}",
+                                401,
+                                "{\"error\":\"invalid session\"}"))));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.fetchContacts();
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("messaging.session.revoked", issues.getFirst().dedupeKey());
+        assertEquals("Session expired", issues.getFirst().title());
     }
 
     @Test

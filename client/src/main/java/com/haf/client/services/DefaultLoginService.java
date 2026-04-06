@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.core.ChatSession;
+import com.haf.client.core.AuthSessionState;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.crypto.UserKeystoreKeyProvider;
@@ -146,6 +147,7 @@ public class DefaultLoginService implements LoginService {
     @Override
     public LoginResult login(LoginCommand command) {
         CurrentUserSession.clear();
+        AuthSessionState.clear();
         if (command == null) {
             return new LoginResult.Failure("Connection failed. Please try again.");
         }
@@ -171,6 +173,7 @@ public class DefaultLoginService implements LoginService {
     @Override
     public LoginResult performKeyTakeover(LoginCommand command) {
         CurrentUserSession.clear();
+        AuthSessionState.clear();
         if (command == null) {
             return new LoginResult.Failure("Connection failed. Please try again.");
         }
@@ -221,10 +224,10 @@ public class DefaultLoginService implements LoginService {
                     && isDuplicateSessionConflict(httpResponse.statusCode(), response)) {
                 return new LoginResult.TakeoverRequired(
                         LoginService.TakeoverReason.DUPLICATE_SESSION,
-                        resolveRejectedMessage(response));
+                        resolveRejectedMessage(httpResponse.statusCode(), response));
             }
             if (!isAuthenticated(httpResponse.statusCode(), response)) {
-                return new LoginResult.Rejected(resolveRejectedMessage(response));
+                return new LoginResult.Rejected(resolveRejectedMessage(httpResponse.statusCode(), response));
             }
             return initializeSessionOrRetry(response, command, attempt, takeoverKey);
         } catch (InterruptedException _) {
@@ -255,6 +258,11 @@ public class DefaultLoginService implements LoginService {
                 persistTakeoverKeyMaterial(response.getUserId(), command.password(), takeoverKey);
             }
             sessionBootstrap.initialize(response.getUserId(), response.getSessionId(), command.password());
+            AuthSessionState.set(
+                    response.getSessionId(),
+                    response.getRefreshToken(),
+                    response.getAccessExpiresAtEpochSeconds(),
+                    response.getRefreshExpiresAtEpochSeconds());
             CurrentUserSession.set(new UserProfileInfo(
                     response.getUserId(),
                     response.getFullName(),
@@ -268,6 +276,7 @@ public class DefaultLoginService implements LoginService {
         } catch (Exception ex) {
             if (isKeyMismatchFailure(ex)) {
                 revokeSessionBestEffort(response.getSessionId());
+                AuthSessionState.clear();
                 return new LoginResult.TakeoverRequired(
                         LoginService.TakeoverReason.KEY_MISMATCH,
                         KEY_MISMATCH_FAILURE_MESSAGE);
@@ -361,7 +370,18 @@ public class DefaultLoginService implements LoginService {
      * @param response parsed login response body
      * @return rejection reason or default login-failed text
      */
-    private static String resolveRejectedMessage(LoginResponse response) {
+    private static String resolveRejectedMessage(int statusCode, LoginResponse response) {
+        if (statusCode == 429) {
+            long retryAfterSeconds = response != null && response.getRetryAfterSeconds() != null
+                    ? response.getRetryAfterSeconds()
+                    : 0L;
+            if (retryAfterSeconds > 0L) {
+                long retryAfterMinutes = Math.max(1L, (retryAfterSeconds + 59L) / 60L);
+                return "Too many login attempts. Try again in " + retryAfterMinutes
+                        + (retryAfterMinutes == 1L ? " minute." : " minutes.");
+            }
+            return "Too many login attempts. Try again later.";
+        }
         if (response != null && response.getError() != null) {
             return response.getError();
         }

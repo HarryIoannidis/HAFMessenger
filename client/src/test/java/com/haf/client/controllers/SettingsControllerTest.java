@@ -57,11 +57,11 @@ class SettingsControllerTest {
         assertNotNull(loaded.controller());
 
         List<SettingsMenuItem> items = loaded.controller().menuItemsForTest();
-        assertEquals(6, items.size());
+        assertEquals(7, items.size());
         assertEquals(
-                List.of("General", "Search", "Preview & Media", "Chat", "Notifications", "Privacy"),
+                List.of("Account", "General", "Search", "Preview & Media", "Chat", "Notifications", "Privacy"),
                 items.stream().map(SettingsMenuItem::label).toList());
-        assertEquals("generalSettingsPane", loaded.controller().visiblePaneIdForTest());
+        assertEquals("accountSettingsPane", loaded.controller().visiblePaneIdForTest());
     }
 
     @Test

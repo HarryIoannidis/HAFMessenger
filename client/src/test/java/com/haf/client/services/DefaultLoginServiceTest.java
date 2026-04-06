@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.core.CurrentUserSession;
+import com.haf.client.core.AuthSessionState;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.exceptions.CryptoOperationException;
@@ -27,6 +28,7 @@ class DefaultLoginServiceTest {
     @BeforeEach
     void clearCurrentUserSession() {
         CurrentUserSession.clear();
+        AuthSessionState.clear();
     }
 
     @Test
@@ -69,6 +71,7 @@ class DefaultLoginServiceTest {
         assertInstanceOf(LoginService.LoginResult.Success.class, result);
         assertEquals(1, attempts.get());
         assertEquals(1, bootstrapCalls.get());
+        assertEquals("s1", AuthSessionState.getAccessToken());
     }
 
     @Test
@@ -217,6 +220,28 @@ class DefaultLoginServiceTest {
     }
 
     @Test
+    void login_rate_limited_rejection_returns_minutes_message() {
+        AtomicInteger attempts = new AtomicInteger();
+
+        LoginResponse rateLimited = LoginResponse.error("Too many login attempts", 125L);
+        DefaultLoginService service = new DefaultLoginService(
+                (command, takeoverPayload) -> {
+                    attempts.incrementAndGet();
+                    return response(429, JsonCodec.toJson(rateLimited));
+                },
+                (userId, sessionId, passphrase) -> {
+                },
+                millis -> {
+                });
+
+        LoginService.LoginResult result = service.login(new LoginService.LoginCommand("user@haf.gr", "password"));
+
+        LoginService.LoginResult.Rejected rejected = assertInstanceOf(LoginService.LoginResult.Rejected.class, result);
+        assertEquals("Too many login attempts. Try again in 3 minutes.", rejected.message());
+        assertEquals(1, attempts.get());
+    }
+
+    @Test
     void perform_key_takeover_submits_takeover_payload_and_bootstraps_session() {
         AtomicInteger attempts = new AtomicInteger();
         AtomicInteger bootstrapCalls = new AtomicInteger();
@@ -278,6 +303,7 @@ class DefaultLoginServiceTest {
     void login_failure_clears_previous_current_user_profile() {
         CurrentUserSession.set(new UserProfileInfo(
                 "old", "Old", "Rank", "REG", "2025-01-01", "old@haf.gr", "6999999999", true));
+        AuthSessionState.set("old-session", "old-refresh", 1_700_000_000L, 1_700_100_000L);
         DefaultLoginService service = new DefaultLoginService(
                 (command, takeoverPayload) -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),
                 (userId, sessionId, passphrase) -> {
@@ -288,6 +314,7 @@ class DefaultLoginServiceTest {
         service.login(new LoginService.LoginCommand("user@haf.gr", "bad-pass"));
 
         assertNull(CurrentUserSession.get());
+        assertNull(AuthSessionState.get());
     }
 
     private static HttpResponse<String> response(int statusCode, String body) {

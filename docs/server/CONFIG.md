@@ -7,7 +7,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 ## Current Implementation
 
 - `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
-- Required vars include DB credentials, TLS keystore, key passphrase, strict runtime mode, and search cursor secret.
+- Required vars include DB credentials, TLS keystore, key passphrase, strict runtime mode, search cursor secret, and JWT signing secret.
 - `HAF_APP_IS_DEV` is required and authoritative for server runtime mode (`true` or `false` only).
 - Optional vars control pool sizing, ports, search limits, and attachment policy.
 - Required keys:
@@ -18,12 +18,16 @@ Document server runtime configuration loaded by `ServerConfig`.
   - `HAF_TLS_KEYSTORE_PATH`
   - `HAF_TLS_KEYSTORE_PASS`
   - `HAF_SEARCH_CURSOR_SECRET`
+  - `HAF_JWT_SECRET`
   - `HAF_APP_IS_DEV`
 - Key defaults:
   - DB pool size: `20`
   - HTTP/WS ports: `8443` / `8444`
   - Search page size: `20` (max `50`)
   - Search min/max query length: `3` / `128`
+  - JWT access TTL: `900` seconds
+  - JWT refresh TTL: `2592000` seconds
+  - JWT absolute session TTL: `2592000` seconds
   - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL)
 
 ## Key Types/Interfaces
@@ -37,15 +41,17 @@ Document server runtime configuration loaded by `ServerConfig`.
 2. Parse required/optional values with defaults and normalized types.
 3. Parse `HAF_APP_IS_DEV` as strict boolean and fail fast on missing/invalid values.
 4. Apply TLS keystore compatibility fallback for `server/...` path variants.
-5. Validate search and attachment constraints.
+5. Validate search, JWT, and attachment constraints.
 6. Expose typed getters used by server bootstrap and ingress.
 
 ## Error/Security Notes
 
 - Missing required values fail fast with `ConfigurationException`.
 - TLS keystore path has compatibility fallback resolution logic.
+- JWT TTL values are validated (`access >= 60s`, `refresh >= access`, `absolute >= refresh`).
 - Attachment policy values are validated to prevent invalid runtime limits.
 - Password getters return cloned char arrays to reduce accidental mutable sharing.
+- Packaging note: first-run local config bootstrap (no manual system-env setup) is tracked as a separate follow-up.
 
 ## Related Files
 

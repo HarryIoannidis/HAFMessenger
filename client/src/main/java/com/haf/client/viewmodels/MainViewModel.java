@@ -1,6 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.core.NetworkSession;
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.requests.AddContactRequest;
@@ -77,6 +78,10 @@ public class MainViewModel {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainViewModel.class);
     private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
+    private static final String REVOKED_SESSION_ISSUE_KEY = "messaging.session.revoked";
+    private static final String REVOKED_SESSION_TITLE = "Session expired";
+    private static final String REVOKED_SESSION_MESSAGE =
+            "Your session expired due to inactivity. Please log in again.";
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
@@ -259,6 +264,15 @@ public class MainViewModel {
         return contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
+                    if (isRevokedSessionError(ex)) {
+                        publishRuntimeIssue(
+                                REVOKED_SESSION_ISSUE_KEY,
+                                REVOKED_SESSION_TITLE,
+                                REVOKED_SESSION_MESSAGE,
+                                () -> {
+                                });
+                        return null;
+                    }
                     LOGGER.error("Failed to load contacts", ex);
                     publishRuntimeIssue(
                             "contacts.fetch.failed",
@@ -858,6 +872,15 @@ public class MainViewModel {
                     scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
                 })
                 .exceptionally(ex -> {
+                    if (isRevokedSessionError(ex)) {
+                        publishRuntimeIssue(
+                                REVOKED_SESSION_ISSUE_KEY,
+                                REVOKED_SESSION_TITLE,
+                                REVOKED_SESSION_MESSAGE,
+                                () -> {
+                                });
+                        return null;
+                    }
                     LOGGER.error("Failed to add contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.add.failed",
@@ -879,6 +902,15 @@ public class MainViewModel {
         }
         contactsGateway.removeContact(userId)
                 .exceptionally(ex -> {
+                    if (isRevokedSessionError(ex)) {
+                        publishRuntimeIssue(
+                                REVOKED_SESSION_ISSUE_KEY,
+                                REVOKED_SESSION_TITLE,
+                                REVOKED_SESSION_MESSAGE,
+                                () -> {
+                                });
+                        return null;
+                    }
                     LOGGER.error("Failed to remove contact on server", ex);
                     publishRuntimeIssue(
                             "contacts.remove.failed",
@@ -925,6 +957,31 @@ public class MainViewModel {
             return fallback;
         }
         return message;
+    }
+
+    /**
+     * Detects invalid-session failures so UI can route through the single
+     * revoked-session flow instead of showing generic contact sync popups.
+     *
+     * @param error candidate runtime failure
+     * @return {@code true} when failure chain indicates revoked/invalid session
+     */
+    private static boolean isRevokedSessionError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                if (statusCode == 401 || statusCode == 403) {
+                    return true;
+                }
+            }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains("invalid session")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**

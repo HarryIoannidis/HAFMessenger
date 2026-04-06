@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -33,6 +34,9 @@ class RateLimiterServiceTest {
 
         @Mock
         private PreparedStatement selectStatement;
+
+        @Mock
+        private PreparedStatement clearStatement;
 
         @Mock
         private ResultSet resultSet;
@@ -173,6 +177,121 @@ class RateLimiterServiceTest {
 
                 verify(auditLogger, times(1))
                                 .logError(eq("rate_limit_failed"), eq(requestId), eq(userId), any());
+        }
+
+        @Test
+        void check_and_consume_login_attempt_allows_when_under_limit() throws SQLException {
+                String requestId = "req-login-1";
+                String email = "user@haf.gr";
+                String sourceIp = "192.168.1.10";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(true);
+                when(resultSet.getTimestamp("lockout_until")).thenReturn(null);
+                when(resultSet.getInt("attempt_count")).thenReturn(3);
+
+                RateLimiterService.RateLimitDecision decision = service.checkAndConsumeLoginAttempt(requestId, email,
+                                sourceIp);
+
+                assertTrue(decision.allowed());
+                assertEquals(0, decision.retryAfterSeconds());
+                verify(auditLogger, never()).logRateLimit(anyString(), anyString(), anyLong());
+        }
+
+        @Test
+        void check_and_consume_login_attempt_rate_limits_when_over_threshold() throws SQLException {
+                String requestId = "req-login-2";
+                String email = "user@haf.gr";
+                String sourceIp = "192.168.1.11";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(true);
+                when(resultSet.getTimestamp("lockout_until")).thenReturn(null);
+                when(resultSet.getInt("attempt_count")).thenReturn(9);
+
+                RateLimiterService.RateLimitDecision decision = service.checkAndConsumeLoginAttempt(requestId, email,
+                                sourceIp);
+
+                assertFalse(decision.allowed());
+                assertTrue(decision.retryAfterSeconds() > 0);
+                verify(auditLogger, times(1)).logRateLimit(eq(requestId), eq(email), anyLong());
+        }
+
+        @Test
+        void check_and_consume_login_attempt_rate_limits_when_locked_out() throws SQLException {
+                String requestId = "req-login-3";
+                String email = "user@haf.gr";
+                String sourceIp = "192.168.1.12";
+                Timestamp lockoutUntil = Timestamp.from(Instant.now().plus(10, ChronoUnit.MINUTES));
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(true);
+                when(resultSet.getTimestamp("lockout_until")).thenReturn(lockoutUntil);
+
+                RateLimiterService.RateLimitDecision decision = service.checkAndConsumeLoginAttempt(requestId, email,
+                                sourceIp);
+
+                assertFalse(decision.allowed());
+                assertTrue(decision.retryAfterSeconds() > 0);
+                verify(auditLogger, times(1)).logRateLimit(eq(requestId), eq(email), anyLong());
+        }
+
+        @Test
+        void check_and_consume_login_attempt_throws_on_sql_exception() throws SQLException {
+                String requestId = "req-login-4";
+                String email = "user@haf.gr";
+                String sourceIp = "192.168.1.13";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement);
+                when(upsertStatement.executeUpdate())
+                                .thenThrow(new SQLException("DB error"));
+
+                RateLimitException ex = assertThrows(
+                                RateLimitException.class,
+                                () -> service.checkAndConsumeLoginAttempt(requestId, email, sourceIp));
+                assertTrue(ex.getMessage().contains("Login rate limit check failed"));
+                verify(auditLogger, times(1))
+                                .logError(eq("login_rate_limit_failed"), eq(requestId), eq(email), any());
+        }
+
+        @Test
+        void clear_login_attempts_deletes_bucket() throws SQLException {
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString())).thenReturn(clearStatement);
+                when(clearStatement.executeUpdate()).thenReturn(1);
+
+                service.clearLoginAttempts("user@haf.gr", "127.0.0.1");
+
+                ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+                verify(clearStatement).setString(eq(1), keyCaptor.capture());
+                String throttleKey = keyCaptor.getValue();
+                assertNotNull(throttleKey);
+                assertEquals(64, throttleKey.length());
+                assertTrue(throttleKey.matches("[a-f0-9]{64}"));
+                verify(clearStatement).executeUpdate();
+        }
+
+        @Test
+        void clear_login_attempts_logs_error_when_delete_fails() throws SQLException {
+                when(dataSource.getConnection()).thenThrow(new SQLException("DB unavailable"));
+
+                assertDoesNotThrow(() -> service.clearLoginAttempts("user@haf.gr", "127.0.0.1"));
+                verify(auditLogger, times(1))
+                                .logError(eq("login_rate_limit_clear_failed"), isNull(), eq("user@haf.gr"), any());
         }
 
         @Test
