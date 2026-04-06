@@ -40,7 +40,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -55,6 +54,7 @@ public class ChatController {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatController.class);
     private static final long MAX_ATTACHMENT_BYTES = 10L * 1024L * 1024L;
     private static final double MESSAGE_CONTEXT_MENU_DELAY_MS = 170.0;
+    private static final double OPEN_CHAT_SCROLL_SETTLE_MS = 180.0;
 
     enum MessageContextAction {
         COPY,
@@ -87,6 +87,7 @@ public class ChatController {
     private ListChangeListener<MessageVM> messageListenerAnchor;
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
+    private PauseTransition chatOpenScrollSettleTransition;
 
     /**
      * Creates the chat controller with the default attachment service.
@@ -228,7 +229,7 @@ public class ChatController {
         loadInitialMessages();
         setupMessageListener();
         viewModel.acknowledgeActiveRecipient();
-        scrollToLatestIfEnabled();
+        scrollToLatestOnChatOpen();
     }
 
     /**
@@ -273,28 +274,92 @@ public class ChatController {
      * @param activeRecipient active recipient id used for acknowledgements
      */
     private void handleMessageChange(ListChangeListener.Change<? extends MessageVM> change, String activeRecipient) {
-        List<MessageVM> addedMessages = null;
-        boolean requiresFullRefresh = false;
-
+        MessageChangeState state = new MessageChangeState();
         while (change.next()) {
-            if (change.wasAdded() && !change.wasRemoved() && !change.wasPermutated() && !change.wasUpdated()) {
-                if (addedMessages == null) {
-                    addedMessages = new ArrayList<>();
-                }
-                addedMessages.addAll(change.getAddedSubList());
-            } else {
-                requiresFullRefresh = true;
-            }
+            applyMessageChangeChunk(change, state);
         }
 
-        if (requiresFullRefresh) {
+        if (state.requiresFullRefresh) {
             refreshRenderedMessages();
             return;
         }
 
-        if (addedMessages != null && !addedMessages.isEmpty()) {
-            processAddedMessages(addedMessages, activeRecipient);
+        if (state.shouldScrollToLatest) {
+            scrollToLatestIfEnabled();
         }
+        if (state.hasIncomingMessages) {
+            viewModel.acknowledgeRecipient(activeRecipient);
+        }
+    }
+
+    /**
+     * Applies one incremental list-change chunk into the rendered chat view.
+     *
+     * @param change observable list change chunk
+     * @param state  cumulative processing state for current list-change event
+     */
+    private void applyMessageChangeChunk(
+            ListChangeListener.Change<? extends MessageVM> change,
+            MessageChangeState state) {
+        if (state.requiresFullRefresh || change.wasPermutated() || change.wasUpdated()) {
+            state.requiresFullRefresh = true;
+            return;
+        }
+        if (change.wasReplaced()) {
+            applyReplaceChunk(change, state);
+            return;
+        }
+        if (change.wasRemoved() && !change.wasAdded()) {
+            applyRemovalChunk(change, state);
+            return;
+        }
+        if (change.wasAdded() && !change.wasRemoved()) {
+            applyAddChunk(change, state);
+            return;
+        }
+        state.requiresFullRefresh = true;
+    }
+
+    /**
+     * Applies replacement chunk updates and records UI side-effects.
+     *
+     * @param change replacement chunk
+     * @param state  cumulative state flags
+     */
+    private void applyReplaceChunk(ListChangeListener.Change<? extends MessageVM> change, MessageChangeState state) {
+        if (!applyReplacementChange(change)) {
+            state.requiresFullRefresh = true;
+            return;
+        }
+        state.shouldScrollToLatest = true;
+        state.hasIncomingMessages = state.hasIncomingMessages || containsIncoming(change.getAddedSubList());
+    }
+
+    /**
+     * Applies removal chunk updates and records fallback behavior when needed.
+     *
+     * @param change removal chunk
+     * @param state  cumulative state flags
+     */
+    private void applyRemovalChunk(ListChangeListener.Change<? extends MessageVM> change, MessageChangeState state) {
+        if (!applyRemovalChange(change)) {
+            state.requiresFullRefresh = true;
+        }
+    }
+
+    /**
+     * Applies add chunk updates and records UI side-effects.
+     *
+     * @param change add chunk
+     * @param state  cumulative state flags
+     */
+    private void applyAddChunk(ListChangeListener.Change<? extends MessageVM> change, MessageChangeState state) {
+        if (!applyAddChange(change)) {
+            state.requiresFullRefresh = true;
+            return;
+        }
+        state.shouldScrollToLatest = true;
+        state.hasIncomingMessages = state.hasIncomingMessages || containsIncoming(change.getAddedSubList());
     }
 
     /**
@@ -312,30 +377,121 @@ public class ChatController {
     }
 
     /**
-     * Renders newly added messages and acknowledges inbound messages for active
-     * recipient.
+     * Applies an add-only list change into the rendered chat node list while
+     * preserving insertion order/index.
      *
-     * @param addedMessages   newly appended messages
-     * @param activeRecipient active recipient id used for ack
+     * @param change add-only observable list change
+     * @return {@code true} when applied successfully; {@code false} when bounds are
+     *         inconsistent and caller should fall back to full refresh
      */
-    private void processAddedMessages(List<? extends MessageVM> addedMessages, String activeRecipient) {
-        boolean hasIncomingMessages = false;
-        for (MessageVM vm : addedMessages) {
-            chatBox.getChildren().add(createMessageNode(vm));
-            if (!vm.isOutgoing()) {
-                hasIncomingMessages = true;
-            }
+    private boolean applyAddChange(ListChangeListener.Change<? extends MessageVM> change) {
+        int from = change.getFrom();
+        if (from < 0 || from > chatBox.getChildren().size()) {
+            return false;
         }
-        scrollToLatestIfEnabled();
-
-        if (hasIncomingMessages) {
-            viewModel.acknowledgeRecipient(activeRecipient);
+        int insertionIndex = from;
+        for (MessageVM vm : change.getAddedSubList()) {
+            chatBox.getChildren().add(insertionIndex++, createMessageNode(vm));
         }
+        return true;
     }
 
     /**
-     * Scrolls chat viewport to latest message and repeats once on next pulse to
-     * handle delayed layout/scene attachment.
+     * Applies a remove-only list change into the rendered chat node list.
+     *
+     * @param change remove-only observable list change
+     * @return {@code true} when applied successfully; {@code false} when bounds are
+     *         inconsistent and caller should fall back to full refresh
+     */
+    private boolean applyRemovalChange(ListChangeListener.Change<? extends MessageVM> change) {
+        int from = change.getFrom();
+        int removedSize = change.getRemovedSize();
+        if (removedSize == 0) {
+            return true;
+        }
+        int to = from + removedSize;
+        if (from < 0 || to > chatBox.getChildren().size()) {
+            return false;
+        }
+        chatBox.getChildren().remove(from, to);
+        return true;
+    }
+
+    /**
+     * Applies a replacement change (remove+add at index) into the rendered chat
+     * node list.
+     *
+     * @param change replacement observable list change
+     * @return {@code true} when applied successfully; {@code false} when bounds are
+     *         inconsistent and caller should fall back to full refresh
+     */
+    private boolean applyReplacementChange(ListChangeListener.Change<? extends MessageVM> change) {
+        int from = change.getFrom();
+        int removedSize = change.getRemovedSize();
+        int to = from + removedSize;
+        if (from < 0 || to > chatBox.getChildren().size()) {
+            return false;
+        }
+        chatBox.getChildren().remove(from, to);
+        int insertionIndex = from;
+        for (MessageVM vm : change.getAddedSubList()) {
+            chatBox.getChildren().add(insertionIndex++, createMessageNode(vm));
+        }
+        return true;
+    }
+
+    /**
+     * Returns whether a batch of changed messages contains any incoming item.
+     *
+     * @param changedMessages changed message models
+     * @return {@code true} when at least one message is incoming
+     */
+    private static boolean containsIncoming(List<? extends MessageVM> changedMessages) {
+        for (MessageVM vm : changedMessages) {
+            if (!vm.isOutgoing()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Mutable accumulator for per-event message-change processing.
+     */
+    private static final class MessageChangeState {
+        private boolean shouldScrollToLatest;
+        private boolean hasIncomingMessages;
+        private boolean requiresFullRefresh;
+    }
+
+    /**
+     * Forces the viewport to the latest message when opening a chat.
+     *
+     * This path intentionally ignores the auto-scroll setting so chat-open always
+     * lands at the bottom, while incoming/outgoing updates continue using the
+     * setting-gated behavior.
+     */
+    private void scrollToLatestOnChatOpen() {
+        if (chatScrollPane == null) {
+            return;
+        }
+        scrollToLatestNow();
+        Platform.runLater(() -> {
+            scrollToLatestNow();
+            Platform.runLater(this::scrollToLatestNow);
+        });
+
+        if (chatOpenScrollSettleTransition != null) {
+            chatOpenScrollSettleTransition.stop();
+        }
+        chatOpenScrollSettleTransition = new PauseTransition(Duration.millis(OPEN_CHAT_SCROLL_SETTLE_MS));
+        chatOpenScrollSettleTransition.setOnFinished(event -> scrollToLatestNow());
+        chatOpenScrollSettleTransition.playFromStart();
+    }
+
+    /**
+     * Scrolls chat viewport to latest message and repeats across two additional UI
+     * pulses to handle delayed layout/scene attachment.
      */
     private void scrollToLatestIfEnabled() {
         if (chatScrollPane == null) {
@@ -343,7 +499,10 @@ public class ChatController {
         }
         if (settings.isChatAutoScrollToLatest()) {
             scrollToLatestNow();
-            Platform.runLater(this::scrollToLatestNow);
+            Platform.runLater(() -> {
+                scrollToLatestNow();
+                Platform.runLater(this::scrollToLatestNow);
+            });
         }
     }
 

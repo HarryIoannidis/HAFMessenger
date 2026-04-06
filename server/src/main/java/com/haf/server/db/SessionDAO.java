@@ -156,8 +156,7 @@ public final class SessionDAO {
                 auditLogger,
                 new JwtTokenService("test-only-jwt-secret", DEFAULT_JWT_ISSUER, DEFAULT_ACCESS_TTL_SECONDS),
                 DEFAULT_REFRESH_TTL_SECONDS,
-                DEFAULT_ABSOLUTE_SESSION_TTL_SECONDS,
-                DEFAULT_IDLE_SESSION_TTL_SECONDS);
+                DEFAULT_ABSOLUTE_SESSION_TTL_SECONDS);
     }
 
     /**
@@ -181,7 +180,7 @@ public final class SessionDAO {
                 jwtTokenService,
                 refreshTokenTtlSeconds,
                 absoluteSessionTtlSeconds,
-                DEFAULT_IDLE_SESSION_TTL_SECONDS);
+                resolveDefaultIdleTtlSeconds(jwtTokenService));
     }
 
     /**
@@ -516,6 +515,22 @@ public final class SessionDAO {
             return left;
         }
         return left.isBefore(right) ? left : right;
+    }
+
+    /**
+     * Resolves default idle-session TTL used by constructors that do not receive an
+     * explicit idle TTL.
+     *
+     * Keeps the historical minimum (10 minutes) and automatically extends it when
+     * access-token TTL is configured above that baseline so refresh windows remain
+     * reachable.
+     *
+     * @param jwtTokenService JWT service containing configured access-token TTL
+     * @return derived idle-session TTL in seconds
+     */
+    private static long resolveDefaultIdleTtlSeconds(JwtTokenService jwtTokenService) {
+        Objects.requireNonNull(jwtTokenService, "jwtTokenService");
+        return Math.max(DEFAULT_IDLE_SESSION_TTL_SECONDS, jwtTokenService.getAccessTtlSeconds());
     }
 
     private boolean rotateRefreshSession(Connection connection,

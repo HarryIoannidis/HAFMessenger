@@ -156,6 +156,23 @@ class SessionDAOTest {
     }
 
     @Test
+    void constructor_without_explicit_idle_ttl_uses_access_ttl_when_access_ttl_is_higher_than_default_idle()
+            throws SQLException {
+        JwtTokenService longAccessTtlService = new JwtTokenService("unit-test-secret", "haf-server", 1_800L);
+        SessionDAO adjustedDao = new SessionDAO(dataSource, auditLogger, longAccessTtlService, 2_592_000L, 2_592_000L);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("WHERE refresh_token_hash"))).thenReturn(selectStatement);
+        when(selectStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        SessionDAO.SessionTokens tokens = adjustedDao.refreshSession("refresh-plain-token");
+
+        assertNull(tokens);
+        verify(selectStatement).setLong(2, 1_800L);
+    }
+
+    @Test
     void isUserRecentlyActive_returns_true_when_recent_session_exists() throws SQLException {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(contains("DATE_SUB(CURRENT_TIMESTAMP"))).thenReturn(preparedStatement);
