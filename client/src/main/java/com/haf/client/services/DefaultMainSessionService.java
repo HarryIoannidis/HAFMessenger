@@ -218,12 +218,12 @@ public class DefaultMainSessionService implements MainSessionService {
                 try {
                     performLogout();
                     completion.complete(null);
-                } catch (Exception ex) {
-                    completion.completeExceptionally(ex);
+                } catch (Throwable ex) {
+                    completion.completeExceptionally(wrapThrowable(ex));
                 }
             });
-        } catch (Exception ex) {
-            completion.completeExceptionally(ex);
+        } catch (Throwable ex) {
+            completion.completeExceptionally(wrapThrowable(ex));
         }
         return completion;
     }
@@ -233,16 +233,16 @@ public class DefaultMainSessionService implements MainSessionService {
      * cleanup.
      */
     private void performLogout() {
-        SessionChannel channel = sessionContext.sessionChannel();
+        SessionChannel channel = resolveSessionChannelSafely();
         if (channel != null) {
             try {
                 channel.stopReceiving();
-            } catch (RuntimeException ex) {
+            } catch (Throwable ex) {
                 LOGGER.warn("Error stopping message receiver on logout; continuing cleanup", ex);
             }
         }
 
-        NetworkGateway gateway = sessionContext.networkGateway();
+        NetworkGateway gateway = resolveNetworkGatewaySafely();
         if (gateway != null) {
             try {
                 gateway.revokeSession().get(LOGOUT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -255,11 +255,13 @@ public class DefaultMainSessionService implements MainSessionService {
                 } else {
                     LOGGER.warn( "Logout API call failed; continuing with local logout", ex);
                 }
+            } catch (Throwable ex) {
+                LOGGER.warn("Logout API call failed before completion; continuing with local logout", ex);
             }
 
             try {
                 gateway.close();
-            } catch (RuntimeException ex) {
+            } catch (Throwable ex) {
                 LOGGER.warn( "Error closing WebSocket on logout", ex);
             }
         }
@@ -270,6 +272,50 @@ public class DefaultMainSessionService implements MainSessionService {
         sessionContext.clearChatSession();
         sessionContext.clearCurrentUserProfile();
         AuthSessionState.clear();
+    }
+
+    /**
+     * Resolves active session channel while protecting logout flow from class
+     * loading/linkage failures.
+     *
+     * @return active session channel, or {@code null} when unavailable
+     */
+    private SessionChannel resolveSessionChannelSafely() {
+        try {
+            return sessionContext.sessionChannel();
+        } catch (Throwable ex) {
+            LOGGER.warn("Could not resolve session channel during logout; continuing with local cleanup", ex);
+            return null;
+        }
+    }
+
+    /**
+     * Resolves active network gateway while protecting logout flow from class
+     * loading/linkage failures.
+     *
+     * @return active network gateway, or {@code null} when unavailable
+     */
+    private NetworkGateway resolveNetworkGatewaySafely() {
+        try {
+            return sessionContext.networkGateway();
+        } catch (Throwable ex) {
+            LOGGER.warn("Could not resolve network gateway during logout; continuing with local cleanup", ex);
+            return null;
+        }
+    }
+
+    /**
+     * Normalizes throwable values into runtime exceptions suitable for completion
+     * futures.
+     *
+     * @param throwable throwable raised by background logout execution
+     * @return runtime exception wrapping original throwable
+     */
+    private static RuntimeException wrapThrowable(Throwable throwable) {
+        if (throwable instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new RuntimeException(throwable);
     }
 
     /**

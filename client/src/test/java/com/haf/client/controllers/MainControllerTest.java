@@ -313,6 +313,26 @@ class MainControllerTest {
         assertTrue(source.contains("hasActivenessLabel && !settings.isPrivacyHidePresenceIndicators()"));
     }
 
+    @Test
+    void manual_refresh_failure_message_uses_default_for_empty_or_generic_errors() {
+        assertEquals(
+                "Could not refresh your session. Please log in again.",
+                MainController.resolveManualRefreshFailureMessage(null));
+        assertEquals(
+                "Could not refresh your session. Please log in again.",
+                MainController.resolveManualRefreshFailureMessage(""));
+        assertEquals(
+                "Could not refresh your session. Please log in again.",
+                MainController.resolveManualRefreshFailureMessage("token refresh failed"));
+    }
+
+    @Test
+    void manual_refresh_failure_message_includes_specific_error_details() {
+        assertEquals(
+                "Could not refresh your session (internal server error). Please log in again.",
+                MainController.resolveManualRefreshFailureMessage(" internal server error "));
+    }
+
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
         @Override
         public CompletableFuture<String> fetchContacts() {

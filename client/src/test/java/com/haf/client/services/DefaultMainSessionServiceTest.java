@@ -2,10 +2,12 @@ package com.haf.client.services;
 
 import com.haf.client.viewmodels.MessagesViewModel;
 import org.junit.jupiter.api.Test;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultMainSessionServiceTest {
@@ -52,6 +54,31 @@ class DefaultMainSessionServiceTest {
         assertTrue(context.networkCleared);
         assertTrue(context.chatCleared);
         assertTrue(context.currentUserProfileCleared);
+    }
+
+    @Test
+    void logout_network_gateway_lookup_linkage_failure_still_clears_local_sessions() {
+        StubSessionContext context = new StubSessionContext(null, new StubSessionChannel());
+        context.networkGatewayFailure = new NoClassDefFoundError("missing synthetic class");
+        DefaultMainSessionService service = new DefaultMainSessionService(context, (name, task) -> task.run());
+
+        service.logout().join();
+
+        assertTrue(context.networkCleared);
+        assertTrue(context.chatCleared);
+        assertTrue(context.currentUserProfileCleared);
+    }
+
+    @Test
+    void logout_task_runner_linkage_failure_completes_future_exceptionally() {
+        StubSessionContext context = new StubSessionContext(null, null);
+        DefaultMainSessionService service = new DefaultMainSessionService(
+                context,
+                (name, task) -> {
+                    throw new NoClassDefFoundError("thread bootstrap failed");
+                });
+
+        assertThrows(CompletionException.class, () -> service.logout().join());
     }
 
     @Test
@@ -147,6 +174,8 @@ class DefaultMainSessionServiceTest {
     private static final class StubSessionContext implements DefaultMainSessionService.SessionContext {
         private final DefaultMainSessionService.NetworkGateway networkGateway;
         private final DefaultMainSessionService.SessionChannel sessionChannel;
+        private Throwable networkGatewayFailure;
+        private Throwable sessionChannelFailure;
         private boolean networkCleared;
         private boolean chatCleared;
         private boolean currentUserProfileCleared;
@@ -160,11 +189,17 @@ class DefaultMainSessionServiceTest {
 
         @Override
         public DefaultMainSessionService.NetworkGateway networkGateway() {
+            if (networkGatewayFailure != null) {
+                throwAsUnchecked(networkGatewayFailure);
+            }
             return networkGateway;
         }
 
         @Override
         public DefaultMainSessionService.SessionChannel sessionChannel() {
+            if (sessionChannelFailure != null) {
+                throwAsUnchecked(sessionChannelFailure);
+            }
             return sessionChannel;
         }
 
@@ -181,6 +216,16 @@ class DefaultMainSessionServiceTest {
         @Override
         public void clearCurrentUserProfile() {
             currentUserProfileCleared = true;
+        }
+
+        private static void throwAsUnchecked(Throwable throwable) {
+            if (throwable instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (throwable instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(throwable);
         }
     }
 }

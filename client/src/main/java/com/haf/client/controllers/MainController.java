@@ -1572,6 +1572,10 @@ public class MainController implements SearchController.ContactActions {
                 return;
             }
 
+            LOGGER.warn(
+                    "Token refresh failed; scheduling retry in {}s (reason={})",
+                    TOKEN_REFRESH_RETRY_SECONDS,
+                    sanitizeRefreshFailureForLog(result.errorMessage()));
             if (autoRefreshTokenEnabled.get()) {
                 scheduleTokenRefresh(TOKEN_REFRESH_RETRY_SECONDS);
             }
@@ -2446,7 +2450,11 @@ public class MainController implements SearchController.ContactActions {
                     Platform.runLater(this::completeRevokedSessionLogout);
                     return;
                 }
-                Platform.runLater(this::showManualRefreshFailedPopup);
+                LOGGER.warn(
+                        "Manual session refresh failed (reason={})",
+                        sanitizeRefreshFailureForLog(result.errorMessage()));
+                String failureMessage = resolveManualRefreshFailureMessage(result.errorMessage());
+                Platform.runLater(() -> showManualRefreshFailedPopup(failureMessage));
             } finally {
                 tokenRefreshInFlight.set(false);
             }
@@ -2457,16 +2465,42 @@ public class MainController implements SearchController.ContactActions {
      * Shows fallback popup when manual refresh attempt fails due to transient
      * transport/server errors.
      */
-    private void showManualRefreshFailedPopup() {
+    private void showManualRefreshFailedPopup(String message) {
         PopupMessageBuilder.create()
                 .popupKey(POPUP_SESSION_REFRESH_FAILED)
                 .title("Refresh failed")
-                .message("Could not refresh your session. Please log in again.")
+                .message(message)
                 .actionText("Go to Login")
                 .singleAction(true)
                 .movable(false)
                 .onAction(this::completeRevokedSessionLogout)
                 .show();
+    }
+
+    /**
+     * Resolves user-facing manual refresh failure text from refresh result errors.
+     *
+     * @param errorMessage refresh failure reason from refresh service
+     * @return popup message text
+     */
+    static String resolveManualRefreshFailureMessage(String errorMessage) {
+        if (errorMessage == null || errorMessage.isBlank() || "token refresh failed".equalsIgnoreCase(errorMessage)) {
+            return "Could not refresh your session. Please log in again.";
+        }
+        return "Could not refresh your session (" + errorMessage.trim() + "). Please log in again.";
+    }
+
+    /**
+     * Resolves concise non-empty reason text for refresh-failure logging.
+     *
+     * @param errorMessage refresh failure reason
+     * @return normalized log-safe reason text
+     */
+    private static String sanitizeRefreshFailureForLog(String errorMessage) {
+        if (errorMessage == null || errorMessage.isBlank()) {
+            return "unknown";
+        }
+        return errorMessage.trim();
     }
 
     /**
