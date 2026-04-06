@@ -2,12 +2,12 @@
 
 ## Purpose
 
-This repository contains a Java 21 secure messaging system for HAF workflows, split into `client`, `server`, and `shared` modules. The documentation in this repo reflects implemented behavior and clearly marks future work.
+This repository contains a Java 25 secure messaging system for HAF workflows, split into `client`, `server`, and `shared` modules. The documentation in this repo reflects implemented behavior and clearly marks future work.
 
 ## Current Implementation
 
 - Architecture: JavaFX 25 desktop client + plain Java server + shared contract/crypto module.
-- Build: Maven multi-module (`shared`, `client`, `server`).
+- Build: Maven multi-module (`shared`, `client`, `server`) targeting Java 25 (`maven.compiler.release=25`).
 - Transport: TLS 1.3 with mode-aware messaging receive transport (dev: WSS push, prod: HTTPS polling).
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
 - Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V12`).

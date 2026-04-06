@@ -1004,16 +1004,6 @@ public class RegisterController {
         }
     }
 
-    // Get the selected rank
-    /**
-     * Returns currently selected rank from rank ComboBox.
-     *
-     * @return selected rank label, or {@code null} when none selected
-     */
-    public String getSelectedRank() {
-        return rankComboBox.getValue();
-    }
-
     /**
      * Shows exit confirmation popup and terminates process on confirmation.
      */

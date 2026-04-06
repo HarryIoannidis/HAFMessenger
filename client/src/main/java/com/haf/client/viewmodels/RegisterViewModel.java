@@ -347,15 +347,6 @@ public class RegisterViewModel {
     }
 
     /**
-     * Returns current password-confirmation value.
-     *
-     * @return entered password-confirmation text
-     */
-    public String getPasswordConf() {
-        return passwordConf.get();
-    }
-
-    /**
      * Returns current validation/registration error message.
      *
      * @return error message text

@@ -1,26 +1,51 @@
-# SEARCH & DIRECTORY FLOW ANALYSIS
+# SEARCH FLOW
 
-This document provides a technical breakdown of the Search interactions for the HAFMessenger client, localized across `MainController` and `SearchController`.
+## Purpose
 
-## 1. Input Throttling Layer
+Describe the current search orchestration across `MainController`, `SearchController`, and `SearchViewModel`.
 
-- The initial UI capture happens via the `toolbarSearchField` housed in the main shell.
-- It enforces strict string normalizations, checking the JVM `trim()` limits before allowing any command to proceed against the `SearchMinimumQueryLength` rule.
-- This layer wraps text input with a 300ms `PauseTransition` acting as a debounce gate to prevent server-spamming during rapid keystrokes.
+## Current Implementation
 
-## 2. Query Dispatch
+- Search input originates in `MainController` (`toolbarSearchField`) and is routed through `SearchFilterController` into `SearchController`.
+- Search trigger policy is settings-driven:
+  - enter-to-search mode
+  - optional instant-on-type mode with `300ms` debounce
+- `SearchViewModel` executes async authenticated requests to `GET /api/v1/search?q=<query>&limit=<n>[&cursor=<token>]`.
+- Results are rendered as cards in a `FlowPane` via `search_result_item.fxml` (not a `ListView` row factory).
+- Pagination uses keyset cursor tokens returned by `UserSearchResponse`; controller can request more pages on scroll.
+- Cross-screen actions are delegated through `SearchController.ContactActions` (`add/remove contact`, `start chat`, `open profile`).
 
-- The query text alongside any actively checked sorting/filter options (`SearchSortViewModel.SortOptions`) are dispatched to the `SearchController`.
-- The controller formats this into a network request targeting the underlying REST directory endpoint (`/api/v1/users/search`).
-- To respect performance limits, it loads paginated returns and deserializes the JSON Array back into `UserSearchResultDTO` arrays.
+## Key Types/Interfaces
 
-## 3. Mapping & Rendering Logic
+- `client.controllers.MainController`
+- `client.controllers.SearchController`
+- `SearchController.ContactActions`
+- `client.viewmodels.SearchViewModel`
+- `client.viewmodels.SearchSortViewModel`
+- `shared.responses.UserSearchResponse`
+- `shared.dto.UserSearchResultDTO`
 
-- Like the chat list, the Search Controller uses a JavaFX `ListView` coupled with a custom UI factory to turn raw array values into `SEARCH_RESULT_ITEM` visual panes.
-- Result lists apply varying styles depending on whether the contact is already registered locally in the user's friend list or if they are purely a fresh directory lookup.
+## Flow
 
-## 4. Hand-off Transitions
+1. User types query in main toolbar search field while search tab is active.
+2. `MainController` applies search settings (debounce/enter requirement/min length) and dispatches `search(query[, sort])`.
+3. `SearchViewModel` validates query length (`UiConstants.SEARCH_MIN_QUERY_LENGTH`) and starts background search for generation-safe results.
+4. ViewModel sends authenticated request to `/api/v1/search` with configured page size and optional cursor.
+5. Parsed `UserSearchResponse` updates status text, result list, and `nextCursor/hasMore` state.
+6. `SearchController` renders result cards and wires per-card actions back to `ContactActions`.
+7. When infinite scroll is enabled, near-bottom scrolling triggers `loadMore()` for cursor pagination.
 
-- The system listens for a click-event on the generated search result row.
-- Upon clicking an item, a callback fires returning the specific generic `UserId` outwards.
-- The `MainController` sweeps up the event, forces the application to switch out of the `<Search>` tab back into the `<Messages>` tab, and immediately mounts the target identity to the Chat Engine—spawning an entirely new conversation fluidly.
+## Error/Security Notes
+
+- Search calls require an active authenticated `NetworkSession`.
+- Failed requests update status text and publish recoverable runtime issues with retry callbacks.
+- Page size is clamped client-side and cursor pagination is server-signed/validated.
+
+## Related Files
+
+- `client/src/main/java/com/haf/client/controllers/MainController.java`
+- `client/src/main/java/com/haf/client/controllers/SearchController.java`
+- `client/src/main/java/com/haf/client/viewmodels/SearchViewModel.java`
+- `client/src/main/resources/fxml/search.fxml`
+- `client/src/main/resources/fxml/search_result_item.fxml`
+- `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`

@@ -117,32 +117,6 @@ public record MessageVM(
     }
 
     /**
-     * Convenience factory for outgoing file messages (localPath = file:// path).
-     *
-     * @param localPath local file path
-     * @param fileName  file display name
-     * @param fileSize  human-readable file size
-     * @param timestamp message timestamp
-     * @return outgoing file message view-model
-     */
-    public static MessageVM outgoingFile(String localPath, String fileName, String fileSize, LocalDateTime timestamp) {
-        return new MessageVM(true, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
-    }
-
-    /**
-     * Convenience factory for incoming file messages (localPath = file:// path).
-     *
-     * @param localPath local file path
-     * @param fileName  file display name
-     * @param fileSize  human-readable file size
-     * @param timestamp message timestamp
-     * @return incoming file message view-model
-     */
-    public static MessageVM incomingFile(String localPath, String fileName, String fileSize, LocalDateTime timestamp) {
-        return new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false);
-    }
-
-    /**
      * Convenience factory for incoming file placeholders while chunked payloads
      * are downloading.
      *
