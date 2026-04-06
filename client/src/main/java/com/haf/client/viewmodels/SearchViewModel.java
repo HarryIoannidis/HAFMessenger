@@ -173,16 +173,6 @@ public class SearchViewModel {
     }
 
     /**
-     * Updates active sort options and re-sorts current in-memory results.
-     *
-     * @param sortOptions new sort options to apply
-     */
-    public void setSortOptions(SearchSortViewModel.SortOptions sortOptions) {
-        this.sortOptions = SearchSortViewModel.normalize(sortOptions);
-        runOnUiThread(this::sortResultsInPlace);
-    }
-
-    /**
      * Returns currently active sort options.
      *
      * @return active sort options

@@ -7,11 +7,24 @@ Document server runtime configuration loaded by `ServerConfig`.
 ## Current Implementation
 
 - `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
-- Required vars include DB, TLS keystore, key passphrase, and search cursor secret.
+- Required vars include DB credentials, TLS keystore, key passphrase, strict runtime mode, and search cursor secret.
 - `HAF_APP_IS_DEV` is required and authoritative for server runtime mode (`true` or `false` only).
 - Optional vars control pool sizing, ports, search limits, and attachment policy.
-- Required keys currently include `HAF_DB_URL`, `HAF_DB_USER`, `HAF_DB_PASS`, `HAF_KEY_PASS`, `HAF_TLS_KEYSTORE_PATH`, `HAF_TLS_KEYSTORE_PASS`, `HAF_SEARCH_CURSOR_SECRET`, and `HAF_APP_IS_DEV`.
-- Defaults include HTTP `8443`, WS `8444`, search page size `20`, and search max page size `50`.
+- Required keys:
+  - `HAF_DB_URL`
+  - `HAF_DB_USER`
+  - `HAF_DB_PASS`
+  - `HAF_KEY_PASS`
+  - `HAF_TLS_KEYSTORE_PATH`
+  - `HAF_TLS_KEYSTORE_PASS`
+  - `HAF_SEARCH_CURSOR_SECRET`
+  - `HAF_APP_IS_DEV`
+- Key defaults:
+  - DB pool size: `20`
+  - HTTP/WS ports: `8443` / `8444`
+  - Search page size: `20` (max `50`)
+  - Search min/max query length: `3` / `128`
+  - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL)
 
 ## Key Types/Interfaces
 
@@ -38,4 +51,5 @@ Document server runtime configuration loaded by `ServerConfig`.
 
 - `server/src/main/java/com/haf/server/config/ServerConfig.java`
 - `server/src/main/resources/config/variables.env`
+- `shared/src/main/java/com/haf/shared/constants/AttachmentConstants.java`
 - `server/src/main/java/com/haf/server/core/Main.java`
