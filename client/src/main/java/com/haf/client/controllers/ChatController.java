@@ -42,6 +42,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +82,7 @@ public class ChatController {
     private ChatViewModel viewModel;
     private ClientSettings settings = ClientSettings.defaults();
     private ClientSettings.Listener settingsListener;
+    private MessagesViewModel.ImagePreviewFallbackListener imagePreviewFallbackListener;
 
     private ListChangeListener<MessageVM> messageListenerAnchor;
     private WeakListChangeListener<MessageVM> weakMessageListener;
@@ -131,6 +133,7 @@ public class ChatController {
     public void initialize() {
         MessagesViewModel messageViewModel = ChatSession.get();
         viewModel = new ChatViewModel(messageViewModel);
+        bindImageFallbackListener();
         bindViewModel();
 
         if (!viewModel.isReady()) {
@@ -161,6 +164,55 @@ public class ChatController {
         if (sendButton != null) {
             sendButton.disableProperty().bind(viewModel.canSendProperty().not());
         }
+    }
+
+    /**
+     * Registers chat-level listener for image payloads that are rendered as files
+     * due to preview incompatibility.
+     */
+    private void bindImageFallbackListener() {
+        if (viewModel == null || !viewModel.isReady()) {
+            return;
+        }
+        if (imagePreviewFallbackListener != null) {
+            viewModel.removeImagePreviewFallbackListener(imagePreviewFallbackListener);
+        }
+        imagePreviewFallbackListener = notice -> Platform.runLater(() -> showImageFallbackPopupIfEnabled(notice));
+        viewModel.addImagePreviewFallbackListener(imagePreviewFallbackListener);
+    }
+
+    /**
+     * Shows fallback popup for downgraded image previews when user preference
+     * allows it and the affected contact is currently active.
+     *
+     * @param notice fallback event from message pipeline
+     */
+    private void showImageFallbackPopupIfEnabled(MessagesViewModel.ImagePreviewFallbackNotice notice) {
+        if (notice == null || !settings.isMediaShowImageFallbackPopup()) {
+            return;
+        }
+        if (viewModel == null || !viewModel.isReady()) {
+            return;
+        }
+        String activeRecipient = viewModel.getRecipientId();
+        if (activeRecipient == null || activeRecipient.isBlank() || !activeRecipient.equals(notice.contactId())) {
+            return;
+        }
+
+        PopupMessageSpec spec = buildImageFallbackNoticeSpec(
+                notice,
+                () -> settings.setMediaShowImageFallbackPopup(false));
+        PopupMessageBuilder.create()
+                .popupKey(spec.popupKey())
+                .title(spec.title())
+                .message(spec.message())
+                .actionText(spec.actionText())
+                .cancelText(spec.cancelText())
+                .showCancel(spec.showCancel())
+                .movable(spec.movable())
+                .onAction(spec.onAction())
+                .onCancel(spec.onCancel())
+                .show();
     }
 
     /**
@@ -454,6 +506,99 @@ public class ChatController {
                 true,
                 onPickAnother,
                 null);
+    }
+
+    /**
+     * Builds popup specification describing why an image-like attachment was shown
+     * as a file tile.
+     *
+     * @param notice          fallback notice emitted by the messaging pipeline
+     * @param onDontShowAgain callback invoked when user opts out of future popups
+     * @return popup configuration object
+     */
+    static PopupMessageSpec buildImageFallbackNoticeSpec(
+            MessagesViewModel.ImagePreviewFallbackNotice notice,
+            Runnable onDontShowAgain) {
+        return new PopupMessageSpec(
+                UiConstants.POPUP_IMAGE_FALLBACK_NOTICE,
+                "Image sent as file",
+                buildImageFallbackMessage(notice),
+                "Don't show again",
+                "Close",
+                true,
+                false,
+                true,
+                onDontShowAgain,
+                null);
+    }
+
+    /**
+     * Creates user-facing explanation for why in-app image preview was downgraded.
+     *
+     * @param notice fallback notice describing declared and detected payload
+     *               formats
+     * @return popup body message
+     */
+    static String buildImageFallbackMessage(MessagesViewModel.ImagePreviewFallbackNotice notice) {
+        if (notice == null) {
+            return "This image could not be previewed in-app, so it was sent as a downloadable file.";
+        }
+
+        String fileName = notice.fileName();
+        String fileTarget = (fileName == null || fileName.isBlank()) ? "This image" : "\"" + fileName + "\"";
+        String declaredMedia = notice.declaredMediaType() == null ? "" : notice.declaredMediaType().trim();
+        String detectedSignature = notice.detectedPayloadSignature() == null
+                ? "unknown"
+                : notice.detectedPayloadSignature().trim().toLowerCase(Locale.ROOT);
+        String expectedSignature = resolveExpectedSignature(declaredMedia);
+
+        if ("image/webp".equals(declaredMedia)) {
+            return fileTarget + " was sent as a file because WEBP preview is not supported in this build.";
+        }
+        if (expectedSignature != null && !"unknown".equals(detectedSignature)
+                && !expectedSignature.equals(detectedSignature)) {
+            return fileTarget + " was sent as a file because it was labeled as "
+                    + formatSignatureLabel(expectedSignature) + " but contains "
+                    + formatSignatureLabel(detectedSignature) + " data.";
+        }
+        if ("unknown".equals(detectedSignature)) {
+            return fileTarget + " was sent as a file because its internal image format could not be recognized.";
+        }
+        return fileTarget + " was sent as a file because "
+                + formatSignatureLabel(detectedSignature)
+                + " preview is not supported in this build.";
+    }
+
+    /**
+     * Maps declared MIME type to expected image signature shorthand.
+     *
+     * @param declaredMediaType normalized MIME type
+     * @return expected signature token, or {@code null} when unknown
+     */
+    private static String resolveExpectedSignature(String declaredMediaType) {
+        if (declaredMediaType == null || declaredMediaType.isBlank()) {
+            return null;
+        }
+        return switch (declaredMediaType) {
+            case "image/png" -> "png";
+            case "image/jpeg" -> "jpeg";
+            case "image/gif" -> "gif";
+            case "image/webp" -> "webp";
+            default -> null;
+        };
+    }
+
+    /**
+     * Formats image signature token for user-facing copy.
+     *
+     * @param signature signature token
+     * @return printable label
+     */
+    private static String formatSignatureLabel(String signature) {
+        if (signature == null || signature.isBlank()) {
+            return "image";
+        }
+        return signature.toUpperCase(Locale.ROOT);
     }
 
     /**

@@ -47,6 +47,7 @@ public final class ClientSettings {
         MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 1.15, ApplyMode.IMMEDIATE),
         MEDIA_SHOW_DOWNLOAD_BUTTON("media.show_download_button", true, ApplyMode.IMMEDIATE),
         MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK("media.open_preview_on_image_click", true, ApplyMode.IMMEDIATE),
+        MEDIA_SHOW_IMAGE_FALLBACK_POPUP("media.show_image_fallback_popup", true, ApplyMode.IMMEDIATE),
 
         CHAT_SEND_ON_ENTER("chat.send_on_enter", true, ApplyMode.IMMEDIATE),
         CHAT_AUTO_SCROLL_TO_LATEST("chat.auto_scroll_to_latest", true, ApplyMode.IMMEDIATE),
@@ -515,6 +516,21 @@ public final class ClientSettings {
      */
     public void setMediaOpenPreviewOnImageClick(boolean enabled) {
         setBoolean(Key.MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK, enabled);
+    }
+
+    /**
+     * Returns whether the image-preview fallback popup is shown when an image must
+     * be downgraded to a file bubble.
+     */
+    public boolean isMediaShowImageFallbackPopup() {
+        return getBoolean(Key.MEDIA_SHOW_IMAGE_FALLBACK_POPUP);
+    }
+
+    /**
+     * Updates whether the image-preview fallback popup is shown.
+     */
+    public void setMediaShowImageFallbackPopup(boolean enabled) {
+        setBoolean(Key.MEDIA_SHOW_IMAGE_FALLBACK_POPUP, enabled);
     }
 
     /**

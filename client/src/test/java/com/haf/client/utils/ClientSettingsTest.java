@@ -58,6 +58,7 @@ class ClientSettingsTest {
         assertEquals(1.15, defaults.getMediaHoverZoomScale(), 0.0001);
         assertTrue(defaults.isMediaShowDownloadButton());
         assertTrue(defaults.isMediaOpenPreviewOnImageClick());
+        assertTrue(defaults.isMediaShowImageFallbackPopup());
     }
 
     @Test
@@ -165,6 +166,7 @@ class ClientSettingsTest {
         settings.setSearchRequireEnterToSearch(true);
         settings.setSearchRememberSortOptions(false);
         settings.setNotificationsShowOsNotifications(false);
+        settings.setMediaShowImageFallbackPopup(false);
         settings.setPrivacyBlurOnStartupUntilUnlock(true);
         settings.setPrivacyConfirmExternalLinkOpen(false);
         settings.setPrivacyShowNotificationMessagePreview(true);
@@ -186,6 +188,7 @@ class ClientSettingsTest {
         assertTrue(reloaded.isSearchRequireEnterToSearch());
         assertFalse(reloaded.isSearchRememberSortOptions());
         assertFalse(reloaded.isNotificationsShowOsNotifications());
+        assertFalse(reloaded.isMediaShowImageFallbackPopup());
         assertEquals(50, reloaded.getSearchResultsPerPage());
         assertEquals(5, reloaded.getSearchMinimumQueryLength());
         assertEquals(100, reloaded.getNotificationsBadgeCap());
