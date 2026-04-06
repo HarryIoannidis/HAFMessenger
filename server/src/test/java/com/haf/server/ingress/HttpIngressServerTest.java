@@ -134,6 +134,8 @@ class HttpIngressServerTest {
         lenient().when(config.getAttachmentChunkBytes()).thenReturn(512);
         lenient().when(config.getAttachmentAllowedTypes()).thenReturn(List.of("application/pdf"));
         lenient().when(config.getAttachmentUnboundTtlSeconds()).thenReturn(1800L);
+        lenient().when(rateLimiterService.checkAndConsumeLoginAttempt(anyString(), anyString(), anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
 
         try {
             server = new HttpIngressServer(
@@ -312,7 +314,7 @@ class HttpIngressServerTest {
         RegisterRequest request = new RegisterRequest();
         request.setFullName("Test Pilot");
         request.setEmail("pilot@haf.gr");
-        request.setPassword("strong-pass");
+        request.setPassword("Strongpass1!");
         request.setPublicKeyPem("pem");
         request.setPublicKeyFingerprint("fingerprint");
 
@@ -343,7 +345,7 @@ class HttpIngressServerTest {
 
         assertEquals(409, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("Account is already logged in."));
-        verify(sessionDAO, never()).createSession(anyString());
+        verify(sessionDAO, never()).createSessionTokens(anyString());
     }
 
     @Test
@@ -363,7 +365,7 @@ class HttpIngressServerTest {
 
         assertEquals(409, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("Account is already logged in."));
-        verify(sessionDAO, never()).createSession(anyString());
+        verify(sessionDAO, never()).createSessionTokens(anyString());
     }
 
     @Test
@@ -402,12 +404,29 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void login_is_rate_limited_before_credential_check() throws Exception {
+        HttpHandler handler = createHandler("LoginHandler");
+        when(rateLimiterService.checkAndConsumeLoginAttempt(anyString(), eq("pilot@haf.gr"), anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(180));
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
+                "{\"email\":\"pilot@haf.gr\",\"password\":\"wrong\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("Too many login attempts"));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":180"));
+        verify(userDAO, never()).findByEmail(anyString());
+    }
+
+    @Test
     void login_succeeds_when_account_is_offline() throws Exception {
         String userId = "user-1";
         String email = "pilot@haf.gr";
         String password = "correct horse battery staple";
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
-        when(sessionDAO.createSession(userId)).thenReturn("session-1");
+        when(sessionDAO.createSessionTokens(userId))
+                .thenReturn(new SessionDAO.SessionTokens("jwt-access-token", "refresh-token", 100L, 200L));
 
         HttpHandler handler = createHandler("LoginHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
@@ -416,8 +435,10 @@ class HttpIngressServerTest {
         handler.handle(exchange.exchange());
 
         assertEquals(200, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"session-1\""));
-        verify(sessionDAO, times(1)).createSession(userId);
+        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"jwt-access-token\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"refreshToken\":\"refresh-token\""));
+        verify(sessionDAO, times(1)).createSessionTokens(userId);
+        verify(rateLimiterService, times(1)).clearLoginAttempts(eq(email), anyString());
     }
 
     @Test
@@ -430,7 +451,8 @@ class HttpIngressServerTest {
         String takeoverFp = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(takeoverPair.getPublic()));
 
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
-        when(sessionDAO.createSession(userId)).thenReturn("session-takeover");
+        when(sessionDAO.createSessionTokens(userId))
+                .thenReturn(new SessionDAO.SessionTokens("jwt-takeover", "refresh-takeover", 100L, 200L));
 
         WebSocket oldConnection = mock(WebSocket.class);
         presenceRegistry.registerConnection(userId, oldConnection);
@@ -448,10 +470,10 @@ class HttpIngressServerTest {
         handler.handle(exchange.exchange());
 
         assertEquals(200, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"session-takeover\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"jwt-takeover\""));
         verify(userDAO, times(1)).updatePublicKey(userId, takeoverPem.trim(), takeoverFp);
         verify(sessionDAO, times(1)).revokeAllSessionsByUserId(userId);
-        verify(sessionDAO, times(1)).createSession(userId);
+        verify(sessionDAO, times(1)).createSessionTokens(userId);
         verify(oldConnection, times(1)).closeConnection(1000, "takeover");
     }
 
@@ -475,7 +497,35 @@ class HttpIngressServerTest {
 
         assertEquals(400, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("takeoverPublicKeyPem"));
-        verify(sessionDAO, never()).createSession(anyString());
+        verify(sessionDAO, never()).createSessionTokens(anyString());
+    }
+
+    @Test
+    void token_refresh_rotates_tokens() throws Exception {
+        HttpHandler handler = createHandler("TokenRefreshHandler");
+        when(sessionDAO.refreshSession("refresh-1"))
+                .thenReturn(new SessionDAO.SessionTokens("jwt-2", "refresh-2", 300L, 600L));
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/token/refresh",
+                "{\"refreshToken\":\"refresh-1\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(200, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"jwt-2\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"refreshToken\":\"refresh-2\""));
+    }
+
+    @Test
+    void token_refresh_rejects_invalid_refresh_token() throws Exception {
+        HttpHandler handler = createHandler("TokenRefreshHandler");
+        when(sessionDAO.refreshSession("refresh-invalid")).thenReturn(null);
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/token/refresh",
+                "{\"refreshToken\":\"refresh-invalid\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(401, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("invalid session"));
     }
 
     @Test

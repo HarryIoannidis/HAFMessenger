@@ -1,6 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.exceptions.HttpCommunicationException;
+import com.haf.client.core.AuthSessionState;
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.NetworkSession;
@@ -268,6 +269,7 @@ public class DefaultMainSessionService implements MainSessionService {
         sessionContext.clearNetworkSession();
         sessionContext.clearChatSession();
         sessionContext.clearCurrentUserProfile();
+        AuthSessionState.clear();
     }
 
     /**

@@ -67,6 +67,8 @@ public class SettingsController {
 
     // Settings panes
     @FXML
+    private VBox accountSettingsPane;
+    @FXML
     private VBox generalSettingsPane;
     @FXML
     private VBox searchSettingsPane;
@@ -80,6 +82,8 @@ public class SettingsController {
     private VBox privacySettingsPane;
 
     // Pane row containers
+    @FXML
+    private VBox accountRowsContainer;
     @FXML
     private VBox generalRowsContainer;
     @FXML
@@ -101,6 +105,7 @@ public class SettingsController {
 
     private final Map<String, VBox> panesById = new LinkedHashMap<>();
     private final List<SettingsMenuItem> menuItems = List.of(
+            new SettingsMenuItem("Account", "mdi2a-account-outline", "accountSettingsPane"),
             new SettingsMenuItem("General", "mdi2c-cog-outline", "generalSettingsPane"),
             new SettingsMenuItem("Search", "mdi2m-magnify", "searchSettingsPane"),
             new SettingsMenuItem("Preview & Media", "mdi2i-image-outline", "mediaSettingsPane"),
@@ -202,6 +207,7 @@ public class SettingsController {
      */
     private void registerPanes() {
         panesById.clear();
+        panesById.put("accountSettingsPane", accountSettingsPane);
         panesById.put("generalSettingsPane", generalSettingsPane);
         panesById.put("searchSettingsPane", searchSettingsPane);
         panesById.put("mediaSettingsPane", mediaSettingsPane);
@@ -214,6 +220,19 @@ public class SettingsController {
      * Creates and appends all settings rows through the shared row builder.
      */
     private void buildRows() {
+        if (accountRowsContainer != null) {
+            accountRowsContainer.getChildren().setAll(
+                    SettingsRowBuilder.buildSectionHeader(
+                            "accountSessionSection",
+                            "Session"),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "accountAutoRefreshTokenRow",
+                            "accountAutoRefreshTokenToggle",
+                            "Auto-refresh Token",
+                            "Automatically rotate your session token before it expires.",
+                            settings.isAccountAutoRefreshToken()));
+        }
+
         if (generalRowsContainer != null) {
             generalRowsContainer.getChildren().setAll(
                     SettingsRowBuilder.buildSectionHeader(
@@ -282,7 +301,7 @@ public class SettingsController {
                             "searchRequireEnterToSearchRow",
                             "searchRequireEnterToSearchToggle",
                             "Require Enter To Search",
-                            "Start search only when pressing Enter (or using the search icon).",
+                            "Start search only when pressing Enter.",
                             settings.isSearchRequireEnterToSearch()),
                     SettingsRowBuilder.buildSliderRow(
                             "searchMinimumQueryLengthRow",
@@ -506,6 +525,9 @@ public class SettingsController {
      * Wires row controls directly into the active {@link ClientSettings} instance.
      */
     private void wireSettingControls() {
+        wireSwitch("accountAutoRefreshTokenRow", "accountAutoRefreshTokenToggle",
+                settings::setAccountAutoRefreshToken);
+
         wireSwitch("generalConfirmExitRow", "generalConfirmExitToggle", settings::setGeneralConfirmExit);
         wireSwitch("generalConfirmLogoutRow", "generalConfirmLogoutToggle", settings::setGeneralConfirmLogout);
         wireSwitch("generalConfirmDeleteChatRow", "generalConfirmDeleteChatToggle",

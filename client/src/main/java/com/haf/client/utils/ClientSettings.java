@@ -27,6 +27,8 @@ public final class ClientSettings {
      * Setting key metadata (type/default/apply-mode).
      */
     public enum Key {
+        ACCOUNT_AUTO_REFRESH_TOKEN("account.auto_refresh_token", true, ApplyMode.IMMEDIATE),
+
         GENERAL_CONFIRM_EXIT("general.confirm_exit", true, ApplyMode.IMMEDIATE),
         GENERAL_CONFIRM_LOGOUT("general.confirm_logout", true, ApplyMode.IMMEDIATE),
         GENERAL_CONFIRM_DELETE_CHAT("general.confirm_delete_chat", true, ApplyMode.IMMEDIATE),
@@ -240,6 +242,20 @@ public final class ClientSettings {
      */
     public boolean isGeneralConfirmExit() {
         return getBoolean(Key.GENERAL_CONFIRM_EXIT);
+    }
+
+    /**
+     * Returns whether account auto-refresh token is enabled.
+     */
+    public boolean isAccountAutoRefreshToken() {
+        return getBoolean(Key.ACCOUNT_AUTO_REFRESH_TOKEN);
+    }
+
+    /**
+     * Updates account auto-refresh token preference.
+     */
+    public void setAccountAutoRefreshToken(boolean enabled) {
+        setBoolean(Key.ACCOUNT_AUTO_REFRESH_TOKEN, enabled);
     }
 
     /**

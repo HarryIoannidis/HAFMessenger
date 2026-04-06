@@ -11,7 +11,8 @@ Describe the implemented registration wizard and submission pipeline used by the
   - `ID_PHOTO`
   - `SELFIE_PHOTO`
 - UI state is bound to `RegisterViewModel` (inputs, error flags, loading state, password visibility toggles).
-- Credentials validation is strict (required fields, `@haf.gr` email domain, phone format, password length/match).
+- Credentials validation is strict (required fields, `@haf.gr` email domain, phone format, and strong password policy: at least 8 chars + uppercase + number + special).
+- Password field shows live strength feedback while typing (`Weak`/`Medium`/`Strong`) with red/orange/green outline and matching label color.
 - Photo steps support drag-and-drop and file picker input with image/type-size validation (`.png/.jpg/.jpeg`, max `10MB`).
 - Final submission runs on a background daemon thread and delegates to `RegistrationService`.
 
@@ -38,6 +39,7 @@ Describe the implemented registration wizard and submission pipeline used by the
 ## Error/Security Notes
 
 - Validation errors are field-specific and prevent step progression.
+- Confirm-password remains button-click validated; no live strength behavior is applied to confirmation input.
 - Registration failures are surfaced as rejected/failure messages without exposing raw internal exceptions to users.
 - Generated private key is stored sealed (`private.enc`) in user keystore roots resolved through `KeystoreRoot` policy.
 - Password is reused as passphrase for local keystore sealing during registration success path.

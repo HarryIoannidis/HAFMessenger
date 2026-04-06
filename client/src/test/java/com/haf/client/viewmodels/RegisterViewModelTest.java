@@ -35,8 +35,8 @@ class RegisterViewModelTest {
         vm.rankProperty().set("Σμηνίας");
         vm.phoneNumProperty().set("6971978340");
         vm.emailProperty().set("user@haf.gr");
-        vm.passwordProperty().set("strongpass123");
-        vm.passwordConfProperty().set("strongpass123");
+        vm.passwordProperty().set("Strongpass1!");
+        vm.passwordConfProperty().set("Strongpass1!");
     }
 
     @Test
@@ -221,17 +221,28 @@ class RegisterViewModelTest {
     @Test
     void validate_password_exactly_min_length_passes() {
         fillAllFieldsValid();
-        vm.passwordProperty().set("abcdef"); // 6 chars
-        vm.passwordConfProperty().set("abcdef");
+        vm.passwordProperty().set("Abcdef1!"); // 8 chars with required complexity
+        vm.passwordConfProperty().set("Abcdef1!");
 
         assertTrue(vm.validate());
     }
 
     @Test
+    void validate_password_missing_required_complexity_fails() {
+        fillAllFieldsValid();
+        vm.passwordProperty().set("abcdefgh");
+        vm.passwordConfProperty().set("abcdefgh");
+
+        assertFalse(vm.validate());
+        assertTrue(vm.passwordErrorProperty().get());
+        assertEquals(RegisterViewModel.ERROR_PASSWORD_WEAK, vm.getErrorMessage());
+    }
+
+    @Test
     void validate_passwords_mismatch_fails() {
         fillAllFieldsValid();
-        vm.passwordProperty().set("strongpass123");
-        vm.passwordConfProperty().set("differentpass");
+        vm.passwordProperty().set("Strongpass1!");
+        vm.passwordConfProperty().set("Differentpass1!");
 
         assertFalse(vm.validate());
         assertTrue(vm.passwordErrorProperty().get());
@@ -324,8 +335,8 @@ class RegisterViewModelTest {
     @Test
     void validate_passwords_checked_last() {
         fillAllFieldsValid();
-        vm.passwordProperty().set("strongpass123");
-        vm.passwordConfProperty().set("wrongconfirm");
+        vm.passwordProperty().set("Strongpass1!");
+        vm.passwordConfProperty().set("Wrongconfirm1!");
 
         assertFalse(vm.validate());
         assertTrue(vm.passwordErrorProperty().get());

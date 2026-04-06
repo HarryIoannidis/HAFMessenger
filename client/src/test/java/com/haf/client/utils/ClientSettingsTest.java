@@ -99,6 +99,7 @@ class ClientSettingsTest {
         ClientSettings b = ClientSettings.forUser(userB);
 
         a.setGeneralConfirmExit(false);
+        a.setAccountAutoRefreshToken(false);
         a.setGeneralConfirmLogout(false);
         a.setGeneralConfirmDeleteChat(false);
         a.setGeneralConfirmRemoveContact(false);
@@ -157,6 +158,7 @@ class ClientSettingsTest {
         ClientSettings settings = ClientSettings.forUser(userId);
 
         settings.setGeneralConfirmExit(false);
+        settings.setAccountAutoRefreshToken(false);
         settings.setGeneralConfirmLogout(false);
         settings.setGeneralConfirmDeleteChat(false);
         settings.setGeneralConfirmRemoveContact(false);
@@ -179,6 +181,7 @@ class ClientSettingsTest {
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
         assertFalse(reloaded.isGeneralConfirmExit());
+        assertFalse(reloaded.isAccountAutoRefreshToken());
         assertFalse(reloaded.isGeneralConfirmLogout());
         assertFalse(reloaded.isGeneralConfirmDeleteChat());
         assertFalse(reloaded.isGeneralConfirmRemoveContact());
@@ -262,6 +265,7 @@ class ClientSettingsTest {
     }
 
     private static void assertGeneralDefaults(ClientSettings defaults) {
+        assertTrue(defaults.isAccountAutoRefreshToken());
         assertTrue(defaults.isGeneralConfirmExit());
         assertTrue(defaults.isGeneralConfirmLogout());
         assertTrue(defaults.isGeneralConfirmDeleteChat());
@@ -271,6 +275,7 @@ class ClientSettingsTest {
     }
 
     private static void assertCustomizedUserSettings(ClientSettings settings) {
+        assertFalse(settings.isAccountAutoRefreshToken());
         assertFalse(settings.isGeneralConfirmExit());
         assertFalse(settings.isGeneralConfirmLogout());
         assertFalse(settings.isGeneralConfirmDeleteChat());
@@ -285,6 +290,7 @@ class ClientSettingsTest {
     }
 
     private static void assertDefaultUserSettings(ClientSettings settings) {
+        assertTrue(settings.isAccountAutoRefreshToken());
         assertTrue(settings.isGeneralConfirmExit());
         assertTrue(settings.isGeneralConfirmLogout());
         assertTrue(settings.isGeneralConfirmDeleteChat());

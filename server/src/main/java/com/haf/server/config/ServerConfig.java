@@ -20,6 +20,9 @@ public final class ServerConfig {
     private static final int DEFAULT_SEARCH_MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_SEARCH_MIN_QUERY_LENGTH = 3;
     private static final int DEFAULT_SEARCH_MAX_QUERY_LENGTH = 128;
+    private static final long DEFAULT_JWT_ACCESS_TTL_SECONDS = 900L;
+    private static final long DEFAULT_JWT_REFRESH_TTL_SECONDS = 2_592_000L;
+    private static final long DEFAULT_JWT_ABSOLUTE_TTL_SECONDS = 2_592_000L;
     private static final long DEFAULT_ATTACHMENT_MAX_BYTES = AttachmentConstants.DEFAULT_MAX_BYTES;
     private static final long DEFAULT_ATTACHMENT_INLINE_MAX_BYTES = AttachmentConstants.DEFAULT_INLINE_MAX_BYTES;
     private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
@@ -47,6 +50,10 @@ public final class ServerConfig {
     private final int searchMinQueryLength;
     private final int searchMaxQueryLength;
     private final String searchCursorSecret;
+    private final String jwtSecret;
+    private final long jwtAccessTtlSeconds;
+    private final long jwtRefreshTtlSeconds;
+    private final long jwtAbsoluteTtlSeconds;
     private final long attachmentMaxBytes;
     private final long attachmentInlineMaxBytes;
     private final int attachmentChunkBytes;
@@ -121,6 +128,12 @@ public final class ServerConfig {
         this.searchMinQueryLength = parseInt(env.get("HAF_SEARCH_MIN_QUERY_LENGTH"), DEFAULT_SEARCH_MIN_QUERY_LENGTH);
         this.searchMaxQueryLength = parseInt(env.get("HAF_SEARCH_MAX_QUERY_LENGTH"), DEFAULT_SEARCH_MAX_QUERY_LENGTH);
         this.searchCursorSecret = require(env, "HAF_SEARCH_CURSOR_SECRET");
+        this.jwtSecret = require(env, "HAF_JWT_SECRET");
+        this.jwtAccessTtlSeconds = parseLong(env.get("HAF_JWT_ACCESS_TTL_SECONDS"), DEFAULT_JWT_ACCESS_TTL_SECONDS);
+        this.jwtRefreshTtlSeconds = parseLong(env.get("HAF_JWT_REFRESH_TTL_SECONDS"), DEFAULT_JWT_REFRESH_TTL_SECONDS);
+        this.jwtAbsoluteTtlSeconds = parseLong(
+                env.get("HAF_JWT_ABSOLUTE_TTL_SECONDS"),
+                DEFAULT_JWT_ABSOLUTE_TTL_SECONDS);
         this.attachmentMaxBytes = parseLong(env.get("HAF_ATTACHMENT_MAX_BYTES"), DEFAULT_ATTACHMENT_MAX_BYTES);
         this.attachmentInlineMaxBytes = parseLong(env.get("HAF_ATTACHMENT_INLINE_MAX_BYTES"),
                 DEFAULT_ATTACHMENT_INLINE_MAX_BYTES);
@@ -130,6 +143,7 @@ public final class ServerConfig {
                 DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS);
 
         validateSearchConfig();
+        validateJwtConfig();
         validateAttachmentConfig();
     }
 
@@ -262,6 +276,34 @@ public final class ServerConfig {
      */
     public String getSearchCursorSecret() {
         return searchCursorSecret;
+    }
+
+    /**
+     * Returns JWT signing secret used for access-token generation.
+     */
+    public String getJwtSecret() {
+        return jwtSecret;
+    }
+
+    /**
+     * Returns access-token TTL in seconds.
+     */
+    public long getJwtAccessTtlSeconds() {
+        return jwtAccessTtlSeconds;
+    }
+
+    /**
+     * Returns refresh-token TTL in seconds.
+     */
+    public long getJwtRefreshTtlSeconds() {
+        return jwtRefreshTtlSeconds;
+    }
+
+    /**
+     * Returns absolute session lifetime TTL in seconds.
+     */
+    public long getJwtAbsoluteTtlSeconds() {
+        return jwtAbsoluteTtlSeconds;
     }
 
     /**
@@ -444,6 +486,25 @@ public final class ServerConfig {
     }
 
     /**
+     * Validates JWT configuration constraints.
+     *
+     * @throws ConfigurationException when JWT TTL values are invalid
+     */
+    private void validateJwtConfig() {
+        if (jwtAccessTtlSeconds < 60L) {
+            throw new ConfigurationException("HAF_JWT_ACCESS_TTL_SECONDS must be >= 60");
+        }
+        if (jwtRefreshTtlSeconds < jwtAccessTtlSeconds) {
+            throw new ConfigurationException(
+                    "HAF_JWT_REFRESH_TTL_SECONDS must be >= HAF_JWT_ACCESS_TTL_SECONDS");
+        }
+        if (jwtAbsoluteTtlSeconds < jwtRefreshTtlSeconds) {
+            throw new ConfigurationException(
+                    "HAF_JWT_ABSOLUTE_TTL_SECONDS must be >= HAF_JWT_REFRESH_TTL_SECONDS");
+        }
+    }
+
+    /**
      * Returns a string representation of this object.
      */
     @Override
@@ -461,6 +522,9 @@ public final class ServerConfig {
                 ", searchMaxPageSize=" + searchMaxPageSize +
                 ", searchMinQueryLength=" + searchMinQueryLength +
                 ", searchMaxQueryLength=" + searchMaxQueryLength +
+                ", jwtAccessTtlSeconds=" + jwtAccessTtlSeconds +
+                ", jwtRefreshTtlSeconds=" + jwtRefreshTtlSeconds +
+                ", jwtAbsoluteTtlSeconds=" + jwtAbsoluteTtlSeconds +
                 ", attachmentMaxBytes=" + attachmentMaxBytes +
                 ", attachmentInlineMaxBytes=" + attachmentInlineMaxBytes +
                 ", attachmentChunkBytes=" + attachmentChunkBytes +

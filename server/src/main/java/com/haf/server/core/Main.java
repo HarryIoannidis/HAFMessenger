@@ -15,6 +15,7 @@ import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.RateLimiterService;
+import com.haf.server.security.JwtTokenService;
 import com.haf.server.exceptions.StartupException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -74,7 +75,16 @@ public final class Main {
 
             EnvelopeDAO envelopeDAO = new EnvelopeDAO(dataSource, auditLogger);
             UserDAO userDAO = new UserDAO(dataSource, auditLogger);
-            SessionDAO sessionDAO = new SessionDAO(dataSource, auditLogger);
+            JwtTokenService jwtTokenService = new JwtTokenService(
+                    config.getJwtSecret(),
+                    "haf-server",
+                    config.getJwtAccessTtlSeconds());
+            SessionDAO sessionDAO = new SessionDAO(
+                    dataSource,
+                    auditLogger,
+                    jwtTokenService,
+                    config.getJwtRefreshTtlSeconds(),
+                    config.getJwtAbsoluteTtlSeconds());
             FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
             AttachmentDAO attachmentDAO = new AttachmentDAO(dataSource);
             ContactDAO contactDAO = new ContactDAO(dataSource);

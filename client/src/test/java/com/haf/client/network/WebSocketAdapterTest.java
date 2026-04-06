@@ -105,6 +105,19 @@ class WebSocketAdapterTest {
     }
 
     @Test
+    void authenticated_http_uses_updated_access_token() {
+        FakeHttpClient client = new FakeHttpClient();
+        client.enqueueResponse(response(200, "{\"ok\":true}", URI.create("https://localhost:8443/api/v1/ping")));
+
+        WebSocketAdapter adapter = new WebSocketAdapter(SERVER_URI, "session-old", client);
+        adapter.updateAccessToken("session-new");
+        adapter.getAuthenticated("/api/v1/ping").join();
+
+        HttpRequest request = client.requests.getFirst();
+        assertEquals("Bearer session-new", request.headers().firstValue("Authorization").orElse(null));
+    }
+
+    @Test
     void authenticated_http_retries_once_on_connection_error() {
         FakeHttpClient client = new FakeHttpClient();
         client.enqueueError(new ConnectException("down"));

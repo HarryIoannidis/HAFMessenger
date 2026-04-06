@@ -33,7 +33,7 @@ public class WebSocketAdapter {
 
     private final URI serverUri;
     private final URI httpBaseUri;
-    private final String sessionId;
+    private volatile String sessionId;
     private final HttpClient httpClient;
     private WebSocket webSocket;
     private Consumer<String> messageConsumer;
@@ -287,7 +287,7 @@ public class WebSocketAdapter {
 
         try {
             CompletableFuture<WebSocket> future = httpClient.newWebSocketBuilder()
-                    .header("Authorization", "Bearer " + sessionId)
+                    .header("Authorization", authorizationHeaderValue())
                     .buildAsync(serverUri, listener);
 
             // Wait for connection to complete (bounded by configured timeout)
@@ -327,7 +327,7 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header("Authorization", authorizationHeaderValue())
                 .GET()
                 .build();
 
@@ -360,7 +360,7 @@ public class WebSocketAdapter {
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header("Authorization", authorizationHeaderValue())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         if (extraHeaders != null && !extraHeaders.isEmpty()) {
@@ -388,18 +388,48 @@ public class WebSocketAdapter {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
-                .header("Authorization", "Bearer " + sessionId)
+                .header("Authorization", authorizationHeaderValue())
                 .DELETE()
                 .build();
 
         return sendWithRetry(request, "DELETE");
     }
 
+    /**
+     * Builds request URI for authenticated helper calls.
+     *
+     * @param path API path
+     * @return resolved request URI
+     * @throws IllegalArgumentException when {@code path} is blank
+     */
     private URI buildAuthenticatedRequestUri(String path) {
         if (path == null || path.isBlank()) {
             throw new IllegalArgumentException("Path must not be blank");
         }
         return httpBaseUri.resolve(path);
+    }
+
+    /**
+     * Updates the bearer access token used by future HTTP/WebSocket handshake
+     * requests.
+     *
+     * @param accessToken new access token
+     * @throws IllegalArgumentException when {@code accessToken} is null/blank
+     */
+    public void updateAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("accessToken");
+        }
+        this.sessionId = accessToken;
+    }
+
+    /**
+     * Builds current bearer authorization header value.
+     *
+     * @return authorization header value
+     */
+    private String authorizationHeaderValue() {
+        return "Bearer " + sessionId;
     }
 
     /**

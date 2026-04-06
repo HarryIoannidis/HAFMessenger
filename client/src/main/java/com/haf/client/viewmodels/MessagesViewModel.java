@@ -187,7 +187,7 @@ public class MessagesViewModel {
                     publishRuntimeIssue(
                             "messaging.session.revoked",
                             "Session expired",
-                            "You were logged out because this account was accessed from another device.",
+                            "Your session expired due to inactivity. Please log in again.",
                             () -> {
                             });
                     return;

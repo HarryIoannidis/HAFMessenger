@@ -11,6 +11,7 @@ import java.io.Serializable;
 public class LoginResponse implements Serializable {
     private String userId;
     private String sessionId;
+    private String refreshToken;
     private String fullName;
     private String rank;
     private String regNumber;
@@ -18,6 +19,9 @@ public class LoginResponse implements Serializable {
     private String telephone;
     private String joinedDate;
     private String status;
+    private Long accessExpiresAtEpochSeconds;
+    private Long refreshExpiresAtEpochSeconds;
+    private Long retryAfterSeconds;
     private String error;
 
     /**
@@ -61,6 +65,24 @@ public class LoginResponse implements Serializable {
      */
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
+    }
+
+    /**
+     * Returns refresh token for access-token rotation.
+     *
+     * @return refresh token
+     */
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    /**
+     * Sets refresh token for access-token rotation.
+     *
+     * @param refreshToken refresh token
+     */
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 
     /**
@@ -115,6 +137,60 @@ public class LoginResponse implements Serializable {
      */
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    /**
+     * Returns access-token expiry epoch seconds.
+     *
+     * @return access-token expiry epoch seconds
+     */
+    public Long getAccessExpiresAtEpochSeconds() {
+        return accessExpiresAtEpochSeconds;
+    }
+
+    /**
+     * Sets access-token expiry epoch seconds.
+     *
+     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     */
+    public void setAccessExpiresAtEpochSeconds(Long accessExpiresAtEpochSeconds) {
+        this.accessExpiresAtEpochSeconds = accessExpiresAtEpochSeconds;
+    }
+
+    /**
+     * Returns refresh-token expiry epoch seconds.
+     *
+     * @return refresh-token expiry epoch seconds
+     */
+    public Long getRefreshExpiresAtEpochSeconds() {
+        return refreshExpiresAtEpochSeconds;
+    }
+
+    /**
+     * Sets refresh-token expiry epoch seconds.
+     *
+     * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
+     */
+    public void setRefreshExpiresAtEpochSeconds(Long refreshExpiresAtEpochSeconds) {
+        this.refreshExpiresAtEpochSeconds = refreshExpiresAtEpochSeconds;
+    }
+
+    /**
+     * Returns retry-after seconds used by 429 responses.
+     *
+     * @return retry-after seconds
+     */
+    public Long getRetryAfterSeconds() {
+        return retryAfterSeconds;
+    }
+
+    /**
+     * Sets retry-after seconds used by 429 responses.
+     *
+     * @param retryAfterSeconds retry-after seconds
+     */
+    public void setRetryAfterSeconds(Long retryAfterSeconds) {
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 
     /**
@@ -223,6 +299,43 @@ public class LoginResponse implements Serializable {
     }
 
     /**
+     * Creates a successful login response with token payload and profile fields.
+     *
+     * @param userId authenticated user id
+     * @param accessToken access JWT
+     * @param refreshToken refresh token
+     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
+     * @param fullName full name
+     * @param rank rank value
+     * @param regNumber registration number
+     * @param email email
+     * @param telephone telephone
+     * @param joinedDate joined-date string
+     * @param status account status
+     * @return populated success response
+     */
+    public static LoginResponse success(
+            String userId,
+            String accessToken,
+            String refreshToken,
+            long accessExpiresAtEpochSeconds,
+            long refreshExpiresAtEpochSeconds,
+            String fullName,
+            String rank,
+            String regNumber,
+            String email,
+            String telephone,
+            String joinedDate,
+            String status) {
+        LoginResponse r = success(userId, accessToken, fullName, rank, regNumber, email, telephone, joinedDate, status);
+        r.setRefreshToken(refreshToken);
+        r.setAccessExpiresAtEpochSeconds(accessExpiresAtEpochSeconds);
+        r.setRefreshExpiresAtEpochSeconds(refreshExpiresAtEpochSeconds);
+        return r;
+    }
+
+    /**
      * Creates a successful login response with full profile payload.
      *
      * @param userId authenticated user id
@@ -268,6 +381,19 @@ public class LoginResponse implements Serializable {
     public static LoginResponse error(String error) {
         LoginResponse r = new LoginResponse();
         r.setError(error);
+        return r;
+    }
+
+    /**
+     * Creates a failed login response with retry-after metadata.
+     *
+     * @param error error text
+     * @param retryAfterSeconds retry-after seconds
+     * @return populated error response
+     */
+    public static LoginResponse error(String error, long retryAfterSeconds) {
+        LoginResponse r = error(error);
+        r.setRetryAfterSeconds(retryAfterSeconds);
         return r;
     }
 }

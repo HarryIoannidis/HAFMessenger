@@ -3,12 +3,16 @@ package com.haf.client.controllers;
 import com.haf.client.core.ChatSession;
 import com.haf.client.core.CurrentUserSession;
 import com.haf.client.core.Launcher;
+import com.haf.client.core.AuthSessionState;
+import com.haf.client.core.NetworkSession;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.models.MessageVM;
 import com.haf.client.models.MessageType;
 import com.haf.client.services.DefaultMainSessionService;
+import com.haf.client.services.DefaultTokenRefreshService;
 import com.haf.client.services.DesktopNotificationService;
 import com.haf.client.services.MainSessionService;
+import com.haf.client.services.TokenRefreshService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ClientRuntimeConfig;
@@ -49,9 +53,18 @@ import java.util.Objects;
 import java.awt.Desktop;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +82,11 @@ public class MainController implements SearchController.ContactActions {
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final String POPUP_SESSION_REVOKED = "popup-session-revoked";
+    private static final long TOKEN_REFRESH_LEEWAY_SECONDS = 60L;
+    private static final long TOKEN_REFRESH_RETRY_SECONDS = 30L;
+    private static final DateTimeFormatter SESSION_EXPIRY_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter SESSION_EXPIRY_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("dd MMM HH:mm");
     private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
             new DesktopNotificationService();
 
@@ -83,6 +101,8 @@ public class MainController implements SearchController.ContactActions {
     private JFXButton maximizeButton;
     @FXML
     private JFXButton closeButton;
+    @FXML
+    private Text sessionExpiryTitleText;
 
     // Nav buttons and their indicators/icons
     @FXML
@@ -152,11 +172,17 @@ public class MainController implements SearchController.ContactActions {
     private final AtomicBoolean logoutInProgress = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
+    private final TokenRefreshService tokenRefreshService;
+    private final ScheduledExecutorService tokenRefreshScheduler;
+    private final Object tokenRefreshLock = new Object();
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
+    private final AtomicBoolean autoRefreshTokenEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean tokenRefreshInFlight = new AtomicBoolean(false);
     private PauseTransition instantSearchDebounce;
     private final GaussianBlur privacyBlurEffect = new GaussianBlur();
     private boolean startupBlurLocked;
     private boolean startupBlurPopupQueued;
+    private ScheduledFuture<?> scheduledTokenRefresh;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
     private SearchController runtimeIssueSearchController;
@@ -172,7 +198,10 @@ public class MainController implements SearchController.ContactActions {
      * Creates the controller with the default main-session service implementation.
      */
     public MainController() {
-        this(new DefaultMainSessionService(), DEFAULT_DESKTOP_NOTIFICATION_SERVICE);
+        this(new DefaultMainSessionService(),
+                DEFAULT_DESKTOP_NOTIFICATION_SERVICE,
+                new DefaultTokenRefreshService(),
+                createTokenRefreshScheduler());
     }
 
     /**
@@ -183,7 +212,10 @@ public class MainController implements SearchController.ContactActions {
      * @throws NullPointerException when {@code mainSessionService} is {@code null}
      */
     MainController(MainSessionService mainSessionService) {
-        this(mainSessionService, DEFAULT_DESKTOP_NOTIFICATION_SERVICE);
+        this(mainSessionService,
+                DEFAULT_DESKTOP_NOTIFICATION_SERVICE,
+                new DefaultTokenRefreshService(),
+                createTokenRefreshScheduler());
     }
 
     /**
@@ -195,10 +227,49 @@ public class MainController implements SearchController.ContactActions {
      *                                   display
      */
     MainController(MainSessionService mainSessionService, DesktopNotificationService desktopNotificationService) {
+        this(mainSessionService,
+                desktopNotificationService,
+                new DefaultTokenRefreshService(),
+                createTokenRefreshScheduler());
+    }
+
+    /**
+     * Creates the controller with explicit dependencies including token-refresh
+     * runtime components.
+     *
+     * @param mainSessionService service responsible for logout and listener wiring
+     * @param desktopNotificationService service used for OS-native notifications
+     * @param tokenRefreshService service used for refresh-token rotation
+     * @param tokenRefreshScheduler scheduler used for delayed refresh execution
+     * @throws NullPointerException when any dependency is {@code null}
+     */
+    MainController(
+            MainSessionService mainSessionService,
+            DesktopNotificationService desktopNotificationService,
+            TokenRefreshService tokenRefreshService,
+            ScheduledExecutorService tokenRefreshScheduler) {
         this.mainSessionService = Objects.requireNonNull(mainSessionService, "mainSessionService");
         this.desktopNotificationService = Objects.requireNonNull(
                 desktopNotificationService,
                 "desktopNotificationService");
+        this.tokenRefreshService = Objects.requireNonNull(tokenRefreshService, "tokenRefreshService");
+        this.tokenRefreshScheduler = Objects.requireNonNull(tokenRefreshScheduler, "tokenRefreshScheduler");
+    }
+
+    /**
+     * Creates single-threaded scheduler used for token refresh background tasks.
+     *
+     * @return daemon single-threaded scheduled executor
+     */
+    private static ScheduledExecutorService createTokenRefreshScheduler() {
+        AtomicInteger threadCounter = new AtomicInteger();
+        ThreadFactory threadFactory = runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setName("haf-token-refresh-" + threadCounter.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+        return Executors.newSingleThreadScheduledExecutor(threadFactory);
     }
 
     /**
@@ -1300,6 +1371,7 @@ public class MainController implements SearchController.ContactActions {
         applySearchFilterSettings();
         applySearchSortMemorySettings();
         applyContactCellSettings();
+        applySessionTokenSettings();
         syncStartupBlurLockFromSetting(false);
         applyPrivacyBlur(ViewRouter.getMainStage() == null || ViewRouter.getMainStage().isFocused());
     }
@@ -1324,11 +1396,197 @@ public class MainController implements SearchController.ContactActions {
                     Stage stage = ViewRouter.getMainStage();
                     applyPrivacyBlur(stage == null || stage.isFocused());
                 }
+                case ACCOUNT_AUTO_REFRESH_TOKEN -> applySessionTokenSettings();
                 default -> {
                     // Other settings are read lazily by their owning controllers.
                 }
             }
         }));
+    }
+
+    /**
+     * Applies session-token related settings: auto-refresh policy and optional title
+     * expiry indicator.
+     */
+    private void applySessionTokenSettings() {
+        boolean enabled = settings.isAccountAutoRefreshToken();
+        autoRefreshTokenEnabled.set(enabled);
+        updateSessionExpiryIndicator();
+        if (enabled) {
+            scheduleNextTokenRefreshFromSessionState();
+            return;
+        }
+        cancelScheduledTokenRefresh();
+    }
+
+    /**
+     * Schedules the next token-refresh attempt using current auth-session metadata.
+     */
+    private void scheduleNextTokenRefreshFromSessionState() {
+        if (!autoRefreshTokenEnabled.get()) {
+            return;
+        }
+        AuthSessionState.Snapshot snapshot = AuthSessionState.get();
+        if (snapshot == null || snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
+            return;
+        }
+        scheduleTokenRefresh(resolveTokenRefreshDelaySeconds(snapshot.accessExpiresAtEpochSeconds()));
+    }
+
+    /**
+     * Computes refresh delay so rotation happens shortly before access-token expiry.
+     *
+     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     * @return delay in seconds before refresh should run
+     */
+    private long resolveTokenRefreshDelaySeconds(Long accessExpiresAtEpochSeconds) {
+        if (accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L) {
+            return TOKEN_REFRESH_RETRY_SECONDS;
+        }
+        long now = Instant.now().getEpochSecond();
+        return Math.max(1L, accessExpiresAtEpochSeconds - now - TOKEN_REFRESH_LEEWAY_SECONDS);
+    }
+
+    /**
+     * Schedules token refresh execution after a delay, replacing any previously
+     * scheduled task.
+     *
+     * @param delaySeconds refresh delay in seconds
+     */
+    private void scheduleTokenRefresh(long delaySeconds) {
+        if (tokenRefreshScheduler.isShutdown()) {
+            return;
+        }
+        synchronized (tokenRefreshLock) {
+            cancelScheduledTokenRefreshLocked();
+            scheduledTokenRefresh = tokenRefreshScheduler.schedule(
+                    this::runTokenRefreshCycle,
+                    delaySeconds,
+                    TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Runs one refresh cycle and schedules follow-up work depending on result.
+     */
+    private void runTokenRefreshCycle() {
+        if (!autoRefreshTokenEnabled.get()) {
+            return;
+        }
+        if (!tokenRefreshInFlight.compareAndSet(false, true)) {
+            return;
+        }
+
+        try {
+            AuthSessionState.Snapshot snapshot = AuthSessionState.get();
+            if (snapshot == null || snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
+                return;
+            }
+
+            TokenRefreshService.TokenRefreshResult result = tokenRefreshService.refresh(snapshot.refreshToken());
+            if (result.success()) {
+                AuthSessionState.set(
+                        result.accessToken(),
+                        result.refreshToken(),
+                        result.accessExpiresAtEpochSeconds(),
+                        result.refreshExpiresAtEpochSeconds());
+
+                var adapter = NetworkSession.get();
+                if (adapter != null) {
+                    adapter.updateAccessToken(result.accessToken());
+                }
+
+                Platform.runLater(this::updateSessionExpiryIndicator);
+                if (autoRefreshTokenEnabled.get()) {
+                    scheduleNextTokenRefreshFromSessionState();
+                }
+                return;
+            }
+
+            if (result.invalidSession()) {
+                Platform.runLater(() -> handleRuntimeIssue(new RuntimeIssue(
+                        "messaging.session.revoked",
+                        "Session Expired",
+                        "Your session expired due to inactivity. Please log in again.",
+                        () -> {
+                        })));
+                return;
+            }
+
+            if (autoRefreshTokenEnabled.get()) {
+                scheduleTokenRefresh(TOKEN_REFRESH_RETRY_SECONDS);
+            }
+        } finally {
+            tokenRefreshInFlight.set(false);
+        }
+    }
+
+    /**
+     * Updates title-bar session expiry indicator visibility and label text based on
+     * account token-refresh setting.
+     */
+    private void updateSessionExpiryIndicator() {
+        if (sessionExpiryTitleText == null) {
+            return;
+        }
+        if (autoRefreshTokenEnabled.get()) {
+            sessionExpiryTitleText.setVisible(false);
+            sessionExpiryTitleText.setManaged(false);
+            sessionExpiryTitleText.setText("");
+            return;
+        }
+
+        Long accessExpiresAtEpochSeconds = AuthSessionState.getAccessExpiresAtEpochSeconds();
+        String label = accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L
+                ? "Session expires soon"
+                : "Session expires at " + formatSessionExpiry(accessExpiresAtEpochSeconds.longValue());
+        sessionExpiryTitleText.setText(label);
+        sessionExpiryTitleText.setVisible(true);
+        sessionExpiryTitleText.setManaged(true);
+    }
+
+    /**
+     * Formats session expiry for title-bar display.
+     *
+     * @param epochSeconds expiry epoch seconds
+     * @return formatted local-time label
+     */
+    private static String formatSessionExpiry(long epochSeconds) {
+        ZoneId zone = ZoneId.systemDefault();
+        var dateTime = Instant.ofEpochSecond(epochSeconds).atZone(zone);
+        if (dateTime.toLocalDate().equals(LocalDate.now(zone))) {
+            return dateTime.format(SESSION_EXPIRY_TIME_FORMATTER);
+        }
+        return dateTime.format(SESSION_EXPIRY_DATE_TIME_FORMATTER);
+    }
+
+    /**
+     * Cancels any scheduled token-refresh task.
+     */
+    private void cancelScheduledTokenRefresh() {
+        synchronized (tokenRefreshLock) {
+            cancelScheduledTokenRefreshLocked();
+        }
+    }
+
+    /**
+     * Cancels scheduled token-refresh task while caller already owns refresh lock.
+     */
+    private void cancelScheduledTokenRefreshLocked() {
+        if (scheduledTokenRefresh == null) {
+            return;
+        }
+        scheduledTokenRefresh.cancel(false);
+        scheduledTokenRefresh = null;
+    }
+
+    /**
+     * Stops token-refresh scheduling and shuts down refresh executor.
+     */
+    private void shutdownTokenRefreshFlow() {
+        autoRefreshTokenEnabled.set(false);
+        cancelScheduledTokenRefresh();
+        tokenRefreshScheduler.shutdownNow();
     }
 
     /**
@@ -1638,6 +1896,7 @@ public class MainController implements SearchController.ContactActions {
     private void handleLogout() {
         LOGGER.info("Logging out...");
         logoutInProgress.set(true);
+        shutdownTokenRefreshFlow();
         persistWindowState(ViewRouter.getMainStage());
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
@@ -1655,6 +1914,7 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
         logoutInProgress.set(true);
+        shutdownTokenRefreshFlow();
         persistWindowState(ViewRouter.getMainStage());
 
         mainSessionService.logout().whenComplete((unused, throwable) -> {
@@ -1820,6 +2080,7 @@ public class MainController implements SearchController.ContactActions {
         if (!shutdownInProgress.compareAndSet(false, true)) {
             return;
         }
+        shutdownTokenRefreshFlow();
         persistWindowState(ViewRouter.getMainStage());
 
         CompletableFuture<Void> logoutFuture;
@@ -1979,8 +2240,8 @@ public class MainController implements SearchController.ContactActions {
         }
         PopupMessageBuilder.create()
                 .popupKey(POPUP_SESSION_REVOKED)
-                .title("Session Ended")
-                .message("You were logged out because this account was accessed from another device.")
+                .title("Session Expired")
+                .message("Your session expired due to inactivity. Please log in again.")
                 .actionText("Go to Login")
                 .singleAction(true)
                 .movable(false)
@@ -1996,6 +2257,7 @@ public class MainController implements SearchController.ContactActions {
         if (!revokedSessionHandlingInProgress.compareAndSet(false, true)) {
             return;
         }
+        shutdownTokenRefreshFlow();
         mainSessionService.logout().whenComplete((unused, throwable) -> Platform.runLater(() -> {
             if (throwable != null) {
                 LOGGER.info("Session revoke cleanup completed with non-fatal errors: {}", throwable.getMessage());

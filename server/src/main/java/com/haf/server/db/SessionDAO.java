@@ -2,162 +2,391 @@ package com.haf.server.db;
 
 import com.haf.server.exceptions.DatabaseOperationException;
 import com.haf.server.metrics.AuditLogger;
+import com.haf.server.security.JwtTokenService;
+import com.haf.server.security.JwtTokenService.VerifiedToken;
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Data-access object for the {@code sessions} table.
- *
- * Follows the same DataSource + AuditLogger pattern as {@link UserDAO}.
+ * Data-access object for authentication sessions.
  */
 public final class SessionDAO {
 
-    private final DataSource dataSource;
-    private final AuditLogger auditLogger;
+    private static final String DEFAULT_JWT_ISSUER = "haf-server";
+    private static final long DEFAULT_ACCESS_TTL_SECONDS = 900L;
+    private static final long DEFAULT_REFRESH_TTL_SECONDS = 2_592_000L;
+    private static final long DEFAULT_ABSOLUTE_SESSION_TTL_SECONDS = 2_592_000L;
+    private static final long DEFAULT_IDLE_SESSION_TTL_SECONDS = 600L;
 
-    /**
-     * SQL query for inserting a new session row.
-     */
     private static final String INSERT_SQL = """
-            INSERT INTO sessions (session_id, user_id, jwt_token, expires_at)
-            VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))
+            INSERT INTO sessions (
+                session_id,
+                access_jti,
+                user_id,
+                refresh_token_hash,
+                issued_at,
+                access_expires_at,
+                refresh_expires_at,
+                refresh_last_rotated_at,
+                last_seen_at,
+                revoked,
+                absolute_expires_at
+            ) VALUES (
+                ?, ?, ?, ?,
+                CURRENT_TIMESTAMP,
+                DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? SECOND),
+                DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? SECOND),
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                FALSE,
+                DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
+            )
             """;
 
-    /**
-     * Creates a SessionDAO with a DataSource and AuditLogger.
-     *
-     * @param dataSource  the DataSource
-     * @param auditLogger the AuditLogger
-     */
-    public SessionDAO(DataSource dataSource, AuditLogger auditLogger) {
-        this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
-        this.auditLogger = Objects.requireNonNull(auditLogger, "auditLogger");
-    }
-
-    /**
-     * Creates a new session for the given user.
-     *
-     * @param userId the user ID
-     * @return the generated session ID
-     * @throws DatabaseOperationException if the insert fails
-     */
-    public String createSession(String userId) {
-        String sessionId = UUID.randomUUID().toString();
-        // Placeholder JWT token until real JWT signing is implemented
-        String jwtToken = "jwt-placeholder-" + sessionId;
-
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
-
-            ps.setString(1, sessionId);
-            ps.setString(2, userId);
-            ps.setString(3, jwtToken);
-
-            ps.executeUpdate();
-
-            return sessionId;
-        } catch (SQLException ex) {
-            auditLogger.logError("db_create_session", null, userId, ex);
-
-            throw new DatabaseOperationException("Failed to create session", ex);
-        }
-    }
-
-    /**
-     * SQL query for selecting user id from an active, non-revoked session.
-     */
-    private static final String SELECT_USER_SQL = """
+    private static final String SELECT_USER_BY_JTI_SQL = """
             SELECT user_id FROM sessions
-            WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked = FALSE
+            WHERE access_jti = ?
+              AND last_seen_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
+              AND access_expires_at > CURRENT_TIMESTAMP
+              AND absolute_expires_at > CURRENT_TIMESTAMP
+              AND revoked = FALSE
+            LIMIT 1
             """;
 
-    /**
-     * SQL query for touching active-session last activity timestamp.
-     */
     private static final String TOUCH_SESSION_SQL = """
             UPDATE sessions
             SET last_seen_at = CURRENT_TIMESTAMP
-            WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP AND revoked = FALSE
+            WHERE access_jti = ?
+              AND last_seen_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
+              AND access_expires_at > CURRENT_TIMESTAMP
+              AND absolute_expires_at > CURRENT_TIMESTAMP
+              AND revoked = FALSE
             """;
 
-    /**
-     * SQL query for checking whether a user has a recently active session.
-     */
     private static final String SELECT_RECENT_ACTIVE_SQL = """
             SELECT 1 FROM sessions
             WHERE user_id = ?
-              AND expires_at > CURRENT_TIMESTAMP
+              AND access_expires_at > CURRENT_TIMESTAMP
+              AND absolute_expires_at > CURRENT_TIMESTAMP
               AND revoked = FALSE
               AND last_seen_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
             LIMIT 1
             """;
 
-    /**
-     * SQL query for revoking a session.
-     */
     private static final String REVOKE_SESSION_SQL = """
             UPDATE sessions
             SET revoked = TRUE
-            WHERE session_id = ?
+            WHERE access_jti = ?
             """;
 
-    /**
-     * SQL query for revoking all sessions for a user.
-     */
     private static final String REVOKE_ALL_SESSIONS_FOR_USER_SQL = """
             UPDATE sessions
             SET revoked = TRUE
             WHERE user_id = ?
             """;
 
+    private static final String SELECT_REFRESH_ROW_SQL = """
+            SELECT session_id, user_id, UNIX_TIMESTAMP(absolute_expires_at) AS absolute_expires_epoch
+            FROM sessions
+            WHERE refresh_token_hash = ?
+              AND last_seen_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? SECOND)
+              AND refresh_expires_at > CURRENT_TIMESTAMP
+              AND absolute_expires_at > CURRENT_TIMESTAMP
+              AND revoked = FALSE
+            LIMIT 1
+            """;
+
+    private static final String ROTATE_REFRESH_SQL = """
+            UPDATE sessions
+            SET access_jti = ?,
+                refresh_token_hash = ?,
+                access_expires_at = LEAST(DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? SECOND), absolute_expires_at),
+                refresh_expires_at = LEAST(DATE_ADD(CURRENT_TIMESTAMP, INTERVAL ? SECOND), absolute_expires_at),
+                refresh_last_rotated_at = CURRENT_TIMESTAMP,
+                last_seen_at = CURRENT_TIMESTAMP
+            WHERE session_id = ?
+              AND refresh_token_hash = ?
+              AND refresh_expires_at > CURRENT_TIMESTAMP
+              AND absolute_expires_at > CURRENT_TIMESTAMP
+              AND revoked = FALSE
+            """;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private final DataSource dataSource;
+    private final AuditLogger auditLogger;
+    private final JwtTokenService jwtTokenService;
+    private final long refreshTokenTtlSeconds;
+    private final long absoluteSessionTtlSeconds;
+    private final long sessionIdleTtlSeconds;
+
     /**
-     * Retrieves the user ID for a given valid session ID.
+     * Authentication token bundle.
      *
-     * @param sessionId the session ID
-     * @return the user ID, or null if invalid/expired
+     * @param accessToken                  access JWT
+     * @param refreshToken                 refresh token
+     * @param accessExpiresAtEpochSeconds  access expiry epoch seconds
+     * @param refreshExpiresAtEpochSeconds refresh expiry epoch seconds
      */
-    public String getUserIdForSession(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
-            return null;
-        }
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement ps = connection.prepareStatement(SELECT_USER_SQL)) {
-
-            ps.setString(1, sessionId);
-
-            try (var rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("user_id");
-                }
-            }
-        } catch (SQLException ex) {
-            auditLogger.logError("db_verify_session", null, "unknown", ex);
-        }
-        return null;
+    public record SessionTokens(
+            String accessToken,
+            String refreshToken,
+            long accessExpiresAtEpochSeconds,
+            long refreshExpiresAtEpochSeconds) {
     }
 
     /**
-     * Retrieves the user id for a valid session and updates its last-seen
-     * timestamp.
-     *
-     * @param sessionId caller session id
-     * @return user id when session is valid, otherwise {@code null}
+     * Creates DAO with test defaults for JWT settings.
+     * Production bootstrap should use
+     * {@link #SessionDAO(DataSource, AuditLogger, JwtTokenService, long, long, long)}.
      */
-    public String getUserIdForSessionAndTouch(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
+    public SessionDAO(DataSource dataSource, AuditLogger auditLogger) {
+        this(dataSource,
+                auditLogger,
+                new JwtTokenService("test-only-jwt-secret", DEFAULT_JWT_ISSUER, DEFAULT_ACCESS_TTL_SECONDS),
+                DEFAULT_REFRESH_TTL_SECONDS,
+                DEFAULT_ABSOLUTE_SESSION_TTL_SECONDS,
+                DEFAULT_IDLE_SESSION_TTL_SECONDS);
+    }
+
+    /**
+     * Creates DAO with explicit JWT and refresh settings.
+     *
+     * @param dataSource                data source
+     * @param auditLogger               audit logger
+     * @param jwtTokenService           JWT service
+     * @param refreshTokenTtlSeconds    refresh-token TTL in seconds
+     * @param absoluteSessionTtlSeconds absolute maximum session lifetime in seconds
+     * @throws NullPointerException     when required collaborators are null
+     * @throws IllegalArgumentException when TTL values are non-positive
+     */
+    public SessionDAO(DataSource dataSource,
+            AuditLogger auditLogger,
+            JwtTokenService jwtTokenService,
+            long refreshTokenTtlSeconds,
+            long absoluteSessionTtlSeconds) {
+        this(dataSource,
+                auditLogger,
+                jwtTokenService,
+                refreshTokenTtlSeconds,
+                absoluteSessionTtlSeconds,
+                DEFAULT_IDLE_SESSION_TTL_SECONDS);
+    }
+
+    /**
+     * Creates DAO with explicit JWT, refresh, and idle-session settings.
+     *
+     * @param dataSource                data source
+     * @param auditLogger               audit logger
+     * @param jwtTokenService           JWT service
+     * @param refreshTokenTtlSeconds    refresh-token TTL in seconds
+     * @param absoluteSessionTtlSeconds absolute maximum session lifetime in seconds
+     * @param sessionIdleTtlSeconds     maximum idle time in seconds before session
+     *                                  is invalid
+     * @throws NullPointerException     when required collaborators are null
+     * @throws IllegalArgumentException when TTL values are non-positive
+     */
+    public SessionDAO(DataSource dataSource,
+            AuditLogger auditLogger,
+            JwtTokenService jwtTokenService,
+            long refreshTokenTtlSeconds,
+            long absoluteSessionTtlSeconds,
+            long sessionIdleTtlSeconds) {
+        this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+        this.auditLogger = Objects.requireNonNull(auditLogger, "auditLogger");
+        this.jwtTokenService = Objects.requireNonNull(jwtTokenService, "jwtTokenService");
+        if (refreshTokenTtlSeconds <= 0L) {
+            throw new IllegalArgumentException("refreshTokenTtlSeconds");
+        }
+        if (absoluteSessionTtlSeconds <= 0L) {
+            throw new IllegalArgumentException("absoluteSessionTtlSeconds");
+        }
+        if (sessionIdleTtlSeconds <= 0L) {
+            throw new IllegalArgumentException("sessionIdleTtlSeconds");
+        }
+        this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
+        this.absoluteSessionTtlSeconds = absoluteSessionTtlSeconds;
+        this.sessionIdleTtlSeconds = sessionIdleTtlSeconds;
+    }
+
+    /**
+     * Creates a new access/refresh token pair for user.
+     *
+     * @param userId user id
+     * @return access JWT (compat helper)
+     */
+    public String createSession(String userId) {
+        return createSessionTokens(userId).accessToken();
+    }
+
+    /**
+     * Creates a new access/refresh token pair for user.
+     *
+     * @param userId user id
+     * @return issued token bundle
+     */
+    public SessionTokens createSessionTokens(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId");
+        }
+
+        String sessionRowId = UUID.randomUUID().toString();
+        String accessJti = UUID.randomUUID().toString();
+        String refreshToken = generateRefreshToken();
+        String refreshTokenHash = sha256Hex(refreshToken);
+
+        Instant issuedAt = Instant.now();
+        Instant absoluteExpiresAt = issuedAt.plusSeconds(absoluteSessionTtlSeconds);
+        Instant accessExpiresAt = minInstant(issuedAt.plusSeconds(jwtTokenService.getAccessTtlSeconds()),
+                absoluteExpiresAt);
+        Instant refreshExpiresAt = minInstant(issuedAt.plusSeconds(refreshTokenTtlSeconds), absoluteExpiresAt);
+
+        String accessToken = jwtTokenService.issueAccessToken(userId, accessJti, issuedAt, accessExpiresAt);
+
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
+
+            ps.setString(1, sessionRowId);
+            ps.setString(2, accessJti);
+            ps.setString(3, userId);
+            ps.setString(4, refreshTokenHash);
+            ps.setLong(5, jwtTokenService.getAccessTtlSeconds());
+            ps.setLong(6, refreshTokenTtlSeconds);
+            ps.setLong(7, absoluteSessionTtlSeconds);
+            ps.executeUpdate();
+
+            return new SessionTokens(
+                    accessToken,
+                    refreshToken,
+                    accessExpiresAt.getEpochSecond(),
+                    refreshExpiresAt.getEpochSecond());
+        } catch (SQLException ex) {
+            auditLogger.logError("db_create_session", null, userId, ex);
+            throw new DatabaseOperationException("Failed to create session", ex);
+        }
+    }
+
+    /**
+     * Rotates token pair using valid refresh token.
+     *
+     * @param refreshToken refresh token
+     * @return new token bundle, or null when refresh token is invalid/expired
+     */
+    public SessionTokens refreshSession(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
             return null;
         }
+
+        String oldRefreshHash = sha256Hex(refreshToken);
+
         try (Connection connection = dataSource.getConnection()) {
-            String userId = loadUserIdForActiveSession(connection, sessionId);
+            RefreshSessionRow refreshRow = loadRefreshSessionRow(connection, oldRefreshHash);
+            if (refreshRow == null) {
+                return null;
+            }
+
+            String newAccessJti = UUID.randomUUID().toString();
+            String newRefreshToken = generateRefreshToken();
+            String newRefreshHash = sha256Hex(newRefreshToken);
+
+            Instant issuedAt = Instant.now();
+            Instant absoluteExpiresAt = Instant.ofEpochSecond(refreshRow.absoluteExpiresAtEpochSeconds());
+            Instant accessExpiresAt = minInstant(
+                    issuedAt.plusSeconds(jwtTokenService.getAccessTtlSeconds()),
+                    absoluteExpiresAt);
+            Instant refreshExpiresAt = minInstant(
+                    issuedAt.plusSeconds(refreshTokenTtlSeconds),
+                    absoluteExpiresAt);
+            if (!accessExpiresAt.isAfter(issuedAt) || !refreshExpiresAt.isAfter(issuedAt)) {
+                return null;
+            }
+            String accessToken = jwtTokenService.issueAccessToken(
+                    refreshRow.userId(),
+                    newAccessJti,
+                    issuedAt,
+                    accessExpiresAt);
+
+            if (!rotateRefreshSession(
+                    connection,
+                    refreshRow.sessionId(),
+                    oldRefreshHash,
+                    newAccessJti,
+                    newRefreshHash,
+                    jwtTokenService.getAccessTtlSeconds(),
+                    refreshTokenTtlSeconds)) {
+                return null;
+            }
+
+            return new SessionTokens(
+                    accessToken,
+                    newRefreshToken,
+                    accessExpiresAt.getEpochSecond(),
+                    refreshExpiresAt.getEpochSecond());
+        } catch (SQLException ex) {
+            auditLogger.logError("db_refresh_session", null, null, ex);
+            throw new DatabaseOperationException("Failed to refresh session", ex);
+        }
+    }
+
+    /**
+     * Resolves user id from valid access JWT.
+     *
+     * @param accessToken access JWT
+     * @return user id or null when invalid
+     */
+    public String getUserIdForSession(String accessToken) {
+        VerifiedToken verifiedToken = parseVerifiedAccessToken(accessToken);
+        if (verifiedToken == null) {
+            return null;
+        }
+
+        try (Connection connection = dataSource.getConnection()) {
+            String userId = loadUserIdForActiveSession(connection, verifiedToken.jti());
             if (userId == null) {
                 return null;
             }
-            if (touchSession(connection, sessionId)) {
+            if (!userId.equals(verifiedToken.userId())) {
+                return null;
+            }
+            return userId;
+        } catch (SQLException ex) {
+            auditLogger.logError("db_verify_session", null, "unknown", ex);
+            return null;
+        }
+    }
+
+    /**
+     * Resolves user id from valid access JWT and updates last seen timestamp.
+     *
+     * @param accessToken access JWT
+     * @return user id or null when invalid
+     */
+    public String getUserIdForSessionAndTouch(String accessToken) {
+        VerifiedToken verifiedToken = parseVerifiedAccessToken(accessToken);
+        if (verifiedToken == null) {
+            return null;
+        }
+
+        try (Connection connection = dataSource.getConnection()) {
+            String userId = loadUserIdForActiveSession(connection, verifiedToken.jti());
+            if (userId == null) {
+                return null;
+            }
+            if (!userId.equals(verifiedToken.userId())) {
+                return null;
+            }
+            if (touchSession(connection, verifiedToken.jti())) {
                 return userId;
             }
             return null;
@@ -168,11 +397,11 @@ public final class SessionDAO {
     }
 
     /**
-     * Returns whether the user has at least one recently active valid session.
+     * Returns whether user has at least one recently active valid access session.
      *
      * @param userId        user identifier
-     * @param withinSeconds activity recency threshold in seconds
-     * @return {@code true} when a recently active session exists
+     * @param withinSeconds recency threshold in seconds
+     * @return true when recently active session exists
      */
     public boolean isUserRecentlyActive(String userId, long withinSeconds) {
         if (userId == null || userId.isBlank() || withinSeconds <= 0) {
@@ -192,68 +421,29 @@ public final class SessionDAO {
     }
 
     /**
-     * Loads user id for an active non-revoked session.
+     * Revokes session represented by access JWT.
      *
-     * @param connection open SQL connection
-     * @param sessionId  session id to verify
-     * @return user id when session is valid, otherwise {@code null}
-     * @throws SQLException when SQL operations fail
+     * @param accessToken access JWT
      */
-    private String loadUserIdForActiveSession(Connection connection, String sessionId)
-            throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_USER_SQL)) {
-            ps.setString(1, sessionId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("user_id");
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Updates {@code last_seen_at} for a valid non-revoked session.
-     *
-     * @param connection open SQL connection
-     * @param sessionId  session id to touch
-     * @return {@code true} when exactly one session row was touched
-     * @throws SQLException when SQL operations fail
-     */
-    private boolean touchSession(Connection connection, String sessionId) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(TOUCH_SESSION_SQL)) {
-            ps.setString(1, sessionId);
-            return ps.executeUpdate() == 1;
-        }
-    }
-
-    /**
-     * Revokes the given session.
-     * If the session does not exist or is already revoked, this is still treated as
-     * a successful no-op.
-     *
-     * @param sessionId the session ID to revoke
-     * @throws DatabaseOperationException if the revoke fails
-     */
-    public void revokeSession(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
+    public void revokeSession(String accessToken) {
+        VerifiedToken verifiedToken = parseVerifiedAccessToken(accessToken);
+        if (verifiedToken == null) {
             return;
         }
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(REVOKE_SESSION_SQL)) {
-            ps.setString(1, sessionId);
+            ps.setString(1, verifiedToken.jti());
             ps.executeUpdate();
         } catch (SQLException ex) {
-            auditLogger.logError("db_revoke_session", null, sessionId, ex);
+            auditLogger.logError("db_revoke_session", null, verifiedToken.jti(), ex);
             throw new DatabaseOperationException("Failed to revoke session", ex);
         }
     }
 
     /**
-     * Revokes all sessions for the given user.
+     * Revokes all sessions for user.
      *
-     * @param userId user whose sessions should be revoked
-     * @throws DatabaseOperationException if revoke fails
+     * @param userId user id
      */
     public void revokeAllSessionsByUserId(String userId) {
         if (userId == null || userId.isBlank()) {
@@ -267,5 +457,105 @@ public final class SessionDAO {
             auditLogger.logError("db_revoke_all_sessions", null, userId, ex);
             throw new DatabaseOperationException("Failed to revoke all sessions for user", ex);
         }
+    }
+
+    private VerifiedToken parseVerifiedAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return null;
+        }
+        try {
+            return jwtTokenService.verifyAccessToken(accessToken);
+        } catch (JwtTokenService.JwtValidationException _) {
+            return null;
+        }
+    }
+
+    private String loadUserIdForActiveSession(Connection connection, String accessJti) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_USER_BY_JTI_SQL)) {
+            ps.setString(1, accessJti);
+            ps.setLong(2, sessionIdleTtlSeconds);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("user_id");
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean touchSession(Connection connection, String accessJti) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(TOUCH_SESSION_SQL)) {
+            ps.setString(1, accessJti);
+            ps.setLong(2, sessionIdleTtlSeconds);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    private RefreshSessionRow loadRefreshSessionRow(Connection connection, String refreshTokenHash)
+            throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_REFRESH_ROW_SQL)) {
+            ps.setString(1, refreshTokenHash);
+            ps.setLong(2, sessionIdleTtlSeconds);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new RefreshSessionRow(
+                            rs.getString("session_id"),
+                            rs.getString("user_id"),
+                            rs.getLong("absolute_expires_epoch"));
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Instant minInstant(Instant left, Instant right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        return left.isBefore(right) ? left : right;
+    }
+
+    private boolean rotateRefreshSession(Connection connection,
+            String sessionId,
+            String oldRefreshTokenHash,
+            String newAccessJti,
+            String newRefreshTokenHash,
+            long accessTtlSeconds,
+            long refreshTtlSeconds) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(ROTATE_REFRESH_SQL)) {
+            ps.setString(1, newAccessJti);
+            ps.setString(2, newRefreshTokenHash);
+            ps.setLong(3, accessTtlSeconds);
+            ps.setLong(4, refreshTtlSeconds);
+            ps.setString(5, sessionId);
+            ps.setString(6, oldRefreshTokenHash);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    private static String generateRefreshToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
+    }
+
+    private record RefreshSessionRow(String sessionId, String userId, long absoluteExpiresAtEpochSeconds) {
     }
 }
