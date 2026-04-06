@@ -15,7 +15,7 @@ Implemented scene docs live under `docs/client/scenes/` and cover:
 
 ## Key Types/Interfaces
 
-- Controllers: `SplashController`, `LoginController`, `RegisterController`, `MainController`, `ChatController`, `SearchController`, `ProfileController`, `PreviewController`, `ContactCell`, `SettingsController`, `PopupMessageController`.
+- Controllers: `SplashController`, `LoginController`, `RegisterController`, `MainController`, `ChatController`, `SearchController`, `ProfileController`, `PreviewController`, `ContactCellController`, `SettingsController`, `PopupMessageController`.
 - ViewModels: `SplashViewModel`, `LoginViewModel`, `RegisterViewModel`, `MainViewModel`, `MessagesViewModel`, `ChatViewModel`, `SearchViewModel`.
 
 ## Flow

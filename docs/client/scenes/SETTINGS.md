@@ -17,8 +17,8 @@ Describe the settings popup scene that exposes per-user client preferences and r
 - `client.controllers.SettingsController`
 - `client.models.SettingsMenuItem`
 - `client.utils.ClientSettings`
-- `client.utils.SettingsRowBuilder`
-- `client.utils.PopupMessageBuilder`
+- `client.builders.SettingsRowBuilder`
+- `client.builders.PopupMessageBuilder`
 - `client.utils.ViewRouter`
 - `client.security.RememberedCredentialsStore`
 
@@ -45,5 +45,5 @@ Describe the settings popup scene that exposes per-user client preferences and r
 - `client/src/main/java/com/haf/client/controllers/SettingsController.java`
 - `client/src/main/java/com/haf/client/security/RememberedCredentialsStore.java`
 - `client/src/main/java/com/haf/client/utils/ClientSettings.java`
-- `client/src/main/java/com/haf/client/utils/SettingsRowBuilder.java`
+- `client/src/main/java/com/haf/client/builders/SettingsRowBuilder.java`
 - `client/src/main/java/com/haf/client/controllers/MainController.java`

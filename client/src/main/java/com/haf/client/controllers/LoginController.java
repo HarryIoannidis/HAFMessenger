@@ -1,10 +1,10 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.security.RememberedCredentialsStore;
 import com.haf.client.services.DefaultLoginService;
 import com.haf.client.services.LoginService;
 import com.haf.client.utils.ClientSettings;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.LoginViewModel;

@@ -1,10 +1,10 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.PopupMessageBuilder;
+import com.haf.client.builders.SettingsRowBuilder;
 import com.haf.client.models.SettingsMenuItem;
 import com.haf.client.security.RememberedCredentialsStore;
 import com.haf.client.utils.ClientSettings;
-import com.haf.client.utils.SettingsRowBuilder;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXSlider;

@@ -20,9 +20,9 @@ import org.slf4j.LoggerFactory;
  * A {@link ListCell} that renders each contact using {@code contact_cell.fxml}.
  * The cell now works with {@link ContactInfo} objects.
  */
-public class ContactCell extends ListCell<ContactInfo> {
+public class ContactCellController extends ListCell<ContactInfo> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ContactCell.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ContactCellController.class);
     private static volatile boolean showUnreadBadges = true;
     private static volatile int unreadBadgeCap = 10;
     private static volatile boolean hidePresenceIndicators;
@@ -43,7 +43,7 @@ public class ContactCell extends ListCell<ContactInfo> {
      * @param showUnreadBadges {@code true} to show unread badges
      */
     public static void setShowUnreadBadges(boolean showUnreadBadges) {
-        ContactCell.showUnreadBadges = showUnreadBadges;
+        ContactCellController.showUnreadBadges = showUnreadBadges;
     }
 
     /**
@@ -52,7 +52,7 @@ public class ContactCell extends ListCell<ContactInfo> {
      * @param unreadBadgeCap maximum unread value shown before capping
      */
     public static void setUnreadBadgeCap(int unreadBadgeCap) {
-        ContactCell.unreadBadgeCap = Math.max(1, unreadBadgeCap);
+        ContactCellController.unreadBadgeCap = Math.max(1, unreadBadgeCap);
     }
 
     /**
@@ -61,7 +61,7 @@ public class ContactCell extends ListCell<ContactInfo> {
      * @param hidePresenceIndicators {@code true} to hide presence dots
      */
     public static void setHidePresenceIndicators(boolean hidePresenceIndicators) {
-        ContactCell.hidePresenceIndicators = hidePresenceIndicators;
+        ContactCellController.hidePresenceIndicators = hidePresenceIndicators;
     }
 
     @FunctionalInterface
@@ -103,7 +103,7 @@ public class ContactCell extends ListCell<ContactInfo> {
      * Creates a contact cell. FXML is loaded lazily on first render to reduce eager
      * startup cost.
      */
-    public ContactCell() {
+    public ContactCellController() {
         // We move the loading logic out of the constructor to avoid
         // "burst" loading when the ListView pre-instantiates cells.
     }
@@ -136,7 +136,7 @@ public class ContactCell extends ListCell<ContactInfo> {
      */
     private static synchronized void ensureFXMLBytesCached() throws IOException {
         if (cachedFXMLBytes == null) {
-            try (var is = ContactCell.class.getResourceAsStream(UiConstants.FXML_CONTACT_CELL)) {
+            try (var is = ContactCellController.class.getResourceAsStream(UiConstants.FXML_CONTACT_CELL)) {
                 if (is != null) {
                     cachedFXMLBytes = is.readAllBytes();
                 }

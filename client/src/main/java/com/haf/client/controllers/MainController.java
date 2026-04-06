@@ -82,13 +82,16 @@ public class MainController implements SearchController.ContactActions {
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final String POPUP_SESSION_REVOKED = "popup-session-revoked";
+    private static final String POPUP_UNDECRYPTABLE_MESSAGES = "popup-undecryptable-messages";
+    private static final String UNDECRYPTABLE_MESSAGES_ISSUE_KEY = "messaging.undecryptable.envelopes";
+    private static final String POPUP_SESSION_REFRESH_FAILED = "popup-session-refresh-failed";
+    private static final String SESSION_EXPIRED_LABEL = "Session expired";
     private static final long TOKEN_REFRESH_LEEWAY_SECONDS = 60L;
     private static final long TOKEN_REFRESH_RETRY_SECONDS = 30L;
     private static final DateTimeFormatter SESSION_EXPIRY_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter SESSION_EXPIRY_DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("dd MMM HH:mm");
-    private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE =
-            new DesktopNotificationService();
+    private static final DateTimeFormatter SESSION_EXPIRY_DATE_TIME_FORMATTER = DateTimeFormatter
+            .ofPattern("dd MMM HH:mm");
+    private static final DesktopNotificationService DEFAULT_DESKTOP_NOTIFICATION_SERVICE = new DesktopNotificationService();
 
     // Window chrome
     @FXML
@@ -170,6 +173,7 @@ public class MainController implements SearchController.ContactActions {
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final AtomicBoolean revokedSessionHandlingInProgress = new AtomicBoolean(false);
     private final AtomicBoolean logoutInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean undecryptableMessagesPopupShown = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
     private final TokenRefreshService tokenRefreshService;
@@ -178,11 +182,13 @@ public class MainController implements SearchController.ContactActions {
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
     private final AtomicBoolean autoRefreshTokenEnabled = new AtomicBoolean(true);
     private final AtomicBoolean tokenRefreshInFlight = new AtomicBoolean(false);
+    private final AtomicBoolean sessionExpired = new AtomicBoolean(false);
     private PauseTransition instantSearchDebounce;
     private final GaussianBlur privacyBlurEffect = new GaussianBlur();
     private boolean startupBlurLocked;
     private boolean startupBlurPopupQueued;
     private ScheduledFuture<?> scheduledTokenRefresh;
+    private ScheduledFuture<?> scheduledSessionExpiryIndicatorUpdate;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
     private SearchController runtimeIssueSearchController;
@@ -221,8 +227,8 @@ public class MainController implements SearchController.ContactActions {
     /**
      * Creates the controller with explicit dependencies.
      *
-     * @param mainSessionService        service responsible for logout and
-     *                                  listener wiring
+     * @param mainSessionService         service responsible for logout and
+     *                                   listener wiring
      * @param desktopNotificationService service used for OS-native notification
      *                                   display
      */
@@ -237,10 +243,12 @@ public class MainController implements SearchController.ContactActions {
      * Creates the controller with explicit dependencies including token-refresh
      * runtime components.
      *
-     * @param mainSessionService service responsible for logout and listener wiring
+     * @param mainSessionService         service responsible for logout and listener
+     *                                   wiring
      * @param desktopNotificationService service used for OS-native notifications
-     * @param tokenRefreshService service used for refresh-token rotation
-     * @param tokenRefreshScheduler scheduler used for delayed refresh execution
+     * @param tokenRefreshService        service used for refresh-token rotation
+     * @param tokenRefreshScheduler      scheduler used for delayed refresh
+     *                                   execution
      * @throws NullPointerException when any dependency is {@code null}
      */
     MainController(
@@ -402,8 +410,8 @@ public class MainController implements SearchController.ContactActions {
 
         setupSearchActionButton();
 
-        toolbarSearchField.textProperty().addListener((obs, oldValue, newValue) ->
-                handleSearchFieldTextChanged(newValue));
+        toolbarSearchField.textProperty()
+                .addListener((obs, oldValue, newValue) -> handleSearchFieldTextChanged(newValue));
     }
 
     /**
@@ -810,7 +818,8 @@ public class MainController implements SearchController.ContactActions {
                 .handle((unused, throwable) -> null)
                 .thenCompose(ignored -> runOnFxThreadAsync(this::activateInitialTabForStartup));
 
-        CompletableFuture.allOf(preloadViewsFuture, fetchContactsFuture, preloadSettingsPopupFuture, activateInitialTabFuture)
+        CompletableFuture
+                .allOf(preloadViewsFuture, fetchContactsFuture, preloadSettingsPopupFuture, activateInitialTabFuture)
                 .whenComplete((unused, throwable) -> Platform.runLater(() -> {
                     if (throwable != null) {
                         LOGGER.warn(
@@ -919,7 +928,7 @@ public class MainController implements SearchController.ContactActions {
      */
     private void setupContactList() {
         contactsList.setCellFactory(lv -> {
-            ContactCell cell = new ContactCell();
+            ContactCellController cell = new ContactCellController();
             cell.setOnClick(this::activateMessagesTab);
             cell.setOnContextMenuRequest(this::showContactContextMenu);
             return cell;
@@ -1360,7 +1369,8 @@ public class MainController implements SearchController.ContactActions {
             });
         }
 
-        stage.focusedProperty().addListener((obs, oldFocused, newFocused) -> applyPrivacyBlur(Boolean.TRUE.equals(newFocused)));
+        stage.focusedProperty()
+                .addListener((obs, oldFocused, newFocused) -> applyPrivacyBlur(Boolean.TRUE.equals(newFocused)));
         applyPrivacyBlur(stage.isFocused());
     }
 
@@ -1385,7 +1395,7 @@ public class MainController implements SearchController.ContactActions {
                 case SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH -> applySearchFilterSettings();
                 case SEARCH_REMEMBER_SORT_OPTIONS -> applySearchSortMemorySettings();
                 case NOTIFICATIONS_SHOW_UNREAD_BADGES, NOTIFICATIONS_BADGE_CAP ->
-                        applyContactCellSettings();
+                    applyContactCellSettings();
                 case PRIVACY_HIDE_PRESENCE_INDICATORS -> applyContactCellSettings();
                 case PRIVACY_BLUR_ON_FOCUS_LOSS, PRIVACY_BLUR_STRENGTH -> {
                     Stage stage = ViewRouter.getMainStage();
@@ -1405,18 +1415,21 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Applies session-token related settings: auto-refresh policy and optional title
+     * Applies session-token related settings: auto-refresh policy and optional
+     * title
      * expiry indicator.
      */
     private void applySessionTokenSettings() {
         boolean enabled = settings.isAccountAutoRefreshToken();
         autoRefreshTokenEnabled.set(enabled);
+        cancelScheduledTokenRefresh();
+        sessionExpired.set(isSessionExpiredByTimestamp(AuthSessionState.getAccessExpiresAtEpochSeconds()));
         updateSessionExpiryIndicator();
         if (enabled) {
             scheduleNextTokenRefreshFromSessionState();
             return;
         }
-        cancelScheduledTokenRefresh();
+        scheduleSessionExpiryIndicatorUpdateFromSessionState();
     }
 
     /**
@@ -1434,7 +1447,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Computes refresh delay so rotation happens shortly before access-token expiry.
+     * Computes refresh delay so rotation happens shortly before access-token
+     * expiry.
      *
      * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
      * @return delay in seconds before refresh should run
@@ -1445,6 +1459,65 @@ public class MainController implements SearchController.ContactActions {
         }
         long now = Instant.now().getEpochSecond();
         return Math.max(1L, accessExpiresAtEpochSeconds - now - TOKEN_REFRESH_LEEWAY_SECONDS);
+    }
+
+    /**
+     * Checks whether a session expiry timestamp is already in the past.
+     *
+     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     * @return {@code true} when expiry is missing or already reached
+     */
+    private static boolean isSessionExpiredByTimestamp(Long accessExpiresAtEpochSeconds) {
+        if (accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L) {
+            return false;
+        }
+        return accessExpiresAtEpochSeconds.longValue() <= Instant.now().getEpochSecond();
+    }
+
+    /**
+     * Schedules title-bar expiry label update and expiry popup for the exact access
+     * token expiry instant while auto-refresh is disabled.
+     */
+    private void scheduleSessionExpiryIndicatorUpdateFromSessionState() {
+        if (autoRefreshTokenEnabled.get()) {
+            return;
+        }
+        Long accessExpiresAtEpochSeconds = AuthSessionState.getAccessExpiresAtEpochSeconds();
+        if (accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L) {
+            return;
+        }
+        long now = Instant.now().getEpochSecond();
+        long delaySeconds = accessExpiresAtEpochSeconds.longValue() - now;
+        if (delaySeconds <= 0L) {
+            markSessionExpiredFromTimeout();
+            return;
+        }
+        synchronized (tokenRefreshLock) {
+            cancelScheduledSessionExpiryIndicatorUpdateLocked();
+            scheduledSessionExpiryIndicatorUpdate = tokenRefreshScheduler.schedule(
+                    this::markSessionExpiredFromTimeout,
+                    delaySeconds,
+                    TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Marks session expired when expiry timeout is reached and surfaces session-end
+     * handling on the UI thread.
+     */
+    private void markSessionExpiredFromTimeout() {
+        if (!sessionExpired.compareAndSet(false, true)) {
+            return;
+        }
+        Platform.runLater(() -> {
+            updateSessionExpiryIndicator();
+            handleRuntimeIssue(new RuntimeIssue(
+                    "messaging.session.revoked",
+                    "Session Expired",
+                    "Your session has expired. You can try refreshing once or log in again.",
+                    () -> {
+                    }));
+        });
     }
 
     /**
@@ -1485,21 +1558,7 @@ public class MainController implements SearchController.ContactActions {
 
             TokenRefreshService.TokenRefreshResult result = tokenRefreshService.refresh(snapshot.refreshToken());
             if (result.success()) {
-                AuthSessionState.set(
-                        result.accessToken(),
-                        result.refreshToken(),
-                        result.accessExpiresAtEpochSeconds(),
-                        result.refreshExpiresAtEpochSeconds());
-
-                var adapter = NetworkSession.get();
-                if (adapter != null) {
-                    adapter.updateAccessToken(result.accessToken());
-                }
-
-                Platform.runLater(this::updateSessionExpiryIndicator);
-                if (autoRefreshTokenEnabled.get()) {
-                    scheduleNextTokenRefreshFromSessionState();
-                }
+                applySuccessfulTokenRefresh(result);
                 return;
             }
 
@@ -1537,12 +1596,47 @@ public class MainController implements SearchController.ContactActions {
         }
 
         Long accessExpiresAtEpochSeconds = AuthSessionState.getAccessExpiresAtEpochSeconds();
-        String label = accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L
-                ? "Session expires soon"
-                : "Session expires at " + formatSessionExpiry(accessExpiresAtEpochSeconds.longValue());
+        boolean expiredNow = sessionExpired.get() || isSessionExpiredByTimestamp(accessExpiresAtEpochSeconds);
+        if (expiredNow) {
+            sessionExpired.set(true);
+        }
+        String label;
+        if (expiredNow) {
+            label = SESSION_EXPIRED_LABEL;
+        } else if (accessExpiresAtEpochSeconds == null || accessExpiresAtEpochSeconds <= 0L) {
+            label = "Session expires soon";
+        } else {
+            label = "Session expires at " + formatSessionExpiry(accessExpiresAtEpochSeconds.longValue());
+        }
         sessionExpiryTitleText.setText(label);
         sessionExpiryTitleText.setVisible(true);
         sessionExpiryTitleText.setManaged(true);
+    }
+
+    /**
+     * Applies successful token refresh result to local auth state and scheduling.
+     *
+     * @param result successful refresh result
+     */
+    private void applySuccessfulTokenRefresh(TokenRefreshService.TokenRefreshResult result) {
+        AuthSessionState.set(
+                result.accessToken(),
+                result.refreshToken(),
+                result.accessExpiresAtEpochSeconds(),
+                result.refreshExpiresAtEpochSeconds());
+        sessionExpired.set(false);
+
+        var adapter = NetworkSession.get();
+        if (adapter != null) {
+            adapter.updateAccessToken(result.accessToken());
+        }
+
+        Platform.runLater(this::updateSessionExpiryIndicator);
+        if (autoRefreshTokenEnabled.get()) {
+            scheduleNextTokenRefreshFromSessionState();
+            return;
+        }
+        scheduleSessionExpiryIndicatorUpdateFromSessionState();
     }
 
     /**
@@ -1570,14 +1664,29 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Cancels scheduled token-refresh task while caller already owns refresh lock.
+     * Cancels scheduled token-refresh and expiry-indicator tasks while caller
+     * already owns refresh lock.
      */
     private void cancelScheduledTokenRefreshLocked() {
         if (scheduledTokenRefresh == null) {
+            cancelScheduledSessionExpiryIndicatorUpdateLocked();
             return;
         }
         scheduledTokenRefresh.cancel(false);
         scheduledTokenRefresh = null;
+        cancelScheduledSessionExpiryIndicatorUpdateLocked();
+    }
+
+    /**
+     * Cancels scheduled session-expiry indicator update task while caller already
+     * owns refresh lock.
+     */
+    private void cancelScheduledSessionExpiryIndicatorUpdateLocked() {
+        if (scheduledSessionExpiryIndicatorUpdate == null) {
+            return;
+        }
+        scheduledSessionExpiryIndicatorUpdate.cancel(false);
+        scheduledSessionExpiryIndicatorUpdate = null;
     }
 
     /**
@@ -1617,9 +1726,9 @@ public class MainController implements SearchController.ContactActions {
      * Applies contact cell settings.
      */
     private void applyContactCellSettings() {
-        ContactCell.setShowUnreadBadges(settings.isNotificationsShowUnreadBadges());
-        ContactCell.setUnreadBadgeCap(settings.getNotificationsBadgeCap());
-        ContactCell.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators());
+        ContactCellController.setShowUnreadBadges(settings.isNotificationsShowUnreadBadges());
+        ContactCellController.setUnreadBadgeCap(settings.getNotificationsBadgeCap());
+        ContactCellController.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators());
         if (contactsList != null) {
             contactsList.refresh();
         }
@@ -1851,7 +1960,7 @@ public class MainController implements SearchController.ContactActions {
             }
             Desktop.getDesktop().browse(new URI(url));
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to open external link: {}", url, ex);
+            LOGGER.warn("Failed to open external link: {}", url, ex);
             showExternalLinkOpenFailedPopup();
         }
     }
@@ -1900,7 +2009,7 @@ public class MainController implements SearchController.ContactActions {
         persistWindowState(ViewRouter.getMainStage());
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                LOGGER.warn( "Logout completed with errors", throwable);
+                LOGGER.warn("Logout completed with errors", throwable);
             }
             Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
         });
@@ -1919,7 +2028,7 @@ public class MainController implements SearchController.ContactActions {
 
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                LOGGER.warn( "Logout before restart completed with errors.", throwable);
+                LOGGER.warn("Logout before restart completed with errors.", throwable);
             }
 
             boolean relaunched = relaunchClientProcess();
@@ -1953,7 +2062,7 @@ public class MainController implements SearchController.ContactActions {
             processBuilder.start();
             return true;
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to relaunch client process.", ex);
+            LOGGER.warn("Failed to relaunch client process.", ex);
             return false;
         }
     }
@@ -2088,13 +2197,13 @@ public class MainController implements SearchController.ContactActions {
             logoutFuture = mainSessionService.logout()
                     .orTimeout(LOGOUT_ON_EXIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to start logout on app exit; continuing shutdown.", ex);
+            LOGGER.warn("Failed to start logout on app exit; continuing shutdown.", ex);
             logoutFuture = CompletableFuture.completedFuture(null);
         }
 
         logoutFuture.whenComplete((unused, throwable) -> {
             if (throwable != null) {
-                LOGGER.warn( "Logout on app exit completed with errors.", throwable);
+                LOGGER.warn("Logout on app exit completed with errors.", throwable);
             }
             Platform.runLater(() -> {
                 Platform.exit();
@@ -2175,41 +2284,87 @@ public class MainController implements SearchController.ContactActions {
         if (issue == null) {
             return;
         }
-        Runnable task = () -> {
-            if (isRevokedSessionIssue(issue)) {
-                if (shouldSuppressRevokedSessionPopup()) {
-                    LOGGER.debug("Suppressing revoked-session popup during local logout/shutdown flow.");
-                    return;
-                }
-                handleRevokedSessionIssue();
-                return;
-            }
-            if (isMessagingRuntimeIssue(issue)) {
-                handleMessagingRuntimeIssue(issue);
-                return;
-            }
-            if (!settings.isNotificationsShowRuntimePopups()) {
-                return;
-            }
-            if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {
-                return;
-            }
-            PopupMessageBuilder.create()
-                    .popupKey(UiConstants.POPUP_RUNTIME_ISSUE)
-                    .title(issue.title())
-                    .message(issue.message())
-                    .actionText("Retry")
-                    .cancelText("Dismiss")
-                    .showCancel(true)
-                    .onAction(() -> runRuntimeIssueRetry(issue.retryAction()))
-                    .show();
-        };
+        Runnable task = () -> handleRuntimeIssueOnUiThread(issue);
 
         if (Platform.isFxApplicationThread()) {
             task.run();
         } else {
             Platform.runLater(task);
         }
+    }
+
+    /**
+     * Handles runtime issue after marshaling execution to the JavaFX application
+     * thread.
+     *
+     * @param issue runtime issue to render/handle
+     */
+    private void handleRuntimeIssueOnUiThread(RuntimeIssue issue) {
+        if (handleSpecialRuntimeIssue(issue)) {
+            return;
+        }
+        if (!shouldShowGenericRuntimeIssuePopup(issue)) {
+            return;
+        }
+        showGenericRuntimeIssuePopup(issue);
+    }
+
+    /**
+     * Handles runtime issues with dedicated flows and returns whether the issue was
+     * consumed.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when issue has been fully handled
+     */
+    private boolean handleSpecialRuntimeIssue(RuntimeIssue issue) {
+        if (isRevokedSessionIssue(issue)) {
+            if (shouldSuppressRevokedSessionPopup()) {
+                LOGGER.debug("Suppressing revoked-session popup during local logout/shutdown flow.");
+                return true;
+            }
+            handleRevokedSessionIssue();
+            return true;
+        }
+        if (isUndecryptableMessagesIssue(issue)) {
+            handleUndecryptableMessagesIssue(issue);
+            return true;
+        }
+        if (isMessagingRuntimeIssue(issue)) {
+            handleMessagingRuntimeIssue(issue);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether generic runtime popup notifications are enabled and permitted by
+     * cooldown gate.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when generic popup should be shown
+     */
+    private boolean shouldShowGenericRuntimeIssuePopup(RuntimeIssue issue) {
+        if (!settings.isNotificationsShowRuntimePopups()) {
+            return false;
+        }
+        return runtimeIssuePopupGate.shouldShow(issue.dedupeKey());
+    }
+
+    /**
+     * Displays the generic retry/dismiss runtime popup.
+     *
+     * @param issue runtime issue to render
+     */
+    private void showGenericRuntimeIssuePopup(RuntimeIssue issue) {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_RUNTIME_ISSUE)
+                .title(issue.title())
+                .message(issue.message())
+                .actionText("Retry")
+                .cancelText("Dismiss")
+                .showCancel(true)
+                .onAction(() -> runRuntimeIssueRetry(issue.retryAction()))
+                .show();
     }
 
     /**
@@ -2220,6 +2375,17 @@ public class MainController implements SearchController.ContactActions {
      */
     private static boolean isRevokedSessionIssue(RuntimeIssue issue) {
         return issue != null && "messaging.session.revoked".equals(issue.dedupeKey());
+    }
+
+    /**
+     * Checks whether runtime issue indicates skipped undecryptable encrypted
+     * messages.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when issue key marks undecryptable-message handling
+     */
+    private static boolean isUndecryptableMessagesIssue(RuntimeIssue issue) {
+        return issue != null && UNDECRYPTABLE_MESSAGES_ISSUE_KEY.equals(issue.dedupeKey());
     }
 
     /**
@@ -2238,15 +2404,87 @@ public class MainController implements SearchController.ContactActions {
         if (!runtimeIssuePopupGate.shouldShow("messaging.session.revoked")) {
             return;
         }
+        sessionExpired.set(true);
+        cancelScheduledTokenRefresh();
+        updateSessionExpiryIndicator();
         PopupMessageBuilder.create()
                 .popupKey(POPUP_SESSION_REVOKED)
                 .title("Session Expired")
-                .message("Your session expired due to inactivity. Please log in again.")
+                .message("Your session has expired. You can try refreshing once or log in again.")
+                .actionText("Refresh Session")
+                .cancelText("Log out")
+                .showCancel(true)
+                .movable(false)
+                .onAction(this::attemptManualSessionRefresh)
+                .onCancel(this::completeRevokedSessionLogout)
+                .show();
+    }
+
+    /**
+     * Attempts one manual refresh-token rotation after session-expired popup
+     * confirmation.
+     */
+    private void attemptManualSessionRefresh() {
+        if (!tokenRefreshInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                AuthSessionState.Snapshot snapshot = AuthSessionState.get();
+                if (snapshot == null || snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
+                    Platform.runLater(this::completeRevokedSessionLogout);
+                    return;
+                }
+
+                TokenRefreshService.TokenRefreshResult result = tokenRefreshService.refresh(snapshot.refreshToken());
+                if (result.success()) {
+                    applySuccessfulTokenRefresh(result);
+                    return;
+                }
+                if (result.invalidSession()) {
+                    Platform.runLater(this::completeRevokedSessionLogout);
+                    return;
+                }
+                Platform.runLater(this::showManualRefreshFailedPopup);
+            } finally {
+                tokenRefreshInFlight.set(false);
+            }
+        });
+    }
+
+    /**
+     * Shows fallback popup when manual refresh attempt fails due to transient
+     * transport/server errors.
+     */
+    private void showManualRefreshFailedPopup() {
+        PopupMessageBuilder.create()
+                .popupKey(POPUP_SESSION_REFRESH_FAILED)
+                .title("Refresh failed")
+                .message("Could not refresh your session. Please log in again.")
                 .actionText("Go to Login")
                 .singleAction(true)
                 .movable(false)
                 .onAction(this::completeRevokedSessionLogout)
-                .onCancel(this::completeRevokedSessionLogout)
+                .show();
+    }
+
+    /**
+     * Shows a one-time informational popup when one or more envelopes cannot be
+     * decrypted on this device.
+     *
+     * @param issue undecryptable-message runtime issue
+     */
+    private void handleUndecryptableMessagesIssue(RuntimeIssue issue) {
+        if (!undecryptableMessagesPopupShown.compareAndSet(false, true)) {
+            return;
+        }
+        PopupMessageBuilder.create()
+                .popupKey(POPUP_UNDECRYPTABLE_MESSAGES)
+                .title(issue.title())
+                .message(issue.message())
+                .actionText("Dismiss")
+                .singleAction(true)
+                .movable(false)
                 .show();
     }
 
@@ -2287,7 +2525,7 @@ public class MainController implements SearchController.ContactActions {
 
         String autoRetryKey = issue.dedupeKey() + ".auto-retry";
         if (!chatAutoRetryGate.shouldShow(autoRetryKey)) {
-            LOGGER.debug( "Skipping duplicate chat auto-retry for key: {}", issue.dedupeKey());
+            LOGGER.debug("Skipping duplicate chat auto-retry for key: {}", issue.dedupeKey());
             return;
         }
 
@@ -2329,7 +2567,7 @@ public class MainController implements SearchController.ContactActions {
         try {
             retryAction.run();
         } catch (Exception ex) {
-            LOGGER.warn( "Runtime issue retry action failed", ex);
+            LOGGER.warn("Runtime issue retry action failed", ex);
         }
     }
 
@@ -2441,8 +2679,8 @@ public class MainController implements SearchController.ContactActions {
      * Shows a desktop notification for an incoming message when notification rules
      * allow it.
      *
-     * @param senderId sender/contact id of the incoming message
-     * @param message incoming message payload
+     * @param senderId     sender/contact id of the incoming message
+     * @param message      incoming message payload
      * @param unreadAction unread action produced for this incoming event
      */
     private void maybeShowIncomingOsNotification(
@@ -2451,7 +2689,8 @@ public class MainController implements SearchController.ContactActions {
             MainViewModel.IncomingUnreadAction unreadAction) {
         Stage stage = ViewRouter.getMainStage();
         boolean windowFocused = stage != null && stage.isFocused();
-        if (!shouldShowIncomingOsNotification(settings.isNotificationsShowOsNotifications(), unreadAction, windowFocused)) {
+        if (!shouldShowIncomingOsNotification(settings.isNotificationsShowOsNotifications(), unreadAction,
+                windowFocused)) {
             return;
         }
 
@@ -2468,8 +2707,8 @@ public class MainController implements SearchController.ContactActions {
      * Determines whether an incoming-message desktop notification should be shown.
      *
      * @param notificationsEnabled whether OS notifications are enabled in settings
-     * @param unreadAction unread action for the incoming event
-     * @param windowFocused whether the main window is currently focused
+     * @param unreadAction         unread action for the incoming event
+     * @param windowFocused        whether the main window is currently focused
      * @return {@code true} when a desktop notification should be shown
      */
     static boolean shouldShowIncomingOsNotification(
@@ -2486,7 +2725,7 @@ public class MainController implements SearchController.ContactActions {
      * Resolves desktop-notification body text from message content and privacy
      * settings.
      *
-     * @param message incoming message payload
+     * @param message            incoming message payload
      * @param showMessagePreview whether text previews are allowed in notifications
      * @return notification body text
      */

@@ -1,7 +1,7 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.models.UserProfileInfo;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.RankIconResolver;
 import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
@@ -146,7 +146,7 @@ public class ProfileController {
      * @param actionLabel action name displayed in popup/log output
      */
     private void showStubDialog(String actionLabel) {
-        LOGGER.info( "{} clicked.", actionLabel);
+        LOGGER.info("{} clicked.", actionLabel);
         PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_PROFILE_STUB)
                 .title(actionLabel)

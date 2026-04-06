@@ -1,8 +1,8 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ImageSaveSupport;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.WindowResizeHelper;
@@ -76,9 +76,9 @@ public class PreviewController {
     /**
      * Displays an image preview and configures optional download support.
      *
-     * @param imageUriOrPath image URI/path to preview
+     * @param imageUriOrPath    image URI/path to preview
      * @param suggestedFileName preferred filename shown in save dialog
-     * @param downloadAllowed whether downloading the previewed image is allowed
+     * @param downloadAllowed   whether downloading the previewed image is allowed
      */
     public void showImage(String imageUriOrPath, String suggestedFileName, boolean downloadAllowed) {
         this.imageUriOrPath = imageUriOrPath;
@@ -167,7 +167,7 @@ public class PreviewController {
      * the latest preview request.
      *
      * @param previewLoadId sequence id captured when load started
-     * @param image loaded image candidate
+     * @param image         loaded image candidate
      */
     private void completePreviewLoadIfCurrent(long previewLoadId, Image image) {
         if (!isCurrentPreviewLoad(previewLoadId, image)) {
@@ -181,7 +181,7 @@ public class PreviewController {
      * Checks whether a callback still targets the current previewed image.
      *
      * @param previewLoadId sequence id captured when load started
-     * @param image image tied to callback invocation
+     * @param image         image tied to callback invocation
      * @return {@code true} when callback belongs to latest preview request
      */
     private boolean isCurrentPreviewLoad(long previewLoadId, Image image) {
@@ -326,7 +326,8 @@ public class PreviewController {
     }
 
     /**
-     * Scales preview image dimensions to fit max bounds while preserving aspect ratio.
+     * Scales preview image dimensions to fit max bounds while preserving aspect
+     * ratio.
      *
      * @param image loaded image to size in the preview container
      */
