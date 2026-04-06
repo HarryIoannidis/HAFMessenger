@@ -316,40 +316,19 @@ public class MessagesViewModel {
             }
 
             LocalDateTime timestamp = LocalDateTime.now();
-            boolean canInline = fileBytes.length <= policy.getAttachmentInlineMaxBytes()
-                    && canSendInlineWithinWsBudget(fileName, mediaType, fileBytes.length);
-            if (canInline) {
-                sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
-                DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
-                runOnUiThread(() -> {
-                    getMessages(contactId).add(outgoing.message());
-                    if (outgoing.fallbackNotice() != null) {
-                        notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
-                    }
-                    status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
-                });
+            if (shouldSendInlineAttachment(fileBytes, policy, fileName, mediaType)) {
+                sendInlineAttachmentAndRender(contactId, fileName, mediaType, fileBytes, timestamp);
             } else {
-                loadingVm = buildLoadingAttachmentVm(true, mediaType, fileName, fileBytes.length, timestamp);
-                MessageVM finalLoadingVm = loadingVm;
-                runOnUiThread(() -> {
-                    getMessages(contactId).add(finalLoadingVm);
-                    status.set(buildAttachmentLoadingStatus(contactId, mediaType, true));
-                });
-
-                sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
-
-                DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
-                MessageVM resolvedLoadingVm = loadingVm;
-                runOnUiThread(() -> {
-                    replaceLoadingMessage(
-                            contactId,
-                            resolvedLoadingVm,
-                            outgoing.message(),
-                            buildAttachmentDeliveredStatus(contactId, mediaType, true));
-                    if (outgoing.fallbackNotice() != null) {
-                        notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
-                    }
-                });
+                loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, mediaType, fileName, fileBytes.length,
+                        timestamp);
+                sendChunkedAttachmentAndRender(
+                        contactId,
+                        fileName,
+                        mediaType,
+                        fileBytes,
+                        policy,
+                        timestamp,
+                        loadingVm);
             }
 
             clearFailedSendRetryAction();
@@ -386,6 +365,111 @@ public class MessagesViewModel {
                 "Attachment could not be sent",
                 "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
                 this::retryLastFailedOperation);
+    }
+
+    /**
+     * Returns whether attachment should be sent inline (single envelope) instead of
+     * chunked upload.
+     *
+     * @param fileBytes attachment bytes
+     * @param policy    active messaging policy snapshot
+     * @param fileName  attachment file name
+     * @param mediaType normalized media type
+     * @return {@code true} when inline transport should be used
+     */
+    private boolean shouldSendInlineAttachment(byte[] fileBytes,
+            MessagingPolicyResponse policy,
+            String fileName,
+            String mediaType) {
+        return fileBytes.length <= policy.getAttachmentInlineMaxBytes()
+                && canSendInlineWithinWsBudget(fileName, mediaType, fileBytes.length);
+    }
+
+    /**
+     * Sends attachment using inline transport and appends the resolved outgoing
+     * message bubble.
+     *
+     * @param contactId recipient/contact id
+     * @param fileName  attachment file name
+     * @param mediaType normalized media type
+     * @param fileBytes attachment bytes
+     * @param timestamp message timestamp
+     * @throws Exception when inline transport fails
+     */
+    private void sendInlineAttachmentAndRender(String contactId,
+            String fileName,
+            String mediaType,
+            byte[] fileBytes,
+            LocalDateTime timestamp) throws Exception {
+        sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
+        DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
+        runOnUiThread(() -> {
+            getMessages(contactId).add(outgoing.message());
+            if (outgoing.fallbackNotice() != null) {
+                notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+            }
+            status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
+        });
+    }
+
+    /**
+     * Shows outgoing loading placeholder while chunked upload is running.
+     *
+     * @param contactId     recipient/contact id
+     * @param mediaType     normalized media type
+     * @param fileName      attachment file name
+     * @param fileSizeBytes attachment size in bytes
+     * @param timestamp     message timestamp
+     * @return loading placeholder message model
+     */
+    private MessageVM showOutgoingAttachmentLoadingPlaceholder(String contactId,
+            String mediaType,
+            String fileName,
+            long fileSizeBytes,
+            LocalDateTime timestamp) {
+        MessageVM loadingVm = buildLoadingAttachmentVm(true, mediaType, fileName, fileSizeBytes, timestamp);
+        MessageVM finalLoadingVm = loadingVm;
+        runOnUiThread(() -> {
+            getMessages(contactId).add(finalLoadingVm);
+            status.set(buildAttachmentLoadingStatus(contactId, mediaType, true));
+        });
+        return loadingVm;
+    }
+
+    /**
+     * Sends attachment using chunked transport and replaces loading placeholder
+     * with resolved outgoing message bubble.
+     *
+     * @param contactId recipient/contact id
+     * @param fileName  attachment file name
+     * @param mediaType normalized media type
+     * @param fileBytes attachment bytes
+     * @param policy    active messaging policy snapshot
+     * @param timestamp message timestamp
+     * @param loadingVm loading placeholder message
+     * @throws Exception when chunked upload flow fails
+     */
+    private void sendChunkedAttachmentAndRender(String contactId,
+            String fileName,
+            String mediaType,
+            byte[] fileBytes,
+            MessagingPolicyResponse policy,
+            LocalDateTime timestamp,
+            MessageVM loadingVm) throws Exception {
+        sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
+
+        DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
+        MessageVM resolvedLoadingVm = loadingVm;
+        runOnUiThread(() -> {
+            replaceLoadingMessage(
+                    contactId,
+                    resolvedLoadingVm,
+                    outgoing.message(),
+                    buildAttachmentDeliveredStatus(contactId, mediaType, true));
+            if (outgoing.fallbackNotice() != null) {
+                notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+            }
+        });
     }
 
     /**
