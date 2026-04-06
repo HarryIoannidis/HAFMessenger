@@ -16,6 +16,7 @@ import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.dto.AttachmentInlinePayload;
 import com.haf.shared.dto.AttachmentReferencePayload;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
@@ -188,6 +189,15 @@ public class MessagesViewModel {
                             "messaging.session.revoked",
                             "Session expired",
                             "Your session expired due to inactivity. Please log in again.",
+                            () -> {
+                            });
+                    return;
+                }
+                if (isUndecryptableEnvelopeError(error)) {
+                    publishRuntimeIssue(
+                            "messaging.undecryptable.envelopes",
+                            "Some messages could not be decrypted",
+                            "Some messages were encrypted with keys not available on this device and were skipped.",
                             () -> {
                             });
                     return;
@@ -869,6 +879,24 @@ public class MessagesViewModel {
             }
             String message = current.getMessage();
             if (message != null && message.toLowerCase().contains("invalid session")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Detects undecryptable-envelope failures surfaced by receiver decryption
+     * fallback exhaustion.
+     *
+     * @param error runtime error candidate
+     * @return {@code true} when envelope decryption failed integrity verification
+     */
+    private static boolean isUndecryptableEnvelopeError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof MessageTamperedException) {
                 return true;
             }
             current = current.getCause();

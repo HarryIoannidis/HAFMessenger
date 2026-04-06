@@ -13,6 +13,7 @@ HAFMessenger/
     src/main/java/
       module-info.java
       com/haf/client/
+        builders/
         controllers/
         core/
         crypto/
@@ -51,6 +52,7 @@ HAFMessenger/
         ingress/
         metrics/
         router/
+        security/
     src/main/resources/
       config/
       db/
@@ -108,8 +110,8 @@ HAFMessenger/
 
 ## Key Types/Interfaces
 
-- Client packages: `controllers`, `viewmodels`, `services`, `network`, `crypto`, `security`, `utils`, `models`, `core`, `exceptions`.
-- Server packages: `config`, `core`, `ingress`, `router`, `db`, `handlers`, `metrics`, `exceptions`.
+- Client packages: `builders`, `controllers`, `viewmodels`, `services`, `network`, `crypto`, `security`, `utils`, `models`, `core`, `exceptions`.
+- Server packages: `config`, `core`, `ingress`, `router`, `db`, `handlers`, `metrics`, `security`, `exceptions`.
 - Shared packages: `dto`, `requests`, `responses`, `constants`, `crypto`, `keystore`, `utils`, `exceptions`.
 
 ## Flow
@@ -132,4 +134,6 @@ HAFMessenger/
 - `client/src/main/java/module-info.java`
 - `server/src/main/java/module-info.java`
 - `shared/src/main/java/module-info.java`
+- `client/src/main/java/com/haf/client/builders`
+- `server/src/main/java/com/haf/server/security/JwtTokenService.java`
 - `.gitignore`

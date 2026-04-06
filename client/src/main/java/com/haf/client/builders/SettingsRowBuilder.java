@@ -1,4 +1,4 @@
-package com.haf.client.utils;
+package com.haf.client.builders;
 
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXCheckBox;

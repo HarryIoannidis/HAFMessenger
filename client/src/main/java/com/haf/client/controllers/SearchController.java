@@ -1,9 +1,9 @@
 package com.haf.client.controllers;
 
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.RankIconResolver;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
@@ -289,7 +289,7 @@ public class SearchController {
                     populateCard(card, result);
                     loadedCards.add(card);
                 } catch (IOException e) {
-                    LOGGER.error( "Could not load search_result_item.fxml", e);
+                    LOGGER.error("Could not load search_result_item.fxml", e);
                 }
             }
 
@@ -324,7 +324,7 @@ public class SearchController {
                     populateCard(card, result);
                     loadedCards.add(card);
                 } catch (IOException e) {
-                    LOGGER.error( "Could not load search_result_item.fxml", e);
+                    LOGGER.error("Could not load search_result_item.fxml", e);
                 }
             }
 
@@ -583,7 +583,7 @@ public class SearchController {
                 action,
                 () -> {
                     contactActions.addContact(result);
-                    LOGGER.info( "Add contact requested for user: {}", result.getUserId());
+                    LOGGER.info("Add contact requested for user: {}", result.getUserId());
                     runIfPresent(onActionCompleted);
                 },
                 () -> confirmRemoveContact(result, onActionCompleted));
@@ -631,7 +631,7 @@ public class SearchController {
                 .dangerAction(true)
                 .onAction(() -> {
                     contactActions.removeContact(result.getUserId());
-                    LOGGER.info( "Remove contact requested for user: {}", result.getUserId());
+                    LOGGER.info("Remove contact requested for user: {}", result.getUserId());
                     runIfPresent(onActionCompleted);
                 })
                 .show();
@@ -674,7 +674,7 @@ public class SearchController {
         if (result == null) {
             return;
         }
-        LOGGER.info( "Start chat requested for user: {}", result.getUserId());
+        LOGGER.info("Start chat requested for user: {}", result.getUserId());
         contactActions.startChatWith(result);
     }
 
@@ -687,7 +687,7 @@ public class SearchController {
         if (result == null) {
             return;
         }
-        LOGGER.info( "Open profile requested for user: {}", result.getUserId());
+        LOGGER.info("Open profile requested for user: {}", result.getUserId());
         contactActions.openProfile(result);
     }
 

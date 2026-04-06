@@ -1,6 +1,9 @@
-package com.haf.client.utils;
+package com.haf.client.builders;
 
 import com.haf.client.controllers.PopupMessageController;
+import com.haf.client.utils.PopupMessageSpec;
+import com.haf.client.utils.UiConstants;
+import com.haf.client.utils.ViewRouter;
 
 /**
  * Fluent builder for reusable popup messages rendered via {@link ViewRouter}.

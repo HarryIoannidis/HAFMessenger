@@ -1,4 +1,4 @@
-package com.haf.client.utils;
+package com.haf.client.builders;
 
 import com.haf.client.models.MessageVM;
 import com.haf.client.models.MessageType;

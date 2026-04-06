@@ -1,6 +1,7 @@
 package com.haf.client.utils;
 
 import com.jfoenix.controls.JFXCheckBox;
+import com.haf.client.builders.SettingsRowBuilder;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXSlider;
 import com.jfoenix.controls.JFXToggleButton;

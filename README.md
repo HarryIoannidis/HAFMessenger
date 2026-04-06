@@ -10,7 +10,7 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 - Build: Maven multi-module (`shared`, `client`, `server`) targeting Java 25 (`maven.compiler.release=25`).
 - Transport: TLS 1.3 with mode-aware messaging receive transport (dev: WSS push, prod: HTTPS polling).
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
-- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V12`).
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V14`).
 - Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
 - Runtime mode control: server mode is controlled by `HAF_APP_IS_DEV`; client mode by `app.isDev`.
 
@@ -25,7 +25,7 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 
 ## Flow
 
-1. Client authenticates via HTTPS and stores a session id.
+1. Client authenticates via HTTPS and stores access/refresh session tokens.
 2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
 3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
 4. Receiver consumes envelopes via mode-aware transport (dev websocket push, prod HTTPS polling), validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.

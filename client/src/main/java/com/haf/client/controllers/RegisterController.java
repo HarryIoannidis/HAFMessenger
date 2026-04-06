@@ -1,9 +1,9 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.services.DefaultRegistrationService;
 import com.haf.client.services.RegistrationService;
 import com.haf.client.utils.ClientSettings;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.RegisterViewModel;
@@ -175,7 +175,8 @@ public class RegisterController {
     /**
      * Creates a register controller with injected registration service.
      *
-     * @param registrationService registration service used for backend registration flow
+     * @param registrationService registration service used for backend registration
+     *                            flow
      */
     RegisterController(RegistrationService registrationService) {
         this.registrationService = Objects.requireNonNull(registrationService, "registrationService");
@@ -405,7 +406,7 @@ public class RegisterController {
      * Applies strength style to text and password fields.
      *
      * @param strengthLabel label text
-     * @param color strength color
+     * @param color         strength color
      */
     private void applyPasswordStrengthStyle(String strengthLabel, Color color) {
         strengthText.setVisible(true);
@@ -692,7 +693,7 @@ public class RegisterController {
     /**
      * Applies registration result to UI state on JavaFX thread.
      *
-     * @param result registration result returned by service layer
+     * @param result       registration result returned by service layer
      * @param originalText original register button text to restore
      */
     private void handleRegistrationResult(RegistrationService.RegistrationResult result, String originalText) {
@@ -701,7 +702,7 @@ public class RegisterController {
             registerButton.setText(originalText);
 
             if (result instanceof RegistrationService.RegistrationResult.Success) {
-                LOGGER.info( "Registration successful for: {}", viewModel.getEmail());
+                LOGGER.info("Registration successful for: {}", viewModel.getEmail());
                 navigateToLogin();
                 return;
             }
@@ -855,7 +856,7 @@ public class RegisterController {
             Image image = new Image(file.toURI().toString());
             previewThumbnail.setImage(image);
         } catch (Exception e) {
-            LOGGER.error( "Failed to load image preview", e);
+            LOGGER.error("Failed to load image preview", e);
         }
     }
 

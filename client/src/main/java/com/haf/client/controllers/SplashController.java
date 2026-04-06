@@ -1,6 +1,6 @@
 package com.haf.client.controllers;
 
-import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
@@ -105,9 +105,9 @@ public class SplashController {
     /**
      * Creates a standardized startup-failure popup specification.
      *
-     * @param error bootstrap error that should be presented
+     * @param error   bootstrap error that should be presented
      * @param onRetry callback executed when the user retries startup
-     * @param onExit callback executed when the user exits the app
+     * @param onExit  callback executed when the user exits the app
      * @return popup spec tailored to the failure category
      */
     static PopupMessageSpec buildFailurePopupSpec(Throwable error, Runnable onRetry, Runnable onExit) {
@@ -165,7 +165,7 @@ public class SplashController {
     /**
      * Determines whether a startup failure is network-related.
      *
-     * @param root root throwable for type checks
+     * @param root              root throwable for type checks
      * @param normalizedMessage lowercased error message text
      * @return {@code true} when the failure appears to be connectivity-related
      */
@@ -189,7 +189,8 @@ public class SplashController {
      * Determines whether a startup failure indicates missing local resources.
      *
      * @param normalizedMessage lowercased error message text
-     * @return {@code true} when failure text indicates missing FXML/assets/resources
+     * @return {@code true} when failure text indicates missing
+     *         FXML/assets/resources
      */
     private static boolean isResourceFailure(String normalizedMessage) {
         return normalizedMessage.contains("missing at")
@@ -202,7 +203,7 @@ public class SplashController {
     /**
      * Determines whether a startup failure indicates security/crypto setup issues.
      *
-     * @param root root throwable for type checks
+     * @param root              root throwable for type checks
      * @param normalizedMessage lowercased error message text
      * @return {@code true} when failure appears security-related
      */

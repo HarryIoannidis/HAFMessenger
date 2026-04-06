@@ -1,4 +1,4 @@
-package com.haf.client.utils;
+package com.haf.client.builders;
 
 import javafx.animation.PauseTransition;
 import javafx.geometry.Pos;

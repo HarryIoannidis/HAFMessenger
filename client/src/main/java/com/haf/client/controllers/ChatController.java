@@ -1,15 +1,15 @@
 package com.haf.client.controllers;
 
+import com.haf.client.builders.ContextMenuBuilder;
+import com.haf.client.builders.MessageBubbleFactory;
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.core.ChatSession;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.services.ChatAttachmentService;
 import com.haf.client.services.DefaultChatAttachmentService;
 import com.haf.client.utils.ClientSettings;
-import com.haf.client.utils.ContextMenuBuilder;
 import com.haf.client.utils.ImageSaveSupport;
-import com.haf.client.utils.MessageBubbleFactory;
-import com.haf.client.utils.PopupMessageBuilder;
 import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
 import com.haf.client.utils.ViewRouter;
@@ -453,7 +453,7 @@ public class ChatController {
         try {
             return Files.size(filePath) > MAX_ATTACHMENT_BYTES;
         } catch (Exception ex) {
-            LOGGER.warn( "Could not read attachment size", ex);
+            LOGGER.warn("Could not read attachment size", ex);
             return false;
         }
     }
@@ -746,13 +746,13 @@ public class ChatController {
      * Handles context-menu-requested events by firing the interaction target,
      * then scheduling a delayed context menu display.
      *
-     * @param event              context menu event
-     * @param interactionTarget  node that owns the context menu
-     * @param menu               context menu to show
-     * @param contextMenuDelay   shared delay holder for cancellation support
+     * @param event             context menu event
+     * @param interactionTarget node that owns the context menu
+     * @param menu              context menu to show
+     * @param contextMenuDelay  shared delay holder for cancellation support
      */
     private void handleContextMenuRequested(ContextMenuEvent event, Node interactionTarget,
-                                            ContextMenu menu, PauseTransition[] contextMenuDelay) {
+            ContextMenu menu, PauseTransition[] contextMenuDelay) {
         final double screenX = event.getScreenX();
         final double screenY = event.getScreenY();
         if (menu.isShowing()) {
@@ -783,7 +783,7 @@ public class ChatController {
      * @param contextMenuDelay shared delay holder for cancellation support
      */
     private void handleMousePressedForContextMenu(MouseEvent event, ContextMenu menu,
-                                                  PauseTransition[] contextMenuDelay) {
+            PauseTransition[] contextMenuDelay) {
         if (contextMenuDelay[0] != null) {
             contextMenuDelay[0].stop();
         }
@@ -944,7 +944,7 @@ public class ChatController {
             }
             Files.copy(sourcePath, destination, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
-            LOGGER.warn( "Failed to save image download", ex);
+            LOGGER.warn("Failed to save image download", ex);
             showAttachmentError("Could not save attachment. Please try again.");
         }
     }
@@ -953,9 +953,9 @@ public class ChatController {
      * Runs an attachment action and optionally gates it behind a privacy
      * confirmation popup.
      *
-     * @param title popup title when confirmation is enabled
+     * @param title   popup title when confirmation is enabled
      * @param message popup body when confirmation is enabled
-     * @param action action to run when confirmed
+     * @param action  action to run when confirmed
      */
     private void runWithAttachmentOpenConfirmation(String title, String message, Runnable action) {
         if (action == null) {

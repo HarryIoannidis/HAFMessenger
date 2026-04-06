@@ -15,7 +15,7 @@ Document the reusable popup-message scene used for confirmations, notices, and g
 ## Key Types/Interfaces
 
 - `client.controllers.PopupMessageController`
-- `client.utils.PopupMessageBuilder`
+- `client.builders.PopupMessageBuilder`
 - `client.utils.PopupMessageSpec`
 - `client.utils.ViewRouter`
 - `client.utils.UiConstants`
@@ -38,6 +38,6 @@ Document the reusable popup-message scene used for confirmations, notices, and g
 
 - `client/src/main/resources/fxml/popup_message.fxml`
 - `client/src/main/java/com/haf/client/controllers/PopupMessageController.java`
-- `client/src/main/java/com/haf/client/utils/PopupMessageBuilder.java`
+- `client/src/main/java/com/haf/client/builders/PopupMessageBuilder.java`
 - `client/src/main/java/com/haf/client/utils/PopupMessageSpec.java`
 - `client/src/main/java/com/haf/client/controllers/MainController.java`
