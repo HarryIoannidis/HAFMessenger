@@ -16,8 +16,8 @@ import com.haf.client.services.TokenRefreshService;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ClientRuntimeConfig;
-import com.haf.client.utils.ContextMenuBuilder;
-import com.haf.client.utils.PopupMessageBuilder;
+import com.haf.client.builders.ContextMenuBuilder;
+import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.RuntimeIssuePopupGate;
 import com.haf.client.utils.UiConstants;
@@ -2337,7 +2337,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Checks whether generic runtime popup notifications are enabled and permitted by
+     * Checks whether generic runtime popup notifications are enabled and permitted
+     * by
      * cooldown gate.
      *
      * @param issue runtime issue candidate
