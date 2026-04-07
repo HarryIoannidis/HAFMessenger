@@ -11,7 +11,7 @@ The `ClientSettings` engine utilizes a robust `Listener` publisher/subscriber mo
 ## 2. Memory vs Storage Tracking
 
 - Changes processed via sliders or toggle checkboxes within the `SettingsController` instantly update the in-memory variables to ensure zero UI-lag.
-- Background jobs asynchronously push these variables to persistent disk storage using standard `java.util.prefs.Preferences`. By attaching to the OS native user registry/PLIST files, configurations easily survive application restarts.
+- Writes are persisted synchronously in the same call chain: `setValue()` (ClientSettings.java, line 961) calls `persistValue()` (line 1019) which delegates to `java.util.prefs.Preferences` directly on the calling thread. By attaching to the OS native user registry/PLIST files, configurations easily survive application restarts.
 
 ## 3. Dynamic Re-Rendering
 
@@ -23,4 +23,4 @@ When critical UX boundaries are altered by the user (like disabling timestamps o
 
 ## 4. Process Locking Constraints
 
-Certain destructive application settings (like changing network environments) can't be rendered cleanly mid-stream. In these cases, the `SettingsController` hooks to a `requestAppRestart()` callback mechanism natively prompting the JVM to initiate an exit sequence instead of risking corrupt states.
+Certain destructive application settings (like changing network environments) can't be rendered cleanly mid-stream. In these cases, the `SettingsController` invokes the `requestAppRestart()` callback (wired from `MainController`), which performs a full logout via `mainSessionService.logout()`, spawns a new client JVM process through `relaunchClientProcess()`, and then terminates the current process with `Platform.exit()` / `System.exit(0)`.
