@@ -529,6 +529,20 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void token_refresh_rejects_revoked_refresh_token_with_takeover_reason() throws Exception {
+        HttpHandler handler = createHandler("TokenRefreshHandler");
+        when(sessionDAO.refreshSession("refresh-revoked")).thenReturn(null);
+        when(sessionDAO.isRefreshSessionRevoked("refresh-revoked")).thenReturn(true);
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/token/refresh",
+                "{\"refreshToken\":\"refresh-revoked\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(401, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("session revoked by takeover"));
+    }
+
+    @Test
     void logout_rejects_missing_auth() throws Exception {
         HttpHandler handler = createHandler("LogoutHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/logout", "{}");
@@ -549,6 +563,20 @@ class HttpIngressServerTest {
 
         assertEquals(401, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("invalid session"));
+    }
+
+    @Test
+    void logout_rejects_revoked_session_with_takeover_reason() throws Exception {
+        HttpHandler handler = createHandler("LogoutHandler");
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/logout", "{}");
+        exchange.requestHeaders().add("Authorization", "Bearer stale-session");
+        when(sessionDAO.getUserIdForSessionAndTouch("stale-session")).thenReturn(null);
+        when(sessionDAO.isAccessSessionRevoked("stale-session")).thenReturn(true);
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(401, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("session revoked by takeover"));
     }
 
     @Test

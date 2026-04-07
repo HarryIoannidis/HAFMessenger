@@ -55,12 +55,15 @@ public class PopupMessageController {
     public void initialize() {
         setupDragBehavior();
         if (closeButton != null) {
+            closeButton.setFocusTraversable(false);
             closeButton.setOnAction(e -> handleCancel());
         }
         if (cancelButton != null) {
+            cancelButton.setFocusTraversable(true);
             cancelButton.setOnAction(e -> handleCancel());
         }
         if (actionButton != null) {
+            actionButton.setFocusTraversable(true);
             actionButton.setOnAction(e -> handleAction());
         }
     }

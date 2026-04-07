@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
 import com.haf.client.utils.RuntimeIssue;
@@ -65,6 +66,48 @@ class MessageViewModelRuntimeTest {
         assertEquals(1, receiver.startCalls.get());
         assertFalse(issues.isEmpty());
         assertEquals("messaging.receive.start.failed", issues.getFirst().dedupeKey());
+    }
+
+    @Test
+    void session_refresh_transport_restore_reconnects_receiver_without_resending_messages() throws Exception {
+        CountingReceiver receiver = new CountingReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
+
+        viewModel.restoreReceiverTransportAfterSessionRefresh();
+
+        awaitCondition(() -> receiver.startCalls.get() == 1 && receiver.stopCalls.get() == 1);
+        assertEquals(1, receiver.startCalls.get());
+        assertEquals(1, receiver.stopCalls.get());
+    }
+
+    @Test
+    void session_refresh_transport_restore_failure_emits_runtime_issue() throws Exception {
+        FailStartReceiver receiver = new FailStartReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.restoreReceiverTransportAfterSessionRefresh();
+
+        awaitCondition(() -> !issues.isEmpty());
+        assertEquals("messaging.refresh.reconnect.failed", issues.getFirst().dedupeKey());
+    }
+
+    @Test
+    void receiver_takeover_error_emits_takeover_runtime_issue() throws Exception {
+        ListenerCapturingReceiver receiver = new ListenerCapturingReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        receiver.listener().onError(new HttpCommunicationException(
+                "HTTP GET failed with status 401: {\"error\":\"session revoked by takeover\"}",
+                401,
+                "{\"error\":\"session revoked by takeover\"}"));
+
+        awaitCondition(() -> !issues.isEmpty());
+        assertEquals("messaging.session.takeover", issues.getFirst().dedupeKey());
+        assertEquals("Logged out", issues.getFirst().title());
     }
 
     private static void awaitCondition(BooleanSupplier condition) throws InterruptedException {
@@ -133,6 +176,22 @@ class MessageViewModelRuntimeTest {
         public void start() throws IOException {
             startCalls.incrementAndGet();
             throw new IOException("cannot connect");
+        }
+    }
+
+    private static final class ListenerCapturingReceiver extends CountingReceiver {
+        private MessageListener listener;
+
+        @Override
+        public void setMessageListener(MessageListener listener) {
+            this.listener = listener;
+        }
+
+        private MessageListener listener() {
+            if (listener == null) {
+                throw new IllegalStateException("listener");
+            }
+            return listener;
         }
     }
 }

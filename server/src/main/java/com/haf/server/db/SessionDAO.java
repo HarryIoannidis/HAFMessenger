@@ -84,6 +84,20 @@ public final class SessionDAO {
             LIMIT 1
             """;
 
+    private static final String SELECT_REVOKED_BY_ACCESS_JTI_SQL = """
+            SELECT revoked
+            FROM sessions
+            WHERE access_jti = ?
+            LIMIT 1
+            """;
+
+    private static final String SELECT_REVOKED_BY_REFRESH_HASH_SQL = """
+            SELECT revoked
+            FROM sessions
+            WHERE refresh_token_hash = ?
+            LIMIT 1
+            """;
+
     private static final String REVOKE_SESSION_SQL = """
             UPDATE sessions
             SET revoked = TRUE
@@ -420,6 +434,44 @@ public final class SessionDAO {
     }
 
     /**
+     * Checks whether access token maps to a session row explicitly marked revoked.
+     *
+     * @param accessToken access JWT
+     * @return {@code true} when matching session row exists and is revoked
+     */
+    public boolean isAccessSessionRevoked(String accessToken) {
+        VerifiedToken verifiedToken = parseVerifiedAccessToken(accessToken);
+        if (verifiedToken == null) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            return loadRevokedFlagByAccessJti(connection, verifiedToken.jti());
+        } catch (SQLException ex) {
+            auditLogger.logError("db_check_revoked_access_session", null, verifiedToken.jti(), ex);
+            return false;
+        }
+    }
+
+    /**
+     * Checks whether refresh token maps to a session row explicitly marked revoked.
+     *
+     * @param refreshToken refresh token
+     * @return {@code true} when matching session row exists and is revoked
+     */
+    public boolean isRefreshSessionRevoked(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return false;
+        }
+        String refreshTokenHash = sha256Hex(refreshToken);
+        try (Connection connection = dataSource.getConnection()) {
+            return loadRevokedFlagByRefreshHash(connection, refreshTokenHash);
+        } catch (SQLException ex) {
+            auditLogger.logError("db_check_revoked_refresh_session", null, null, ex);
+            return false;
+        }
+    }
+
+    /**
      * Revokes session represented by access JWT.
      *
      * @param accessToken access JWT
@@ -488,6 +540,30 @@ public final class SessionDAO {
             ps.setLong(2, sessionIdleTtlSeconds);
             return ps.executeUpdate() == 1;
         }
+    }
+
+    private boolean loadRevokedFlagByAccessJti(Connection connection, String accessJti) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_REVOKED_BY_ACCESS_JTI_SQL)) {
+            ps.setString(1, accessJti);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBoolean("revoked");
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean loadRevokedFlagByRefreshHash(Connection connection, String refreshTokenHash) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_REVOKED_BY_REFRESH_HASH_SQL)) {
+            ps.setString(1, refreshTokenHash);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBoolean("revoked");
+                }
+            }
+        }
+        return false;
     }
 
     private RefreshSessionRow loadRefreshSessionRow(Connection connection, String refreshTokenHash)

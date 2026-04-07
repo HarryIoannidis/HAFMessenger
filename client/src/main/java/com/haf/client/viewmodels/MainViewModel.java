@@ -17,6 +17,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,6 +79,10 @@ public class MainViewModel {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainViewModel.class);
     private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
+    private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
+    private static final String SESSION_TAKEOVER_TITLE = "Logged out";
+    private static final String SESSION_TAKEOVER_MESSAGE =
+            "You were logged out because this account was signed in on another device.";
     private static final String REVOKED_SESSION_ISSUE_KEY = "messaging.session.revoked";
     private static final String REVOKED_SESSION_TITLE = "Session expired";
     private static final String REVOKED_SESSION_MESSAGE =
@@ -264,13 +269,12 @@ public class MainViewModel {
         return contactsGateway.fetchContacts()
                 .thenAccept(this::applyContactsSnapshot)
                 .exceptionally(ex -> {
+                    if (isSessionTakeoverError(ex)) {
+                        publishSessionTakeoverIssue();
+                        return null;
+                    }
                     if (isRevokedSessionError(ex)) {
-                        publishRuntimeIssue(
-                                REVOKED_SESSION_ISSUE_KEY,
-                                REVOKED_SESSION_TITLE,
-                                REVOKED_SESSION_MESSAGE,
-                                () -> {
-                                });
+                        publishRevokedSessionIssue();
                         return null;
                     }
                     LOGGER.error("Failed to load contacts", ex);
@@ -872,13 +876,12 @@ public class MainViewModel {
                     scheduleAddContactPresenceFallback(userId, baselinePresenceSignal);
                 })
                 .exceptionally(ex -> {
+                    if (isSessionTakeoverError(ex)) {
+                        publishSessionTakeoverIssue();
+                        return null;
+                    }
                     if (isRevokedSessionError(ex)) {
-                        publishRuntimeIssue(
-                                REVOKED_SESSION_ISSUE_KEY,
-                                REVOKED_SESSION_TITLE,
-                                REVOKED_SESSION_MESSAGE,
-                                () -> {
-                                });
+                        publishRevokedSessionIssue();
                         return null;
                     }
                     LOGGER.error("Failed to add contact on server", ex);
@@ -902,13 +905,12 @@ public class MainViewModel {
         }
         contactsGateway.removeContact(userId)
                 .exceptionally(ex -> {
+                    if (isSessionTakeoverError(ex)) {
+                        publishSessionTakeoverIssue();
+                        return null;
+                    }
                     if (isRevokedSessionError(ex)) {
-                        publishRuntimeIssue(
-                                REVOKED_SESSION_ISSUE_KEY,
-                                REVOKED_SESSION_TITLE,
-                                REVOKED_SESSION_MESSAGE,
-                                () -> {
-                                });
+                        publishRevokedSessionIssue();
                         return null;
                     }
                     LOGGER.error("Failed to remove contact on server", ex);
@@ -938,6 +940,31 @@ public class MainViewModel {
                 // Listener failures should not block others.
             }
         }
+    }
+
+    /**
+     * Emits dedicated runtime issue when session has been revoked by another
+     * device takeover.
+     */
+    private void publishSessionTakeoverIssue() {
+        publishRuntimeIssue(
+                SESSION_TAKEOVER_ISSUE_KEY,
+                SESSION_TAKEOVER_TITLE,
+                SESSION_TAKEOVER_MESSAGE,
+                () -> {
+                });
+    }
+
+    /**
+     * Emits runtime issue for generic expired/invalid sessions.
+     */
+    private void publishRevokedSessionIssue() {
+        publishRuntimeIssue(
+                REVOKED_SESSION_ISSUE_KEY,
+                REVOKED_SESSION_TITLE,
+                REVOKED_SESSION_MESSAGE,
+                () -> {
+                });
     }
 
     /**
@@ -982,6 +1009,36 @@ public class MainViewModel {
             current = current.getCause();
         }
         return false;
+    }
+
+    /**
+     * Detects invalid-session failures caused by explicit takeover revocation.
+     *
+     * @param error candidate runtime failure
+     * @return {@code true} when failure chain indicates takeover-triggered revoke
+     */
+    private static boolean isSessionTakeoverError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (containsSessionTakeoverMarker(current.getMessage())) {
+                return true;
+            }
+            if (current instanceof HttpCommunicationException communicationException
+                    && containsSessionTakeoverMarker(communicationException.getResponseBody())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static boolean containsSessionTakeoverMarker(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        return normalized.contains("session revoked by takeover")
+                || normalized.contains("revoked by takeover");
     }
 
     /**

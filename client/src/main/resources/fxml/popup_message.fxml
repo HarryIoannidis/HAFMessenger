@@ -62,8 +62,8 @@
    <bottom>
       <HBox alignment="CENTER" prefHeight="52.0" spacing="10.0" BorderPane.alignment="CENTER">
          <children>
-            <JFXButton fx:id="cancelButton" focusTraversable="false" maxWidth="1.7976931348623157E308" prefHeight="38.0" prefWidth="160.0" styleClass="button-close" text="Cancel" HBox.hgrow="ALWAYS" />
-            <JFXButton fx:id="actionButton" focusTraversable="false" maxWidth="1.7976931348623157E308" prefHeight="38.0" prefWidth="160.0" styleClass="button-action" text="OK" HBox.hgrow="ALWAYS" />
+            <JFXButton fx:id="cancelButton" focusTraversable="true" maxWidth="1.7976931348623157E308" prefHeight="38.0" prefWidth="160.0" styleClass="button-close" text="Cancel" HBox.hgrow="ALWAYS" />
+            <JFXButton fx:id="actionButton" focusTraversable="true" maxWidth="1.7976931348623157E308" prefHeight="38.0" prefWidth="160.0" styleClass="button-action" text="OK" HBox.hgrow="ALWAYS" />
          </children>
          <padding>
             <Insets bottom="10.0" left="12.0" right="12.0" top="4.0" />

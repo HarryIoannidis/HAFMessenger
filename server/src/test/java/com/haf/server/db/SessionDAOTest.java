@@ -156,6 +156,29 @@ class SessionDAOTest {
     }
 
     @Test
+    void isAccessSessionRevoked_returns_true_when_matching_session_is_revoked() throws SQLException {
+        String accessToken = issueToken("user-123", "jti-revoked");
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("SELECT revoked"))).thenReturn(selectStatement);
+        when(selectStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getBoolean("revoked")).thenReturn(true);
+
+        assertTrue(dao.isAccessSessionRevoked(accessToken));
+    }
+
+    @Test
+    void isRefreshSessionRevoked_returns_true_when_matching_session_is_revoked() throws SQLException {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("WHERE refresh_token_hash"))).thenReturn(selectStatement);
+        when(selectStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getBoolean("revoked")).thenReturn(true);
+
+        assertTrue(dao.isRefreshSessionRevoked("refresh-token"));
+    }
+
+    @Test
     void constructor_without_explicit_idle_ttl_uses_access_ttl_when_access_ttl_is_higher_than_default_idle()
             throws SQLException {
         JwtTokenService longAccessTtlService = new JwtTokenService("unit-test-secret", "haf-server", 1_800L);
