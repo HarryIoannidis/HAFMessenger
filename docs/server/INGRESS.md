@@ -32,6 +32,7 @@ Describe implemented HTTPS and websocket ingress surfaces and request handling b
 
 - TLS is restricted to `TLSv1.3` with hardened cipher suites.
 - Invalid auth/session or malformed payloads return structured errors.
+- Auth failures distinguish generic invalid sessions (`invalid session`) from forced-session takeover revocation (`session revoked by takeover`) so clients can show specific logout UX.
 - Ingress does envelope validation only; no plaintext decryption occurs server-side.
 - Rate limiting applies to ingress `POST /messages` and polling endpoints (`GET /messages`, `POST /messages/ack`), and login-specific limits apply to `/login` (email+IP key).
 - Security headers include HSTS, CSP, X-Content-Type-Options, and X-Frame-Options on responses.

@@ -40,7 +40,11 @@ When the HTTP call yields a `200 OK` without error payloads in the `LoginRespons
 
 - `MainController` reads account setting `Auto-refresh Token` (default ON).
 - When ON, the client schedules background refresh calls to `/api/v1/token/refresh` before access expiry and updates `WebSocketAdapter` with the rotated access JWT.
-- When OFF, auto-refresh is disabled and the title bar shows `Session expires at ...` based on current access-token expiry metadata.
+- When ON and refresh fails with an invalid session, the controller maps server reason text to UX:
+  - `session revoked by takeover` => blocking "Logged out" popup and route to login.
+  - other invalid-session failures => blocking "Session Expired" popup with one manual refresh attempt before logout.
+- When OFF, auto-refresh is disabled and the title bar shows `Session expires at ...` based on current access-token expiry metadata, then flips to `Session expired` at expiry time.
+- When a session expires while auto-refresh is OFF, the same revoked-session popup path is used, including one manual refresh attempt and fallback login routing.
 
 ## 5. Transitioning Phase
 
