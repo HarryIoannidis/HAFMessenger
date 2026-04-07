@@ -28,4 +28,13 @@ class PopupMessageControllerTest {
         assertTrue(source.contains("boolean showCloseButton = !isCloseDisabledPopup(spec.popupKey());"));
         assertTrue(source.contains("|| SESSION_REVOKED_POPUP_KEY.equals(popupKey);"));
     }
+
+    @Test
+    void popup_buttons_are_focus_traversable_for_keyboard_navigation() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("closeButton.setFocusTraversable(false);"));
+        assertTrue(source.contains("cancelButton.setFocusTraversable(true);"));
+        assertTrue(source.contains("actionButton.setFocusTraversable(true);"));
+    }
 }

@@ -23,6 +23,7 @@ public final class ServerConfig {
     private static final long DEFAULT_JWT_ACCESS_TTL_SECONDS = 900L;
     private static final long DEFAULT_JWT_REFRESH_TTL_SECONDS = 2_592_000L;
     private static final long DEFAULT_JWT_ABSOLUTE_TTL_SECONDS = 2_592_000L;
+    private static final long DEFAULT_JWT_IDLE_TTL_FLOOR_SECONDS = 600L;
     private static final long DEFAULT_ATTACHMENT_MAX_BYTES = AttachmentConstants.DEFAULT_MAX_BYTES;
     private static final long DEFAULT_ATTACHMENT_INLINE_MAX_BYTES = AttachmentConstants.DEFAULT_INLINE_MAX_BYTES;
     private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
@@ -54,6 +55,7 @@ public final class ServerConfig {
     private final long jwtAccessTtlSeconds;
     private final long jwtRefreshTtlSeconds;
     private final long jwtAbsoluteTtlSeconds;
+    private final long jwtIdleTtlSeconds;
     private final long attachmentMaxBytes;
     private final long attachmentInlineMaxBytes;
     private final int attachmentChunkBytes;
@@ -134,6 +136,9 @@ public final class ServerConfig {
         this.jwtAbsoluteTtlSeconds = parseLong(
                 env.get("HAF_JWT_ABSOLUTE_TTL_SECONDS"),
                 DEFAULT_JWT_ABSOLUTE_TTL_SECONDS);
+        this.jwtIdleTtlSeconds = parseLong(
+                env.get("HAF_JWT_IDLE_TTL_SECONDS"),
+                Math.max(DEFAULT_JWT_IDLE_TTL_FLOOR_SECONDS, this.jwtAccessTtlSeconds));
         this.attachmentMaxBytes = parseLong(env.get("HAF_ATTACHMENT_MAX_BYTES"), DEFAULT_ATTACHMENT_MAX_BYTES);
         this.attachmentInlineMaxBytes = parseLong(env.get("HAF_ATTACHMENT_INLINE_MAX_BYTES"),
                 DEFAULT_ATTACHMENT_INLINE_MAX_BYTES);
@@ -307,6 +312,13 @@ public final class ServerConfig {
     }
 
     /**
+     * Returns idle-session timeout in seconds.
+     */
+    public long getJwtIdleTtlSeconds() {
+        return jwtIdleTtlSeconds;
+    }
+
+    /**
      * Returns maximum attachment bytes accepted by the server.
      */
     public long getAttachmentMaxBytes() {
@@ -375,7 +387,7 @@ public final class ServerConfig {
      * Parses a boolean value from a candidate string.
      *
      * @param candidate raw candidate value
-     * @param key configuration key for diagnostics
+     * @param key       configuration key for diagnostics
      * @return parsed boolean value
      */
     private static boolean parseBoolean(String candidate, String key) {
@@ -392,10 +404,11 @@ public final class ServerConfig {
     /**
      * Parses a long value from a candidate string.
      *
-     * @param candidate raw candidate value from environment input
+     * @param candidate    raw candidate value from environment input
      * @param defaultValue fallback value used when candidate is blank
      * @return parsed long value
-     * @throws ConfigurationException when candidate is non-blank but not a valid long
+     * @throws ConfigurationException when candidate is non-blank but not a valid
+     *                                long
      */
     private static long parseLong(String candidate, long defaultValue) {
         if (candidate == null || candidate.isBlank()) {
@@ -411,7 +424,8 @@ public final class ServerConfig {
     /**
      * Parses and normalizes allowed attachment MIME types.
      *
-     * Uses defaults when no value is provided, normalizes aliases, deduplicates entries, and validates that at
+     * Uses defaults when no value is provided, normalizes aliases, deduplicates
+     * entries, and validates that at
      * least one type remains after normalization.
      *
      * @param candidate comma-separated MIME type string from configuration
@@ -439,7 +453,8 @@ public final class ServerConfig {
     /**
      * Validates search pagination/query configuration constraints.
      *
-     * @throws ConfigurationException when configured search limits are inconsistent or out of range
+     * @throws ConfigurationException when configured search limits are inconsistent
+     *                                or out of range
      */
     private void validateSearchConfig() {
         if (searchPageSize < 1) {
@@ -462,7 +477,8 @@ public final class ServerConfig {
     /**
      * Validates attachment upload policy configuration constraints.
      *
-     * @throws ConfigurationException when attachment limits or chunk sizing are invalid
+     * @throws ConfigurationException when attachment limits or chunk sizing are
+     *                                invalid
      */
     private void validateAttachmentConfig() {
         if (attachmentMaxBytes < 1) {
@@ -502,6 +518,9 @@ public final class ServerConfig {
             throw new ConfigurationException(
                     "HAF_JWT_ABSOLUTE_TTL_SECONDS must be >= HAF_JWT_REFRESH_TTL_SECONDS");
         }
+        if (jwtIdleTtlSeconds < 60L) {
+            throw new ConfigurationException("HAF_JWT_IDLE_TTL_SECONDS must be >= 60");
+        }
     }
 
     /**
@@ -525,6 +544,7 @@ public final class ServerConfig {
                 ", jwtAccessTtlSeconds=" + jwtAccessTtlSeconds +
                 ", jwtRefreshTtlSeconds=" + jwtRefreshTtlSeconds +
                 ", jwtAbsoluteTtlSeconds=" + jwtAbsoluteTtlSeconds +
+                ", jwtIdleTtlSeconds=" + jwtIdleTtlSeconds +
                 ", attachmentMaxBytes=" + attachmentMaxBytes +
                 ", attachmentInlineMaxBytes=" + attachmentInlineMaxBytes +
                 ", attachmentChunkBytes=" + attachmentChunkBytes +

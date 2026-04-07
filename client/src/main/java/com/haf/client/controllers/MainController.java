@@ -65,6 +65,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Locale;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +83,9 @@ public class MainController implements SearchController.ContactActions {
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final String POPUP_SESSION_REVOKED = "popup-session-revoked";
+    private static final String POPUP_SESSION_TAKEOVER = "popup-session-takeover";
     private static final String POPUP_UNDECRYPTABLE_MESSAGES = "popup-undecryptable-messages";
+    private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
     private static final String UNDECRYPTABLE_MESSAGES_ISSUE_KEY = "messaging.undecryptable.envelopes";
     private static final String POPUP_SESSION_REFRESH_FAILED = "popup-session-refresh-failed";
     private static final String SESSION_EXPIRED_LABEL = "Session expired";
@@ -1563,12 +1566,7 @@ public class MainController implements SearchController.ContactActions {
             }
 
             if (result.invalidSession()) {
-                Platform.runLater(() -> handleRuntimeIssue(new RuntimeIssue(
-                        "messaging.session.revoked",
-                        "Session Expired",
-                        "Your session expired due to inactivity. Please log in again.",
-                        () -> {
-                        })));
+                Platform.runLater(() -> handleRuntimeIssue(resolveInvalidSessionRuntimeIssue(result.errorMessage())));
                 return;
             }
 
@@ -1623,6 +1621,7 @@ public class MainController implements SearchController.ContactActions {
      * @param result successful refresh result
      */
     private void applySuccessfulTokenRefresh(TokenRefreshService.TokenRefreshResult result) {
+        boolean recoveredExpiredSession = sessionExpired.get();
         AuthSessionState.set(
                 result.accessToken(),
                 result.refreshToken(),
@@ -1634,6 +1633,9 @@ public class MainController implements SearchController.ContactActions {
         if (adapter != null) {
             adapter.updateAccessToken(result.accessToken());
         }
+        if (recoveredExpiredSession) {
+            restoreMessagingTransportAfterSessionRefresh();
+        }
 
         Platform.runLater(this::updateSessionExpiryIndicator);
         if (autoRefreshTokenEnabled.get()) {
@@ -1641,6 +1643,18 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
         scheduleSessionExpiryIndicatorUpdateFromSessionState();
+    }
+
+    /**
+     * Restores receiver transport after a session-expired flow recovers via token
+     * refresh.
+     */
+    private void restoreMessagingTransportAfterSessionRefresh() {
+        MessagesViewModel chatViewModel = ChatSession.get();
+        if (chatViewModel == null) {
+            return;
+        }
+        chatViewModel.restoreReceiverTransportAfterSessionRefresh();
     }
 
     /**
@@ -2321,6 +2335,14 @@ public class MainController implements SearchController.ContactActions {
      * @return {@code true} when issue has been fully handled
      */
     private boolean handleSpecialRuntimeIssue(RuntimeIssue issue) {
+        if (isSessionTakeoverIssue(issue)) {
+            if (shouldSuppressRevokedSessionPopup()) {
+                LOGGER.debug("Suppressing takeover-session popup during local logout/shutdown flow.");
+                return true;
+            }
+            handleSessionTakeoverIssue();
+            return true;
+        }
         if (isRevokedSessionIssue(issue)) {
             if (shouldSuppressRevokedSessionPopup()) {
                 LOGGER.debug("Suppressing revoked-session popup during local logout/shutdown flow.");
@@ -2383,6 +2405,16 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
+     * Checks whether runtime issue indicates forced logout due to login takeover.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when issue key marks takeover-session handling
+     */
+    private static boolean isSessionTakeoverIssue(RuntimeIssue issue) {
+        return issue != null && SESSION_TAKEOVER_ISSUE_KEY.equals(issue.dedupeKey());
+    }
+
+    /**
      * Checks whether runtime issue indicates skipped undecryptable encrypted
      * messages.
      *
@@ -2422,6 +2454,27 @@ public class MainController implements SearchController.ContactActions {
                 .movable(false)
                 .onAction(this::attemptManualSessionRefresh)
                 .onCancel(this::completeRevokedSessionLogout)
+                .show();
+    }
+
+    /**
+     * Shows blocking takeover-session popup and routes the user to login.
+     */
+    private void handleSessionTakeoverIssue() {
+        if (!runtimeIssuePopupGate.shouldShow(SESSION_TAKEOVER_ISSUE_KEY)) {
+            return;
+        }
+        sessionExpired.set(true);
+        cancelScheduledTokenRefresh();
+        updateSessionExpiryIndicator();
+        PopupMessageBuilder.create()
+                .popupKey(POPUP_SESSION_TAKEOVER)
+                .title("Logged out")
+                .message("A new device logged into this account. You have been logged out.")
+                .actionText("Go to Login")
+                .singleAction(true)
+                .movable(false)
+                .onAction(this::completeRevokedSessionLogout)
                 .show();
     }
 
@@ -2488,6 +2541,39 @@ public class MainController implements SearchController.ContactActions {
             return "Could not refresh your session. Please log in again.";
         }
         return "Could not refresh your session (" + errorMessage.trim() + "). Please log in again.";
+    }
+
+    /**
+     * Maps invalid-session refresh failures to takeover-specific or generic session
+     * runtime issues.
+     *
+     * @param errorMessage refresh failure reason
+     * @return runtime issue payload to publish on UI thread
+     */
+    private static RuntimeIssue resolveInvalidSessionRuntimeIssue(String errorMessage) {
+        if (isTakeoverSessionMessage(errorMessage)) {
+            return new RuntimeIssue(
+                    SESSION_TAKEOVER_ISSUE_KEY,
+                    "Logged out",
+                    "A new device logged into this account. You have been logged out.",
+                    () -> {
+                    });
+        }
+        return new RuntimeIssue(
+                "messaging.session.revoked",
+                "Session Expired",
+                "Your session expired due to inactivity. Please log in again.",
+                () -> {
+                });
+    }
+
+    private static boolean isTakeoverSessionMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.trim().toLowerCase(Locale.ROOT);
+        return normalized.contains("session revoked by takeover")
+                || normalized.contains("revoked by takeover");
     }
 
     /**

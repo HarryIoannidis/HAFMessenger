@@ -84,7 +84,8 @@ public final class Main {
                     auditLogger,
                     jwtTokenService,
                     config.getJwtRefreshTtlSeconds(),
-                    config.getJwtAbsoluteTtlSeconds());
+                    config.getJwtAbsoluteTtlSeconds(),
+                    config.getJwtIdleTtlSeconds());
             FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
             AttachmentDAO attachmentDAO = new AttachmentDAO(dataSource);
             ContactDAO contactDAO = new ContactDAO(dataSource);

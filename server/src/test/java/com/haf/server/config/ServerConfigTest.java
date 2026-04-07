@@ -51,6 +51,7 @@ class ServerConfigTest {
         assertEquals(900L, config.getJwtAccessTtlSeconds());
         assertEquals(2_592_000L, config.getJwtRefreshTtlSeconds());
         assertEquals(2_592_000L, config.getJwtAbsoluteTtlSeconds());
+        assertEquals(900L, config.getJwtIdleTtlSeconds());
         assertEquals(AttachmentConstants.DEFAULT_MAX_BYTES, config.getAttachmentMaxBytes());
         assertEquals(AttachmentConstants.DEFAULT_INLINE_MAX_BYTES, config.getAttachmentInlineMaxBytes());
         assertEquals(AttachmentConstants.DEFAULT_CHUNK_BYTES, config.getAttachmentChunkBytes());
@@ -153,6 +154,24 @@ class ServerConfigTest {
         Map<String, String> env = createMinimalEnv();
         env.put("HAF_JWT_REFRESH_TTL_SECONDS", "1200");
         env.put("HAF_JWT_ABSOLUTE_TTL_SECONDS", "600");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_uses_custom_jwt_idle_ttl_when_configured() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_JWT_IDLE_TTL_SECONDS", "43200");
+
+        ServerConfig config = ServerConfig.fromEnv(env);
+
+        assertEquals(43200L, config.getJwtIdleTtlSeconds());
+    }
+
+    @Test
+    void load_fails_when_jwt_idle_ttl_is_too_low() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_JWT_IDLE_TTL_SECONDS", "30");
 
         assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }

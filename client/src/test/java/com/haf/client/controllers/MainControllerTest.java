@@ -333,6 +333,29 @@ class MainControllerTest {
                 MainController.resolveManualRefreshFailureMessage(" internal server error "));
     }
 
+    @Test
+    void successful_refresh_after_expired_session_restores_messaging_transport() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("boolean recoveredExpiredSession = sessionExpired.get();"));
+        assertTrue(source.contains("if (recoveredExpiredSession) {"));
+        assertTrue(source.contains("restoreMessagingTransportAfterSessionRefresh();"));
+        assertTrue(source.contains("chatViewModel.restoreReceiverTransportAfterSessionRefresh();"));
+    }
+
+    @Test
+    void takeover_session_flow_uses_forced_logout_popup_without_refresh_option() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("resolveInvalidSessionRuntimeIssue(result.errorMessage())"));
+        assertTrue(source.contains("private void handleSessionTakeoverIssue() {"));
+        assertTrue(source.contains(".popupKey(POPUP_SESSION_TAKEOVER)"));
+        assertTrue(source.contains(".title(\"Logged out\")"));
+        assertTrue(source.contains(".message(\"A new device logged into this account. You have been logged out.\")"));
+        assertTrue(source.contains(".actionText(\"Go to Login\")"));
+        assertTrue(source.contains(".singleAction(true)"));
+    }
+
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {
         @Override
         public CompletableFuture<String> fetchContacts() {

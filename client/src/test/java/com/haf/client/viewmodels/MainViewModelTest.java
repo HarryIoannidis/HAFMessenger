@@ -165,6 +165,24 @@ class MainViewModelTest {
     }
 
     @Test
+    void fetch_contacts_takeover_session_emits_takeover_issue() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.failedFuture(
+                        new HttpCommunicationException(
+                                "HTTP GET failed with status 401: {\"error\":\"session revoked by takeover\"}",
+                                401,
+                                "{\"error\":\"session revoked by takeover\"}"))));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.fetchContacts();
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("messaging.session.takeover", issues.getFirst().dedupeKey());
+        assertEquals("Logged out", issues.getFirst().title());
+    }
+
+    @Test
     void add_contact_failure_emits_runtime_issue_and_retry_does_not_duplicate_local_contact() {
         AtomicInteger addCalls = new AtomicInteger();
         AtomicBoolean failAdd = new AtomicBoolean(true);

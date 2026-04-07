@@ -36,6 +36,7 @@ import java.time.ZoneId;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -127,6 +128,10 @@ public class MessagesViewModel {
     private static final int MAX_WS_INBOUND_MESSAGE_BYTES = resolveWsInboundMessageBytes();
     private static final int INLINE_WIRE_HEADROOM_BYTES = 16 * 1024;
     private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
+    private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
+    private static final String SESSION_TAKEOVER_TITLE = "Logged out";
+    private static final String SESSION_TAKEOVER_MESSAGE =
+            "You were logged out because this account was signed in on another device.";
 
     /**
      * Creates a MessagesViewModel.
@@ -184,6 +189,15 @@ public class MessagesViewModel {
              */
             @Override
             public void onError(Throwable error) {
+                if (isSessionTakeoverError(error)) {
+                    publishRuntimeIssue(
+                            SESSION_TAKEOVER_ISSUE_KEY,
+                            SESSION_TAKEOVER_TITLE,
+                            SESSION_TAKEOVER_MESSAGE,
+                            () -> {
+                            });
+                    return;
+                }
                 if (isRevokedSessionError(error)) {
                     publishRuntimeIssue(
                             "messaging.session.revoked",
@@ -736,6 +750,30 @@ public class MessagesViewModel {
     }
 
     /**
+     * Restores receiver transport after access-token rotation succeeds.
+     *
+     * This reconnect path intentionally does not resend the last failed outgoing
+     * message; it only restores inbound/presence transport.
+     */
+    public void restoreReceiverTransportAfterSessionRefresh() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                reconnectReceiver();
+                runOnUiThread(() -> status.set("Messaging connection restored"));
+            } catch (Exception ex) {
+                runOnUiThread(() -> status.set(
+                        "Failed to restore messaging connection: " + resolveErrorMessage(ex, "Unknown error.")));
+                publishRuntimeIssue(
+                        "messaging.refresh.reconnect.failed",
+                        "Connection issue",
+                        "Session refreshed, but messaging connection could not be restored. "
+                                + resolveErrorMessage(ex, "Please retry."),
+                        this::restoreReceiverTransportAfterSessionRefresh);
+            }
+        });
+    }
+
+    /**
      * Notifies all registered presence listeners while isolating failures per
      * listener.
      *
@@ -884,6 +922,37 @@ public class MessagesViewModel {
             current = current.getCause();
         }
         return false;
+    }
+
+    /**
+     * Detects takeover-specific invalid-session errors from authenticated messaging
+     * flows.
+     *
+     * @param error runtime error candidate
+     * @return {@code true} when session was explicitly revoked by takeover
+     */
+    private static boolean isSessionTakeoverError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (containsSessionTakeoverMarker(current.getMessage())) {
+                return true;
+            }
+            if (current instanceof HttpCommunicationException communicationException
+                    && containsSessionTakeoverMarker(communicationException.getResponseBody())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static boolean containsSessionTakeoverMarker(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        return normalized.contains("session revoked by takeover")
+                || normalized.contains("revoked by takeover");
     }
 
     /**

@@ -129,6 +129,7 @@ public final class HttpIngressServer {
     private static final String INTERNAL_SERVER_ERROR = "internal server error";
     private static final String MISSING_OR_INVALID_AUTH = "missing or invalid auth";
     private static final String INVALID_SESSION = "invalid session";
+    private static final String SESSION_REVOKED_BY_TAKEOVER = "session revoked by takeover";
     private static final String INVALID_REQUEST_PATH = "invalid request path";
     private static final String INVALID_CONTACT_ID = "invalid contactId";
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
@@ -1291,8 +1292,11 @@ public final class HttpIngressServer {
 
                 SessionDAO.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
                 if (rotated == null) {
+                    String reason = sessionDAO.isRefreshSessionRevoked(request.getRefreshToken())
+                            ? SESSION_REVOKED_BY_TAKEOVER
+                            : INVALID_SESSION;
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(RefreshTokenResponse.error(INVALID_SESSION)));
+                            JsonCodec.toJson(RefreshTokenResponse.error(reason)));
                     return;
                 }
 
@@ -2562,7 +2566,10 @@ public final class HttpIngressServer {
         String sessionId = authHeader.substring(BEARER_PREFIX.length());
         String callerId = sessionDAO.getUserIdForSessionAndTouch(sessionId);
         if (callerId == null) {
-            return new AuthResult(sessionId, null, INVALID_SESSION);
+            String reason = sessionDAO.isAccessSessionRevoked(sessionId)
+                    ? SESSION_REVOKED_BY_TAKEOVER
+                    : INVALID_SESSION;
+            return new AuthResult(sessionId, null, reason);
         }
         return new AuthResult(sessionId, callerId, null);
     }
