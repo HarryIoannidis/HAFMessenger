@@ -66,7 +66,7 @@ public final class KeystoreRoot {
 
     /**
      * User-level fallback keystore root:
-     * Win: %LOCALAPPDATA%\HAF\keystore or <home>\AppData\Local\HAF\keystore,
+     * Win: %LOCALAPPDATA%\HAF\keystore or [home]\AppData\Local\HAF\keystore,
      * Linux: $XDG_DATA_HOME/haf/keystore or ~/.local/share/haf/keystore.
      * Caller creates dir and applies 0700/ACLs.
      *

@@ -11,7 +11,8 @@ import java.util.Base64;
 import java.security.PrivateKey;
 
 /**
- * Decrypts encrypted message envelopes and enforces validation and expiry checks.
+ * Decrypts encrypted message envelopes and enforces validation and expiry
+ * checks.
  */
 public class MessageDecryptor {
     private final PrivateKey recipientPrivateKey;

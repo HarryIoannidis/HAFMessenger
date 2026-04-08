@@ -1,7 +1,7 @@
 package com.haf.client.services;
 
 import com.haf.client.utils.ClientRuntimeConfig;
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.JsonCodec;
@@ -65,7 +65,7 @@ class DefaultRegistrationServiceTest {
                 HttpClient::newHttpClient,
                 client -> "",
                 (client, request) -> response(201, JsonCodec.toJson(RegisterResponse.success("user-1"))),
-                (file, adminPublicKey) -> new EncryptedFileDTO(),
+                (file, adminPublicKey) -> new EncryptedFile(),
                 (registrationKeyPair, userId, passphrase) -> {
                     saveCalls.incrementAndGet();
                     savedUserId.set(userId);
@@ -91,7 +91,7 @@ class DefaultRegistrationServiceTest {
                 HttpClient::newHttpClient,
                 client -> "",
                 (client, request) -> response(400, JsonCodec.toJson(RegisterResponse.error("Email already exists"))),
-                (file, adminPublicKey) -> new EncryptedFileDTO(),
+                (file, adminPublicKey) -> new EncryptedFile(),
                 (registrationKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));
@@ -125,7 +125,7 @@ class DefaultRegistrationServiceTest {
                 },
                 (file, adminPublicKey) -> {
                     encryptCalls.incrementAndGet();
-                    return new EncryptedFileDTO();
+                    return new EncryptedFile();
                 },
                 (registrationKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
 
@@ -147,7 +147,7 @@ class DefaultRegistrationServiceTest {
                 (client, request) -> {
                     throw new RuntimeException("transport failure");
                 },
-                (file, adminPublicKey) -> new EncryptedFileDTO(),
+                (file, adminPublicKey) -> new EncryptedFile(),
                 (registrationKeyPair, userId, passphrase) -> {
                 });
 

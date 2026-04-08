@@ -13,7 +13,7 @@ import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
@@ -135,8 +135,7 @@ public final class HttpIngressServer {
     private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
     private static final String TOO_MANY_LOGIN_ATTEMPTS = "Too many login attempts";
     private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
-    private static final String TAKEOVER_FIELDS_REQUIRED =
-            "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true";
+    private static final String TAKEOVER_FIELDS_REQUIRED = "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true";
     private static final String TAKEOVER_FINGERPRINT_MISMATCH = "takeover key fingerprint mismatch";
     private static final String STALE_RECIPIENT_KEY_ERROR = "recipient key is stale";
     private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
@@ -928,7 +927,7 @@ public final class HttpIngressServer {
          * @param userId the user ID
          * @return the file ID or null
          */
-        private String storePhoto(EncryptedFileDTO dto, String userId) {
+        private String storePhoto(EncryptedFile dto, String userId) {
             if (dto == null || dto.getCiphertextB64() == null || dto.getCiphertextB64().isBlank()) {
                 return null;
             }
@@ -1149,10 +1148,10 @@ public final class HttpIngressServer {
          * Applies forced takeover effects: key rotation, session revocation, and
          * dev-mode websocket connection closure.
          *
-         * @param userId         authenticated user id
-         * @param publicKeyPem   takeover public key PEM
-         * @param fingerprint    takeover key fingerprint
-         * @param requestId      request id used in audit logs
+         * @param userId       authenticated user id
+         * @param publicKeyPem takeover public key PEM
+         * @param fingerprint  takeover key fingerprint
+         * @param requestId    request id used in audit logs
          */
         private void applyForcedTakeover(
                 String userId,
@@ -1361,10 +1360,10 @@ public final class HttpIngressServer {
         /**
          * Sends JSON response with request id propagation.
          *
-         * @param exchange HTTP exchange
+         * @param exchange  HTTP exchange
          * @param requestId request id
-         * @param status status code
-         * @param body body JSON
+         * @param status    status code
+         * @param body      body JSON
          * @throws IOException on write failure
          */
         private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {

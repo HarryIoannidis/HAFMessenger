@@ -1,6 +1,6 @@
 package com.haf.shared.requests;
 
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import java.io.Serializable;
 
 /**
@@ -19,8 +19,8 @@ public class RegisterRequest implements Serializable {
     private String password;
     private String publicKeyPem;
     private String publicKeyFingerprint;
-    private EncryptedFileDTO idPhoto;
-    private EncryptedFileDTO selfiePhoto;
+    private EncryptedFile idPhoto;
+    private EncryptedFile selfiePhoto;
 
     /**
      * Creates an empty registration request DTO for JSON deserialization.
@@ -196,7 +196,7 @@ public class RegisterRequest implements Serializable {
      *
      * @return encrypted ID-photo payload
      */
-    public EncryptedFileDTO getIdPhoto() {
+    public EncryptedFile getIdPhoto() {
         return idPhoto;
     }
 
@@ -205,7 +205,7 @@ public class RegisterRequest implements Serializable {
      *
      * @param idPhoto encrypted ID-photo payload
      */
-    public void setIdPhoto(EncryptedFileDTO idPhoto) {
+    public void setIdPhoto(EncryptedFile idPhoto) {
         this.idPhoto = idPhoto;
     }
 
@@ -214,7 +214,7 @@ public class RegisterRequest implements Serializable {
      *
      * @return encrypted selfie-photo payload
      */
-    public EncryptedFileDTO getSelfiePhoto() {
+    public EncryptedFile getSelfiePhoto() {
         return selfiePhoto;
     }
 
@@ -223,7 +223,7 @@ public class RegisterRequest implements Serializable {
      *
      * @param selfiePhoto encrypted selfie-photo payload
      */
-    public void setSelfiePhoto(EncryptedFileDTO selfiePhoto) {
+    public void setSelfiePhoto(EncryptedFile selfiePhoto) {
         this.selfiePhoto = selfiePhoto;
     }
 }

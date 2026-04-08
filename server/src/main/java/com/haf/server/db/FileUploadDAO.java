@@ -1,7 +1,7 @@
 package com.haf.server.db;
 
 import com.haf.server.exceptions.DatabaseOperationException;
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -49,7 +49,7 @@ public final class FileUploadDAO {
     }
 
     /**
-     * Persists an {@link EncryptedFileDTO} and returns the generated
+     * Persists an {@link EncryptedFile} and returns the generated
      * {@code file_id}.
      *
      * @param dto        the encrypted file metadata and ciphertext
@@ -58,7 +58,7 @@ public final class FileUploadDAO {
      * @return the new {@code file_id} UUID string
      * @throws DatabaseOperationException if the insert fails
      */
-    public String insert(EncryptedFileDTO dto, String uploaderId) {
+    public String insert(EncryptedFile dto, String uploaderId) {
         Objects.requireNonNull(dto, "dto");
         Objects.requireNonNull(uploaderId, "uploaderId");
 

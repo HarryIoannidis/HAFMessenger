@@ -9,15 +9,14 @@ import java.io.Serializable;
  * The server stores these fields opaquely in {@code file_uploads} without ever
  * possessing the AES session key (true end-to-end encryption).
  *
- * <ul>
- * <li>{@code ciphertextB64} – AES-GCM ciphertext (Base64)</li>
- * <li>{@code ivB64} – 12-byte GCM IV (Base64)</li>
- * <li>{@code tagB64} – 16-byte GCM authentication tag (Base64)</li>
- * <li>{@code ephemeralPublicB64}– sender's ephemeral X25519 public key
- * (Base64/DER)</li>
- * <li>{@code contentType} – MIME type of the original file</li>
- * <li>{@code originalSize} – size in bytes of the plaintext file</li>
- * </ul>
+ * Field meanings:
+ * - {@code ciphertextB64}: AES-GCM ciphertext (Base64)
+ * - {@code ivB64}: 12-byte GCM IV (Base64)
+ * - {@code tagB64}: 16-byte GCM authentication tag (Base64)
+ * - {@code ephemeralPublicB64}: sender's ephemeral X25519 public key
+ *   (Base64/DER)
+ * - {@code contentType}: MIME type of the original file
+ * - {@code originalSize}: size in bytes of the plaintext file
  */
 public class EncryptedFileDTO implements Serializable {
     private String ciphertextB64;

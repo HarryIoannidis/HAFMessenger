@@ -240,8 +240,8 @@ public final class ClientRuntimeConfig {
      * This keeps compatibility for components that still require a websocket URI
      * object, even though production messaging receive mode uses HTTPS polling.
      *
-     * For forwarded tunnel hosts such as {@code <id>-8443...}, this method swaps
-     * the host segment to {@code <id>-8444...}. For explicit HTTPS port 8443, this
+     * For forwarded tunnel hosts such as {@code [id]-8443...}, this method swaps
+     * the host segment to {@code [id]-8444...}. For explicit HTTPS port 8443, this
      * method maps it to WSS port 8444.
      *
      * @param prodServerBaseUri production HTTPS server URI
