@@ -2,6 +2,7 @@ package com.haf.client.crypto;
 
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.EccKeyIO;
 import org.junit.jupiter.api.*;
@@ -135,5 +136,25 @@ class UserKeystoreKeyProviderTest {
 
         assertNotNull(loadedKey);
         assertArrayEquals(externalKp.getPublic().getEncoded(), loadedKey.getEncoded());
+    }
+
+    @Test
+    void bootstrap_constructor_rejects_null_passphrase() {
+        System.setProperty("haf.keystore.root", tmpRoot.toAbsolutePath().toString());
+        try {
+            assertThrows(KeystoreOperationException.class, () -> new UserKeystoreKeyProvider("user-a", null));
+        } finally {
+            System.clearProperty("haf.keystore.root");
+        }
+    }
+
+    @Test
+    void bootstrap_constructor_rejects_empty_passphrase() {
+        System.setProperty("haf.keystore.root", tmpRoot.toAbsolutePath().toString());
+        try {
+            assertThrows(KeystoreOperationException.class, () -> new UserKeystoreKeyProvider("user-a", new char[0]));
+        } finally {
+            System.clearProperty("haf.keystore.root");
+        }
     }
 }

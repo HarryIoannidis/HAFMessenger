@@ -5,6 +5,8 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KeystoreBootstrapTest {
+    private static final char[] BOOTSTRAP_PASS = "test-bootstrap-pass".toCharArray();
+
     private String originalUserHome;
     private Path tempHome;
 
@@ -52,7 +54,7 @@ class KeystoreBootstrapTest {
     @Test
     void bootstrap_creates_user_fallback_with_keys_and_permissions() throws Exception {
         System.out.println("Loaded from: " + KeystoreRoot.class.getProtectionDomain().getCodeSource().getLocation());
-        Path root = KeystoreBootstrap.run();
+        Path root = KeystoreBootstrap.run(null, BOOTSTRAP_PASS);
 
         assertEquals(KeystoreRoot.userFallback().normalize(), root.normalize());
 
@@ -86,6 +88,16 @@ class KeystoreBootstrapTest {
                 assertEquals(2, p3.size(), "file must be 600");
             }
         }
+    }
+
+    @Test
+    void bootstrap_rejects_null_passphrase() {
+        assertThrows(IllegalArgumentException.class, () -> KeystoreBootstrap.run("user-1", null));
+    }
+
+    @Test
+    void bootstrap_rejects_empty_passphrase() {
+        assertThrows(IllegalArgumentException.class, () -> KeystoreBootstrap.run("user-1", new char[0]));
     }
 
 }

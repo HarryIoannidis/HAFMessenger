@@ -11,7 +11,8 @@ Document the client key-provider implementation used by messaging send/receive f
 - Recipient key lookup order:
   1. local keystore metadata match
   2. optional directory-service fetcher callback (`setDirectoryServiceFetcher`)
-- Default constructor path bootstraps keystore root through `KeystoreBootstrap.run(...)` before opening `UserKeystore`.
+- Default constructor path bootstraps keystore root through `KeystoreBootstrap.run(senderId, passphrase)` before opening `UserKeystore`.
+- Client bootstrap requires an explicit non-empty passphrase from login/registration flows and never reads `HAF_KEY_PASS`.
 
 ## Key Types/Interfaces
 
@@ -33,6 +34,7 @@ Document the client key-provider implementation used by messaging send/receive f
 - Missing recipient keys raise `KeyNotFoundException`.
 - Passphrase is cloned and never logged.
 - Directory fetch failures do not silently downgrade security behavior.
+- Empty/null passphrase at bootstrap time raises `KeystoreOperationException`.
 
 ## Related Files
 

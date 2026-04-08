@@ -58,6 +58,7 @@ class UserDAOTest {
         assertNotNull(userId);
         assertFalse(userId.isBlank());
         verify(insertStatement, times(1)).executeUpdate();
+        verify(insertStatement).setString(2, request.getFullName()); // username
         verify(insertStatement).setString(3, request.getEmail()); // email
         verify(insertStatement).setString(4, "$2a$12$hashedPasswordValue"); // password_hash
         verify(insertStatement).setString(8, request.getFullName()); // full_name
