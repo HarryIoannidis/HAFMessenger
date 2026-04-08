@@ -17,7 +17,7 @@ Describe registration scene behavior including credential collection and encrypt
 - `client.viewmodels.RegisterViewModel`
 - `client.services.RegistrationService`
 - `shared.requests.RegisterRequest`
-- `shared.dto.EncryptedFileDTO`
+- `shared.dto.EncryptedFile`
 
 ## Flow
 

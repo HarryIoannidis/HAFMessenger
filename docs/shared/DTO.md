@@ -8,7 +8,7 @@ Describe current shared DTO families used across client/server boundaries.
 
 - Core encrypted payload DTOs:
   - `EncryptedMessage`
-  - `EncryptedFileDTO`
+  - `EncryptedFile`
   - attachment payload DTOs
 - Auth/search/contact and attachment request/response DTOs are split under:
   - `shared.requests`
@@ -19,7 +19,7 @@ Describe current shared DTO families used across client/server boundaries.
 ## Key Types/Interfaces
 
 - `shared.dto.EncryptedMessage`
-- `shared.dto.EncryptedFileDTO`
+- `shared.dto.EncryptedFile`
 - `shared.dto.KeyMetadata`
 - `shared.requests.*`
 - `shared.responses.*`
