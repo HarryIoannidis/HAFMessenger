@@ -14,6 +14,7 @@ Describe current keystore root policy, bootstrap, and sealing behavior.
 - `UserKeystore` stores key directories with `public.pem`, `private.enc`, `metadata.json`.
 - `KeystoreSealing` uses PBKDF2-HMAC-SHA256 + AES-GCM envelope format `v1.<salt>.<iv>.<ciphertext>`.
 - `KeystoreBootstrap` can create initial key material and fallback to user path when privileged paths are unavailable.
+- `KeystoreBootstrap.run(userId, passphrase)` requires an explicit non-empty passphrase and does not source passphrases from environment variables.
 
 ## Key Types/Interfaces
 
@@ -35,6 +36,7 @@ Describe current keystore root policy, bootstrap, and sealing behavior.
 - Private key remains sealed at rest.
 - File permissions are hardened through `FilePerms` helpers.
 - Passphrase arrays are cloned at API boundaries to reduce accidental shared mutable state.
+- Legacy fallback passphrases (for example `dev-pass-change`) are not supported.
 
 ## Related Files
 

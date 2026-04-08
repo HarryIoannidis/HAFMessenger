@@ -5,6 +5,8 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KeystoreBootstrapIdempotentTest {
+    private static final char[] BOOTSTRAP_PASS = "test-bootstrap-pass".toCharArray();
+
     private String originalUserHome;
     private Path tempHome;
 
@@ -38,13 +40,13 @@ class KeystoreBootstrapIdempotentTest {
 
     @Test
     void run_is_idempotent_when_keys_exist() throws Exception {
-        Path root1 = KeystoreBootstrap.run();
+        Path root1 = KeystoreBootstrap.run(null, BOOTSTRAP_PASS);
         long count1;
         try (var s = Files.list(root1)) {
             count1 = s.filter(Files::isDirectory).count();
         }
 
-        Path root2 = KeystoreBootstrap.run();
+        Path root2 = KeystoreBootstrap.run(null, BOOTSTRAP_PASS);
         long count2;
         try (var s = Files.list(root2)) {
             count2 = s.filter(Files::isDirectory).count();

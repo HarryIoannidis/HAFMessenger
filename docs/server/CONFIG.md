@@ -8,6 +8,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 
 - `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
 - Required vars include DB credentials, TLS keystore, key passphrase, strict runtime mode, search cursor secret, and JWT signing secret.
+- `HAF_KEY_PASS` is consumed by server runtime only and is not used by client keystore bootstrap.
 - `HAF_APP_IS_DEV` is required and authoritative for server runtime mode (`true` or `false` only).
 - Optional vars control pool sizing, ports, search limits, and attachment policy.
 - Required keys:

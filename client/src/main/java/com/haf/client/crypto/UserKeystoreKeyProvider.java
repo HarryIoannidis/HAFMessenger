@@ -63,11 +63,25 @@ public class UserKeystoreKeyProvider implements KeyProvider {
      */
     private static Path bootstrapKeystore(String senderId, char[] passphrase) {
         try {
+            requireBootstrapPassphrase(senderId, passphrase);
             return KeystoreBootstrap.run(senderId, passphrase);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new KeystoreOperationException("Keystore bootstrap failed for user: " + senderId, e);
+        }
+    }
+
+    /**
+     * Ensures bootstrap is always executed with an explicit non-empty passphrase.
+     *
+     * @param senderId   sender id bound to the keystore root
+     * @param passphrase passphrase provided by login/registration flow
+     */
+    private static void requireBootstrapPassphrase(String senderId, char[] passphrase) {
+        if (passphrase == null || passphrase.length == 0) {
+            throw new KeystoreOperationException(
+                    "Keystore bootstrap requires non-empty passphrase for user: " + senderId);
         }
     }
 

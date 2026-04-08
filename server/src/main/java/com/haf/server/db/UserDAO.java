@@ -120,7 +120,7 @@ public final class UserDAO {
                 PreparedStatement ps = connection.prepareStatement(INSERT_SQL)) {
 
             ps.setString(1, userId);
-            ps.setString(2, request.getEmail()); // username = email
+            ps.setString(2, request.getFullName()); // username = full name
             ps.setString(3, request.getEmail());
             ps.setString(4, hashedPassword);
             ps.setString(5, request.getRank());

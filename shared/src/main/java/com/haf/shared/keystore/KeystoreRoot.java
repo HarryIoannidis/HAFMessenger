@@ -10,7 +10,8 @@ public final class KeystoreRoot {
     /**
      * Prevents instantiation of this utility class.
      */
-    private KeystoreRoot() {}
+    private KeystoreRoot() {
+    }
 
     /**
      * Preferred keystore root:
@@ -36,7 +37,8 @@ public final class KeystoreRoot {
     }
 
     /**
-     * Resolves the preferred base keystore directory from system properties, environment,
+     * Resolves the preferred base keystore directory from system properties,
+     * environment,
      * and platform defaults.
      *
      * @return base preferred keystore path
@@ -88,7 +90,8 @@ public final class KeystoreRoot {
     }
 
     /**
-     * Resolves a per-user fallback keystore directory from environment and platform defaults.
+     * Resolves a per-user fallback keystore directory from environment and platform
+     * defaults.
      *
      * @return base fallback keystore path
      */
