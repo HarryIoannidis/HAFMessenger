@@ -28,7 +28,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - `MetricsRegistry`, `AuditLogger`, `EncryptedMessageValidator`, `JwtTokenService`
   - DAOs in `server.db`
 - Shared notable classes:
-  - `EncryptedMessage`, `EncryptedFileDTO`, attachment payload DTOs, request/response DTOs including token refresh DTOs
+  - `EncryptedMessage`, `EncryptedFile`, attachment payload DTOs, request/response DTOs including token refresh DTOs
   - `MessageValidator`, `JsonCodec`, `MessageEncryptor`, `MessageDecryptor`, `AttachmentPayloadCodec`
   - `KeyProvider`, `UserKeystore`, `KeystoreBootstrap`
 
@@ -92,7 +92,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - `module-info.java`
   - Constants: `AttachmentConstants.java`, `CryptoConstants.java`, `MessageHeader.java`
   - Crypto: `AadCodec.java`, `CryptoECC.java`, `CryptoService.java`, `MessageDecryptor.java`, `MessageEncryptor.java`
-  - DTO: `AttachmentInlinePayload.java`, `AttachmentReferencePayload.java`, `EncryptedFileDTO.java`, `EncryptedMessage.java`, `KeyMetadata.java`, `UserSearchResultDTO.java`
+  - DTO: `AttachmentInlinePayload.java`, `AttachmentReferencePayload.java`, `EncryptedFile.java`, `EncryptedMessage.java`, `KeyMetadata.java`, `UserSearchResultDTO.java`
   - Exceptions: `CryptoOperationException.java`, `JsonCodecException.java`, `KeyNotFoundException.java`, `KeystoreOperationException.java`, `MessageDecryptionException.java`, `MessageExpiredException.java`, `MessageTamperedException.java`, `MessageValidationException.java`
   - Keystore: `KeyProvider.java`, `KeystoreBootstrap.java`, `KeystoreRoot.java`, `KeystoreSealing.java`, `UserKeystore.java`
   - Requests: `AddContactRequest.java`, `AttachmentBindRequest.java`, `AttachmentChunkRequest.java`, `AttachmentCompleteRequest.java`, `AttachmentInitRequest.java`, `LoginRequest.java`, `RefreshTokenRequest.java`, `RegisterRequest.java`
@@ -103,7 +103,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Integration tests: `KeystoreE2EIT.java`, `KeystorePermsE2EIT.java`, `KeystoreTamperIT.java`, `KeystoreWrongPassIT.java`
   - Constants: `AttachmentConstantsTest.java`, `CryptoConstantsTest.java`, `MessageHeaderTest.java`
   - Crypto: `AadBindingTest.java`, `AadCodecTest.java`, `CryptoECCTest.java`, `CryptoServiceTest.java`, `MessageDecryptorTest.java`, `MessageEncryptorTest.java`, `MessageFlowTest.java`
-  - DTO: `EncryptedFileDTOTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultDTOTest.java`
+  - DTO: `EncryptedFileTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultDTOTest.java`
   - Exceptions: `MessageExpiryTest.java`, `MessageTamperingTests.java`
   - Keystore: `KeyProviderTest.java`, `KeystoreBootstrapIdempotentTest.java`, `KeystoreBootstrapTest.java`, `KeystoreRootTest.java`, `KeystoreSealingTest.java`, `UserKeystoreTest.java`
   - Requests: `AddContactRequestTest.java`, `LoginRequestTest.java`

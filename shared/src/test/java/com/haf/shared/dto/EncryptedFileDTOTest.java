@@ -5,7 +5,7 @@ import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class EncryptedFileDTOTest {
+class EncryptedFileTest {
 
     @Test
     void fields_survive_json_round_trip() {

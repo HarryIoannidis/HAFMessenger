@@ -14,11 +14,11 @@ import java.io.Serializable;
  * - {@code ivB64}: 12-byte GCM IV (Base64)
  * - {@code tagB64}: 16-byte GCM authentication tag (Base64)
  * - {@code ephemeralPublicB64}: sender's ephemeral X25519 public key
- *   (Base64/DER)
+ * (Base64/DER)
  * - {@code contentType}: MIME type of the original file
  * - {@code originalSize}: size in bytes of the plaintext file
  */
-public class EncryptedFileDTO implements Serializable {
+public class EncryptedFile implements Serializable {
     private String ciphertextB64;
     private String ivB64;
     private String tagB64;
@@ -29,7 +29,7 @@ public class EncryptedFileDTO implements Serializable {
     /**
      * Creates an empty encrypted file DTO for JSON deserialization.
      */
-    public EncryptedFileDTO() {
+    public EncryptedFile() {
         // Required for JSON deserialization
     }
 

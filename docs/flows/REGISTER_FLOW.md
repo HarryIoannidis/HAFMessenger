@@ -23,7 +23,7 @@ Describe the implemented registration wizard and submission pipeline used by the
 - `client.services.RegistrationService`
 - `client.services.DefaultRegistrationService`
 - `shared.requests.RegisterRequest`
-- `shared.dto.EncryptedFileDTO`
+- `shared.dto.EncryptedFile`
 - `shared.keystore.UserKeystore`
 
 ## Flow
@@ -32,7 +32,7 @@ Describe the implemented registration wizard and submission pipeline used by the
 2. User uploads ID photo and selfie, each validated by `validateFile(...)` and step-specific presence checks.
 3. Controller builds `RegistrationService.RegistrationCommand` from form fields and selected files.
 4. `DefaultRegistrationService` generates an X25519 registration keypair and constructs `RegisterRequest`.
-5. Service tries to fetch admin key from `/api/v1/config/admin-key`; if available, photos are encrypted into `EncryptedFileDTO` payloads.
+5. Service tries to fetch admin key from `/api/v1/config/admin-key`; if available, photos are encrypted into `EncryptedFile` payloads.
 6. Service submits `POST /api/v1/register`.
 7. On success, service persists generated key material in local keystore and UI navigates back to login.
 
