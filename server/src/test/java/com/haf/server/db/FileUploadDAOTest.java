@@ -1,7 +1,7 @@
 package com.haf.server.db;
 
 import com.haf.server.exceptions.DatabaseOperationException;
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +38,7 @@ class FileUploadDAOTest {
     @Test
     void insert_returns_non_blank_file_id() throws SQLException {
         // Arrange
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenReturn(insertStatement);
         when(insertStatement.executeUpdate()).thenReturn(1);
@@ -53,7 +53,7 @@ class FileUploadDAOTest {
 
     @Test
     void insert_executes_update_exactly_once() throws SQLException {
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenReturn(insertStatement);
         when(insertStatement.executeUpdate()).thenReturn(1);
@@ -65,7 +65,7 @@ class FileUploadDAOTest {
 
     @Test
     void insert_sets_uploader_id_as_second_param() throws SQLException {
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(anyString())).thenReturn(insertStatement);
         when(insertStatement.executeUpdate()).thenReturn(1);
@@ -79,7 +79,7 @@ class FileUploadDAOTest {
 
     @Test
     void insert_sets_content_type() throws SQLException {
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         dto.setContentType("image/png");
 
         when(dataSource.getConnection()).thenReturn(connection);
@@ -94,7 +94,7 @@ class FileUploadDAOTest {
 
     @Test
     void insert_uses_fallback_content_type_when_null() throws SQLException {
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         dto.setContentType(null);
 
         when(dataSource.getConnection()).thenReturn(connection);
@@ -109,7 +109,7 @@ class FileUploadDAOTest {
 
     @Test
     void insert_wraps_sql_exception() throws SQLException {
-        EncryptedFileDTO dto = buildValidDto();
+        EncryptedFile dto = buildValidDto();
         when(dataSource.getConnection()).thenThrow(new SQLException("connection failed"));
 
         assertThrows(DatabaseOperationException.class, () -> dao.insert(dto, "user-id"));
@@ -125,8 +125,8 @@ class FileUploadDAOTest {
         assertThrows(NullPointerException.class, () -> dao.insert(buildValidDto(), null));
     }
 
-    private static EncryptedFileDTO buildValidDto() {
-        EncryptedFileDTO dto = new EncryptedFileDTO();
+    private static EncryptedFile buildValidDto() {
+        EncryptedFile dto = new EncryptedFile();
         // Base64-encode some fake ciphertext so the DAO doesn't choke on decode
         dto.setCiphertextB64(Base64.getEncoder().encodeToString("fake-ciphertext-bytes".getBytes()));
         dto.setIvB64(Base64.getEncoder().encodeToString(new byte[12]));

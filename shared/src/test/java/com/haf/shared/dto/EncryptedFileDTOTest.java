@@ -9,7 +9,7 @@ class EncryptedFileDTOTest {
 
     @Test
     void fields_survive_json_round_trip() {
-        EncryptedFileDTO original = new EncryptedFileDTO();
+        EncryptedFile original = new EncryptedFile();
         original.setCiphertextB64("abc123CipherText==");
         original.setIvB64("ivBase64==");
         original.setTagB64("tagBase64==");
@@ -18,7 +18,7 @@ class EncryptedFileDTOTest {
         original.setOriginalSize(512000L);
 
         String json = JsonCodec.toJson(original);
-        EncryptedFileDTO parsed = JsonCodec.fromJson(json, EncryptedFileDTO.class);
+        EncryptedFile parsed = JsonCodec.fromJson(json, EncryptedFile.class);
 
         assertEquals(original.getCiphertextB64(), parsed.getCiphertextB64());
         assertEquals(original.getIvB64(), parsed.getIvB64());
@@ -30,13 +30,13 @@ class EncryptedFileDTOTest {
 
     @Test
     void null_fields_serialize_to_null_in_json() {
-        EncryptedFileDTO dto = new EncryptedFileDTO();
+        EncryptedFile dto = new EncryptedFile();
         // Leave all fields null
 
         String json = JsonCodec.toJson(dto);
 
         // Deserialized back, all fields should still be null
-        EncryptedFileDTO parsed = JsonCodec.fromJson(json, EncryptedFileDTO.class);
+        EncryptedFile parsed = JsonCodec.fromJson(json, EncryptedFile.class);
         assertNull(parsed.getCiphertextB64());
         assertNull(parsed.getIvB64());
         assertNull(parsed.getTagB64());
@@ -48,12 +48,12 @@ class EncryptedFileDTOTest {
     @Test
     void register_request_embeds_id_and_selfie_photos() {
         RegisterRequest req = new RegisterRequest();
-        EncryptedFileDTO idPhoto = new EncryptedFileDTO();
+        EncryptedFile idPhoto = new EncryptedFile();
         idPhoto.setContentType("image/jpeg");
         idPhoto.setCiphertextB64("ct1==");
         req.setIdPhoto(idPhoto);
 
-        EncryptedFileDTO selfiePhoto = new EncryptedFileDTO();
+        EncryptedFile selfiePhoto = new EncryptedFile();
         selfiePhoto.setContentType("image/png");
         selfiePhoto.setCiphertextB64("ct2==");
         req.setSelfiePhoto(selfiePhoto);

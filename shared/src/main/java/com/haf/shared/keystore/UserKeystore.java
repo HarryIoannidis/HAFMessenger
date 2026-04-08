@@ -18,10 +18,10 @@ import java.util.stream.Stream;
 
 /**
  * Folder Structure:
- * <root>/<keyId>/metadata.json
- * <root>/<keyId>/public.pem
- * <root>/<keyId>/private.enc (ASCII envelope: v1.<b64(salt)>. <b64(iv)>.
- * <b64(GCM(ciphertext+tag))>)
+ * [root]/[keyId]/metadata.json
+ * [root]/[keyId]/public.pem
+ * [root]/[keyId]/private.enc
+ * (ASCII envelope: v1.[b64(salt)].[b64(iv)].[b64(GCM(ciphertext+tag))])
  * Note: JavaDoc only in public methods.
  */
 public final class UserKeystore {
@@ -225,7 +225,7 @@ public final class UserKeystore {
     }
 
     /**
-     * Reads <root>/<keyId>/metadata.json for all keyIds and returns KeyMetadata.
+     * Reads [root]/[keyId]/metadata.json for all keyIds and returns KeyMetadata.
      *
      * @return list of KeyMetadata
      * @throws Exception if reading/JSON parsing fails

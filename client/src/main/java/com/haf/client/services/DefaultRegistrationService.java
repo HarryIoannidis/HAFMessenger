@@ -5,7 +5,7 @@ import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.crypto.CryptoECC;
 import com.haf.shared.crypto.CryptoService;
-import com.haf.shared.dto.EncryptedFileDTO;
+import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.keystore.KeystoreRoot;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.requests.RegisterRequest;
@@ -64,7 +64,7 @@ public class DefaultRegistrationService implements RegistrationService {
          *
          * @param client HTTP client to use
          * @return admin public key PEM, or {@code null} when unavailable
-         * @throws InterruptedException when call is interrupted
+         * @throws InterruptedException      when call is interrupted
          * @throws RegistrationFlowException when fetch/parsing fails
          */
         String fetch(HttpClient client) throws InterruptedException, RegistrationFlowException;
@@ -75,10 +75,10 @@ public class DefaultRegistrationService implements RegistrationService {
         /**
          * Sends registration request payload to backend.
          *
-         * @param client configured HTTP client
+         * @param client  configured HTTP client
          * @param request registration request payload
          * @return HTTP response with registration result
-         * @throws InterruptedException when request is interrupted
+         * @throws InterruptedException      when request is interrupted
          * @throws RegistrationFlowException when send fails
          */
         HttpResponse<String> send(HttpClient client, RegisterRequest request)
@@ -90,12 +90,12 @@ public class DefaultRegistrationService implements RegistrationService {
         /**
          * Encrypts a registration photo using admin public key.
          *
-         * @param file photo file to encrypt
+         * @param file           photo file to encrypt
          * @param adminPublicKey admin public key for hybrid encryption
          * @return encrypted-file DTO payload
          * @throws RegistrationFlowException when encryption fails
          */
-        EncryptedFileDTO encrypt(File file, PublicKey adminPublicKey) throws RegistrationFlowException;
+        EncryptedFile encrypt(File file, PublicKey adminPublicKey) throws RegistrationFlowException;
     }
 
     @FunctionalInterface
@@ -104,8 +104,8 @@ public class DefaultRegistrationService implements RegistrationService {
          * Persists generated registration key pair to local keystore.
          *
          * @param registrationKeyPair generated key pair
-         * @param userId registered user id
-         * @param passphrase passphrase used for key protection
+         * @param userId              registered user id
+         * @param passphrase          passphrase used for key protection
          * @throws RegistrationFlowException when persistence fails
          */
         void save(KeyPair registrationKeyPair, String userId, char[] passphrase) throws RegistrationFlowException;
@@ -133,12 +133,12 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Creates registration service with injectable dependencies.
      *
-     * @param keyPairProvider registration keypair provider
-     * @param httpClientProvider HTTP client factory
-     * @param adminKeyProvider admin key fetch strategy
+     * @param keyPairProvider     registration keypair provider
+     * @param httpClientProvider  HTTP client factory
+     * @param adminKeyProvider    admin key fetch strategy
      * @param registrationGateway registration submission gateway
-     * @param photoEncryptor photo encryption strategy
-     * @param keystoreSaver local keystore persistence strategy
+     * @param photoEncryptor      photo encryption strategy
+     * @param keystoreSaver       local keystore persistence strategy
      */
     DefaultRegistrationService(KeyPairProvider keyPairProvider,
             HttpClientProvider httpClientProvider,
@@ -187,16 +187,17 @@ public class DefaultRegistrationService implements RegistrationService {
             Thread.currentThread().interrupt();
             return new RegistrationResult.Failure("Registration interrupted.");
         } catch (RegistrationFlowException e) {
-            LOGGER.error( "Registration failed", e);
+            LOGGER.error("Registration failed", e);
             return new RegistrationResult.Failure("Connection failed. Please try again.");
         } catch (RuntimeException e) {
-            LOGGER.error( "Registration failed", e);
+            LOGGER.error("Registration failed", e);
             return new RegistrationResult.Failure("Connection failed. Please try again.");
         }
     }
 
     /**
-     * Fetches admin key while converting failures into warning logs and null result.
+     * Fetches admin key while converting failures into warning logs and null
+     * result.
      *
      * @param client HTTP client used for admin key fetch
      * @return admin PEM value, or {@code null} when unavailable
@@ -208,10 +209,10 @@ public class DefaultRegistrationService implements RegistrationService {
         } catch (InterruptedException interruptedException) {
             throw interruptedException;
         } catch (RegistrationFlowException ex) {
-            LOGGER.warn( "Failed to fetch admin public key", ex);
+            LOGGER.warn("Failed to fetch admin public key", ex);
             return null;
         } catch (RuntimeException ex) {
-            LOGGER.warn( "Failed to fetch admin public key", ex);
+            LOGGER.warn("Failed to fetch admin public key", ex);
             return null;
         }
     }
@@ -219,8 +220,8 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Encrypts optional registration photos when admin public key is available.
      *
-     * @param command registration command containing photo files
-     * @param request request DTO that receives encrypted photo payloads
+     * @param command  registration command containing photo files
+     * @param request  request DTO that receives encrypted photo payloads
      * @param adminPem admin public key PEM text
      * @throws RegistrationFlowException when PEM parsing or photo encryption fails
      */
@@ -243,22 +244,22 @@ public class DefaultRegistrationService implements RegistrationService {
      * Persists generated keypair locally after successful backend registration.
      *
      * @param registrationKeyPair generated registration keypair
-     * @param userId backend-assigned user id
-     * @param password user password used as passphrase
+     * @param userId              backend-assigned user id
+     * @param password            user password used as passphrase
      */
     private void persistKeypair(KeyPair registrationKeyPair, String userId, String password) {
         try {
             char[] passphrase = password == null ? new char[0] : password.toCharArray();
             keystoreSaver.save(registrationKeyPair, userId, passphrase);
         } catch (RegistrationFlowException e) {
-            LOGGER.error( "Failed to save Keystore after successful registration", e);
+            LOGGER.error("Failed to save Keystore after successful registration", e);
         }
     }
 
     /**
      * Maps registration command + public key into backend register request DTO.
      *
-     * @param command registration command payload
+     * @param command             registration command payload
      * @param registrationKeyPair generated registration keypair
      * @return register request DTO ready for submission
      */
@@ -281,7 +282,7 @@ public class DefaultRegistrationService implements RegistrationService {
      * registration.
      *
      * @param statusCode HTTP response status
-     * @param response parsed register response body
+     * @param response   parsed register response body
      * @return {@code true} when registration succeeded
      */
     private static boolean isSuccessful(int statusCode, RegisterResponse response) {
@@ -323,8 +324,9 @@ public class DefaultRegistrationService implements RegistrationService {
      * Fetches admin public key PEM from config endpoint.
      *
      * @param client configured HTTP client
-     * @return admin public key PEM, or {@code null} when endpoint does not return key
-     * @throws InterruptedException when request is interrupted
+     * @return admin public key PEM, or {@code null} when endpoint does not return
+     *         key
+     * @throws InterruptedException      when request is interrupted
      * @throws RegistrationFlowException when fetch/parsing fails
      */
     private static String fetchAdminPublicKeyPem(HttpClient client)
@@ -358,10 +360,10 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Sends registration request to backend endpoint.
      *
-     * @param client configured HTTP client
+     * @param client  configured HTTP client
      * @param request register request payload
      * @return HTTP response from registration endpoint
-     * @throws InterruptedException when request is interrupted
+     * @throws InterruptedException      when request is interrupted
      * @throws RegistrationFlowException when submission fails
      */
     private static HttpResponse<String> sendRegistrationRequest(HttpClient client, RegisterRequest request)
@@ -397,12 +399,12 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Encrypts registration photo with ephemeral ECDH + AES-GCM payload.
      *
-     * @param file plaintext photo file
+     * @param file           plaintext photo file
      * @param adminPublicKey admin public key used for key agreement
      * @return encrypted file DTO sent to backend
      * @throws RegistrationFlowException when encryption process fails
      */
-    private static EncryptedFileDTO encryptPhoto(File file, PublicKey adminPublicKey) throws RegistrationFlowException {
+    private static EncryptedFile encryptPhoto(File file, PublicKey adminPublicKey) throws RegistrationFlowException {
         try {
             byte[] plaintext = Files.readAllBytes(file.toPath());
             KeyPair ephemeral = EccKeyIO.generate();
@@ -414,7 +416,7 @@ public class DefaultRegistrationService implements RegistrationService {
             byte[] cipherText = java.util.Arrays.copyOfRange(cipherTextAndTag, 0, ctLen);
             byte[] authTag = java.util.Arrays.copyOfRange(cipherTextAndTag, ctLen, cipherTextAndTag.length);
 
-            EncryptedFileDTO dto = new EncryptedFileDTO();
+            EncryptedFile dto = new EncryptedFile();
             dto.setCiphertextB64(Base64.getEncoder().encodeToString(cipherText));
             dto.setIvB64(Base64.getEncoder().encodeToString(iv));
             dto.setTagB64(Base64.getEncoder().encodeToString(authTag));
@@ -431,8 +433,8 @@ public class DefaultRegistrationService implements RegistrationService {
      * Saves registration keypair into user's keystore root directory.
      *
      * @param registrationKeyPair generated registration keypair
-     * @param userId registered user id
-     * @param passphrase passphrase used to encrypt private key
+     * @param userId              registered user id
+     * @param passphrase          passphrase used to encrypt private key
      * @throws RegistrationFlowException when persistence fails
      */
     private static void saveKeypairToKeystore(KeyPair registrationKeyPair, String userId, char[] passphrase)
@@ -455,7 +457,8 @@ public class DefaultRegistrationService implements RegistrationService {
      *
      * @param userId user id used to namespace keystore path
      * @return resolved keystore root path
-     * @throws RegistrationFlowException when neither preferred nor fallback root can be initialized
+     * @throws RegistrationFlowException when neither preferred nor fallback root
+     *                                   can be initialized
      */
     private static Path getOrCreateKeystoreRoot(String userId) throws RegistrationFlowException {
         try {
