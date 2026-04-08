@@ -52,10 +52,12 @@ public final class KeystoreSealing {
      * @param pass     the password to use for opening
      * @param envelope the envelope to open
      * @return the plaintext
-     * @throws GeneralSecurityException if key derivation or cipher setup fails
-     * @throws KeystoreOperationException if envelope format is invalid or decryption/authentication fails
+     * @throws GeneralSecurityException   if key derivation or cipher setup fails
+     * @throws KeystoreOperationException if envelope format is invalid or
+     *                                    decryption/authentication fails
      */
-    public static byte[] openWithPass(char[] pass, byte[] envelope) throws GeneralSecurityException, KeystoreOperationException {
+    public static byte[] openWithPass(char[] pass, byte[] envelope)
+            throws GeneralSecurityException, KeystoreOperationException {
         String env = new String(envelope, java.nio.charset.StandardCharsets.US_ASCII);
         String[] parts = env.split("\\.");
 

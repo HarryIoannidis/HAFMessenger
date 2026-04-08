@@ -7,22 +7,22 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * Applies restrictive filesystem permissions for keystore files and directories.
+ * Applies restrictive filesystem permissions for keystore files and
+ * directories.
  */
 public final class FilePerms {
-    private static final Set<PosixFilePermission> DIR_700 =
-            EnumSet.of(PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE,
-                    PosixFilePermission.OWNER_EXECUTE);
+    private static final Set<PosixFilePermission> DIR_700 = EnumSet.of(PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE);
 
-    private static final Set<PosixFilePermission> FILE_600 =
-            EnumSet.of(PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE);
+    private static final Set<PosixFilePermission> FILE_600 = EnumSet.of(PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE);
 
     /**
      * Prevents instantiation of this utility class.
      */
-    private FilePerms() {}
+    private FilePerms() {
+    }
 
     /**
      * Ensures that the given directory exists and is 700.
@@ -31,7 +31,8 @@ public final class FilePerms {
      * @throws IOException if the directory cannot be created or secured
      */
     public static void ensureDir700(Path dir) throws IOException {
-        if (!Files.exists(dir)) Files.createDirectories(dir);
+        if (!Files.exists(dir))
+            Files.createDirectories(dir);
         try {
             Files.setPosixFilePermissions(dir, DIR_700);
         } catch (UnsupportedOperationException ignored) {
@@ -49,12 +50,15 @@ public final class FilePerms {
      * @throws IOException if the file cannot be created, written, or secured
      */
     public static void writeFile600(Path file, byte[] data) throws IOException {
-        if (Files.notExists(file)) Files.createFile(file);
+        if (Files.notExists(file))
+            Files.createFile(file);
 
         Files.write(file, data, StandardOpenOption.TRUNCATE_EXISTING);
 
-        try { 
-            Files.setPosixFilePermissions(file, FILE_600); 
-        } catch (UnsupportedOperationException ignored) {}
+        try {
+            Files.setPosixFilePermissions(file, FILE_600);
+        } catch (UnsupportedOperationException ignored) {
+            // ignore for non-posix systems
+        }
     }
 }
