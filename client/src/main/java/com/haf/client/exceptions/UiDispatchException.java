@@ -19,7 +19,7 @@ public class UiDispatchException extends RuntimeException {
      * Creates an exception for UI-dispatch failures with a wrapped root cause.
      *
      * @param message human-readable description of the dispatch failure
-     * @param cause root cause that triggered the dispatch failure
+     * @param cause   root cause that triggered the dispatch failure
      */
     public UiDispatchException(String message, Throwable cause) {
         super(message, cause);

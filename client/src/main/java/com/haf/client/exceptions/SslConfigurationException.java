@@ -21,7 +21,7 @@ public class SslConfigurationException extends RuntimeException {
      * root cause.
      *
      * @param message human-readable description of the SSL configuration problem
-     * @param cause root cause that triggered the SSL configuration failure
+     * @param cause   root cause that triggered the SSL configuration failure
      */
     public SslConfigurationException(String message, Throwable cause) {
         super(message, cause);

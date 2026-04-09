@@ -218,11 +218,11 @@ public class DefaultMainSessionService implements MainSessionService {
                 try {
                     performLogout();
                     completion.complete(null);
-                } catch (Throwable ex) {
+                } catch (Exception ex) {
                     completion.completeExceptionally(wrapThrowable(ex));
                 }
             });
-        } catch (Throwable ex) {
+        } catch (Exception ex) {
             completion.completeExceptionally(wrapThrowable(ex));
         }
         return completion;
@@ -234,36 +234,12 @@ public class DefaultMainSessionService implements MainSessionService {
      */
     private void performLogout() {
         SessionChannel channel = resolveSessionChannelSafely();
-        if (channel != null) {
-            try {
-                channel.stopReceiving();
-            } catch (Throwable ex) {
-                LOGGER.warn("Error stopping message receiver on logout; continuing cleanup", ex);
-            }
-        }
+        stopSessionChannelSafely(channel);
 
         NetworkGateway gateway = resolveNetworkGatewaySafely();
         if (gateway != null) {
-            try {
-                gateway.revokeSession().get(LOGOUT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                LOGGER.warn( "Logout API call interrupted; continuing with local logout", ex);
-            } catch (ExecutionException | TimeoutException ex) {
-                if (isExpectedInvalidSessionLogoutFailure(ex)) {
-                    LOGGER.info("Logout API call returned invalid-session after revoke/takeover; continuing local logout");
-                } else {
-                    LOGGER.warn( "Logout API call failed; continuing with local logout", ex);
-                }
-            } catch (Throwable ex) {
-                LOGGER.warn("Logout API call failed before completion; continuing with local logout", ex);
-            }
-
-            try {
-                gateway.close();
-            } catch (Throwable ex) {
-                LOGGER.warn( "Error closing WebSocket on logout", ex);
-            }
+            revokeSessionSafely(gateway);
+            closeGatewaySafely(gateway);
         }
 
         unregisterPresenceListener();
@@ -283,7 +259,7 @@ public class DefaultMainSessionService implements MainSessionService {
     private SessionChannel resolveSessionChannelSafely() {
         try {
             return sessionContext.sessionChannel();
-        } catch (Throwable ex) {
+        } catch (Exception ex) {
             LOGGER.warn("Could not resolve session channel during logout; continuing with local cleanup", ex);
             return null;
         }
@@ -298,9 +274,60 @@ public class DefaultMainSessionService implements MainSessionService {
     private NetworkGateway resolveNetworkGatewaySafely() {
         try {
             return sessionContext.networkGateway();
-        } catch (Throwable ex) {
+        } catch (Exception ex) {
             LOGGER.warn("Could not resolve network gateway during logout; continuing with local cleanup", ex);
             return null;
+        }
+    }
+
+    /**
+     * Stops message receiving on active channel with best-effort failure isolation.
+     *
+     * @param channel active channel, or {@code null}
+     */
+    private void stopSessionChannelSafely(SessionChannel channel) {
+        if (channel == null) {
+            return;
+        }
+        try {
+            channel.stopReceiving();
+        } catch (Exception ex) {
+            LOGGER.warn("Error stopping message receiver on logout; continuing cleanup", ex);
+        }
+    }
+
+    /**
+     * Revokes remote session token with timeout and tolerant fallback.
+     *
+     * @param gateway active network gateway
+     */
+    private void revokeSessionSafely(NetworkGateway gateway) {
+        try {
+            gateway.revokeSession().get(LOGOUT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Logout API call interrupted; continuing with local logout", ex);
+        } catch (ExecutionException | TimeoutException ex) {
+            if (isExpectedInvalidSessionLogoutFailure(ex)) {
+                LOGGER.info("Logout API call returned invalid-session after revoke/takeover; continuing local logout");
+            } else {
+                LOGGER.warn("Logout API call failed; continuing with local logout", ex);
+            }
+        } catch (Exception ex) {
+            LOGGER.warn("Logout API call failed before completion; continuing with local logout", ex);
+        }
+    }
+
+    /**
+     * Closes active gateway with best-effort failure isolation.
+     *
+     * @param gateway active network gateway
+     */
+    private void closeGatewaySafely(NetworkGateway gateway) {
+        try {
+            gateway.close();
+        } catch (Exception ex) {
+            LOGGER.warn("Error closing WebSocket on logout", ex);
         }
     }
 

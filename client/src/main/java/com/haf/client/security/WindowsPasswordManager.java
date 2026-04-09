@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * Windows Credential Manager-backed secure vault via JNA WinCred APIs.
  */
-final class WindowsCredentialManagerPasswordVault implements SecurePasswordVault {
+final class WindowsPasswordManager implements SecurePasswordVault {
 
     private static final int CRED_TYPE_GENERIC = 1;
     private static final int CRED_PERSIST_LOCAL_MACHINE = 2;
@@ -32,7 +32,7 @@ final class WindowsCredentialManagerPasswordVault implements SecurePasswordVault
      *
      * @param serviceName target service namespace
      */
-    WindowsCredentialManagerPasswordVault(String serviceName) {
+    WindowsPasswordManager(String serviceName) {
         this(serviceName, new JnaWindowsCredentialApi(), isWindowsPlatform());
     }
 
@@ -44,7 +44,7 @@ final class WindowsCredentialManagerPasswordVault implements SecurePasswordVault
      * @param credentialApi   WinCred boundary implementation
      * @param windowsPlatform whether current platform should be treated as Windows
      */
-    WindowsCredentialManagerPasswordVault(
+    WindowsPasswordManager(
             String serviceName,
             WindowsCredentialApi credentialApi,
             boolean windowsPlatform) {

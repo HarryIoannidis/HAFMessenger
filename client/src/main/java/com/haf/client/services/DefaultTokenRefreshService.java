@@ -116,9 +116,9 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
     /**
      * Resolves a user-facing failure message from refresh response payload.
      *
-     * @param response parsed response payload
+     * @param response   parsed response payload
      * @param statusCode HTTP status code from refresh endpoint
-     * @param rawBody raw response body
+     * @param rawBody    raw response body
      * @return normalized failure message
      */
     static String resolveRefreshFailureMessage(RefreshTokenResponse response, int statusCode, String rawBody) {
@@ -167,11 +167,9 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
         if (normalized.contains("session") && (normalized.contains("expired") || normalized.contains("revoked"))) {
             return true;
         }
-        if (normalized.contains("refresh token")
-                && (normalized.contains("invalid") || normalized.contains("expired") || normalized.contains("revoked"))) {
-            return true;
-        }
-        return false;
+        return normalized.contains("refresh token")
+                && (normalized.contains("invalid") || normalized.contains("expired")
+                        || normalized.contains("revoked"));
     }
 
     /**
@@ -179,7 +177,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * for legacy response field names.
      *
      * @param response parsed typed response model
-     * @param rawBody raw response body
+     * @param rawBody  raw response body
      * @return resolved access token string, or {@code null} when absent
      */
     static String resolveAccessToken(RefreshTokenResponse response, String rawBody) {
@@ -194,7 +192,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * fallback for legacy response field names.
      *
      * @param response parsed typed response model
-     * @param rawBody raw response body
+     * @param rawBody  raw response body
      * @return resolved refresh token string, or {@code null} when absent
      */
     static String resolveRefreshToken(RefreshTokenResponse response, String rawBody) {
@@ -209,7 +207,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * fallback for alternate field names.
      *
      * @param response parsed typed response model
-     * @param rawBody raw response body
+     * @param rawBody  raw response body
      * @return expiry epoch seconds, or {@code null} when absent
      */
     static Long resolveAccessExpiry(RefreshTokenResponse response, String rawBody) {
@@ -224,7 +222,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * fallback for alternate field names.
      *
      * @param response parsed typed response model
-     * @param rawBody raw response body
+     * @param rawBody  raw response body
      * @return expiry epoch seconds, or {@code null} when absent
      */
     static Long resolveRefreshExpiry(RefreshTokenResponse response, String rawBody) {
@@ -239,7 +237,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * typed model or raw JSON body.
      *
      * @param response parsed typed response model
-     * @param rawBody raw response body
+     * @param rawBody  raw response body
      * @return {@code true} when explicit error value is present
      */
     static boolean hasExplicitError(RefreshTokenResponse response, String rawBody) {
@@ -268,12 +266,12 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * Extracts first non-blank string value from provided JSON keys.
      *
      * @param rawBody raw JSON body
-     * @param keys candidate keys in lookup order
+     * @param keys    candidate keys in lookup order
      * @return extracted string value, or {@code null} when not present
      */
     private static String extractJsonString(String rawBody, String... keys) {
         Map<?, ?> parsed = parseBodyAsMap(rawBody);
-        if (parsed == null || keys == null) {
+        if (parsed.isEmpty() || keys == null || keys.length == 0) {
             return null;
         }
         for (String key : keys) {
@@ -289,12 +287,12 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * Extracts first numeric long value from provided JSON keys.
      *
      * @param rawBody raw JSON body
-     * @param keys candidate keys in lookup order
+     * @param keys    candidate keys in lookup order
      * @return extracted long value, or {@code null} when not present
      */
     private static Long extractJsonLong(String rawBody, String... keys) {
         Map<?, ?> parsed = parseBodyAsMap(rawBody);
-        if (parsed == null || keys == null) {
+        if (parsed.isEmpty() || keys == null || keys.length == 0) {
             return null;
         }
         for (String key : keys) {
@@ -317,20 +315,20 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
      * Parses raw JSON body into map representation for compatibility field lookups.
      *
      * @param rawBody raw response body
-     * @return parsed map, or {@code null} when body is blank/non-object
+     * @return parsed map, or empty map when body is blank/non-object
      */
     private static Map<?, ?> parseBodyAsMap(String rawBody) {
         if (rawBody == null || rawBody.isBlank()) {
-            return null;
+            return Map.of();
         }
         try {
             Object parsed = JsonCodec.fromJson(rawBody, Object.class);
             if (parsed instanceof Map<?, ?> map) {
                 return map;
             }
-            return null;
+            return Map.of();
         } catch (Exception ex) {
-            return null;
+            return Map.of();
         }
     }
 

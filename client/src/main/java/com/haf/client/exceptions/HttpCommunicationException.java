@@ -25,7 +25,7 @@ public class HttpCommunicationException extends RuntimeException {
      * exception.
      *
      * @param message human-readable explanation of the communication failure
-     * @param cause the root cause that triggered this failure
+     * @param cause   the root cause that triggered this failure
      */
     public HttpCommunicationException(String message, Throwable cause) {
         super(message, cause);
@@ -36,8 +36,8 @@ public class HttpCommunicationException extends RuntimeException {
     /**
      * Creates an exception for an HTTP call that returned an error response.
      *
-     * @param message human-readable explanation of the HTTP failure
-     * @param statusCode HTTP status code returned by the server
+     * @param message      human-readable explanation of the HTTP failure
+     * @param statusCode   HTTP status code returned by the server
      * @param responseBody raw response body returned by the server, if any
      */
     public HttpCommunicationException(String message, int statusCode, String responseBody) {

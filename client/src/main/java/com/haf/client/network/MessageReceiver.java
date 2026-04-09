@@ -5,7 +5,8 @@ import com.haf.shared.exceptions.MessageDecryptionException;
 import java.io.IOException;
 
 /**
- * Defines the contract for receiving, decrypting, and acknowledging incoming messages.
+ * Defines the contract for receiving, decrypting, and acknowledging incoming
+ * messages.
  */
 public interface MessageReceiver {
     /**

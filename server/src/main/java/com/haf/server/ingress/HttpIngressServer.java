@@ -103,8 +103,8 @@ public final class HttpIngressServer {
     private final PresenceRegistry presenceRegistry;
     private final ExecutorService executor;
     private final Object trustedProxyCacheLock = new Object();
-    private final AtomicReference<TrustedProxyCache> trustedProxyCache =
-            new AtomicReference<>(TrustedProxyCache.empty());
+    private final AtomicReference<TrustedProxyCache> trustedProxyCache = new AtomicReference<>(
+            TrustedProxyCache.empty());
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
     private static final String MESSAGES_PATH = apiPath("messages");
     private static final String STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
@@ -1277,7 +1277,7 @@ public final class HttpIngressServer {
          * missing.
          *
          * @param providedPassword caller-provided password
-         * @param storedHash account hash, or {@code null} when account is unknown
+         * @param storedHash       account hash, or {@code null} when account is unknown
          * @return {@code true} when stored hash is present and password matches
          */
         static boolean verifyPasswordWithSentinel(String providedPassword, String storedHash) {
@@ -2384,14 +2384,15 @@ public final class HttpIngressServer {
         /**
          * Routes attachment request to init/chunk/complete/bind/download handlers.
          *
-         * @param exchange HTTP exchange
+         * @param exchange  HTTP exchange
          * @param requestId request id for diagnostics and throttling
-         * @param callerId authenticated caller id
-         * @param method   HTTP method
-         * @param suffix   path suffix under attachments root
+         * @param callerId  authenticated caller id
+         * @param method    HTTP method
+         * @param suffix    path suffix under attachments root
          * @throws IOException when response write fails
          */
-        private void dispatchRequest(HttpExchange exchange, String requestId, String callerId, String method, String suffix)
+        private void dispatchRequest(HttpExchange exchange, String requestId, String callerId, String method,
+                String suffix)
                 throws IOException {
             if ("/init".equals(suffix)) {
                 handleInitRequest(exchange, requestId, callerId, method);
@@ -2422,7 +2423,8 @@ public final class HttpIngressServer {
                 case CHUNK -> handleChunk(exchange, callerId, route.attachmentId());
                 case COMPLETE -> handleComplete(exchange, callerId, route.attachmentId());
                 case BIND -> handleBind(exchange, callerId, route.attachmentId());
-                default -> sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                default ->
+                    sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
             }
         }
 
@@ -2852,7 +2854,7 @@ public final class HttpIngressServer {
      * Immutable cache for trusted proxy CIDR snapshots and parsed ranges.
      *
      * @param cidrSnapshot normalized configured CIDR values
-     * @param ranges parsed CIDR ranges
+     * @param ranges       parsed CIDR ranges
      */
     private record TrustedProxyCache(List<String> cidrSnapshot, List<CidrRange> ranges) {
         static TrustedProxyCache empty() {
@@ -2897,7 +2899,7 @@ public final class HttpIngressServer {
      * Represents one CIDR/IP range for trusted proxy matching.
      *
      * @param networkAddress normalized network address
-     * @param prefixLength prefix bits
+     * @param prefixLength   prefix bits
      */
     private record CidrRange(InetAddress networkAddress, int prefixLength) {
         /**
@@ -3020,9 +3022,9 @@ public final class HttpIngressServer {
     /**
      * Applies endpoint-scoped API rate limit and emits standardized 429 payload.
      *
-     * @param exchange HTTP exchange
+     * @param exchange  HTTP exchange
      * @param requestId request id
-     * @param scope rate-limit scope
+     * @param scope     rate-limit scope
      * @param principal user/ip principal key
      * @return {@code true} when request is allowed
      * @throws IOException when response write fails

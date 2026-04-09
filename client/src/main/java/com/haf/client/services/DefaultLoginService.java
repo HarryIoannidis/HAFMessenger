@@ -48,9 +48,8 @@ public class DefaultLoginService implements LoginService {
     static final int LOGIN_HTTP_TIMEOUT_SECONDS = 10;
     static final int LOGIN_RETRY_DELAY_MS = 400;
     static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
-    static final String KEY_MISMATCH_FAILURE_MESSAGE =
-            "Local secure keys on this device do not match this account on the server. "
-                    + "Import this account keystore from the original device to receive messages.";
+    static final String KEY_MISMATCH_FAILURE_MESSAGE = "Local secure keys on this device do not match this account on the server. "
+            + "Import this account keystore from the original device to receive messages.";
 
     @FunctionalInterface
     interface LoginGateway {
@@ -200,12 +199,12 @@ public class DefaultLoginService implements LoginService {
      * Performs a single login attempt and returns a terminal result or
      * {@code null} to continue retrying.
      *
-     * @param command                 normalized login command
-     * @param attempt                 current attempt number (1-based)
-     * @param takeoverKey             generated takeover key material when running
-     *                                forced takeover
-     * @param mapDuplicateToTakeover  whether login {@code 409} should be mapped to
-     *                                takeover-required result
+     * @param command                normalized login command
+     * @param attempt                current attempt number (1-based)
+     * @param takeoverKey            generated takeover key material when running
+     *                               forced takeover
+     * @param mapDuplicateToTakeover whether login {@code 409} should be mapped to
+     *                               takeover-required result
      * @return attempt result, or {@code null} when caller should retry
      */
     private LoginResult performAttempt(
@@ -348,7 +347,8 @@ public class DefaultLoginService implements LoginService {
     }
 
     /**
-     * Determines whether login response indicates duplicate active session conflict.
+     * Determines whether login response indicates duplicate active session
+     * conflict.
      *
      * @param statusCode HTTP status code
      * @param response   parsed login response body

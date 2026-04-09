@@ -29,9 +29,9 @@ public interface TokenRefreshService {
         /**
          * Creates successful refresh result.
          *
-         * @param accessToken new access token
-         * @param refreshToken new refresh token
-         * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+         * @param accessToken                  new access token
+         * @param refreshToken                 new refresh token
+         * @param accessExpiresAtEpochSeconds  access-token expiry epoch seconds
          * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
          * @return successful refresh result
          */
@@ -54,7 +54,7 @@ public interface TokenRefreshService {
          * Creates failed refresh result.
          *
          * @param invalidSession whether failure is an invalid/expired-session case
-         * @param errorMessage failure message
+         * @param errorMessage   failure message
          * @return failed refresh result
          */
         public static TokenRefreshResult failure(boolean invalidSession, String errorMessage) {
