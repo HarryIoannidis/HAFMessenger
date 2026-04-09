@@ -93,8 +93,7 @@ public class DefaultMessageSender implements MessageSender {
             if (!isStaleRecipientKeyFailure(firstFailure)) {
                 throw firstFailure;
             }
-            PreparedEncryptedMessage retried =
-                    prepareEncryptedMessage(payload, recipientId, contentType, ttlSeconds);
+            PreparedEncryptedMessage retried = prepareEncryptedMessage(payload, recipientId, contentType, ttlSeconds);
             return sendEncryptedMessageWithFingerprint(retried.encryptedMessage(), retried.recipientFingerprint());
         }
     }
@@ -184,7 +183,7 @@ public class DefaultMessageSender implements MessageSender {
     /**
      * Sends an encrypted message with optional recipient fingerprint header.
      *
-     * @param encryptedMessage       encrypted message envelope
+     * @param encryptedMessage        encrypted message envelope
      * @param recipientKeyFingerprint optional recipient key fingerprint
      * @return send result containing envelope id and expiration timestamp
      * @throws IOException if transport fails or server returns invalid response
@@ -237,14 +236,13 @@ public class DefaultMessageSender implements MessageSender {
     private static boolean isStaleRecipientKeyFailure(Throwable error) {
         Throwable current = error;
         while (current != null) {
-            if (current instanceof HttpCommunicationException communicationException) {
-                if (communicationException.getStatusCode() == 409) {
-                    String responseBody = communicationException.getResponseBody();
-                    if (responseBody != null
-                            && (responseBody.contains(STALE_RECIPIENT_KEY_CODE)
-                                    || responseBody.contains("recipient key is stale"))) {
-                        return true;
-                    }
+            if (current instanceof HttpCommunicationException communicationException
+                    && communicationException.getStatusCode() == 409) {
+                String responseBody = communicationException.getResponseBody();
+                if (responseBody != null
+                        && (responseBody.contains(STALE_RECIPIENT_KEY_CODE)
+                                || responseBody.contains("recipient key is stale"))) {
+                    return true;
                 }
             }
             current = current.getCause();
@@ -256,7 +254,7 @@ public class DefaultMessageSender implements MessageSender {
      * Prepared encrypted message payload with recipient key fingerprint used for
      * encryption.
      *
-     * @param encryptedMessage    encrypted envelope
+     * @param encryptedMessage     encrypted envelope
      * @param recipientFingerprint recipient key fingerprint
      */
     private record PreparedEncryptedMessage(EncryptedMessage encryptedMessage, String recipientFingerprint) {

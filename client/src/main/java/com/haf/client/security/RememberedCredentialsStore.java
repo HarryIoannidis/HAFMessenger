@@ -25,7 +25,7 @@ public final class RememberedCredentialsStore {
      * Creates a remembered-credentials store using the given preferences node and
      * password vault.
      *
-     * @param preferences preferences node that stores remember flags and email
+     * @param preferences   preferences node that stores remember flags and email
      * @param passwordVault secure vault used for password read/write/delete
      */
     public RememberedCredentialsStore(Preferences preferences, SecurePasswordVault passwordVault) {
@@ -152,7 +152,7 @@ public final class RememberedCredentialsStore {
     private static SecurePasswordVault createDefaultVault() {
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (osName.contains("win")) {
-            return new WindowsCredentialManagerPasswordVault(SERVICE_NAME);
+            return new WindowsPasswordManager(SERVICE_NAME);
         }
         if (osName.contains("mac") || osName.contains("darwin")) {
             return new MacOsKeychainPasswordVault(SERVICE_NAME);

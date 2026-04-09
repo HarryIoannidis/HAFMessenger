@@ -20,7 +20,7 @@ public class RegistrationFlowException extends Exception {
      * cause.
      *
      * @param message human-readable description of the registration failure
-     * @param cause root cause that triggered this exception
+     * @param cause   root cause that triggered this exception
      */
     public RegistrationFlowException(String message, Throwable cause) {
         super(message, cause);

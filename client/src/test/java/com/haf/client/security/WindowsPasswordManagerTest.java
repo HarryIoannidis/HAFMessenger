@@ -8,13 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class WindowsCredentialManagerPasswordVaultTest {
+class WindowsPasswordManagerTest {
 
     @Test
     void windows_vault_reads_and_writes_through_credential_api() {
         FakeWindowsCredentialApi api = new FakeWindowsCredentialApi();
-        WindowsCredentialManagerPasswordVault vault =
-                new WindowsCredentialManagerPasswordVault("HAFMessenger", api, true);
+        WindowsPasswordManager vault = new WindowsPasswordManager("HAFMessenger", api, true);
 
         assertTrue(vault.isAvailable());
         assertTrue(vault.savePassword("Pilot@haf.gr", "secret123"));
@@ -30,14 +29,13 @@ class WindowsCredentialManagerPasswordVaultTest {
         FakeWindowsCredentialApi api = new FakeWindowsCredentialApi();
         api.supported = false;
 
-        WindowsCredentialManagerPasswordVault notSupportedVault =
-                new WindowsCredentialManagerPasswordVault("HAFMessenger", api, true);
+        WindowsPasswordManager notSupportedVault = new WindowsPasswordManager("HAFMessenger", api, true);
         assertFalse(notSupportedVault.isAvailable());
         assertFalse(notSupportedVault.savePassword("pilot@haf.gr", "secret"));
         assertEquals(Optional.empty(), notSupportedVault.loadPassword("pilot@haf.gr"));
 
-        WindowsCredentialManagerPasswordVault nonWindowsVault =
-                new WindowsCredentialManagerPasswordVault("HAFMessenger", new FakeWindowsCredentialApi(), false);
+        WindowsPasswordManager nonWindowsVault = new WindowsPasswordManager("HAFMessenger",
+                new FakeWindowsCredentialApi(), false);
         assertFalse(nonWindowsVault.isAvailable());
         assertFalse(nonWindowsVault.deletePassword("pilot@haf.gr"));
     }
@@ -48,15 +46,14 @@ class WindowsCredentialManagerPasswordVaultTest {
         api.writeSucceeds = false;
         api.deleteSucceeds = false;
 
-        WindowsCredentialManagerPasswordVault vault =
-                new WindowsCredentialManagerPasswordVault("HAFMessenger", api, true);
+        WindowsPasswordManager vault = new WindowsPasswordManager("HAFMessenger", api, true);
 
         assertFalse(vault.savePassword("pilot@haf.gr", "secret"));
         assertEquals(Optional.empty(), vault.loadPassword("pilot@haf.gr"));
         assertFalse(vault.deletePassword("pilot@haf.gr"));
     }
 
-    private static final class FakeWindowsCredentialApi implements WindowsCredentialManagerPasswordVault.WindowsCredentialApi {
+    private static final class FakeWindowsCredentialApi implements WindowsPasswordManager.WindowsCredentialApi {
 
         private final Map<String, String> credentialsByTarget = new HashMap<>();
         private boolean supported = true;

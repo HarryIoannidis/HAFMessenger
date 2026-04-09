@@ -30,16 +30,16 @@ public record ContactInfo(
     /**
      * Canonical constructor that normalizes unread count to a non-negative value.
      *
-     * @param id unique contact/user id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id              unique contact/user id
+     * @param name            display name
+     * @param regNumber       military registration number
+     * @param rank            rank label
+     * @param email           contact email
+     * @param telephone       contact telephone
+     * @param joinedDate      join date text
      * @param activenessLabel status label used in the UI
      * @param activenessColor status color used for the presence indicator
-     * @param unreadCount local unread message count
+     * @param unreadCount     local unread message count
      */
     public ContactInfo {
         if (unreadCount < 0) {
@@ -56,12 +56,12 @@ public record ContactInfo(
      * Creates an active contact with full profile fields and zero unread by
      * default.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
      * @return active {@link ContactInfo} entry
      */
@@ -79,13 +79,13 @@ public record ContactInfo(
     /**
      * Creates an active contact with explicit unread count.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
      * @param unreadCount unread messages for this contact
      * @return active {@link ContactInfo} entry
      */
@@ -98,7 +98,8 @@ public record ContactInfo(
             String telephone,
             String joinedDate,
             int unreadCount) {
-        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Active", "#00b706", unreadCount);
+        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Active", "#00b706",
+                unreadCount);
     }
 
     /** Convenience factory for an inactive contact. */
@@ -110,12 +111,12 @@ public record ContactInfo(
      * Creates an inactive contact with full profile fields and default unread
      * state.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
      * @return inactive {@link ContactInfo} entry
      */
@@ -133,13 +134,13 @@ public record ContactInfo(
     /**
      * Creates an inactive contact with explicit unread count.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
      * @param unreadCount unread messages for this contact
      * @return inactive {@link ContactInfo} entry
      */
@@ -152,7 +153,8 @@ public record ContactInfo(
             String telephone,
             String joinedDate,
             int unreadCount) {
-        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Inactive", "#ff0000", unreadCount);
+        return new ContactInfo(id, name, regNumber, rank, email, telephone, joinedDate, "Inactive", "#ff0000",
+                unreadCount);
     }
 
     /**
@@ -166,12 +168,12 @@ public record ContactInfo(
     /**
      * Creates a contact with unknown presence and default unread state.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
      * @return unknown-presence {@link ContactInfo} entry
      */
@@ -189,13 +191,13 @@ public record ContactInfo(
     /**
      * Creates a contact with unknown presence and explicit unread count.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
      * @param unreadCount unread messages for this contact
      * @return unknown-presence {@link ContactInfo} entry
      */
@@ -214,8 +216,8 @@ public record ContactInfo(
     /**
      * Alias for {@link #online(String, String, String)}.
      *
-     * @param id unique contact id
-     * @param name display name
+     * @param id        unique contact id
+     * @param name      display name
      * @param regNumber military registration number
      * @return active {@link ContactInfo} entry
      */
@@ -224,14 +226,15 @@ public record ContactInfo(
     }
 
     /**
-     * Alias for {@link #online(String, String, String, String, String, String, String)}.
+     * Alias for
+     * {@link #online(String, String, String, String, String, String, String)}.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
      * @return active {@link ContactInfo} entry
      */
@@ -247,15 +250,16 @@ public record ContactInfo(
     }
 
     /**
-     * Alias for {@link #online(String, String, String, String, String, String, String, int)}.
+     * Alias for
+     * {@link #online(String, String, String, String, String, String, String, int)}.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
      * @param unreadCount unread messages for this contact
      * @return active {@link ContactInfo} entry
      */
@@ -274,8 +278,8 @@ public record ContactInfo(
     /**
      * Alias for {@link #offline(String, String, String)}.
      *
-     * @param id unique contact id
-     * @param name display name
+     * @param id        unique contact id
+     * @param name      display name
      * @param regNumber military registration number
      * @return inactive {@link ContactInfo} entry
      */
@@ -284,14 +288,15 @@ public record ContactInfo(
     }
 
     /**
-     * Alias for {@link #offline(String, String, String, String, String, String, String)}.
+     * Alias for
+     * {@link #offline(String, String, String, String, String, String, String)}.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
      * @return inactive {@link ContactInfo} entry
      */
@@ -307,15 +312,16 @@ public record ContactInfo(
     }
 
     /**
-     * Alias for {@link #offline(String, String, String, String, String, String, String, int)}.
+     * Alias for
+     * {@link #offline(String, String, String, String, String, String, String, int)}.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
      * @param unreadCount unread messages for this contact
      * @return inactive {@link ContactInfo} entry
      */
@@ -334,10 +340,10 @@ public record ContactInfo(
     /**
      * Creates contact info from a presence flag with minimal profile fields.
      *
-     * @param id unique contact id
-     * @param name display name
+     * @param id        unique contact id
+     * @param name      display name
      * @param regNumber military registration number
-     * @param active presence flag
+     * @param active    presence flag
      * @return active/inactive {@link ContactInfo} derived from presence
      */
     public static ContactInfo fromPresence(String id, String name, String regNumber, boolean active) {
@@ -347,14 +353,14 @@ public record ContactInfo(
     /**
      * Creates contact info from a presence flag with full profile fields.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
+     * @param id         unique contact id
+     * @param name       display name
+     * @param regNumber  military registration number
+     * @param rank       rank label
+     * @param email      contact email
+     * @param telephone  contact telephone
      * @param joinedDate join date text
-     * @param active presence flag
+     * @param active     presence flag
      * @return active/inactive {@link ContactInfo} derived from presence
      */
     public static ContactInfo fromPresence(
@@ -374,14 +380,14 @@ public record ContactInfo(
     /**
      * Creates contact info from presence and explicit unread count.
      *
-     * @param id unique contact id
-     * @param name display name
-     * @param regNumber military registration number
-     * @param rank rank label
-     * @param email contact email
-     * @param telephone contact telephone
-     * @param joinedDate join date text
-     * @param active presence flag
+     * @param id          unique contact id
+     * @param name        display name
+     * @param regNumber   military registration number
+     * @param rank        rank label
+     * @param email       contact email
+     * @param telephone   contact telephone
+     * @param joinedDate  join date text
+     * @param active      presence flag
      * @param unreadCount unread messages for this contact
      * @return active/inactive {@link ContactInfo} derived from presence
      */

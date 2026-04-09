@@ -463,7 +463,8 @@ public final class ServerConfig {
     }
 
     /**
-     * Resolves an optional path value with compatibility fallback for `server/` prefix.
+     * Resolves an optional path value with compatibility fallback for `server/`
+     * prefix.
      *
      * @param candidate optional path string
      * @return resolved path, or {@code null} when unset

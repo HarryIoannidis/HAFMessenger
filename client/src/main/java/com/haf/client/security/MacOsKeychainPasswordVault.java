@@ -251,54 +251,12 @@ final class MacOsKeychainPasswordVault implements SecurePasswordVault {
 
     /**
      * Result envelope for command execution in this vault adapter.
+     *
+     * @param exitCode       process exit code
+     * @param stdout         command stdout text
+     * @param stderr         command stderr text
+     * @param commandMissing whether command executable was unavailable
      */
-    static final class CommandResult {
-        private final int exitCode;
-        private final String stdout;
-        private final String stderr;
-        private final boolean commandMissing;
-
-        /**
-         * Creates a command result.
-         *
-         * @param exitCode       process exit code
-         * @param stdout         command stdout text
-         * @param stderr         command stderr text
-         * @param commandMissing whether command executable was unavailable
-         */
-        CommandResult(int exitCode, String stdout, String stderr, boolean commandMissing) {
-            this.exitCode = exitCode;
-            this.stdout = stdout;
-            this.stderr = stderr;
-            this.commandMissing = commandMissing;
-        }
-
-        /**
-         * @return process exit code
-         */
-        int exitCode() {
-            return exitCode;
-        }
-
-        /**
-         * @return captured stdout
-         */
-        String stdout() {
-            return stdout;
-        }
-
-        /**
-         * @return captured stderr
-         */
-        String stderr() {
-            return stderr;
-        }
-
-        /**
-         * @return {@code true} when the command executable was missing
-         */
-        boolean commandMissing() {
-            return commandMissing;
-        }
+    record CommandResult(int exitCode, String stdout, String stderr, boolean commandMissing) {
     }
 }

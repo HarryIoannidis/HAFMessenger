@@ -129,11 +129,12 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Creates a WebSocketAdapter with explicit HTTP base URI for authenticated REST helper calls.
+     * Creates a WebSocketAdapter with explicit HTTP base URI for authenticated REST
+     * helper calls.
      *
-     * @param serverUri WebSocket server URI (for WSS transport)
+     * @param serverUri   WebSocket server URI (for WSS transport)
      * @param httpBaseUri HTTPS server base URI (for REST helper methods)
-     * @param sessionId bearer session id
+     * @param sessionId   bearer session id
      */
     public WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId) {
         this(serverUri, httpBaseUri, sessionId, createDefaultHttpClient(),
@@ -144,8 +145,8 @@ public class WebSocketAdapter {
     /**
      * Test seam constructor that accepts an externally created HTTP client.
      *
-     * @param serverUri WebSocket server URI
-     * @param sessionId bearer session id
+     * @param serverUri  WebSocket server URI
+     * @param sessionId  bearer session id
      * @param httpClient injected HTTP client used by transport operations
      */
     WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient) {
@@ -157,10 +158,10 @@ public class WebSocketAdapter {
     /**
      * Test seam constructor with explicit HTTP base URI and injected HTTP client.
      *
-     * @param serverUri WebSocket server URI
+     * @param serverUri   WebSocket server URI
      * @param httpBaseUri HTTPS server base URI for REST helper calls
-     * @param sessionId bearer session id
-     * @param httpClient injected HTTP client used by transport operations
+     * @param sessionId   bearer session id
+     * @param httpClient  injected HTTP client used by transport operations
      */
     WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId, HttpClient httpClient) {
         this(serverUri, httpBaseUri, sessionId, httpClient,
@@ -171,10 +172,10 @@ public class WebSocketAdapter {
     /**
      * Internal constructor with injectable async and delay strategies.
      *
-     * @param serverUri WebSocket server URI
-     * @param sessionId bearer session id
-     * @param httpClient injected HTTP client
-     * @param asyncRunner async execution strategy for reconnect attempts
+     * @param serverUri     WebSocket server URI
+     * @param sessionId     bearer session id
+     * @param httpClient    injected HTTP client
+     * @param asyncRunner   async execution strategy for reconnect attempts
      * @param delayStrategy delay strategy used by reconnect backoff
      */
     WebSocketAdapter(URI serverUri, String sessionId, HttpClient httpClient,
@@ -190,11 +191,11 @@ public class WebSocketAdapter {
     /**
      * Internal constructor with injectable async and delay strategies.
      *
-     * @param serverUri WebSocket server URI
-     * @param httpBaseUri HTTPS base URI used by authenticated REST helper methods
-     * @param sessionId bearer session id
-     * @param httpClient injected HTTP client
-     * @param asyncRunner async execution strategy for reconnect attempts
+     * @param serverUri     WebSocket server URI
+     * @param httpBaseUri   HTTPS base URI used by authenticated REST helper methods
+     * @param sessionId     bearer session id
+     * @param httpClient    injected HTTP client
+     * @param asyncRunner   async execution strategy for reconnect attempts
      * @param delayStrategy delay strategy used by reconnect backoff
      */
     WebSocketAdapter(URI serverUri, URI httpBaseUri, String sessionId, HttpClient httpClient,
@@ -335,7 +336,8 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Executes an authenticated POST request against the server using the configured
+     * Executes an authenticated POST request against the server using the
+     * configured
      * HttpClient.
      *
      * @param path The API path to request
@@ -443,7 +445,7 @@ public class WebSocketAdapter {
                 .thenApply(response -> validateResponse(response, method))
                 .exceptionallyCompose(error -> {
                     if (isConnectionError(error)) {
-                        LOGGER.warn( "HTTP {} failed with connection error, retrying once", method);
+                        LOGGER.warn("HTTP {} failed with connection error, retrying once", method);
                         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                                 .thenApply(response -> validateResponse(response, method));
                     }
