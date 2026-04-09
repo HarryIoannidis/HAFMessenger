@@ -15,6 +15,7 @@ public class PopupMessageController {
 
     private static final String STARTUP_PRIVACY_UNLOCK_POPUP_KEY = "popup-privacy-startup-blur-unlock";
     private static final String SESSION_REVOKED_POPUP_KEY = "popup-session-revoked";
+    private static final String SESSION_TAKEOVER_POPUP_KEY = "popup-session-takeover";
 
     // Popup window chrome
     @FXML
@@ -174,7 +175,8 @@ public class PopupMessageController {
      */
     private static boolean isCloseDisabledPopup(String popupKey) {
         return STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(popupKey)
-                || SESSION_REVOKED_POPUP_KEY.equals(popupKey);
+                || SESSION_REVOKED_POPUP_KEY.equals(popupKey)
+                || SESSION_TAKEOVER_POPUP_KEY.equals(popupKey);
     }
 
     /**
