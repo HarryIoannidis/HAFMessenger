@@ -10,7 +10,7 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 - Build: Maven multi-module (`shared`, `client`, `server`) targeting Java 25 (`maven.compiler.release=25`).
 - Transport: TLS 1.3 with mode-aware messaging receive transport (dev: WSS push, prod: HTTPS polling).
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
-- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V14`).
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V15`).
 - Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
 - Runtime mode control: server mode is controlled by `HAF_APP_IS_DEV`; client mode by `app.isDev`.
 

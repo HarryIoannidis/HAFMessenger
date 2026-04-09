@@ -11,7 +11,7 @@ Document the security model for the new cross-platform remembered-password stora
   - remembered email (`remembered_email`) in Java Preferences
   - password only in an OS-backed secure vault abstraction (`SecurePasswordVault`)
 - Default vault selection is platform-specific:
-  1. Windows: `WindowsCredentialManagerPasswordVault` (WinCred via JNA)
+  1. Windows: `WindowsPasswordManager` (WinCred via JNA)
   2. macOS: `MacOsKeychainPasswordVault` (`security` CLI + Keychain generic password)
   3. Linux: `LinuxSecretToolPasswordVault` (`secret-tool` + Secret Service)
   4. Other/unsupported: `UnsupportedPasswordVault` (no password persistence)
@@ -48,7 +48,7 @@ Document the security model for the new cross-platform remembered-password stora
 
 - `com.haf.client.security.RememberedCredentialsStore`
 - `com.haf.client.security.SecurePasswordVault`
-- `com.haf.client.security.WindowsCredentialManagerPasswordVault`
+- `com.haf.client.security.WindowsPasswordManager`
 - `com.haf.client.security.MacOsKeychainPasswordVault`
 - `com.haf.client.security.LinuxSecretToolPasswordVault`
 - `com.haf.client.security.UnsupportedPasswordVault`
@@ -57,12 +57,12 @@ Document the security model for the new cross-platform remembered-password stora
 
 - `client/src/main/java/com/haf/client/security/RememberedCredentialsStore.java`
 - `client/src/main/java/com/haf/client/security/SecurePasswordVault.java`
-- `client/src/main/java/com/haf/client/security/WindowsCredentialManagerPasswordVault.java`
+- `client/src/main/java/com/haf/client/security/WindowsPasswordManager.java`
 - `client/src/main/java/com/haf/client/security/MacOsKeychainPasswordVault.java`
 - `client/src/main/java/com/haf/client/security/LinuxSecretToolPasswordVault.java`
 - `client/src/main/java/com/haf/client/controllers/LoginController.java`
 - `client/src/main/java/com/haf/client/controllers/SettingsController.java`
 - `client/src/test/java/com/haf/client/security/RememberedCredentialsStoreTest.java`
-- `client/src/test/java/com/haf/client/security/WindowsCredentialManagerPasswordVaultTest.java`
+- `client/src/test/java/com/haf/client/security/WindowsPasswordManagerTest.java`
 - `client/src/test/java/com/haf/client/security/MacOsKeychainPasswordVaultTest.java`
 - `client/src/test/java/com/haf/client/security/LinuxSecretToolPasswordVaultTest.java`
