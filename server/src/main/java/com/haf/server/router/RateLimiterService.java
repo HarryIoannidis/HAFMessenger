@@ -97,6 +97,37 @@ public final class RateLimiterService {
              WHERE throttle_key = ?
             """;
 
+    /**
+     * SQL query for upserting generic API rate-limit data.
+     */
+    private static final String API_UPSERT_SQL = """
+            INSERT INTO api_rate_limits (throttle_key, attempt_count, window_start, lockout_until)
+            VALUES (?, 1, NOW(), NULL)
+            ON DUPLICATE KEY UPDATE
+                attempt_count = CASE
+                    WHEN TIMESTAMPDIFF(SECOND, window_start, NOW()) >= ? THEN 1
+                    ELSE attempt_count + 1
+                END,
+                window_start = CASE
+                    WHEN TIMESTAMPDIFF(SECOND, window_start, NOW()) >= ? THEN NOW()
+                    ELSE window_start
+                END,
+                lockout_until = CASE
+                    WHEN TIMESTAMPDIFF(SECOND, window_start, NOW()) >= ? THEN NULL
+                    WHEN attempt_count + 1 >= ? THEN DATE_ADD(NOW(), INTERVAL ? MINUTE)
+                    ELSE lockout_until
+                END
+            """;
+
+    /**
+     * SQL query for selecting generic API rate-limit data.
+     */
+    private static final String API_SELECT_SQL = """
+            SELECT attempt_count, lockout_until
+              FROM api_rate_limits
+             WHERE throttle_key = ?
+            """;
+
     private final DataSource dataSource;
     private final AuditLogger auditLogger;
 
@@ -184,6 +215,44 @@ public final class RateLimiterService {
     }
 
     /**
+     * Checks and consumes generic API rate-limit state based on scope + principal.
+     *
+     * @param requestId request id
+     * @param scope policy scope describing limits for this endpoint family
+     * @param principal key material (e.g. user id or IP)
+     * @return rate-limit decision
+     */
+    public RateLimitDecision checkAndConsumeApi(String requestId, ApiRateLimitScope scope, String principal) {
+        Objects.requireNonNull(scope, "scope");
+        String throttleKey = buildApiThrottleKey(scope, principal);
+        try (Connection connection = dataSource.getConnection()) {
+            upsertApiWindow(connection, throttleKey, scope);
+            try (PreparedStatement select = connection.prepareStatement(API_SELECT_SQL)) {
+                select.setString(1, throttleKey);
+                ResultSet rs = select.executeQuery();
+                if (rs.next()) {
+                    Timestamp lockoutUntil = rs.getTimestamp("lockout_until");
+                    if (lockoutUntil != null && lockoutUntil.after(Timestamp.from(Instant.now()))) {
+                        long retryAfterSeconds = Duration.between(Instant.now(), lockoutUntil.toInstant()).toSeconds();
+                        auditLogger.logRateLimit(requestId, scope.policyKey(), retryAfterSeconds);
+                        return RateLimitDecision.block(retryAfterSeconds);
+                    }
+
+                    int count = rs.getInt("attempt_count");
+                    if (count > scope.maxAttempts()) {
+                        auditLogger.logRateLimit(requestId, scope.policyKey(), scope.windowSeconds());
+                        return RateLimitDecision.block(scope.windowSeconds());
+                    }
+                }
+            }
+            return RateLimitDecision.allow();
+        } catch (SQLException ex) {
+            auditLogger.logError("api_rate_limit_failed", requestId, scope.policyKey(), ex);
+            throw new RateLimitException("API rate limit check failed", ex);
+        }
+    }
+
+    /**
      * Clears login rate-limit state after successful authentication.
      *
      * @param email account email
@@ -239,6 +308,26 @@ public final class RateLimiterService {
     }
 
     /**
+     * Upserts API rate-limit window for endpoint scope + principal key.
+     *
+     * @param connection open connection
+     * @param throttleKey hashed scope+principal key
+     * @param scope endpoint policy scope
+     * @throws SQLException on SQL failure
+     */
+    private void upsertApiWindow(Connection connection, String throttleKey, ApiRateLimitScope scope) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(API_UPSERT_SQL)) {
+            ps.setString(1, throttleKey);
+            ps.setInt(2, scope.windowSeconds());
+            ps.setInt(3, scope.windowSeconds());
+            ps.setInt(4, scope.windowSeconds());
+            ps.setInt(5, scope.maxAttempts());
+            ps.setInt(6, scope.lockoutMinutes());
+            ps.executeUpdate();
+        }
+    }
+
+    /**
      * Builds stable throttle-key digest from email and source IP.
      *
      * @param email account email
@@ -249,6 +338,63 @@ public final class RateLimiterService {
         String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
         String normalizedIp = sourceIp == null ? "unknown" : sourceIp.trim();
         return sha256Hex(normalizedEmail + "|" + normalizedIp);
+    }
+
+    /**
+     * Builds stable API throttle-key digest from scope and principal.
+     *
+     * @param scope endpoint policy scope
+     * @param principal identity material (IP or user id)
+     * @return SHA-256 hex key
+     */
+    private String buildApiThrottleKey(ApiRateLimitScope scope, String principal) {
+        String normalizedPrincipal = principal == null ? "unknown" : principal.trim().toLowerCase();
+        return sha256Hex(scope.policyKey() + "|" + normalizedPrincipal);
+    }
+
+    /**
+     * Represents fixed rate-limit settings for API endpoint families.
+     */
+    public enum ApiRateLimitScope {
+        REGISTER("register", 600, 5, 30),
+        ADMIN_KEY("admin-key", 60, 30, 5),
+        USER_KEY("user-key", 60, 120, 5),
+        SEARCH("search", 60, 60, 5),
+        CONTACTS("contacts", 60, 120, 5),
+        TOKEN_REFRESH("token-refresh", 60, 30, 5),
+        MESSAGING_CONFIG("messaging-config", 60, 60, 5),
+        ATTACHMENTS_INIT("attachments-init", 60, 20, 5),
+        ATTACHMENTS_CHUNK("attachments-chunk", 60, 600, 2),
+        ATTACHMENTS_COMPLETE_BIND("attachments-complete-bind", 60, 60, 5),
+        ATTACHMENTS_DOWNLOAD("attachments-download", 60, 120, 5);
+
+        private final String policyKey;
+        private final int windowSeconds;
+        private final int maxAttempts;
+        private final int lockoutMinutes;
+
+        ApiRateLimitScope(String policyKey, int windowSeconds, int maxAttempts, int lockoutMinutes) {
+            this.policyKey = policyKey;
+            this.windowSeconds = windowSeconds;
+            this.maxAttempts = maxAttempts;
+            this.lockoutMinutes = lockoutMinutes;
+        }
+
+        public String policyKey() {
+            return policyKey;
+        }
+
+        public int windowSeconds() {
+            return windowSeconds;
+        }
+
+        public int maxAttempts() {
+            return maxAttempts;
+        }
+
+        public int lockoutMinutes() {
+            return lockoutMinutes;
+        }
     }
 
     /**

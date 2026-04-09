@@ -43,6 +43,7 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Constructor;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
@@ -127,6 +128,10 @@ class HttpIngressServerTest {
         lenient().when(config.getSearchMaxPageSize()).thenReturn(50);
         lenient().when(config.getSearchMinQueryLength()).thenReturn(3);
         lenient().when(config.getSearchMaxQueryLength()).thenReturn(128);
+        lenient().when(config.isTrustProxy()).thenReturn(false);
+        lenient().when(config.getTrustedProxyCidrs()).thenReturn(List.of());
+        lenient().when(config.getIngressExecutorThreads()).thenReturn(4);
+        lenient().when(config.getIngressExecutorQueueCapacity()).thenReturn(64);
         lenient().when(config.getSearchCursorSecret()).thenReturn("test-search-secret");
 
         lenient().when(config.getAttachmentMaxBytes()).thenReturn(10L * 1024L * 1024L);
@@ -135,6 +140,8 @@ class HttpIngressServerTest {
         lenient().when(config.getAttachmentAllowedTypes()).thenReturn(List.of("application/pdf"));
         lenient().when(config.getAttachmentUnboundTtlSeconds()).thenReturn(1800L);
         lenient().when(rateLimiterService.checkAndConsumeLoginAttempt(anyString(), anyString(), anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.allow());
+        lenient().when(rateLimiterService.checkAndConsumeApi(anyString(), any(), anyString()))
                 .thenReturn(RateLimiterService.RateLimitDecision.allow());
 
         try {
@@ -197,6 +204,7 @@ class HttpIngressServerTest {
 
         assertEquals(202, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"envelopeId\":\"env-1\""));
+        assertFalse(exchange.responseHeaders().containsKey("X-User-Id"));
         verify(mailboxRouter, times(1)).ingress(any(EncryptedMessage.class));
     }
 
@@ -330,6 +338,28 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void registration_is_rate_limited_by_source_ip() throws Exception {
+        HttpHandler handler = createHandler("RegistrationHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.REGISTER),
+                anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(30));
+        RegisterRequest request = new RegisterRequest();
+        request.setFullName("Test Pilot");
+        request.setEmail("pilot@haf.gr");
+        request.setPassword("Strongpass1!");
+        request.setPublicKeyPem("pem");
+        request.setPublicKeyFingerprint("fingerprint");
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/register", JsonCodec.toJson(request));
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":30"));
+        verify(userDAO, never()).insert(any(RegisterRequest.class), anyString());
+    }
+
+    @Test
     void login_rejects_when_account_is_already_online() throws Exception {
         String userId = "user-1";
         String email = "pilot@haf.gr";
@@ -417,6 +447,68 @@ class HttpIngressServerTest {
         assertTrue(exchange.responseBodyAsString().contains("Too many login attempts"));
         assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":180"));
         verify(userDAO, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void login_ignores_x_forwarded_for_when_remote_is_not_trusted_proxy() throws Exception {
+        when(config.isTrustProxy()).thenReturn(true);
+        when(config.getTrustedProxyCidrs()).thenReturn(List.of("10.0.0.0/8"));
+
+        HttpHandler handler = createHandler("LoginHandler");
+        ExchangeHarness exchange = newExchange(
+                "POST",
+                "/api/v1/login",
+                "{\"email\":\"pilot@haf.gr\",\"password\":\"wrong\"}");
+        exchange.requestHeaders().add("X-Forwarded-For", "198.51.100.9");
+        exchange.setRemoteAddress("203.0.113.11", 443);
+        when(userDAO.findByEmail("pilot@haf.gr")).thenReturn(null);
+
+        handler.handle(exchange.exchange());
+
+        verify(rateLimiterService, times(1))
+                .checkAndConsumeLoginAttempt(anyString(), eq("pilot@haf.gr"), eq("203.0.113.11"));
+    }
+
+    @Test
+    void login_uses_forwarded_for_when_remote_is_trusted_proxy() throws Exception {
+        when(config.isTrustProxy()).thenReturn(true);
+        when(config.getTrustedProxyCidrs()).thenReturn(List.of("203.0.113.0/24"));
+
+        HttpHandler handler = createHandler("LoginHandler");
+        ExchangeHarness exchange = newExchange(
+                "POST",
+                "/api/v1/login",
+                "{\"email\":\"pilot@haf.gr\",\"password\":\"wrong\"}");
+        exchange.requestHeaders().add("X-Forwarded-For", "198.51.100.42, 203.0.113.77");
+        exchange.setRemoteAddress("203.0.113.10", 443);
+        when(userDAO.findByEmail("pilot@haf.gr")).thenReturn(null);
+
+        handler.handle(exchange.exchange());
+
+        verify(rateLimiterService, times(1))
+                .checkAndConsumeLoginAttempt(anyString(), eq("pilot@haf.gr"), eq("198.51.100.42"));
+    }
+
+    @Test
+    void login_password_helper_uses_sentinel_when_hash_missing() throws Exception {
+        Class<?> loginHandler = Class.forName(HttpIngressServer.class.getName() + "$LoginHandler");
+        java.lang.reflect.Method verifyMethod = loginHandler.getDeclaredMethod(
+                "verifyPasswordWithSentinel",
+                String.class,
+                String.class);
+        verifyMethod.setAccessible(true);
+
+        String hash = Password.hash("correct horse battery staple")
+                .addRandomSalt()
+                .with(ARGON2)
+                .getResult();
+        boolean valid = (boolean) verifyMethod.invoke(null, "correct horse battery staple", hash);
+        boolean invalid = (boolean) verifyMethod.invoke(null, "wrong", hash);
+        boolean missing = (boolean) verifyMethod.invoke(null, "anything", null);
+
+        assertTrue(valid);
+        assertFalse(invalid);
+        assertFalse(missing);
     }
 
     @Test
@@ -543,6 +635,23 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void token_refresh_is_rate_limited_by_source_ip() throws Exception {
+        HttpHandler handler = createHandler("TokenRefreshHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.TOKEN_REFRESH),
+                anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(45));
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/token/refresh",
+                "{\"refreshToken\":\"refresh-1\"}");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":45"));
+        verify(sessionDAO, never()).refreshSession(anyString());
+    }
+
+    @Test
     void logout_rejects_missing_auth() throws Exception {
         HttpHandler handler = createHandler("LogoutHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/logout", "{}");
@@ -614,9 +723,36 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void admin_key_is_public_but_rate_limited() throws Exception {
+        HttpHandler handler = createHandler("AdminKeyHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.ADMIN_KEY),
+                anyString()))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(20));
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/config/admin-key", "");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":20"));
+    }
+
+    @Test
+    void user_key_rejects_missing_auth() throws Exception {
+        HttpHandler handler = createHandler("UserKeyHandler");
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-1/key", "");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(401, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("missing or invalid auth"));
+    }
+
+    @Test
     void user_key_rejects_invalid_path() throws Exception {
         HttpHandler handler = createHandler("UserKeyHandler");
         ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-1", "");
+        authenticate(exchange, "sess-user-key-path", "caller");
 
         handler.handle(exchange.exchange());
 
@@ -629,6 +765,7 @@ class HttpIngressServerTest {
         HttpHandler handler = createHandler("UserKeyHandler");
         when(userDAO.getPublicKey("u-1")).thenReturn(new UserDAO.PublicKeyRecord("PEM", "fp-1"));
         ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-1/key", "");
+        authenticate(exchange, "sess-user-key", "caller");
 
         handler.handle(exchange.exchange());
 
@@ -641,11 +778,33 @@ class HttpIngressServerTest {
     void user_key_returns_not_found_when_user_missing() throws Exception {
         HttpHandler handler = createHandler("UserKeyHandler");
         ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-missing/key", "");
+        authenticate(exchange, "sess-user-key-missing", "caller");
 
         handler.handle(exchange.exchange());
 
         assertEquals(404, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("user not found"));
+    }
+
+    @Test
+    void admin_user_key_and_search_handlers_close_exchange() throws Exception {
+        HttpHandler adminHandler = createHandler("AdminKeyHandler");
+        ExchangeHarness adminExchange = newExchange("GET", "/api/v1/config/admin-key", "");
+        adminHandler.handle(adminExchange.exchange());
+        verify(adminExchange.exchange(), times(1)).close();
+
+        HttpHandler userKeyHandler = createHandler("UserKeyHandler");
+        ExchangeHarness userKeyExchange = newExchange("GET", "/api/v1/users/u-1/key", "");
+        authenticate(userKeyExchange, "sess-user-key-close", "caller");
+        when(userDAO.getPublicKey("u-1")).thenReturn(new UserDAO.PublicKeyRecord("PEM", "fp-1"));
+        userKeyHandler.handle(userKeyExchange.exchange());
+        verify(userKeyExchange.exchange(), times(1)).close();
+
+        HttpHandler searchHandler = createHandler("SearchHandler");
+        ExchangeHarness searchExchange = newExchange("GET", "/api/v1/search?q=%20", "");
+        authenticate(searchExchange, "sess-search-close", "caller");
+        searchHandler.handle(searchExchange.exchange());
+        verify(searchExchange.exchange(), times(1)).close();
     }
 
     @Test
@@ -658,6 +817,22 @@ class HttpIngressServerTest {
 
         assertEquals(400, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("invalid limit"));
+    }
+
+    @Test
+    void search_is_rate_limited_for_authenticated_caller() throws Exception {
+        HttpHandler handler = createHandler("SearchHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.SEARCH),
+                eq("caller")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(15));
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/search?q=alice", "");
+        authenticate(exchange, "sess-search-limit", "caller");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":15"));
     }
 
     @Test
@@ -834,6 +1009,22 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void contacts_is_rate_limited_for_authenticated_caller() throws Exception {
+        HttpHandler handler = createHandler("ContactsHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.CONTACTS),
+                eq("caller")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(21));
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/contacts", "");
+        authenticate(exchange, "sess-contacts-limit", "caller");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":21"));
+    }
+
+    @Test
     void contacts_get_returns_contact_list() throws Exception {
         HttpHandler handler = createHandler("ContactsHandler");
         ExchangeHarness exchange = newExchange("GET", "/api/v1/contacts", "");
@@ -931,6 +1122,22 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void messaging_config_is_rate_limited_for_authenticated_caller() throws Exception {
+        HttpHandler handler = createHandler("MessagingConfigHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.MESSAGING_CONFIG),
+                eq("caller")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(9));
+        ExchangeHarness exchange = newExchange("GET", "/api/v1/config/messaging", "");
+        authenticate(exchange, "sess-msg-policy-limit", "caller");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":9"));
+    }
+
+    @Test
     void attachments_rejects_missing_auth() throws Exception {
         HttpHandler handler = createHandler("AttachmentsHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/attachments/init", "{}");
@@ -951,6 +1158,27 @@ class HttpIngressServerTest {
 
         assertEquals(405, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("method not allowed"));
+    }
+
+    @Test
+    void attachments_chunk_is_rate_limited() throws Exception {
+        HttpHandler handler = createHandler("AttachmentsHandler");
+        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.ATTACHMENTS_CHUNK),
+                eq("caller")))
+                .thenReturn(RateLimiterService.RateLimitDecision.block(7));
+        AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
+        chunkReq.setChunkIndex(0);
+        chunkReq.setChunkDataB64(Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 }));
+
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/attachments/att-1/chunk", JsonCodec.toJson(chunkReq));
+        authenticate(exchange, "sess-attach-chunk-limit", "caller");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(429, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":7"));
+        verify(attachmentDAO, never()).storeChunk(anyString(), anyString(), anyInt(), any(byte[].class));
     }
 
     @Test
@@ -1143,12 +1371,14 @@ class HttpIngressServerTest {
         Headers responseHeaders = new Headers();
         ByteArrayOutputStream responseBody = new ByteArrayOutputStream();
         AtomicInteger statusCode = new AtomicInteger(-1);
+        InetSocketAddress remoteAddress = new InetSocketAddress("203.0.113.10", 443);
 
         String payload = body == null ? "" : body;
         lenient().when(exchange.getRequestMethod()).thenReturn(method);
         lenient().when(exchange.getRequestURI()).thenReturn(URI.create(path));
         lenient().when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
         lenient().when(exchange.getResponseHeaders()).thenReturn(responseHeaders);
+        lenient().when(exchange.getRemoteAddress()).thenReturn(remoteAddress);
         lenient().when(exchange.getRequestBody())
                 .thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
         lenient().when(exchange.getResponseBody()).thenReturn(responseBody);
@@ -1157,13 +1387,17 @@ class HttpIngressServerTest {
             return null;
         }).when(exchange).sendResponseHeaders(anyInt(), anyLong());
 
-        return new ExchangeHarness(exchange, requestHeaders, responseBody, statusCode);
+        return new ExchangeHarness(exchange, requestHeaders, responseHeaders, responseBody, statusCode);
     }
 
-    private record ExchangeHarness(HttpExchange exchange, Headers requestHeaders,
+    private record ExchangeHarness(HttpExchange exchange, Headers requestHeaders, Headers responseHeaders,
             ByteArrayOutputStream responseBody, AtomicInteger statusCode) {
         private String responseBodyAsString() {
             return responseBody.toString(StandardCharsets.UTF_8);
+        }
+
+        private void setRemoteAddress(String host, int port) {
+            lenient().when(exchange.getRemoteAddress()).thenReturn(new InetSocketAddress(host, port));
         }
     }
 

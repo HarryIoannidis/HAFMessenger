@@ -29,6 +29,7 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.time.Duration;
@@ -59,6 +60,7 @@ public final class Main {
      */
     private void start() {
         ServerConfig config = ServerConfig.load();
+        configureDbTlsTrustStore(config);
         runFlywayMigrations(config);
 
         HikariDataSource dataSource = createDataSource(config);
@@ -208,6 +210,24 @@ public final class Main {
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
         hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
         return new HikariDataSource(hikariConfig);
+    }
+
+    /**
+     * Configures JVM truststore properties used by MySQL when strict TLS validation
+     * is enabled.
+     *
+     * @param config server configuration
+     */
+    private static void configureDbTlsTrustStore(ServerConfig config) {
+        Path truststorePath = config.getDbTruststorePath();
+        char[] truststorePassword = config.getDbTruststorePassword();
+        if (truststorePath == null || truststorePassword == null || truststorePassword.length == 0) {
+            return;
+        }
+
+        System.setProperty("javax.net.ssl.trustStore", truststorePath.toAbsolutePath().toString());
+        System.setProperty("javax.net.ssl.trustStoreType", config.getDbTruststoreType());
+        System.setProperty("javax.net.ssl.trustStorePassword", new String(truststorePassword));
     }
 
     /**
