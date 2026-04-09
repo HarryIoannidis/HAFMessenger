@@ -20,7 +20,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Network: `WebSocketAdapter`, `DefaultMessageSender`, `DefaultMessageReceiver`, `MessageSender`, `MessageReceiver`
   - Services: `DefaultLoginService`, `DefaultRegistrationService`, `DefaultMainSessionService`, `DefaultTokenRefreshService`, `TokenRefreshService`, `DesktopNotificationService`
   - Builders: `ContextMenuBuilder`, `MessageBubbleFactory`, `PopupMessageBuilder`, `SettingsRowBuilder`
-  - Security: `RememberedCredentialsStore`, `SecurePasswordVault`, `WindowsCredentialManagerPasswordVault`, `MacOsKeychainPasswordVault`, `LinuxSecretToolPasswordVault`
+  - Security: `RememberedCredentialsStore`, `SecurePasswordVault`, `WindowsPasswordManager`, `MacOsKeychainPasswordVault`, `LinuxSecretToolPasswordVault`
 - Server notable classes:
   - `Main`, `ServerConfig`
   - `HttpIngressServer`, `WebSocketIngressServer`
@@ -54,7 +54,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Exceptions: `ClientConfigurationException.java`, `HttpCommunicationException.java`, `RegistrationFlowException.java`, `SslConfigurationException.java`, `UiDispatchException.java`
   - Models: `ContactInfo.java`, `MessageType.java`, `MessageVM.java`, `SettingsMenuItem.java`, `UserProfileInfo.java`
   - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `WebSocketAdapter.java`
-  - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsCredentialManagerPasswordVault.java`
+  - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsPasswordManager.java`
   - Services: `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DefaultTokenRefreshService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`, `TokenRefreshService.java`
   - Utils: `ClientRuntimeConfig.java`, `ClientSettings.java`, `ImageSaveSupport.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
   - ViewModels: `ChatViewModel.java`, `LoginViewModel.java`, `MainViewModel.java`, `MessagesViewModel.java`, `RegisterViewModel.java`, `SearchSortViewModel.java`, `SearchViewModel.java`, `SplashViewModel.java`
@@ -62,7 +62,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Controllers: `ChatControllerTest.java`, `ContactCellTest.java`, `LoginControllerTest.java`, `MainContentLoaderTest.java`, `MainControllerTest.java`, `PopupMessageControllerTest.java`, `PreviewControllerTest.java`, `RegisterControllerTest.java`, `SearchControllerTest.java`, `SearchFilterUiTest.java`, `SettingsControllerRememberCredentialsTest.java`, `SettingsControllerTest.java`, `SplashControllerTest.java`
   - Crypto: `UserKeystoreKeyProviderTest.java`
   - Network: `MessageReceiverTest.java`, `MessageSenderTest.java`, `WebSocketAdapterTest.java`
-  - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsCredentialManagerPasswordVaultTest.java`
+  - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsPasswordManagerTest.java`
   - Services: `DefaultChatAttachmentServiceTest.java`, `DefaultLoginServiceTest.java`, `DefaultMainSessionServiceTest.java`, `DefaultRegistrationServiceTest.java`
   - Utils: `ClientRuntimeConfigTest.java`, `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
   - ViewModels: `ChatViewModelTest.java`, `LoginViewModelTest.java`, `MainViewModelTest.java`, `MessageViewModelAttachmentTest.java`, `MessageViewModelIncomingListenerTest.java`, `MessageViewModelPresenceTest.java`, `MessageViewModelRuntimeTest.java`, `RegisterViewModelTest.java`, `SearchViewModelTest.java`, `SplashViewModelTest.java`
@@ -103,7 +103,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Integration tests: `KeystoreE2EIT.java`, `KeystorePermsE2EIT.java`, `KeystoreTamperIT.java`, `KeystoreWrongPassIT.java`
   - Constants: `AttachmentConstantsTest.java`, `CryptoConstantsTest.java`, `MessageHeaderTest.java`
   - Crypto: `AadBindingTest.java`, `AadCodecTest.java`, `CryptoECCTest.java`, `CryptoServiceTest.java`, `MessageDecryptorTest.java`, `MessageEncryptorTest.java`, `MessageFlowTest.java`
-  - DTO: `EncryptedFileTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultDTOTest.java`
+  - DTO: `EncryptedFileDTOTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultDTOTest.java`
   - Exceptions: `MessageExpiryTest.java`, `MessageTamperingTests.java`
   - Keystore: `KeyProviderTest.java`, `KeystoreBootstrapIdempotentTest.java`, `KeystoreBootstrapTest.java`, `KeystoreRootTest.java`, `KeystoreSealingTest.java`, `UserKeystoreTest.java`
   - Requests: `AddContactRequestTest.java`, `LoginRequestTest.java`
