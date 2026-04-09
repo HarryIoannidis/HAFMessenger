@@ -29,7 +29,7 @@ class ContactCellTest {
     @Test
     void unread_badge_text_uses_dynamic_cap_format() throws Exception {
         String source = java.nio.file.Files
-                .readString(java.nio.file.Path.of("src/main/java/com/haf/client/controllers/ContactCell.java"));
+                .readString(java.nio.file.Path.of("src/main/java/com/haf/client/controllers/ContactCellController.java"));
 
         assertTrue(source.contains("formatUnreadBadgeText(unreadCount, unreadBadgeCap)"));
         assertTrue(source.contains("if (normalized > cap) {"));

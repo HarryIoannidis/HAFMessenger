@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MessageBubbleFactoryTest {
 
-    private static final Path FACTORY_SOURCE = Path.of("src/main/java/com/haf/client/utils/MessageBubbleFactory.java");
+    private static final Path FACTORY_SOURCE = Path.of("src/main/java/com/haf/client/builders/MessageBubbleFactory.java");
 
     @Test
     void message_bubbles_are_wrapped_with_stackpane_and_overlay_button() throws IOException {

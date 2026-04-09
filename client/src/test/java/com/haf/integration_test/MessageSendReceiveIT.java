@@ -44,6 +44,14 @@ class MessageSendReceiveIT {
 
         @Override
         public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
+            return postAuthenticated(path, jsonBody, java.util.Map.of());
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
+                String path,
+                String jsonBody,
+                java.util.Map<String, String> extraHeaders) {
             if ("/api/v1/messages".equals(path)) {
                 try {
                     sendText(jsonBody);
@@ -52,7 +60,7 @@ class MessageSendReceiveIT {
                     return java.util.concurrent.CompletableFuture.failedFuture(e);
                 }
             }
-            return super.postAuthenticated(path, jsonBody);
+            return super.postAuthenticated(path, jsonBody, extraHeaders);
         }
 
         @Override

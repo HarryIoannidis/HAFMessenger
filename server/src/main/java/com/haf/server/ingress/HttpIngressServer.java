@@ -12,6 +12,7 @@ import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
+import com.haf.server.router.RateLimiterService.ApiRateLimitScope;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
 import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.dto.EncryptedMessage;
@@ -64,14 +65,20 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -94,20 +101,12 @@ public final class HttpIngressServer {
     private final AttachmentDAO attachmentDAO;
     private final ContactDAO contactDAO;
     private final PresenceRegistry presenceRegistry;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor;
+    private final Object trustedProxyCacheLock = new Object();
+    private final AtomicReference<TrustedProxyCache> trustedProxyCache =
+            new AtomicReference<>(TrustedProxyCache.empty());
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
-    private static final String MESSAGES_PATH = "/api/v1/messages";
-    private static final String REGISTER_PATH = "/api/v1/register";
-    private static final String LOGIN_PATH = "/api/v1/login";
-    private static final String TOKEN_REFRESH_PATH = "/api/v1/token/refresh";
-    private static final String LOGOUT_PATH = "/api/v1/logout";
-    private static final String USERS_PATH = "/api/v1/users";
-    private static final String SEARCH_PATH = "/api/v1/search";
-    private static final String CONTACTS_PATH = "/api/v1/contacts";
-    private static final String HEALTH_PATH = "/api/v1/health";
-    private static final String ADMIN_KEY_PATH = "/api/v1/config/admin-key";
-    private static final String MESSAGING_CONFIG_PATH = "/api/v1/config/messaging";
-    private static final String ATTACHMENTS_PATH = "/api/v1/attachments";
+    private static final String MESSAGES_PATH = apiPath("messages");
     private static final String STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
     private static final String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
     private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
@@ -117,7 +116,6 @@ public final class HttpIngressServer {
     private static final String APPLICATION_JSON = "application/json";
     private static final String AUTHORIZATION = "Authorization";
     private static final String RECIPIENT_KEY_FINGERPRINT_HEADER = "X-Recipient-Key-Fingerprint";
-    private static final String BEARER_PREFIX = "Bearer ";
     private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
     private static final String REQUEST_BODY_EXCEEDS_LIMIT = "Request body exceeds limit";
@@ -127,17 +125,7 @@ public final class HttpIngressServer {
     private static final String X_FRAME_OPTIONS_VALUE = "DENY";
     private static final String METHOD_NOT_ALLOWED = "method not allowed";
     private static final String INTERNAL_SERVER_ERROR = "internal server error";
-    private static final String MISSING_OR_INVALID_AUTH = "missing or invalid auth";
-    private static final String INVALID_SESSION = "invalid session";
-    private static final String SESSION_REVOKED_BY_TAKEOVER = "session revoked by takeover";
     private static final String INVALID_REQUEST_PATH = "invalid request path";
-    private static final String INVALID_CONTACT_ID = "invalid contactId";
-    private static final String INVALID_EMAIL_PASSWORD = "Invalid email or password";
-    private static final String TOO_MANY_LOGIN_ATTEMPTS = "Too many login attempts";
-    private static final String ACCOUNT_ALREADY_LOGGED_IN = "Account is already logged in.";
-    private static final String TAKEOVER_FIELDS_REQUIRED = "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true";
-    private static final String TAKEOVER_FINGERPRINT_MISMATCH = "takeover key fingerprint mismatch";
-    private static final String STALE_RECIPIENT_KEY_ERROR = "recipient key is stale";
     private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
@@ -147,6 +135,62 @@ public final class HttpIngressServer {
             CryptoConstants.ARGON2_PARALLELISM,
             CryptoConstants.ARGON2_OUTPUT_LENGTH,
             com.password4j.types.Argon2.ID);
+    private static final String LOGIN_SENTINEL_HASH = Password.hash("haf-login-sentinel-password")
+            .addRandomSalt(CryptoConstants.SALT_LEN)
+            .with(ARGON2)
+            .getResult();
+
+    /**
+     * Builds an API path under {@code /api/v1}.
+     *
+     * @param segment first path segment
+     * @return full API path
+     */
+    private static String apiPath(String segment) {
+        return "/api/v1/" + segment;
+    }
+
+    /**
+     * Builds a nested API path under {@code /api/v1}.
+     *
+     * @param parent parent segment
+     * @param child  child segment
+     * @return full API path
+     */
+    private static String apiPath(String parent, String child) {
+        return "/api/v1/" + parent + "/" + child;
+    }
+
+    private enum AttachmentAction {
+        DOWNLOAD,
+        CHUNK,
+        COMPLETE,
+        BIND
+    }
+
+    private static final class AttachmentRoute {
+        private final String attachmentId;
+        private final AttachmentAction action;
+        private final ApiRateLimitScope rateLimitScope;
+
+        private AttachmentRoute(String attachmentId, AttachmentAction action, ApiRateLimitScope rateLimitScope) {
+            this.attachmentId = attachmentId;
+            this.action = action;
+            this.rateLimitScope = rateLimitScope;
+        }
+
+        private String attachmentId() {
+            return attachmentId;
+        }
+
+        private AttachmentAction action() {
+            return action;
+        }
+
+        private ApiRateLimitScope rateLimitScope() {
+            return rateLimitScope;
+        }
+    }
 
     /**
      * Pushes contact presence to all active requester connections after contact
@@ -333,7 +377,31 @@ public final class HttpIngressServer {
         if (value == null) {
             return "";
         }
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder escaped = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        escaped.append("\\u");
+                        escaped.append(Character.forDigit((ch >> 12) & 0xF, 16));
+                        escaped.append(Character.forDigit((ch >> 8) & 0xF, 16));
+                        escaped.append(Character.forDigit((ch >> 4) & 0xF, 16));
+                        escaped.append(Character.forDigit(ch & 0xF, 16));
+                    } else {
+                        escaped.append(ch);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     /**
@@ -372,7 +440,35 @@ public final class HttpIngressServer {
         this.attachmentDAO = attachmentDAO;
         this.contactDAO = contactDAO;
         this.presenceRegistry = presenceRegistry;
+        refreshTrustedProxyRanges(config.getTrustedProxyCidrs());
+        this.executor = createIngressExecutor(config);
         this.server = createServer(sslContext);
+    }
+
+    /**
+     * Creates a bounded ingress executor to prevent unbounded thread growth.
+     *
+     * @param config runtime config carrying thread/queue limits
+     * @return bounded executor service
+     */
+    private static ExecutorService createIngressExecutor(ServerConfig config) {
+        int threadCount = config.getIngressExecutorThreads();
+        int queueCapacity = config.getIngressExecutorQueueCapacity();
+        AtomicInteger threadIndex = new AtomicInteger();
+        ThreadFactory factory = runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setName("haf-http-ingress-" + threadIndex.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+        return new ThreadPoolExecutor(
+                threadCount,
+                threadCount,
+                60L,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(queueCapacity),
+                factory,
+                new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     /**
@@ -404,17 +500,17 @@ public final class HttpIngressServer {
         });
 
         httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
-        httpsServer.createContext(REGISTER_PATH, new RegistrationHandler());
-        httpsServer.createContext(LOGIN_PATH, new LoginHandler());
-        httpsServer.createContext(TOKEN_REFRESH_PATH, new TokenRefreshHandler());
-        httpsServer.createContext(LOGOUT_PATH, new LogoutHandler());
-        httpsServer.createContext(USERS_PATH, new UserKeyHandler());
-        httpsServer.createContext(SEARCH_PATH, new SearchHandler());
-        httpsServer.createContext(CONTACTS_PATH, new ContactsHandler());
-        httpsServer.createContext(HEALTH_PATH, new HealthHandler());
-        httpsServer.createContext(ADMIN_KEY_PATH, new AdminKeyHandler());
-        httpsServer.createContext(MESSAGING_CONFIG_PATH, new MessagingConfigHandler());
-        httpsServer.createContext(ATTACHMENTS_PATH, new AttachmentsHandler());
+        httpsServer.createContext(apiPath("register"), new RegistrationHandler());
+        httpsServer.createContext(apiPath("login"), new LoginHandler());
+        httpsServer.createContext(apiPath("token", "refresh"), new TokenRefreshHandler());
+        httpsServer.createContext(apiPath("logout"), new LogoutHandler());
+        httpsServer.createContext(apiPath("users"), new UserKeyHandler());
+        httpsServer.createContext(apiPath("search"), new SearchHandler());
+        httpsServer.createContext(apiPath("contacts"), new ContactsHandler());
+        httpsServer.createContext(apiPath("health"), new HealthHandler());
+        httpsServer.createContext(apiPath("config", "admin-key"), new AdminKeyHandler());
+        httpsServer.createContext(apiPath("config", "messaging"), new MessagingConfigHandler());
+        httpsServer.createContext(apiPath("attachments"), new AttachmentsHandler());
         httpsServer.setExecutor(executor);
 
         return httpsServer;
@@ -441,11 +537,8 @@ public final class HttpIngressServer {
      * Handles HTTP requests.
      */
     private final class IngressHandler implements HttpHandler {
-        private static final String MESSAGES_ACK_PATH = MESSAGES_PATH + "/ack";
         private static final int DEFAULT_FETCH_LIMIT = 100;
         private static final int MAX_FETCH_LIMIT = 500;
-        private static final String ENVELOPE_IDS_REQUIRED = "envelopeIds is required";
-        private static final String INVALID_LIMIT = "invalid limit";
 
         /**
          * Handles an HTTP request.
@@ -467,8 +560,6 @@ public final class HttpIngressServer {
             }
             String userId = authResult.callerId();
 
-            exchange.getResponseHeaders().add("X-User-Id", userId);
-
             try {
                 String method = exchange.getRequestMethod();
                 String path = normalizePath(exchange.getRequestURI().getPath());
@@ -481,12 +572,12 @@ public final class HttpIngressServer {
                     handleFetchUndelivered(exchange, requestId, userId);
                     return;
                 }
-                if (METHOD_POST.equalsIgnoreCase(method) && MESSAGES_ACK_PATH.equals(path)) {
+                if (METHOD_POST.equalsIgnoreCase(method) && (MESSAGES_PATH + "/ack").equals(path)) {
                     handleAcknowledge(exchange, requestId, userId);
                     return;
                 }
 
-                if (!MESSAGES_PATH.equals(path) && !MESSAGES_ACK_PATH.equals(path)) {
+                if (!MESSAGES_PATH.equals(path) && !(MESSAGES_PATH + "/ack").equals(path)) {
                     respond(exchange, requestId, 404, JSON_ERROR_PREFIX + INVALID_REQUEST_PATH + JSON_ERROR_SUFFIX);
                     return;
                 }
@@ -528,7 +619,7 @@ public final class HttpIngressServer {
 
             if (isRecipientKeyFingerprintStale(exchange, message)) {
                 respond(exchange, requestId, 409,
-                        "{\"error\":\"" + STALE_RECIPIENT_KEY_ERROR + "\",\"code\":\"stale_recipient_key\"}");
+                        "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}");
                 return;
             }
 
@@ -618,7 +709,7 @@ public final class HttpIngressServer {
             Map<?, ?> ackMap = JsonCodec.fromJson(body, Map.class);
             List<String> envelopeIds = extractEnvelopeIds(ackMap == null ? null : ackMap.get("envelopeIds"));
             if (envelopeIds.isEmpty()) {
-                throw new IllegalArgumentException(ENVELOPE_IDS_REQUIRED);
+                throw new IllegalArgumentException("envelopeIds is required");
             }
 
             boolean acknowledged = mailboxRouter.acknowledgeOwned(userId, envelopeIds);
@@ -676,7 +767,7 @@ public final class HttpIngressServer {
             try {
                 return Math.clamp(Integer.parseInt(rawLimit), 1, MAX_FETCH_LIMIT);
             } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException(INVALID_LIMIT, ex);
+                throw new IllegalArgumentException("invalid limit", ex);
             }
         }
 
@@ -747,7 +838,7 @@ public final class HttpIngressServer {
          * @return escaped text
          */
         private String escapeJson(String value) {
-            return value == null ? INTERNAL_SERVER_ERROR : value.replace("\"", "\\\"");
+            return HttpIngressServer.escapeJson(value == null ? INTERNAL_SERVER_ERROR : value);
         }
 
         /**
@@ -831,6 +922,11 @@ public final class HttpIngressServer {
             try {
                 if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
                     respond(exchange, requestId, 405, JsonCodec.toJson(RegisterResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+
+                String sourceIp = resolveClientIp(exchange);
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.REGISTER, sourceIp)) {
                     return;
                 }
 
@@ -1054,21 +1150,18 @@ public final class HttpIngressServer {
                         sourceIp);
                 if (!loginRateDecision.allowed()) {
                     respond(exchange, requestId, 429, JsonCodec.toJson(
-                            LoginResponse.error(TOO_MANY_LOGIN_ATTEMPTS, loginRateDecision.retryAfterSeconds())));
+                            LoginResponse.error("Too many login attempts", loginRateDecision.retryAfterSeconds())));
                     return;
                 }
 
                 // Look up user by email
                 UserDAO.UserRecord user = userDAO.findByEmail(request.getEmail());
-                if (user == null) {
+                boolean passwordValid = verifyPasswordWithSentinel(
+                        request.getPassword(),
+                        user == null ? null : user.passwordHash());
+                if (user == null || !passwordValid) {
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(LoginResponse.error(INVALID_EMAIL_PASSWORD)));
-                    return;
-                }
-
-                if (!Password.check(request.getPassword(), user.passwordHash()).with(ARGON2)) {
-                    respond(exchange, requestId, 401,
-                            JsonCodec.toJson(LoginResponse.error(INVALID_EMAIL_PASSWORD)));
+                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
                     return;
                 }
 
@@ -1085,7 +1178,7 @@ public final class HttpIngressServer {
 
                 if (!forceTakeover && isDuplicateLoginAttemptForRuntime(user.userId())) {
                     respond(exchange, requestId, 409,
-                            JsonCodec.toJson(LoginResponse.error(ACCOUNT_ALREADY_LOGGED_IN)));
+                            JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
                     return;
                 }
 
@@ -1134,13 +1227,14 @@ public final class HttpIngressServer {
             String takeoverPublicKeyPem = request.getTakeoverPublicKeyPem();
             String takeoverFingerprint = request.getTakeoverPublicKeyFingerprint();
             if (isBlank(takeoverPublicKeyPem) || isBlank(takeoverFingerprint)) {
-                throw new IllegalArgumentException(TAKEOVER_FIELDS_REQUIRED);
+                throw new IllegalArgumentException(
+                        "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true");
             }
 
             String normalizedProvidedFingerprint = takeoverFingerprint.trim();
             String normalizedCalculatedFingerprint = calculateFingerprint(takeoverPublicKeyPem);
             if (!normalizedCalculatedFingerprint.equalsIgnoreCase(normalizedProvidedFingerprint)) {
-                throw new IllegalArgumentException(TAKEOVER_FINGERPRINT_MISMATCH);
+                throw new IllegalArgumentException("takeover key fingerprint mismatch");
             }
         }
 
@@ -1176,6 +1270,20 @@ public final class HttpIngressServer {
             } catch (Exception ex) {
                 throw new IllegalArgumentException("invalid takeoverPublicKeyPem", ex);
             }
+        }
+
+        /**
+         * Verifies password hash while consuming Argon2 work even when account is
+         * missing.
+         *
+         * @param providedPassword caller-provided password
+         * @param storedHash account hash, or {@code null} when account is unknown
+         * @return {@code true} when stored hash is present and password matches
+         */
+        static boolean verifyPasswordWithSentinel(String providedPassword, String storedHash) {
+            String hashToCheck = storedHash == null ? LOGIN_SENTINEL_HASH : storedHash;
+            boolean matches = Password.check(providedPassword, hashToCheck).with(ARGON2);
+            return storedHash != null && matches;
         }
 
         /**
@@ -1281,6 +1389,11 @@ public final class HttpIngressServer {
                     return;
                 }
 
+                String sourceIp = resolveClientIp(exchange);
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.TOKEN_REFRESH, sourceIp)) {
+                    return;
+                }
+
                 String body = readBody(exchange.getRequestBody());
                 RefreshTokenRequest request = JsonCodec.fromJson(body, RefreshTokenRequest.class);
                 if (request == null || isBlank(request.getRefreshToken())) {
@@ -1292,8 +1405,8 @@ public final class HttpIngressServer {
                 SessionDAO.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
                 if (rotated == null) {
                     String reason = sessionDAO.isRefreshSessionRevoked(request.getRefreshToken())
-                            ? SESSION_REVOKED_BY_TAKEOVER
-                            : INVALID_SESSION;
+                            ? "session revoked by takeover"
+                            : "invalid session";
                     respond(exchange, requestId, 401,
                             JsonCodec.toJson(RefreshTokenResponse.error(reason)));
                     return;
@@ -1466,21 +1579,30 @@ public final class HttpIngressServer {
          */
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            exchange.getResponseHeaders().add(X_REQUEST_ID, UUID.randomUUID().toString());
+            String requestId = UUID.randomUUID().toString();
+            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
-                return;
+            try {
+                if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendPlain(exchange, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
+                    return;
+                }
+
+                String sourceIp = resolveClientIp(exchange);
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.ADMIN_KEY, sourceIp)) {
+                    return;
+                }
+
+                String pem = config.getAdminPublicKeyPem();
+                String body = pem != null
+                        ? "{\"adminPublicKeyPem\":\"" + pem.replace("\n", "\\n") + "\"}"
+                        : "{\"adminPublicKeyPem\":null}";
+
+                sendPlain(exchange, 200, body);
+            } finally {
+                exchange.close();
             }
-
-            String pem = config.getAdminPublicKeyPem();
-            String body = pem != null
-                    ? "{\"adminPublicKeyPem\":\"" + pem.replace("\n", "\\n") + "\"}"
-                    : "{\"adminPublicKeyPem\":null}";
-
-            sendPlain(exchange, 200, body);
-            exchange.close();
         }
 
         /**
@@ -1530,34 +1652,45 @@ public final class HttpIngressServer {
             exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error(METHOD_NOT_ALLOWED)));
-                return;
-            }
-
-            // Path must match /api/v1/users/{userId}/key
-            String path = exchange.getRequestURI().getPath();
-            if (path == null || !path.endsWith("/key")) {
-                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
-                return;
-            }
-
-            // Extract userId
-            String prefix = USERS_PATH + "/";
-            if (!path.startsWith(prefix)) {
-                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
-                return;
-            }
-
-            String remainder = path.substring(prefix.length());
-            int slashIndex = remainder.indexOf('/');
-            if (slashIndex == -1) {
-                sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("missing userId")));
-                return;
-            }
-            String targetUserId = remainder.substring(0, slashIndex);
-
             try {
+                if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendPlain(exchange, 405, JsonCodec.toJson(PublicKeyResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
+
+                AuthResult authResult = resolveAuthenticatedCaller(exchange);
+                if (!authResult.authenticated()) {
+                    sendPlain(exchange, 401, JsonCodec.toJson(PublicKeyResponse.error(authResult.error())));
+                    return;
+                }
+                String callerId = authResult.callerId();
+
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.USER_KEY, callerId)) {
+                    return;
+                }
+
+                // Path must match /api/v1/users/{userId}/key
+                String path = exchange.getRequestURI().getPath();
+                if (path == null || !path.endsWith("/key")) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
+                    return;
+                }
+
+                // Extract userId
+                String prefix = apiPath("users") + "/";
+                if (!path.startsWith(prefix)) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error(INVALID_REQUEST_PATH)));
+                    return;
+                }
+
+                String remainder = path.substring(prefix.length());
+                int slashIndex = remainder.indexOf('/');
+                if (slashIndex == -1) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(PublicKeyResponse.error("missing userId")));
+                    return;
+                }
+                String targetUserId = remainder.substring(0, slashIndex);
+
                 UserDAO.PublicKeyRecord keyRecord = userDAO.getPublicKey(targetUserId);
                 if (keyRecord == null) {
                     sendPlain(exchange, 404, JsonCodec.toJson(PublicKeyResponse.error("user not found")));
@@ -1569,6 +1702,8 @@ public final class HttpIngressServer {
             } catch (Exception ex) {
                 auditLogger.logError("user_key_lookup_error", requestId, null, ex);
                 sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error(INTERNAL_SERVER_ERROR)));
+            } finally {
+                exchange.close();
             }
         }
 
@@ -1609,10 +1744,7 @@ public final class HttpIngressServer {
      */
     private final class SearchHandler implements HttpHandler {
 
-        private static final String CURSOR_HMAC_ALGO = "HmacSHA256";
-        private static final String INVALID_LIMIT = "invalid limit";
         private static final String INVALID_CURSOR = "invalid cursor";
-        private static final String INVALID_QUERY_PARAMS = "invalid query parameters";
 
         /**
          * Handles authenticated user search with keyset pagination and signed cursors.
@@ -1626,95 +1758,103 @@ public final class HttpIngressServer {
             exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
             applySecurityHeaders(exchange.getResponseHeaders());
 
-            if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error(METHOD_NOT_ALLOWED)));
-                return;
-            }
-
-            AuthResult authResult = resolveAuthenticatedCaller(exchange);
-            if (!authResult.authenticated()) {
-                sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(authResult.error())));
-                return;
-            }
-            String callerId = authResult.callerId();
-
-            Map<String, String> queryParams;
             try {
-                queryParams = parseQueryParams(exchange.getRequestURI().getRawQuery());
-            } catch (IllegalArgumentException _) {
-                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_QUERY_PARAMS)));
-                return;
-            }
-            String searchTerm = queryParams.getOrDefault("q", "");
-            String normalizedQuery = searchTerm == null ? "" : searchTerm.trim();
-            if (normalizedQuery.isBlank()) {
-                sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(List.of(), false, null)));
-                return;
-            }
+                if (!METHOD_GET.equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendPlain(exchange, 405, JsonCodec.toJson(UserSearchResponse.error(METHOD_NOT_ALLOWED)));
+                    return;
+                }
 
-            if (normalizedQuery.length() < config.getSearchMinQueryLength()) {
-                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse
-                        .error("query must be at least " + config.getSearchMinQueryLength() + " characters")));
-                return;
-            }
-            if (normalizedQuery.length() > config.getSearchMaxQueryLength()) {
-                normalizedQuery = normalizedQuery.substring(0, config.getSearchMaxQueryLength());
-            }
+                AuthResult authResult = resolveAuthenticatedCaller(exchange);
+                if (!authResult.authenticated()) {
+                    sendPlain(exchange, 401, JsonCodec.toJson(UserSearchResponse.error(authResult.error())));
+                    return;
+                }
+                String callerId = authResult.callerId();
 
-            int effectiveLimit;
-            try {
-                effectiveLimit = resolveLimit(queryParams.get("limit"));
-            } catch (IllegalArgumentException _) {
-                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_LIMIT)));
-                return;
-            }
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.SEARCH, callerId)) {
+                    return;
+                }
 
-            String cursorToken = queryParams.get("cursor");
-            CursorKey cursor;
-            try {
-                cursor = decodeCursor(cursorToken);
-            } catch (IllegalArgumentException _) {
-                sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_CURSOR)));
-                return;
-            }
+                Map<String, String> queryParams;
+                try {
+                    queryParams = parseQueryParams(exchange.getRequestURI().getRawQuery());
+                } catch (IllegalArgumentException _) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error("invalid query parameters")));
+                    return;
+                }
+                String searchTerm = queryParams.getOrDefault("q", "");
+                String normalizedQuery = searchTerm == null ? "" : searchTerm.trim();
+                if (normalizedQuery.isBlank()) {
+                    sendPlain(exchange, 200, JsonCodec.toJson(UserSearchResponse.success(List.of(), false, null)));
+                    return;
+                }
 
-            String queryHash = sha256Hex(normalizedQuery);
-            auditLogger.logSearchRequest(
-                    requestId,
-                    callerId,
-                    normalizedQuery.length(),
-                    queryHash,
-                    effectiveLimit,
-                    cursor.isPresent());
+                if (normalizedQuery.length() < config.getSearchMinQueryLength()) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse
+                            .error("query must be at least " + config.getSearchMinQueryLength() + " characters")));
+                    return;
+                }
+                if (normalizedQuery.length() > config.getSearchMaxQueryLength()) {
+                    normalizedQuery = normalizedQuery.substring(0, config.getSearchMaxQueryLength());
+                }
 
-            try {
-                UserDAO.SearchPage page = userDAO.searchUsersPage(
-                        normalizedQuery,
+                int effectiveLimit;
+                try {
+                    effectiveLimit = resolveLimit(queryParams.get("limit"));
+                } catch (IllegalArgumentException _) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error("invalid limit")));
+                    return;
+                }
+
+                String cursorToken = queryParams.get("cursor");
+                CursorKey cursor;
+                try {
+                    cursor = decodeCursor(cursorToken);
+                } catch (IllegalArgumentException _) {
+                    sendPlain(exchange, 400, JsonCodec.toJson(UserSearchResponse.error(INVALID_CURSOR)));
+                    return;
+                }
+
+                String queryHash = sha256Hex(normalizedQuery);
+                auditLogger.logSearchRequest(
+                        requestId,
                         callerId,
+                        normalizedQuery.length(),
+                        queryHash,
                         effectiveLimit,
-                        cursor.fullName(),
-                        cursor.userId());
+                        cursor.isPresent());
 
-                List<UserSearchResultDTO> results = page.results().stream()
-                        .map(r -> new UserSearchResultDTO(
-                                r.userId(),
-                                r.fullName(),
-                                r.regNumber(),
-                                r.email(),
-                                r.rank(),
-                                r.telephone(),
-                                r.joinedDate()))
-                        .toList();
-                String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
-                sendPlain(exchange, 200,
-                        JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
-            } catch (Exception ex) {
-                auditLogger.logError("search_error", requestId, callerId, ex, Map.of(
-                        "queryLength", normalizedQuery.length(),
-                        "queryHash", queryHash,
-                        "limit", effectiveLimit,
-                        "cursorSupplied", cursor.isPresent()));
-                sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error(INTERNAL_SERVER_ERROR)));
+                try {
+                    UserDAO.SearchPage page = userDAO.searchUsersPage(
+                            normalizedQuery,
+                            callerId,
+                            effectiveLimit,
+                            cursor.fullName(),
+                            cursor.userId());
+
+                    List<UserSearchResultDTO> results = page.results().stream()
+                            .map(r -> new UserSearchResultDTO(
+                                    r.userId(),
+                                    r.fullName(),
+                                    r.regNumber(),
+                                    r.email(),
+                                    r.rank(),
+                                    r.telephone(),
+                                    r.joinedDate()))
+                            .toList();
+                    String nextCursor = page.hasMore() ? encodeCursor(page.lastFullName(), page.lastUserId()) : null;
+                    sendPlain(exchange, 200,
+                            JsonCodec.toJson(UserSearchResponse.success(results, page.hasMore(), nextCursor)));
+                } catch (Exception ex) {
+                    auditLogger.logError("search_error", requestId, callerId, ex, Map.of(
+                            "queryLength", normalizedQuery.length(),
+                            "queryHash", queryHash,
+                            "limit", effectiveLimit,
+                            "cursorSupplied", cursor.isPresent()));
+                    sendPlain(exchange, 500, JsonCodec.toJson(UserSearchResponse.error(INTERNAL_SERVER_ERROR)));
+                }
+            } finally {
+                exchange.close();
             }
         }
 
@@ -1733,7 +1873,7 @@ public final class HttpIngressServer {
                 int requested = Integer.parseInt(rawLimit);
                 return Math.clamp(requested, 1, config.getSearchMaxPageSize());
             } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException(INVALID_LIMIT, ex);
+                throw new IllegalArgumentException("invalid limit", ex);
             }
         }
 
@@ -1841,9 +1981,9 @@ public final class HttpIngressServer {
          */
         private byte[] hmac(String payload) {
             try {
-                Mac mac = Mac.getInstance(CURSOR_HMAC_ALGO);
+                Mac mac = Mac.getInstance("HmacSHA256");
                 byte[] secretBytes = config.getSearchCursorSecret().getBytes(StandardCharsets.UTF_8);
-                mac.init(new SecretKeySpec(secretBytes, CURSOR_HMAC_ALGO));
+                mac.init(new SecretKeySpec(secretBytes, "HmacSHA256"));
                 return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             } catch (Exception ex) {
                 throw new IllegalStateException("Failed to sign search cursor", ex);
@@ -2006,6 +2146,9 @@ public final class HttpIngressServer {
             String method = exchange.getRequestMethod();
 
             try {
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.CONTACTS, callerId)) {
+                    return;
+                }
                 if (METHOD_GET.equalsIgnoreCase(method)) {
                     handleGet(exchange, callerId);
                 } else if (METHOD_POST.equalsIgnoreCase(method)) {
@@ -2063,7 +2206,7 @@ public final class HttpIngressServer {
             AddContactRequest request = JsonCodec.fromJson(body, AddContactRequest.class);
             String contactId = request != null && request.getContactId() != null ? request.getContactId().trim() : "";
             if (contactId.isBlank()) {
-                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error(INVALID_CONTACT_ID)));
+                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error("invalid contactId")));
                 return;
             }
             contactDAO.addContact(callerId, contactId);
@@ -2090,7 +2233,7 @@ public final class HttpIngressServer {
                 }
             }
             if (contactId.isBlank()) {
-                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error(INVALID_CONTACT_ID)));
+                sendPlain(exchange, 400, JsonCodec.toJson(ContactsResponse.error("invalid contactId")));
                 return;
             }
             contactDAO.removeContact(callerId, contactId);
@@ -2176,6 +2319,10 @@ public final class HttpIngressServer {
                     return;
                 }
 
+                if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.MESSAGING_CONFIG, callerId)) {
+                    return;
+                }
+
                 MessagingPolicyResponse response = MessagingPolicyResponse.success(
                         config.getAttachmentMaxBytes(),
                         config.getAttachmentInlineMaxBytes(),
@@ -2216,10 +2363,10 @@ public final class HttpIngressServer {
 
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
-            String suffix = path.substring(ATTACHMENTS_PATH.length());
+            String suffix = path.substring(apiPath("attachments").length());
 
             try {
-                dispatchRequest(exchange, callerId, method, suffix);
+                dispatchRequest(exchange, requestId, callerId, method, suffix);
             } catch (SecurityException _) {
                 sendJson(exchange, 403, jsonError("forbidden"));
             } catch (IllegalArgumentException ex) {
@@ -2238,50 +2385,115 @@ public final class HttpIngressServer {
          * Routes attachment request to init/chunk/complete/bind/download handlers.
          *
          * @param exchange HTTP exchange
+         * @param requestId request id for diagnostics and throttling
          * @param callerId authenticated caller id
          * @param method   HTTP method
          * @param suffix   path suffix under attachments root
          * @throws IOException when response write fails
          */
-        private void dispatchRequest(HttpExchange exchange, String callerId, String method, String suffix)
+        private void dispatchRequest(HttpExchange exchange, String requestId, String callerId, String method, String suffix)
                 throws IOException {
             if ("/init".equals(suffix)) {
-                if (!METHOD_POST.equalsIgnoreCase(method)) {
-                    sendJson(exchange, 405, JsonCodec.toJson(AttachmentInitResponse.error(METHOD_NOT_ALLOWED)));
-                    return;
-                }
-                handleInit(exchange, callerId);
+                handleInitRequest(exchange, requestId, callerId, method);
                 return;
             }
 
+            AttachmentRoute route = parseAttachmentRoute(suffix);
+            if (route == null) {
+                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                return;
+            }
+
+            if (route.action() == AttachmentAction.DOWNLOAD) {
+                handleDownloadRequest(exchange, requestId, callerId, method, route.attachmentId());
+                return;
+            }
+
+            if (!METHOD_POST.equalsIgnoreCase(method)) {
+                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+                return;
+            }
+
+            if (!enforceApiRateLimit(exchange, requestId, route.rateLimitScope(), callerId)) {
+                return;
+            }
+
+            switch (route.action()) {
+                case CHUNK -> handleChunk(exchange, callerId, route.attachmentId());
+                case COMPLETE -> handleComplete(exchange, callerId, route.attachmentId());
+                case BIND -> handleBind(exchange, callerId, route.attachmentId());
+                default -> sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
+            }
+        }
+
+        /**
+         * Handles attachment init route method checks and throttling.
+         */
+        private void handleInitRequest(
+                HttpExchange exchange,
+                String requestId,
+                String callerId,
+                String method) throws IOException {
+            if (!METHOD_POST.equalsIgnoreCase(method)) {
+                sendJson(exchange, 405, JsonCodec.toJson(AttachmentInitResponse.error(METHOD_NOT_ALLOWED)));
+                return;
+            }
+            if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.ATTACHMENTS_INIT, callerId)) {
+                return;
+            }
+            handleInit(exchange, callerId);
+        }
+
+        /**
+         * Handles attachment download route method checks and throttling.
+         */
+        private void handleDownloadRequest(
+                HttpExchange exchange,
+                String requestId,
+                String callerId,
+                String method,
+                String attachmentId) throws IOException {
+            if (!METHOD_GET.equalsIgnoreCase(method)) {
+                sendJson(exchange, 405, JsonCodec.toJson(AttachmentDownloadResponse.error(METHOD_NOT_ALLOWED)));
+                return;
+            }
+            if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.ATTACHMENTS_DOWNLOAD, callerId)) {
+                return;
+            }
+            handleDownload(exchange, callerId, attachmentId);
+        }
+
+        /**
+         * Parses non-init attachment routes.
+         *
+         * @param suffix request suffix after attachments root
+         * @return parsed route, or {@code null} when invalid
+         */
+        private AttachmentRoute parseAttachmentRoute(String suffix) {
             String[] parts = splitAttachmentPath(suffix);
             if (parts == null || parts.length == 0 || parts[0].isBlank()) {
-                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
-                return;
+                return null;
             }
+
             String attachmentId = parts[0];
-
             if (parts.length == 1) {
-                if (!METHOD_GET.equalsIgnoreCase(method)) {
-                    sendJson(exchange, 405, JsonCodec.toJson(AttachmentDownloadResponse.error(METHOD_NOT_ALLOWED)));
-                    return;
-                }
-                handleDownload(exchange, callerId, attachmentId);
-                return;
+                return new AttachmentRoute(attachmentId, AttachmentAction.DOWNLOAD,
+                        ApiRateLimitScope.ATTACHMENTS_DOWNLOAD);
             }
 
-            if (parts.length != 2 || !METHOD_POST.equalsIgnoreCase(method)) {
-                sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
-                return;
+            if (parts.length != 2 || parts[1] == null || parts[1].isBlank()) {
+                return null;
             }
 
-            switch (parts[1]) {
-                case "chunk" -> handleChunk(exchange, callerId, attachmentId);
-                case "complete" -> handleComplete(exchange, callerId, attachmentId);
-                case "bind" -> handleBind(exchange, callerId, attachmentId);
-                default ->
-                    sendJson(exchange, 400, JsonCodec.toJson(AttachmentInitResponse.error(INVALID_REQUEST_PATH)));
-            }
+            return switch (parts[1]) {
+                case "chunk" -> new AttachmentRoute(attachmentId, AttachmentAction.CHUNK,
+                        ApiRateLimitScope.ATTACHMENTS_CHUNK);
+                case "complete" -> new AttachmentRoute(attachmentId, AttachmentAction.COMPLETE,
+                        ApiRateLimitScope.ATTACHMENTS_COMPLETE_BIND);
+                case "bind" -> new AttachmentRoute(attachmentId, AttachmentAction.BIND,
+                        ApiRateLimitScope.ATTACHMENTS_COMPLETE_BIND);
+                default -> null;
+            };
         }
 
         /**
@@ -2508,28 +2720,260 @@ public final class HttpIngressServer {
      * @param exchange HTTP exchange
      * @return normalized source IP token
      */
-    private static String resolveClientIp(HttpExchange exchange) {
+    private String resolveClientIp(HttpExchange exchange) {
         if (exchange == null) {
             return "unknown";
         }
+        String remoteIp = resolveSocketRemoteIp(exchange);
+        InetAddress remoteAddress = resolveSocketRemoteAddress(exchange);
+        if (!config.isTrustProxy() || remoteAddress == null || !isTrustedProxyAddress(remoteAddress)) {
+            return remoteIp;
+        }
+
         String forwardedFor = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            String first = forwardedFor.split(",")[0].trim();
-            if (!first.isBlank()) {
-                return first;
+        String forwardedClientIp = resolveForwardedClientIp(forwardedFor);
+        return forwardedClientIp == null ? remoteIp : forwardedClientIp;
+    }
+
+    /**
+     * Resolves client IP from X-Forwarded-For chain by scanning right-to-left and
+     * selecting first non-trusted hop.
+     *
+     * @param forwardedFor raw X-Forwarded-For header value
+     * @return resolved client IP, or {@code null} when value cannot be resolved
+     */
+    private String resolveForwardedClientIp(String forwardedFor) {
+        if (forwardedFor == null || forwardedFor.isBlank()) {
+            return null;
+        }
+        String[] hops = forwardedFor.split(",");
+        for (int i = hops.length - 1; i >= 0; i--) {
+            InetAddress candidate = parseLiteralIp(hops[i]);
+            if (candidate == null) {
+                continue;
+            }
+            if (!isTrustedProxyAddress(candidate)) {
+                return candidate.getHostAddress();
             }
         }
-        if (exchange.getRemoteAddress() != null) {
-            InetAddress address = exchange.getRemoteAddress().getAddress();
-            if (address != null && address.getHostAddress() != null && !address.getHostAddress().isBlank()) {
-                return address.getHostAddress();
-            }
-            if (exchange.getRemoteAddress().getHostString() != null
-                    && !exchange.getRemoteAddress().getHostString().isBlank()) {
-                return exchange.getRemoteAddress().getHostString();
-            }
+        return null;
+    }
+
+    /**
+     * Resolves socket remote IP string fallback.
+     *
+     * @param exchange HTTP exchange
+     * @return IP/host token
+     */
+    private static String resolveSocketRemoteIp(HttpExchange exchange) {
+        if (exchange == null || exchange.getRemoteAddress() == null) {
+            return "unknown";
+        }
+        InetAddress address = exchange.getRemoteAddress().getAddress();
+        if (address != null && address.getHostAddress() != null && !address.getHostAddress().isBlank()) {
+            return address.getHostAddress();
+        }
+        if (exchange.getRemoteAddress().getHostString() != null
+                && !exchange.getRemoteAddress().getHostString().isBlank()) {
+            return exchange.getRemoteAddress().getHostString();
         }
         return "unknown";
+    }
+
+    /**
+     * Resolves raw socket remote inet address.
+     *
+     * @param exchange HTTP exchange
+     * @return remote inet address or {@code null}
+     */
+    private static InetAddress resolveSocketRemoteAddress(HttpExchange exchange) {
+        if (exchange == null || exchange.getRemoteAddress() == null) {
+            return null;
+        }
+        return exchange.getRemoteAddress().getAddress();
+    }
+
+    /**
+     * Indicates whether provided address belongs to trusted proxy allowlist.
+     *
+     * @param address candidate address
+     * @return {@code true} when address matches trusted proxy CIDRs
+     */
+    private boolean isTrustedProxyAddress(InetAddress address) {
+        if (address == null) {
+            return false;
+        }
+        for (CidrRange range : resolveTrustedProxyRanges()) {
+            if (range.contains(address)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Resolves trusted proxy CIDR ranges and refreshes cached parsing when
+     * configured values change.
+     *
+     * @return parsed trusted proxy ranges
+     */
+    private List<CidrRange> resolveTrustedProxyRanges() {
+        List<String> configured = config.getTrustedProxyCidrs();
+        List<String> normalized = configured == null ? List.of() : List.copyOf(configured);
+        TrustedProxyCache cache = trustedProxyCache.get();
+        if (normalized.equals(cache.cidrSnapshot())) {
+            return cache.ranges();
+        }
+        synchronized (trustedProxyCacheLock) {
+            cache = trustedProxyCache.get();
+            if (!normalized.equals(cache.cidrSnapshot())) {
+                refreshTrustedProxyRanges(normalized);
+                cache = trustedProxyCache.get();
+            }
+            return cache.ranges();
+        }
+    }
+
+    /**
+     * Rebuilds parsed trusted proxy CIDR ranges from configured literals.
+     *
+     * @param cidrValues configured CIDR/IP allowlist
+     */
+    private void refreshTrustedProxyRanges(List<String> cidrValues) {
+        List<String> normalized = cidrValues == null ? List.of() : List.copyOf(cidrValues);
+        List<CidrRange> parsed = new ArrayList<>(normalized.size());
+        for (String cidr : normalized) {
+            parsed.add(CidrRange.parse(cidr));
+        }
+        trustedProxyCache.set(new TrustedProxyCache(normalized, List.copyOf(parsed)));
+    }
+
+    /**
+     * Immutable cache for trusted proxy CIDR snapshots and parsed ranges.
+     *
+     * @param cidrSnapshot normalized configured CIDR values
+     * @param ranges parsed CIDR ranges
+     */
+    private record TrustedProxyCache(List<String> cidrSnapshot, List<CidrRange> ranges) {
+        static TrustedProxyCache empty() {
+            return new TrustedProxyCache(List.of(), List.of());
+        }
+    }
+
+    /**
+     * Parses an IP literal from a candidate header token.
+     *
+     * @param value candidate token
+     * @return parsed inet address or {@code null} when token is invalid/non-literal
+     */
+    private static InetAddress parseLiteralIp(String value) {
+        if (value == null) {
+            return null;
+        }
+        String candidate = value.trim();
+        if (candidate.isBlank()) {
+            return null;
+        }
+
+        int zoneIndex = candidate.indexOf('%');
+        if (zoneIndex > 0) {
+            candidate = candidate.substring(0, zoneIndex);
+        }
+
+        boolean looksLikeIpv4 = candidate.chars().allMatch(ch -> Character.isDigit(ch) || ch == '.');
+        boolean looksLikeIpv6 = candidate.indexOf(':') >= 0;
+        if (!looksLikeIpv4 && !looksLikeIpv6) {
+            return null;
+        }
+
+        try {
+            return InetAddress.getByName(candidate);
+        } catch (Exception _) {
+            return null;
+        }
+    }
+
+    /**
+     * Represents one CIDR/IP range for trusted proxy matching.
+     *
+     * @param networkAddress normalized network address
+     * @param prefixLength prefix bits
+     */
+    private record CidrRange(InetAddress networkAddress, int prefixLength) {
+        /**
+         * Parses CIDR/IP candidate to a normalized range.
+         *
+         * @param value CIDR/IP value
+         * @return parsed range
+         */
+        static CidrRange parse(String value) {
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("CIDR value cannot be blank");
+            }
+            String[] parts = value.trim().split("/", -1);
+            if (parts.length > 2) {
+                throw new IllegalArgumentException("Invalid CIDR value: " + value);
+            }
+            try {
+                String ipPart = parts[0].trim();
+                if (ipPart.isBlank()) {
+                    throw new IllegalArgumentException("Invalid CIDR value: " + value);
+                }
+                InetAddress parsed = InetAddress.getByName(ipPart);
+                byte[] raw = parsed.getAddress();
+                int maxBits = raw.length * 8;
+                int prefix = maxBits;
+                if (parts.length == 2) {
+                    prefix = Integer.parseInt(parts[1].trim());
+                }
+                if (prefix < 0 || prefix > maxBits) {
+                    throw new IllegalArgumentException("CIDR prefix out of range: " + value);
+                }
+                byte[] masked = maskNetwork(raw, prefix);
+                return new CidrRange(InetAddress.getByAddress(masked), prefix);
+            } catch (IllegalArgumentException ex) {
+                throw ex;
+            } catch (Exception ex) {
+                throw new IllegalArgumentException("Invalid CIDR value: " + value, ex);
+            }
+        }
+
+        /**
+         * Indicates whether candidate address belongs to this CIDR/IP range.
+         *
+         * @param address address to evaluate
+         * @return {@code true} when candidate is in range
+         */
+        boolean contains(InetAddress address) {
+            if (address == null) {
+                return false;
+            }
+            byte[] networkBytes = networkAddress.getAddress();
+            byte[] candidate = address.getAddress();
+            if (candidate.length != networkBytes.length) {
+                return false;
+            }
+            byte[] masked = maskNetwork(candidate, prefixLength);
+            return MessageDigest.isEqual(masked, networkBytes);
+        }
+
+        private static byte[] maskNetwork(byte[] input, int prefixLength) {
+            byte[] masked = input.clone();
+            int fullBytes = prefixLength / 8;
+            int remainingBits = prefixLength % 8;
+            if (fullBytes < masked.length && remainingBits > 0) {
+                int mask = 0xFF << (8 - remainingBits);
+                masked[fullBytes] = (byte) (masked[fullBytes] & mask);
+                for (int i = fullBytes + 1; i < masked.length; i++) {
+                    masked[i] = 0;
+                }
+                return masked;
+            }
+            for (int i = fullBytes; i < masked.length; i++) {
+                masked[i] = 0;
+            }
+            return masked;
+        }
     }
 
     /**
@@ -2558,19 +3002,39 @@ public final class HttpIngressServer {
      */
     private AuthResult resolveAuthenticatedCaller(HttpExchange exchange) {
         String authHeader = exchange.getRequestHeaders().getFirst(AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            return new AuthResult(null, null, MISSING_OR_INVALID_AUTH);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return new AuthResult(null, null, "missing or invalid auth");
         }
 
-        String sessionId = authHeader.substring(BEARER_PREFIX.length());
+        String sessionId = authHeader.substring("Bearer ".length());
         String callerId = sessionDAO.getUserIdForSessionAndTouch(sessionId);
         if (callerId == null) {
             String reason = sessionDAO.isAccessSessionRevoked(sessionId)
-                    ? SESSION_REVOKED_BY_TAKEOVER
-                    : INVALID_SESSION;
+                    ? "session revoked by takeover"
+                    : "invalid session";
             return new AuthResult(sessionId, null, reason);
         }
         return new AuthResult(sessionId, callerId, null);
+    }
+
+    /**
+     * Applies endpoint-scoped API rate limit and emits standardized 429 payload.
+     *
+     * @param exchange HTTP exchange
+     * @param requestId request id
+     * @param scope rate-limit scope
+     * @param principal user/ip principal key
+     * @return {@code true} when request is allowed
+     * @throws IOException when response write fails
+     */
+    private boolean enforceApiRateLimit(HttpExchange exchange, String requestId, ApiRateLimitScope scope,
+            String principal) throws IOException {
+        RateLimitDecision decision = rateLimiterService.checkAndConsumeApi(requestId, scope, principal);
+        if (decision.allowed()) {
+            return true;
+        }
+        sendJson(exchange, 429, jsonRateLimit(decision.retryAfterSeconds()));
+        return false;
     }
 
     /**
@@ -2599,6 +3063,17 @@ public final class HttpIngressServer {
     private String jsonError(String message) {
         String safe = message == null ? INTERNAL_SERVER_ERROR : message.replace("\"", "\\\"");
         return JSON_ERROR_PREFIX + safe + JSON_ERROR_SUFFIX;
+    }
+
+    /**
+     * Builds standard JSON payload for rate-limit rejections.
+     *
+     * @param retryAfterSeconds retry-after value in seconds
+     * @return JSON payload
+     */
+    private String jsonRateLimit(long retryAfterSeconds) {
+        long safeRetryAfter = Math.max(1L, retryAfterSeconds);
+        return "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + safeRetryAfter + "}";
     }
 
     /**

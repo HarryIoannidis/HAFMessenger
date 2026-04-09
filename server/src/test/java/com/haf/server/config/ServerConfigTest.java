@@ -47,6 +47,10 @@ class ServerConfigTest {
         assertEquals(20, config.getSearchPageSize());
         assertEquals(50, config.getSearchMaxPageSize());
         assertEquals(3, config.getSearchMinQueryLength());
+        assertFalse(config.isTrustProxy());
+        assertTrue(config.getTrustedProxyCidrs().isEmpty());
+        assertEquals(64, config.getIngressExecutorThreads());
+        assertEquals(1024, config.getIngressExecutorQueueCapacity());
         assertEquals("test-jwt-secret", config.getJwtSecret());
         assertEquals(900L, config.getJwtAccessTtlSeconds());
         assertEquals(2_592_000L, config.getJwtRefreshTtlSeconds());
@@ -66,6 +70,49 @@ class ServerConfigTest {
 
         ServerConfig config = ServerConfig.fromEnv(env);
         assertEquals(50, config.getDbPoolSize());
+    }
+
+    @Test
+    void load_uses_custom_proxy_and_ingress_executor_settings() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_TRUST_PROXY", "true");
+        env.put("HAF_TRUSTED_PROXY_CIDRS", "10.0.0.0/8,192.168.1.10");
+        env.put("HAF_INGRESS_EXECUTOR_THREADS", "32");
+        env.put("HAF_INGRESS_EXECUTOR_QUEUE_CAPACITY", "2048");
+
+        ServerConfig config = ServerConfig.fromEnv(env);
+
+        assertTrue(config.isTrustProxy());
+        assertEquals(2, config.getTrustedProxyCidrs().size());
+        assertEquals("10.0.0.0/8", config.getTrustedProxyCidrs().get(0));
+        assertEquals(32, config.getIngressExecutorThreads());
+        assertEquals(2048, config.getIngressExecutorQueueCapacity());
+    }
+
+    @Test
+    void load_fails_when_trust_proxy_enabled_without_cidrs() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_TRUST_PROXY", "true");
+        env.remove("HAF_TRUSTED_PROXY_CIDRS");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_fails_when_trusted_proxy_cidr_is_invalid() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_TRUST_PROXY", "true");
+        env.put("HAF_TRUSTED_PROXY_CIDRS", "invalid-value");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+    }
+
+    @Test
+    void load_fails_when_ingress_executor_values_are_invalid() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_INGRESS_EXECUTOR_THREADS", "0");
+
+        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @Test

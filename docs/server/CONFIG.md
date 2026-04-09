@@ -11,6 +11,10 @@ Document server runtime configuration loaded by `ServerConfig`.
 - `HAF_KEY_PASS` is consumed by server runtime only and is not used by client keystore bootstrap.
 - `HAF_APP_IS_DEV` is required and authoritative for server runtime mode (`true` or `false` only).
 - Optional vars control pool sizing, ports, search limits, and attachment policy.
+- Optional DB TLS truststore vars:
+  - `HAF_DB_TRUSTSTORE_PATH`
+  - `HAF_DB_TRUSTSTORE_PASS`
+  - `HAF_DB_TRUSTSTORE_TYPE` (default: `PKCS12`)
 - Required keys:
   - `HAF_DB_URL`
   - `HAF_DB_USER`

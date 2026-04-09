@@ -317,4 +317,70 @@ class RateLimiterServiceTest {
                 assertFalse(decision.allowed());
                 assertEquals(1, decision.retryAfterSeconds()); // minimum enforced
         }
+
+        @Test
+        void check_and_consume_api_allows_when_under_limit() throws SQLException {
+                String requestId = "req-api-1";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(true);
+                when(resultSet.getTimestamp("lockout_until")).thenReturn(null);
+                when(resultSet.getInt("attempt_count")).thenReturn(1);
+
+                RateLimiterService.RateLimitDecision decision = service.checkAndConsumeApi(
+                                requestId,
+                                RateLimiterService.ApiRateLimitScope.SEARCH,
+                                "caller-1");
+
+                assertTrue(decision.allowed());
+                assertEquals(0, decision.retryAfterSeconds());
+        }
+
+        @Test
+        void check_and_consume_api_rate_limits_when_over_threshold() throws SQLException {
+                String requestId = "req-api-2";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(true);
+                when(resultSet.getTimestamp("lockout_until")).thenReturn(null);
+                when(resultSet.getInt("attempt_count")).thenReturn(1000);
+
+                RateLimiterService.RateLimitDecision decision = service.checkAndConsumeApi(
+                                requestId,
+                                RateLimiterService.ApiRateLimitScope.REGISTER,
+                                "198.51.100.7");
+
+                assertFalse(decision.allowed());
+                assertTrue(decision.retryAfterSeconds() > 0);
+                verify(auditLogger, times(1)).logRateLimit(eq(requestId), eq("register"), anyLong());
+        }
+
+        @Test
+        void check_and_consume_api_builds_hashed_scope_principal_key() throws SQLException {
+                String requestId = "req-api-3";
+
+                when(dataSource.getConnection()).thenReturn(connection);
+                when(connection.prepareStatement(anyString()))
+                                .thenReturn(upsertStatement, selectStatement);
+                when(upsertStatement.executeUpdate()).thenReturn(1);
+                when(selectStatement.executeQuery()).thenReturn(resultSet);
+                when(resultSet.next()).thenReturn(false);
+
+                service.checkAndConsumeApi(requestId, RateLimiterService.ApiRateLimitScope.CONTACTS, "Caller-A");
+
+                ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+                verify(upsertStatement).setString(eq(1), keyCaptor.capture());
+                String throttleKey = keyCaptor.getValue();
+                assertNotNull(throttleKey);
+                assertEquals(64, throttleKey.length());
+                assertTrue(throttleKey.matches("[a-f0-9]{64}"));
+        }
 }

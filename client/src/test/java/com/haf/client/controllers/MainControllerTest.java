@@ -168,7 +168,7 @@ class MainControllerTest {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         assertTrue(source.contains("if (!settings.isNotificationsShowRuntimePopups()) {"));
-        assertTrue(source.contains("if (!runtimeIssuePopupGate.shouldShow(issue.dedupeKey())) {"));
+        assertTrue(source.contains("return runtimeIssuePopupGate.shouldShow(issue.dedupeKey());"));
     }
 
     @Test
@@ -304,7 +304,7 @@ class MainControllerTest {
     void hide_presence_setting_is_applied_locally_on_contact_cells_and_profile_pane() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("ContactCell.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
+        assertTrue(source.contains("ContactCellController.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
         assertTrue(source.contains("private static final String HIDDEN_ACTIVITY_LABEL = \"Hidden Activity\";"));
         assertTrue(source.contains("""
                 settings.isPrivacyHidePresenceIndicators()
