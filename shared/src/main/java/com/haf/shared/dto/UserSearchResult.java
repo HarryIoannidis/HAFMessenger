@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * DTO representing a single user search result.
  */
-public class UserSearchResultDTO implements Serializable {
+public class UserSearchResult implements Serializable {
     private String userId;
     private String fullName;
     private String regNumber;
@@ -18,49 +18,50 @@ public class UserSearchResultDTO implements Serializable {
     /**
      * Creates an empty search-result DTO for JSON deserialization.
      */
-    public UserSearchResultDTO() {
+    public UserSearchResult() {
         // Required for JSON deserialization
     }
 
     /**
      * Creates a search-result DTO with core identity fields.
      *
-     * @param userId user id
-     * @param fullName full name
+     * @param userId    user id
+     * @param fullName  full name
      * @param regNumber registration number
-     * @param email email address
-     * @param rank rank value
+     * @param email     email address
+     * @param rank      rank value
      */
-    public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank) {
+    public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank) {
         this(userId, fullName, regNumber, email, rank, null, null, false);
     }
 
     /**
      * Creates a search-result DTO with core identity fields and presence state.
      *
-     * @param userId user id
-     * @param fullName full name
+     * @param userId    user id
+     * @param fullName  full name
      * @param regNumber registration number
-     * @param email email address
-     * @param rank rank value
-     * @param active active presence flag
+     * @param email     email address
+     * @param rank      rank value
+     * @param active    active presence flag
      */
-    public UserSearchResultDTO(String userId, String fullName, String regNumber, String email, String rank, boolean active) {
+    public UserSearchResult(String userId, String fullName, String regNumber, String email, String rank,
+            boolean active) {
         this(userId, fullName, regNumber, email, rank, null, null, active);
     }
 
     /**
      * Creates a search-result DTO with profile fields.
      *
-     * @param userId user id
-     * @param fullName full name
-     * @param regNumber registration number
-     * @param email email address
-     * @param rank rank value
-     * @param telephone telephone number
+     * @param userId     user id
+     * @param fullName   full name
+     * @param regNumber  registration number
+     * @param email      email address
+     * @param rank       rank value
+     * @param telephone  telephone number
      * @param joinedDate joined-date text
      */
-    public UserSearchResultDTO(
+    public UserSearchResult(
             String userId,
             String fullName,
             String regNumber,
@@ -74,16 +75,16 @@ public class UserSearchResultDTO implements Serializable {
     /**
      * Creates a fully populated search-result DTO.
      *
-     * @param userId user id
-     * @param fullName full name
-     * @param regNumber registration number
-     * @param email email address
-     * @param rank rank value
-     * @param telephone telephone number
+     * @param userId     user id
+     * @param fullName   full name
+     * @param regNumber  registration number
+     * @param email      email address
+     * @param rank       rank value
+     * @param telephone  telephone number
      * @param joinedDate joined-date text
-     * @param active active presence flag
+     * @param active     active presence flag
      */
-    public UserSearchResultDTO(
+    public UserSearchResult(
             String userId,
             String fullName,
             String regNumber,

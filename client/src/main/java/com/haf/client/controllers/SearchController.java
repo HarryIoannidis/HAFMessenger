@@ -7,7 +7,7 @@ import com.haf.client.builders.PopupMessageBuilder;
 import com.haf.client.utils.ClientSettings;
 import com.haf.client.viewmodels.SearchSortViewModel;
 import com.haf.client.viewmodels.SearchViewModel;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
@@ -60,7 +60,7 @@ public class SearchController {
              * @param result ignored
              */
             @Override
-            public void addContact(UserSearchResultDTO result) {
+            public void addContact(UserSearchResult result) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
 
@@ -80,7 +80,7 @@ public class SearchController {
              * @param result ignored
              */
             @Override
-            public void startChatWith(UserSearchResultDTO result) {
+            public void startChatWith(UserSearchResult result) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
 
@@ -90,7 +90,7 @@ public class SearchController {
              * @param result ignored
              */
             @Override
-            public void openProfile(UserSearchResultDTO result) {
+            public void openProfile(UserSearchResult result) {
                 // Intentionally no-op: default port implementation when Search is not wired.
             }
         };
@@ -108,7 +108,7 @@ public class SearchController {
          *
          * @param result selected search result to add
          */
-        void addContact(UserSearchResultDTO result);
+        void addContact(UserSearchResult result);
 
         /**
          * Removes a user from local contacts by id.
@@ -122,14 +122,14 @@ public class SearchController {
          *
          * @param result selected user to start chatting with
          */
-        void startChatWith(UserSearchResultDTO result);
+        void startChatWith(UserSearchResult result);
 
         /**
          * Opens the profile popup for the selected search result.
          *
          * @param result selected user profile to display
          */
-        void openProfile(UserSearchResultDTO result);
+        void openProfile(UserSearchResult result);
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SearchController.class);
@@ -200,7 +200,7 @@ public class SearchController {
         viewModel.hasResultsProperty().addListener((obs, oldValue, newValue) -> updateResultsVisibility(newValue));
         updateResultsVisibility(viewModel.hasResultsProperty().get());
 
-        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResultDTO>) this::onResultsChanged);
+        viewModel.resultsProperty().addListener((ListChangeListener<UserSearchResult>) this::onResultsChanged);
         renderAllResults(viewModel.resultsProperty());
     }
 
@@ -228,9 +228,9 @@ public class SearchController {
      *
      * @param change change descriptor emitted by observable result list
      */
-    private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResultDTO> change) {
+    private void onResultsChanged(ListChangeListener.Change<? extends UserSearchResult> change) {
         boolean needsFullRender = false;
-        List<UserSearchResultDTO> addedRows = null;
+        List<UserSearchResult> addedRows = null;
 
         while (change.next()) {
             if (change.wasPermutated() || change.wasReplaced() || change.wasRemoved() || change.wasUpdated()) {
@@ -270,7 +270,7 @@ public class SearchController {
      *
      * @param results full result snapshot to render
      */
-    private void renderAllResults(List<UserSearchResultDTO> results) {
+    private void renderAllResults(List<UserSearchResult> results) {
         int generation = renderGeneration.incrementAndGet();
 
         if (results == null || results.isEmpty()) {
@@ -278,10 +278,10 @@ public class SearchController {
             return;
         }
 
-        List<UserSearchResultDTO> snapshot = List.copyOf(results);
+        List<UserSearchResult> snapshot = List.copyOf(results);
         Thread.ofVirtual().name("search-item-loader").start(() -> {
             List<javafx.scene.Node> loadedCards = new ArrayList<>();
-            for (UserSearchResultDTO result : snapshot) {
+            for (UserSearchResult result : snapshot) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
                     FXMLLoader loader = new FXMLLoader(resource);
@@ -307,16 +307,16 @@ public class SearchController {
      *
      * @param results newly added results
      */
-    private void appendResults(List<UserSearchResultDTO> results) {
+    private void appendResults(List<UserSearchResult> results) {
         int generation = renderGeneration.get();
         if (results == null || results.isEmpty()) {
             return;
         }
 
-        List<UserSearchResultDTO> snapshot = List.copyOf(results);
+        List<UserSearchResult> snapshot = List.copyOf(results);
         Thread.ofVirtual().name("search-item-loader-append").start(() -> {
             List<javafx.scene.Node> loadedCards = new ArrayList<>();
-            for (UserSearchResultDTO result : snapshot) {
+            for (UserSearchResult result : snapshot) {
                 try {
                     var resource = getClass().getResource(UiConstants.FXML_SEARCH_RESULT_ITEM);
                     FXMLLoader loader = new FXMLLoader(resource);
@@ -382,7 +382,7 @@ public class SearchController {
      * @param card   loaded result-card node
      * @param result data object to render inside the card
      */
-    private void populateCard(javafx.scene.Node card, UserSearchResultDTO result) {
+    private void populateCard(javafx.scene.Node card, UserSearchResult result) {
         populateTextElements(card, result);
         populateRankIcon(card, result);
         populateActionButtons(card, result);
@@ -395,7 +395,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateTextElements(javafx.scene.Node card, UserSearchResultDTO result) {
+    private void populateTextElements(javafx.scene.Node card, UserSearchResult result) {
         Text fullNameText = (Text) card.lookup("#fullNameText");
         Text regNumberText = (Text) card.lookup("#regNumberText");
         Text emailText = (Text) card.lookup("#emailText");
@@ -417,7 +417,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateRankIcon(javafx.scene.Node card, UserSearchResultDTO result) {
+    private void populateRankIcon(javafx.scene.Node card, UserSearchResult result) {
         javafx.scene.image.ImageView rankImage = (javafx.scene.image.ImageView) card.lookup("#rankImage");
         if (rankImage != null && result.getRank() != null) {
             String iconPath = RankIconResolver.resolve(result.getRank());
@@ -439,7 +439,7 @@ public class SearchController {
      * @param card   The search result card.
      * @param result The search result.
      */
-    private void populateActionButtons(javafx.scene.Node card, UserSearchResultDTO result) {
+    private void populateActionButtons(javafx.scene.Node card, UserSearchResult result) {
         com.jfoenix.controls.JFXButton removeButton = (com.jfoenix.controls.JFXButton) card.lookup("#removeButton");
         com.jfoenix.controls.JFXButton startChatButton = (com.jfoenix.controls.JFXButton) card
                 .lookup("#startChatButton");
@@ -454,7 +454,7 @@ public class SearchController {
      * @param card   result card node
      * @param result represented user search result
      */
-    private void setupCardProfileOpen(javafx.scene.Node card, UserSearchResultDTO result) {
+    private void setupCardProfileOpen(javafx.scene.Node card, UserSearchResult result) {
         if (card == null) {
             return;
         }
@@ -500,7 +500,7 @@ public class SearchController {
      * @param removeButton The remove button.
      * @param result       The search result.
      */
-    private void setupRemoveButton(com.jfoenix.controls.JFXButton removeButton, UserSearchResultDTO result) {
+    private void setupRemoveButton(com.jfoenix.controls.JFXButton removeButton, UserSearchResult result) {
         if (removeButton == null)
             return;
 
@@ -519,7 +519,7 @@ public class SearchController {
      */
     private void setupStartChatButton(com.jfoenix.controls.JFXButton startChatButton,
             com.jfoenix.controls.JFXButton removeButton,
-            UserSearchResultDTO result) {
+            UserSearchResult result) {
         if (startChatButton == null)
             return;
 
@@ -560,7 +560,7 @@ public class SearchController {
      *
      * @param result search result whose contact state should be toggled
      */
-    void handleToggleContact(UserSearchResultDTO result) {
+    void handleToggleContact(UserSearchResult result) {
         handleToggleContact(result, null);
     }
 
@@ -571,7 +571,7 @@ public class SearchController {
      * @param result            search result whose contact state should be toggled
      * @param onActionCompleted callback invoked after toggle action completes
      */
-    private void handleToggleContact(UserSearchResultDTO result, Runnable onActionCompleted) {
+    private void handleToggleContact(UserSearchResult result, Runnable onActionCompleted) {
         if (result == null) {
             return;
         }
@@ -617,7 +617,7 @@ public class SearchController {
      * @param result            target contact represented as search result
      * @param onActionCompleted callback invoked after removal
      */
-    private void confirmRemoveContact(UserSearchResultDTO result, Runnable onActionCompleted) {
+    private void confirmRemoveContact(UserSearchResult result, Runnable onActionCompleted) {
         if (result == null || result.getUserId() == null || result.getUserId().isBlank()) {
             return;
         }
@@ -670,7 +670,7 @@ public class SearchController {
      *
      * @param result selected search result
      */
-    void handleStartChat(UserSearchResultDTO result) {
+    void handleStartChat(UserSearchResult result) {
         if (result == null) {
             return;
         }
@@ -683,7 +683,7 @@ public class SearchController {
      *
      * @param result selected search result
      */
-    void handleOpenProfile(UserSearchResultDTO result) {
+    void handleOpenProfile(UserSearchResult result) {
         if (result == null) {
             return;
         }

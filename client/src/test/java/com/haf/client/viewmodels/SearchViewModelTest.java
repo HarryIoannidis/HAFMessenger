@@ -3,7 +3,7 @@ package com.haf.client.viewmodels;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.responses.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
@@ -65,7 +65,7 @@ class SearchViewModelTest {
         AtomicReference<Integer> receivedLimit = new AtomicReference<>();
         AtomicReference<String> receivedCursor = new AtomicReference<>();
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
             receivedQuery.set(query);
@@ -90,7 +90,7 @@ class SearchViewModelTest {
     void runtime_page_size_is_clamped_between_ten_and_hundred() {
         AtomicReference<Integer> receivedLimit = new AtomicReference<>();
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
             receivedLimit.set(limit);
             return JsonCodec.toJson(response);
@@ -112,10 +112,10 @@ class SearchViewModelTest {
         AtomicInteger calls = new AtomicInteger();
         AtomicReference<String> secondCursor = new AtomicReference<>();
         UserSearchResponse first = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)),
+                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)),
                 true, "cursor-1");
         UserSearchResponse second = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)),
+                new UserSearchResult("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)),
                 false, null);
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
@@ -139,16 +139,18 @@ class SearchViewModelTest {
     @Test
     void sort_by_full_name_supports_ascending_and_descending() {
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Zoe", "10", "zoe@haf.gr", UiConstants.RANK_SMINIAS, true),
-                new UserSearchResultDTO("u-2", "anna", "11", "anna@haf.gr", UiConstants.RANK_SMINIAS, true),
-                new UserSearchResultDTO("u-3", "Mike", "12", "mike@haf.gr", UiConstants.RANK_SMINIAS, true)));
+                new UserSearchResult("u-1", "Zoe", "10", "zoe@haf.gr", UiConstants.RANK_SMINIAS, true),
+                new UserSearchResult("u-2", "anna", "11", "anna@haf.gr", UiConstants.RANK_SMINIAS, true),
+                new UserSearchResult("u-3", "Mike", "12", "mike@haf.gr", UiConstants.RANK_SMINIAS, true)));
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> JsonCodec.toJson(response));
-        viewModel.search("name", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.FULL_NAME, SearchSortViewModel.Direction.ASC));
+        viewModel.search("name", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.FULL_NAME,
+                SearchSortViewModel.Direction.ASC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-2", "u-3", "u-1")));
         assertEquals(List.of("u-2", "u-3", "u-1"), toUserIds(viewModel));
 
-        viewModel.search("name", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.FULL_NAME, SearchSortViewModel.Direction.DESC));
+        viewModel.search("name", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.FULL_NAME,
+                SearchSortViewModel.Direction.DESC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-1", "u-3", "u-2")));
         assertEquals(List.of("u-1", "u-3", "u-2"), toUserIds(viewModel));
     }
@@ -156,16 +158,18 @@ class SearchViewModelTest {
     @Test
     void sort_by_reg_number_uses_numeric_ordering() {
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-10", "Ten", "10", "ten@haf.gr", UiConstants.RANK_SMINIAS, true),
-                new UserSearchResultDTO("u-2", "Two", "2", "two@haf.gr", UiConstants.RANK_SMINIAS, true),
-                new UserSearchResultDTO("u-1", "One", "1", "one@haf.gr", UiConstants.RANK_SMINIAS, true)));
+                new UserSearchResult("u-10", "Ten", "10", "ten@haf.gr", UiConstants.RANK_SMINIAS, true),
+                new UserSearchResult("u-2", "Two", "2", "two@haf.gr", UiConstants.RANK_SMINIAS, true),
+                new UserSearchResult("u-1", "One", "1", "one@haf.gr", UiConstants.RANK_SMINIAS, true)));
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> JsonCodec.toJson(response));
-        viewModel.search("regg", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER, SearchSortViewModel.Direction.ASC));
+        viewModel.search("regg", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER,
+                SearchSortViewModel.Direction.ASC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-1", "u-2", "u-10")));
         assertEquals(List.of("u-1", "u-2", "u-10"), toUserIds(viewModel));
 
-        viewModel.search("regg", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER, SearchSortViewModel.Direction.DESC));
+        viewModel.search("regg", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER,
+                SearchSortViewModel.Direction.DESC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-10", "u-2", "u-1")));
         assertEquals(List.of("u-10", "u-2", "u-1"), toUserIds(viewModel));
     }
@@ -173,16 +177,18 @@ class SearchViewModelTest {
     @Test
     void sort_by_rank_follows_hierarchy_including_pterarchos() {
         UserSearchResponse response = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-high", "High", "100", "high@haf.gr", UiConstants.RANK_PTERARCHOS, true),
-                new UserSearchResultDTO("u-mid", "Mid", "101", "mid@haf.gr", UiConstants.RANK_SMINAGOS, true),
-                new UserSearchResultDTO("u-low", "Low", "102", "low@haf.gr", UiConstants.RANK_YPOSMINIAS, true)));
+                new UserSearchResult("u-high", "High", "100", "high@haf.gr", UiConstants.RANK_PTERARCHOS, true),
+                new UserSearchResult("u-mid", "Mid", "101", "mid@haf.gr", UiConstants.RANK_SMINAGOS, true),
+                new UserSearchResult("u-low", "Low", "102", "low@haf.gr", UiConstants.RANK_YPOSMINIAS, true)));
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> JsonCodec.toJson(response));
-        viewModel.search("rank", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.RANK, SearchSortViewModel.Direction.ASC));
+        viewModel.search("rank",
+                new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.RANK, SearchSortViewModel.Direction.ASC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-low", "u-mid", "u-high")));
         assertEquals(List.of("u-low", "u-mid", "u-high"), toUserIds(viewModel));
 
-        viewModel.search("rank", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.RANK, SearchSortViewModel.Direction.DESC));
+        viewModel.search("rank", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.RANK,
+                SearchSortViewModel.Direction.DESC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-high", "u-mid", "u-low")));
         assertEquals(List.of("u-high", "u-mid", "u-low"), toUserIds(viewModel));
     }
@@ -191,11 +197,11 @@ class SearchViewModelTest {
     void load_more_keeps_results_sorted_after_append() {
         AtomicInteger calls = new AtomicInteger();
         UserSearchResponse first = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-30", "Thirty", "30", "thirty@haf.gr", UiConstants.RANK_SMINIAS, true),
-                new UserSearchResultDTO("u-10", "Ten", "10", "ten@haf.gr", UiConstants.RANK_SMINIAS, true)),
+                new UserSearchResult("u-30", "Thirty", "30", "thirty@haf.gr", UiConstants.RANK_SMINIAS, true),
+                new UserSearchResult("u-10", "Ten", "10", "ten@haf.gr", UiConstants.RANK_SMINIAS, true)),
                 true, "cursor-1");
         UserSearchResponse second = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-20", "Twenty", "20", "twenty@haf.gr", UiConstants.RANK_SMINIAS, true)),
+                new UserSearchResult("u-20", "Twenty", "20", "twenty@haf.gr", UiConstants.RANK_SMINIAS, true)),
                 false, null);
 
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
@@ -205,7 +211,8 @@ class SearchViewModelTest {
             return JsonCodec.toJson(second);
         });
 
-        viewModel.search("more", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER, SearchSortViewModel.Direction.ASC));
+        viewModel.search("more", new SearchSortViewModel.SortOptions(SearchSortViewModel.Field.REG_NUMBER,
+                SearchSortViewModel.Direction.ASC));
         awaitCondition(() -> matchesOrder(viewModel, List.of("u-10", "u-30")));
         assertEquals(List.of("u-10", "u-30"), toUserIds(viewModel));
 
@@ -261,7 +268,7 @@ class SearchViewModelTest {
     void search_exception_emits_runtime_issue_and_retry_reexecutes_query() {
         AtomicInteger calls = new AtomicInteger();
         UserSearchResponse success = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true)));
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
             if (calls.getAndIncrement() == 0) {
                 throw new RuntimeException("boom");
@@ -286,7 +293,7 @@ class SearchViewModelTest {
         AtomicInteger calls = new AtomicInteger();
         UserSearchResponse failure = UserSearchResponse.error("Server unavailable");
         UserSearchResponse success = UserSearchResponse.success(List.of(
-                new UserSearchResultDTO("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-2", "John Doe", "124", "john@haf.gr", "SMINIAS", true)));
         SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
             if (calls.getAndIncrement() == 0) {
                 return JsonCodec.toJson(failure);
@@ -307,9 +314,9 @@ class SearchViewModelTest {
     }
 
     private static List<String> toUserIds(SearchViewModel viewModel) {
-        List<UserSearchResultDTO> snapshot = new ArrayList<>(viewModel.resultsProperty());
+        List<UserSearchResult> snapshot = new ArrayList<>(viewModel.resultsProperty());
         List<String> userIds = new ArrayList<>(snapshot.size());
-        for (UserSearchResultDTO dto : snapshot) {
+        for (UserSearchResult dto : snapshot) {
             userIds.add(dto.getUserId());
         }
         return userIds;

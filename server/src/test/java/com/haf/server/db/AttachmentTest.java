@@ -18,7 +18,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class AttachmentDAOTest {
+class AttachmentTest {
 
     @Mock
     private DataSource dataSource;
@@ -26,11 +26,11 @@ class AttachmentDAOTest {
     @Mock
     private Connection connection;
 
-    private AttachmentDAO dao;
+    private Attachment dao;
 
     @BeforeEach
     void setUp() {
-        dao = new AttachmentDAO(dataSource);
+        dao = new Attachment(dataSource);
     }
 
     @Test
@@ -39,7 +39,7 @@ class AttachmentDAOTest {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(contains("INSERT INTO message_attachments"))).thenReturn(insert);
 
-        AttachmentDAO.UploadInitResult result = dao.initUpload(
+        Attachment.UploadInitResult result = dao.initUpload(
                 "sender-1",
                 "recipient-1",
                 "application/vnd.haf.encrypted-message+json",
@@ -79,7 +79,7 @@ class AttachmentDAOTest {
         when(chunkRs.next()).thenReturn(true);
         when(chunkRs.getBytes("chunk_data")).thenReturn(chunk);
 
-        AttachmentDAO.ChunkStoreResult result = dao.storeChunk("sender-1", "att-1", 0, chunk);
+        Attachment.ChunkStoreResult result = dao.storeChunk("sender-1", "att-1", 0, chunk);
 
         assertEquals(0, result.chunkIndex());
         assertFalse(result.stored());
@@ -132,7 +132,7 @@ class AttachmentDAOTest {
         when(bindRs.getString("status")).thenReturn("COMPLETE");
         when(bindRs.getTimestamp("expires_at")).thenReturn(new Timestamp(expiry));
 
-        AttachmentDAO.BindResult result = dao.bindUploadToEnvelope("sender-1", "att-1", "env-1");
+        Attachment.BindResult result = dao.bindUploadToEnvelope("sender-1", "att-1", "env-1");
 
         assertEquals("att-1", result.attachmentId());
         assertEquals("env-1", result.envelopeId());

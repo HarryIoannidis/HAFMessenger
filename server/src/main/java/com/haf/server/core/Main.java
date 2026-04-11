@@ -1,12 +1,12 @@
 package com.haf.server.core;
 
 import com.haf.server.config.ServerConfig;
-import com.haf.server.db.ContactDAO;
-import com.haf.server.db.EnvelopeDAO;
-import com.haf.server.db.FileUploadDAO;
-import com.haf.server.db.AttachmentDAO;
-import com.haf.server.db.SessionDAO;
-import com.haf.server.db.UserDAO;
+import com.haf.server.db.Contact;
+import com.haf.server.db.Envelope;
+import com.haf.server.db.FileUpload;
+import com.haf.server.db.Attachment;
+import com.haf.server.db.Session;
+import com.haf.server.db.User;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.ingress.HttpIngressServer;
 import com.haf.server.ingress.PresenceRegistry;
@@ -75,22 +75,22 @@ public final class Main {
             AuditLogger auditLogger = AuditLogger.create(metricsRegistry);
             EncryptedMessageValidator validator = new EncryptedMessageValidator();
 
-            EnvelopeDAO envelopeDAO = new EnvelopeDAO(dataSource, auditLogger);
-            UserDAO userDAO = new UserDAO(dataSource, auditLogger);
+            Envelope envelopeDAO = new Envelope(dataSource, auditLogger);
+            User userDAO = new User(dataSource, auditLogger);
             JwtTokenService jwtTokenService = new JwtTokenService(
                     config.getJwtSecret(),
                     "haf-server",
                     config.getJwtAccessTtlSeconds());
-            SessionDAO sessionDAO = new SessionDAO(
+            Session sessionDAO = new Session(
                     dataSource,
                     auditLogger,
                     jwtTokenService,
                     config.getJwtRefreshTtlSeconds(),
                     config.getJwtAbsoluteTtlSeconds(),
                     config.getJwtIdleTtlSeconds());
-            FileUploadDAO fileUploadDAO = new FileUploadDAO(dataSource);
-            AttachmentDAO attachmentDAO = new AttachmentDAO(dataSource);
-            ContactDAO contactDAO = new ContactDAO(dataSource);
+            FileUpload fileUploadDAO = new FileUpload(dataSource);
+            Attachment attachmentDAO = new Attachment(dataSource);
+            Contact contactDAO = new Contact(dataSource);
             MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
             PresenceRegistry presenceRegistry = new PresenceRegistry();

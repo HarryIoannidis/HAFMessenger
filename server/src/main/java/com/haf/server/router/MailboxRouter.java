@@ -1,6 +1,6 @@
 package com.haf.server.router;
 
-import com.haf.server.db.EnvelopeDAO;
+import com.haf.server.db.Envelope;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.shared.dto.EncryptedMessage;
@@ -19,7 +19,7 @@ public final class MailboxRouter implements AutoCloseable {
 
     private static final Duration TTL_CLEANUP_INTERVAL = Duration.ofMinutes(5);
 
-    private final EnvelopeDAO envelopeDAO;
+    private final Envelope envelopeDAO;
     private final ScheduledExecutorService scheduler;
     private final AuditLogger auditLogger;
     private final MetricsRegistry metricsRegistry;
@@ -35,7 +35,7 @@ public final class MailboxRouter implements AutoCloseable {
      * @param auditLogger     The logger for auditing cleanup operations.
      * @param metricsRegistry The registry for tracking metrics.
      */
-    public MailboxRouter(EnvelopeDAO envelopeDAO,
+    public MailboxRouter(Envelope envelopeDAO,
             ScheduledExecutorService scheduler,
             AuditLogger auditLogger,
             MetricsRegistry metricsRegistry) {

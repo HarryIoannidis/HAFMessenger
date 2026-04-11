@@ -1,10 +1,10 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
-import com.haf.server.db.ContactDAO;
+import com.haf.server.db.Contact;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
-import com.haf.server.db.SessionDAO;
+import com.haf.server.db.Session;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.MailboxRouter.MailboxSubscriber;
 import com.haf.server.router.MailboxRouter.MailboxSubscription;
@@ -42,8 +42,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
 
     private final Map<WebSocket, MailboxSubscription> subscriptions = new ConcurrentHashMap<>();
     private final Map<WebSocket, String> connectionUsers = new ConcurrentHashMap<>();
-    private final SessionDAO sessionDAO;
-    private final ContactDAO contactDAO;
+    private final Session sessionDAO;
+    private final Contact contactDAO;
     private final PresenceRegistry presenceRegistry;
     private final CountDownLatch startupSignal = new CountDownLatch(1);
     private final AtomicReference<Exception> startupFailure = new AtomicReference<>();
@@ -69,8 +69,8 @@ public final class WebSocketIngressServer extends WebSocketServer {
             RateLimiterService rateLimiterService,
             AuditLogger auditLogger,
             MetricsRegistry metricsRegistry,
-            SessionDAO sessionDAO,
-            ContactDAO contactDAO,
+            Session sessionDAO,
+            Contact contactDAO,
             PresenceRegistry presenceRegistry) {
         super(new InetSocketAddress(config.getWsPort()));
         setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
@@ -327,11 +327,11 @@ public final class WebSocketIngressServer extends WebSocketServer {
      */
     private void sendPresenceSnapshot(WebSocket conn, String userId) {
         try {
-            List<ContactDAO.ContactRecord> contacts = contactDAO.getContacts(userId);
+            List<Contact.ContactRecord> contacts = contactDAO.getContacts(userId);
             if (contacts == null || contacts.isEmpty()) {
                 return;
             }
-            for (ContactDAO.ContactRecord contact : contacts) {
+            for (Contact.ContactRecord contact : contacts) {
                 if (contact == null || contact.userId() == null || contact.userId().isBlank()) {
                     continue;
                 }

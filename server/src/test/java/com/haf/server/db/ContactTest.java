@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ContactDAOTest {
+class ContactTest {
 
     @Mock
     private HikariDataSource dataSource;
@@ -35,11 +35,11 @@ class ContactDAOTest {
     @Mock
     private ResultSet resultSet;
 
-    private ContactDAO dao;
+    private Contact dao;
 
     @BeforeEach
     void setUp() {
-        dao = new ContactDAO(dataSource);
+        dao = new Contact(dataSource);
     }
 
     @Test
@@ -78,7 +78,7 @@ class ContactDAOTest {
         when(resultSet.getString("telephone")).thenReturn("6900000001", "6900000002");
         when(resultSet.getDate("joined_date")).thenReturn(Date.valueOf("2026-01-01"), Date.valueOf("2026-01-02"));
 
-        List<ContactDAO.ContactRecord> contacts = dao.getContacts("caller-1");
+        List<Contact.ContactRecord> contacts = dao.getContacts("caller-1");
 
         assertEquals(2, contacts.size());
         assertEquals("u-1", contacts.get(0).userId());

@@ -17,7 +17,7 @@ import java.util.UUID;
  * deliberately never inspects or decrypts the ciphertext – it is only
  * responsible for persisting and retrieving bytes.
  */
-public final class FileUploadDAO {
+public final class FileUpload {
 
     private final DataSource dataSource;
 
@@ -40,11 +40,11 @@ public final class FileUploadDAO {
             """;
 
     /**
-     * Creates a FileUploadDAO.
+     * Creates a FileUpload.
      *
      * @param dataSource the DataSource
      */
-    public FileUploadDAO(DataSource dataSource) {
+    public FileUpload(DataSource dataSource) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
     }
 

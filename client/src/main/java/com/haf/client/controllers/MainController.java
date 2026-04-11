@@ -25,7 +25,7 @@ import com.haf.client.utils.ViewRouter;
 import com.haf.client.viewmodels.MainViewModel;
 import com.haf.client.viewmodels.MessagesViewModel;
 import com.haf.client.viewmodels.SearchSortViewModel;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -942,7 +942,7 @@ public class MainController implements SearchController.ContactActions {
      * Adds a searched user to the contacts list and switches to their chat.
      */
     @Override
-    public void startChatWith(UserSearchResultDTO result) {
+    public void startChatWith(UserSearchResult result) {
         if (result == null || result.getUserId() == null || result.getUserId().isBlank()) {
             return;
         }
@@ -979,7 +979,7 @@ public class MainController implements SearchController.ContactActions {
      * @param result search result to convert into a contact entry
      */
     @Override
-    public void addContact(UserSearchResultDTO result) {
+    public void addContact(UserSearchResult result) {
         viewModel.addContact(result);
     }
 
@@ -1007,7 +1007,7 @@ public class MainController implements SearchController.ContactActions {
      * @param result search result whose profile should be displayed
      */
     @Override
-    public void openProfile(UserSearchResultDTO result) {
+    public void openProfile(UserSearchResult result) {
         UserProfileInfo profile = UserProfileInfo.fromSearchResult(result, false);
         if (profile == null) {
             return;

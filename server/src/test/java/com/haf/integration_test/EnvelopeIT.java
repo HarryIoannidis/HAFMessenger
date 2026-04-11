@@ -1,6 +1,6 @@
 package com.haf.integration_test;
 
-import com.haf.server.db.EnvelopeDAO;
+import com.haf.server.db.Envelope;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.QueuedEnvelope;
@@ -27,7 +27,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers(disabledWithoutDocker = true)
-class EnvelopeDAOIT {
+class EnvelopeIT {
 
     @Container
     @SuppressWarnings("resource")
@@ -37,7 +37,7 @@ class EnvelopeDAOIT {
             .withPassword("test");
 
     private HikariDataSource dataSource;
-    private EnvelopeDAO dao;
+    private Envelope dao;
     private AuditLogger auditLogger;
 
     @BeforeEach
@@ -58,7 +58,7 @@ class EnvelopeDAOIT {
 
         MetricsRegistry metricsRegistry = new MetricsRegistry();
         auditLogger = AuditLogger.create(metricsRegistry);
-        dao = new EnvelopeDAO(dataSource, auditLogger);
+        dao = new Envelope(dataSource, auditLogger);
     }
 
     @AfterEach

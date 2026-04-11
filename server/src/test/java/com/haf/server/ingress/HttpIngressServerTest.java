@@ -1,11 +1,11 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
-import com.haf.server.db.AttachmentDAO;
-import com.haf.server.db.ContactDAO;
-import com.haf.server.db.FileUploadDAO;
-import com.haf.server.db.SessionDAO;
-import com.haf.server.db.UserDAO;
+import com.haf.server.db.Attachment;
+import com.haf.server.db.Contact;
+import com.haf.server.db.FileUpload;
+import com.haf.server.db.Session;
+import com.haf.server.db.User;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
@@ -96,19 +96,19 @@ class HttpIngressServerTest {
     private AuditLogger auditLogger;
 
     @Mock
-    private UserDAO userDAO;
+    private User userDAO;
 
     @Mock
-    private SessionDAO sessionDAO;
+    private Session sessionDAO;
 
     @Mock
-    private FileUploadDAO fileUploadDAO;
+    private FileUpload fileUploadDAO;
 
     @Mock
-    private AttachmentDAO attachmentDAO;
+    private Attachment attachmentDAO;
 
     @Mock
-    private ContactDAO contactDAO;
+    private Contact contactDAO;
 
     private PresenceRegistry presenceRegistry;
 
@@ -212,7 +212,7 @@ class HttpIngressServerTest {
     void ingress_rejects_stale_recipient_key_fingerprint_header() throws Exception {
         HttpHandler handler = createHandler("IngressHandler");
         EncryptedMessage message = validMessage("sender-1", "recipient-1");
-        when(userDAO.getPublicKey("recipient-1")).thenReturn(new UserDAO.PublicKeyRecord("pem", "fp-current"));
+        when(userDAO.getPublicKey("recipient-1")).thenReturn(new User.PublicKeyRecord("pem", "fp-current"));
 
         ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
         exchange.requestHeaders().add("X-Recipient-Key-Fingerprint", "fp-stale");
@@ -518,7 +518,7 @@ class HttpIngressServerTest {
         String password = "correct horse battery staple";
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
         when(sessionDAO.createSessionTokens(userId))
-                .thenReturn(new SessionDAO.SessionTokens("jwt-access-token", "refresh-token", 100L, 200L));
+                .thenReturn(new Session.SessionTokens("jwt-access-token", "refresh-token", 100L, 200L));
 
         HttpHandler handler = createHandler("LoginHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
@@ -544,7 +544,7 @@ class HttpIngressServerTest {
 
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
         when(sessionDAO.createSessionTokens(userId))
-                .thenReturn(new SessionDAO.SessionTokens("jwt-takeover", "refresh-takeover", 100L, 200L));
+                .thenReturn(new Session.SessionTokens("jwt-takeover", "refresh-takeover", 100L, 200L));
 
         WebSocket oldConnection = mock(WebSocket.class);
         presenceRegistry.registerConnection(userId, oldConnection);
@@ -596,7 +596,7 @@ class HttpIngressServerTest {
     void token_refresh_rotates_tokens() throws Exception {
         HttpHandler handler = createHandler("TokenRefreshHandler");
         when(sessionDAO.refreshSession("refresh-1"))
-                .thenReturn(new SessionDAO.SessionTokens("jwt-2", "refresh-2", 300L, 600L));
+                .thenReturn(new Session.SessionTokens("jwt-2", "refresh-2", 300L, 600L));
         ExchangeHarness exchange = newExchange("POST", "/api/v1/token/refresh",
                 "{\"refreshToken\":\"refresh-1\"}");
 
@@ -763,7 +763,7 @@ class HttpIngressServerTest {
     @Test
     void user_key_returns_public_key_payload() throws Exception {
         HttpHandler handler = createHandler("UserKeyHandler");
-        when(userDAO.getPublicKey("u-1")).thenReturn(new UserDAO.PublicKeyRecord("PEM", "fp-1"));
+        when(userDAO.getPublicKey("u-1")).thenReturn(new User.PublicKeyRecord("PEM", "fp-1"));
         ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-1/key", "");
         authenticate(exchange, "sess-user-key", "caller");
 
@@ -796,7 +796,7 @@ class HttpIngressServerTest {
         HttpHandler userKeyHandler = createHandler("UserKeyHandler");
         ExchangeHarness userKeyExchange = newExchange("GET", "/api/v1/users/u-1/key", "");
         authenticate(userKeyExchange, "sess-user-key-close", "caller");
-        when(userDAO.getPublicKey("u-1")).thenReturn(new UserDAO.PublicKeyRecord("PEM", "fp-1"));
+        when(userDAO.getPublicKey("u-1")).thenReturn(new User.PublicKeyRecord("PEM", "fp-1"));
         userKeyHandler.handle(userKeyExchange.exchange());
         verify(userKeyExchange.exchange(), times(1)).close();
 
@@ -866,7 +866,7 @@ class HttpIngressServerTest {
     void search_rejects_tampered_cursor_signature() throws Exception {
         HttpHandler handler = createHandler("SearchHandler");
 
-        UserDAO.SearchRecord row = new UserDAO.SearchRecord(
+        User.SearchRecord row = new User.SearchRecord(
                 "u-1",
                 "Alice",
                 "REG-1",
@@ -875,7 +875,7 @@ class HttpIngressServerTest {
                 "6900000000",
                 "2026-01-01");
         when(userDAO.searchUsersPage("alice", "caller", 2, null, null))
-                .thenReturn(new UserDAO.SearchPage(List.of(row), true, "Alice Z", "uid-last"));
+                .thenReturn(new User.SearchPage(List.of(row), true, "Alice Z", "uid-last"));
 
         ExchangeHarness first = newExchange("GET", "/api/v1/search?q=alice&limit=2", "");
         authenticate(first, "sess-search-tamper", "caller");
@@ -901,7 +901,7 @@ class HttpIngressServerTest {
         ExchangeHarness exchange = newExchange("GET", "/api/v1/search?q=alice&limit=2", "");
         authenticate(exchange, "sess-search-ok", "caller");
 
-        UserDAO.SearchRecord row = new UserDAO.SearchRecord(
+        User.SearchRecord row = new User.SearchRecord(
                 "u-1",
                 "Alice",
                 "REG-1",
@@ -910,7 +910,7 @@ class HttpIngressServerTest {
                 "6900000000",
                 "2026-01-01");
         when(userDAO.searchUsersPage("alice", "caller", 2, null, null))
-                .thenReturn(new UserDAO.SearchPage(List.of(row), false, null, null));
+                .thenReturn(new User.SearchPage(List.of(row), false, null, null));
 
         handler.handle(exchange.exchange());
 
@@ -922,7 +922,7 @@ class HttpIngressServerTest {
     void search_cursor_roundtrip_encodes_and_decodes_signature() throws Exception {
         HttpHandler handler = createHandler("SearchHandler");
 
-        UserDAO.SearchRecord row = new UserDAO.SearchRecord(
+        User.SearchRecord row = new User.SearchRecord(
                 "u-1",
                 "Alice",
                 "REG-1",
@@ -932,9 +932,9 @@ class HttpIngressServerTest {
                 "2026-01-01");
 
         when(userDAO.searchUsersPage("alice", "caller", 2, null, null))
-                .thenReturn(new UserDAO.SearchPage(List.of(row), true, "Alice Z", "uid-last"));
+                .thenReturn(new User.SearchPage(List.of(row), true, "Alice Z", "uid-last"));
         when(userDAO.searchUsersPage("alice", "caller", 2, "Alice Z", "uid-last"))
-                .thenReturn(new UserDAO.SearchPage(List.of(), false, null, null));
+                .thenReturn(new User.SearchPage(List.of(), false, null, null));
 
         ExchangeHarness first = newExchange("GET", "/api/v1/search?q=alice&limit=2", "");
         authenticate(first, "sess-search-cursor", "caller");
@@ -1031,7 +1031,7 @@ class HttpIngressServerTest {
         authenticate(exchange, "sess-contacts", "caller");
 
         when(contactDAO.getContacts("caller")).thenReturn(List.of(
-                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
+                new Contact.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
                         "2026-01-01")));
 
         handler.handle(exchange.exchange());
@@ -1051,7 +1051,7 @@ class HttpIngressServerTest {
         authenticate(exchange, "sess-contacts-prod", "caller");
 
         when(contactDAO.getContacts("caller")).thenReturn(List.of(
-                new ContactDAO.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
+                new Contact.ContactRecord("u-2", "Contact User", "REG-2", "c@haf.gr", "SMINIAS", "6900000002",
                         "2026-01-01")));
 
         handler.handle(exchange.exchange());
@@ -1245,7 +1245,7 @@ class HttpIngressServerTest {
         authenticate(initExchange, "sess-attach", "caller");
         when(attachmentDAO.initUpload("caller", "recipient-1", "application/vnd.haf.encrypted-message+json", 1024L, 2,
                 1800L))
-                .thenReturn(new AttachmentDAO.UploadInitResult("att-1", 12345L));
+                .thenReturn(new Attachment.UploadInitResult("att-1", 12345L));
 
         handler.handle(initExchange.exchange());
         assertEquals(200, initExchange.statusCode().get());
@@ -1259,7 +1259,7 @@ class HttpIngressServerTest {
                 JsonCodec.toJson(chunkReq));
         authenticate(chunkExchange, "sess-attach", "caller");
         when(attachmentDAO.storeChunk(eq("caller"), eq("att-1"), eq(0), any(byte[].class)))
-                .thenReturn(new AttachmentDAO.ChunkStoreResult(0, true));
+                .thenReturn(new Attachment.ChunkStoreResult(0, true));
 
         handler.handle(chunkExchange.exchange());
         assertEquals(200, chunkExchange.statusCode().get());
@@ -1273,7 +1273,7 @@ class HttpIngressServerTest {
                 JsonCodec.toJson(completeReq));
         authenticate(completeExchange, "sess-attach", "caller");
         when(attachmentDAO.completeUpload("caller", "att-1", 2, 1024L))
-                .thenReturn(new AttachmentDAO.CompletionResult(2, 1024L, "COMPLETE"));
+                .thenReturn(new Attachment.CompletionResult(2, 1024L, "COMPLETE"));
 
         handler.handle(completeExchange.exchange());
         assertEquals(200, completeExchange.statusCode().get());
@@ -1285,7 +1285,7 @@ class HttpIngressServerTest {
         ExchangeHarness bindExchange = newExchange("POST", "/api/v1/attachments/att-1/bind", JsonCodec.toJson(bindReq));
         authenticate(bindExchange, "sess-attach", "caller");
         when(attachmentDAO.bindUploadToEnvelope("caller", "att-1", "env-1"))
-                .thenReturn(new AttachmentDAO.BindResult("att-1", "env-1", 777L));
+                .thenReturn(new Attachment.BindResult("att-1", "env-1", 777L));
 
         handler.handle(bindExchange.exchange());
         assertEquals(200, bindExchange.statusCode().get());
@@ -1295,7 +1295,7 @@ class HttpIngressServerTest {
         ExchangeHarness downloadExchange = newExchange("GET", "/api/v1/attachments/att-1", "");
         authenticate(downloadExchange, "sess-attach", "caller");
         when(attachmentDAO.loadForRecipient("caller", "att-1"))
-                .thenReturn(new AttachmentDAO.DownloadBlob(
+                .thenReturn(new Attachment.DownloadBlob(
                         "att-1",
                         "sender-1",
                         "caller",
@@ -1351,9 +1351,9 @@ class HttpIngressServerTest {
         return message;
     }
 
-    private static UserDAO.UserRecord approvedUser(String userId, String password) {
+    private static User.UserRecord approvedUser(String userId, String password) {
         String passwordHash = Password.hash(password).addRandomSalt().with(ARGON2).getResult();
-        return new UserDAO.UserRecord(
+        return new User.UserRecord(
                 userId,
                 passwordHash,
                 "Pilot",

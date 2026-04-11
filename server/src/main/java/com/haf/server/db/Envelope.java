@@ -20,7 +20,7 @@ import java.util.*;
 /**
  * Persists and retrieves encrypted message envelopes for mailbox delivery.
  */
-public final class EnvelopeDAO {
+public final class Envelope {
 
     private final DataSource dataSource;
     private final AuditLogger auditLogger;
@@ -116,12 +116,12 @@ public final class EnvelopeDAO {
             """;
 
     /**
-     * Creates an EnvelopeDAO with a DataSource.
+     * Creates an Envelope with a DataSource.
      *
      * @param dataSource  the DataSource
      * @param auditLogger the AuditLogger
      */
-    public EnvelopeDAO(DataSource dataSource, AuditLogger auditLogger) {
+    public Envelope(DataSource dataSource, AuditLogger auditLogger) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
         this.auditLogger = Objects.requireNonNull(auditLogger, "auditLogger");
     }

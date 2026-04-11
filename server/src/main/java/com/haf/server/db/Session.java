@@ -21,7 +21,7 @@ import java.util.UUID;
 /**
  * Data-access object for authentication sessions.
  */
-public final class SessionDAO {
+public final class Session {
 
     private static final String DEFAULT_JWT_ISSUER = "haf-server";
     private static final long DEFAULT_ACCESS_TTL_SECONDS = 900L;
@@ -163,9 +163,9 @@ public final class SessionDAO {
     /**
      * Creates DAO with test defaults for JWT settings.
      * Production bootstrap should use
-     * {@link #SessionDAO(DataSource, AuditLogger, JwtTokenService, long, long, long)}.
+     * {@link #Session(DataSource, AuditLogger, JwtTokenService, long, long, long)}.
      */
-    public SessionDAO(DataSource dataSource, AuditLogger auditLogger) {
+    public Session(DataSource dataSource, AuditLogger auditLogger) {
         this(dataSource,
                 auditLogger,
                 new JwtTokenService("test-only-jwt-secret", DEFAULT_JWT_ISSUER, DEFAULT_ACCESS_TTL_SECONDS),
@@ -184,7 +184,7 @@ public final class SessionDAO {
      * @throws NullPointerException     when required collaborators are null
      * @throws IllegalArgumentException when TTL values are non-positive
      */
-    public SessionDAO(DataSource dataSource,
+    public Session(DataSource dataSource,
             AuditLogger auditLogger,
             JwtTokenService jwtTokenService,
             long refreshTokenTtlSeconds,
@@ -210,7 +210,7 @@ public final class SessionDAO {
      * @throws NullPointerException     when required collaborators are null
      * @throws IllegalArgumentException when TTL values are non-positive
      */
-    public SessionDAO(DataSource dataSource,
+    public Session(DataSource dataSource,
             AuditLogger auditLogger,
             JwtTokenService jwtTokenService,
             long refreshTokenTtlSeconds,

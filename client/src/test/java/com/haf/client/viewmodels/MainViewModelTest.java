@@ -4,7 +4,7 @@ import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.responses.ContactsResponse;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -27,9 +27,9 @@ class MainViewModelTest {
     @Test
     void fetch_contacts_upserts_without_duplicates() {
         ContactsResponse first = ContactsResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Doe", "100", "jane@haf.gr", "SMINIAS", false)));
+                new UserSearchResult("u-1", "Jane Doe", "100", "jane@haf.gr", "SMINIAS", false)));
         ContactsResponse second = ContactsResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
 
         AtomicInteger calls = new AtomicInteger();
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
@@ -53,7 +53,7 @@ class MainViewModelTest {
         AtomicInteger addCalls = new AtomicInteger();
         AtomicInteger fetchCalls = new AtomicInteger();
         ContactsResponse refreshed = ContactsResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> {
                     fetchCalls.incrementAndGet();
@@ -80,7 +80,7 @@ class MainViewModelTest {
         AtomicInteger addCalls = new AtomicInteger();
         AtomicInteger fetchCalls = new AtomicInteger();
         ContactsResponse refreshed = ContactsResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane", "100", "jane@haf.gr", "SMINIAS", true)));
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> {
                     fetchCalls.incrementAndGet();
@@ -288,7 +288,7 @@ class MainViewModelTest {
     void enriched_profile_fields_survive_presence_update() {
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> CompletableFuture.completedFuture("{}")));
-        UserSearchResultDTO dto = new UserSearchResultDTO(
+        UserSearchResult dto = new UserSearchResult(
                 "u-1",
                 "Jane",
                 "100",
@@ -340,7 +340,7 @@ class MainViewModelTest {
     @Test
     void unread_is_preserved_when_presence_and_contact_snapshot_update_the_contact() {
         ContactsResponse refreshed = ContactsResponse.success(List.of(
-                new UserSearchResultDTO("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
+                new UserSearchResult("u-1", "Jane Updated", "100", "jane@haf.gr", "SMINIAS", true)));
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> CompletableFuture.completedFuture(JsonCodec.toJson(refreshed))));
 

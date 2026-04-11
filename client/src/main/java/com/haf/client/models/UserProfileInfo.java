@@ -1,6 +1,6 @@
 package com.haf.client.models;
 
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 
 /**
  * View model for the profile popup.
@@ -24,7 +24,7 @@ public record UserProfileInfo(
      * @return mapped {@link UserProfileInfo}, or {@code null} when {@code result}
      *         is {@code null}
      */
-    public static UserProfileInfo fromSearchResult(UserSearchResultDTO result, boolean selfProfile) {
+    public static UserProfileInfo fromSearchResult(UserSearchResult result, boolean selfProfile) {
         if (result == null) {
             return null;
         }
