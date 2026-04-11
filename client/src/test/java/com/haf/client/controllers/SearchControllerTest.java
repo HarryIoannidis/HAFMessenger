@@ -1,7 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.viewmodels.SearchViewModel;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -104,14 +104,15 @@ class SearchControllerTest {
                 .anyMatch(field -> field.getType().equals(MainController.class));
         boolean mainControllerMethodTypeFound = Arrays.stream(SearchController.class.getDeclaredMethods())
                 .anyMatch(method -> method.getReturnType().equals(MainController.class)
-                        || Arrays.stream(method.getParameterTypes()).anyMatch(type -> type.equals(MainController.class)));
+                        || Arrays.stream(method.getParameterTypes())
+                                .anyMatch(type -> type.equals(MainController.class)));
 
         assertFalse(mainControllerFieldFound);
         assertFalse(mainControllerMethodTypeFound);
     }
 
-    private static UserSearchResultDTO sampleUser() {
-        return new UserSearchResultDTO("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true);
+    private static UserSearchResult sampleUser() {
+        return new UserSearchResult("u-1", "Jane Doe", "123", "jane@haf.gr", "SMINIAS", true);
     }
 
     private static final class StubSearchContactActions implements SearchController.ContactActions {
@@ -127,7 +128,7 @@ class SearchControllerTest {
         }
 
         @Override
-        public void addContact(UserSearchResultDTO result) {
+        public void addContact(UserSearchResult result) {
             addCalls.incrementAndGet();
         }
 
@@ -137,12 +138,12 @@ class SearchControllerTest {
         }
 
         @Override
-        public void startChatWith(UserSearchResultDTO result) {
+        public void startChatWith(UserSearchResult result) {
             startChatCalls.incrementAndGet();
         }
 
         @Override
-        public void openProfile(UserSearchResultDTO result) {
+        public void openProfile(UserSearchResult result) {
             openProfileCalls.incrementAndGet();
         }
     }

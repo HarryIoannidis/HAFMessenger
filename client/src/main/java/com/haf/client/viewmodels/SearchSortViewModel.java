@@ -1,7 +1,7 @@
 package com.haf.client.viewmodels;
 
 import com.haf.client.utils.UiConstants;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
@@ -77,9 +77,9 @@ public final class SearchSortViewModel {
      * @param options sorting options to apply
      * @return comparator with stable tie-breaker on user id
      */
-    public static Comparator<UserSearchResultDTO> comparator(SortOptions options) {
+    public static Comparator<UserSearchResult> comparator(SortOptions options) {
         SortOptions active = normalize(options);
-        Comparator<UserSearchResultDTO> comparator = switch (active.field()) {
+        Comparator<UserSearchResult> comparator = switch (active.field()) {
             case FULL_NAME -> SearchSortViewModel::compareByFullName;
             case REG_NUMBER -> SearchSortViewModel::compareByRegNumber;
             case RANK -> SearchSortViewModel::compareByRank;
@@ -98,7 +98,7 @@ public final class SearchSortViewModel {
      * @param right right result
      * @return comparator result for full-name ordering
      */
-    private static int compareByFullName(UserSearchResultDTO left, UserSearchResultDTO right) {
+    private static int compareByFullName(UserSearchResult left, UserSearchResult right) {
         return compareText(
                 left == null ? null : left.getFullName(),
                 right == null ? null : right.getFullName());
@@ -112,7 +112,7 @@ public final class SearchSortViewModel {
      * @param right right result
      * @return comparator result for registration-number ordering
      */
-    private static int compareByRegNumber(UserSearchResultDTO left, UserSearchResultDTO right) {
+    private static int compareByRegNumber(UserSearchResult left, UserSearchResult right) {
         Integer leftNumeric = parseRegNumber(left == null ? null : left.getRegNumber());
         Integer rightNumeric = parseRegNumber(right == null ? null : right.getRegNumber());
         if (leftNumeric != null && rightNumeric != null) {
@@ -134,7 +134,7 @@ public final class SearchSortViewModel {
      * @param right right result
      * @return comparator result for rank ordering
      */
-    private static int compareByRank(UserSearchResultDTO left, UserSearchResultDTO right) {
+    private static int compareByRank(UserSearchResult left, UserSearchResult right) {
         String leftRank = left == null ? null : left.getRank();
         String rightRank = right == null ? null : right.getRank();
         int rankCompare = Integer.compare(rankWeight(leftRank), rankWeight(rightRank));
@@ -195,7 +195,7 @@ public final class SearchSortViewModel {
      * @param dto search result entry
      * @return normalized user id string
      */
-    private static String safeUserId(UserSearchResultDTO dto) {
+    private static String safeUserId(UserSearchResult dto) {
         return normalizeText(dto == null ? null : dto.getUserId());
     }
 

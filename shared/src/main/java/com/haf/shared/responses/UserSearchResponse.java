@@ -1,6 +1,6 @@
 package com.haf.shared.responses;
 
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import java.io.Serializable;
 import java.util.List;
 
@@ -11,7 +11,7 @@ import java.util.List;
  * On failure: {@code error} contains the reason and {@code results} is null.
  */
 public class UserSearchResponse implements Serializable {
-    private List<UserSearchResultDTO> results;
+    private List<UserSearchResult> results;
     private String error;
     private boolean hasMore;
     private String nextCursor;
@@ -28,7 +28,7 @@ public class UserSearchResponse implements Serializable {
      *
      * @return search results, or {@code null} when the request fails
      */
-    public List<UserSearchResultDTO> getResults() {
+    public List<UserSearchResult> getResults() {
         return results;
     }
 
@@ -37,7 +37,7 @@ public class UserSearchResponse implements Serializable {
      *
      * @param results user search matches
      */
-    public void setResults(List<UserSearchResultDTO> results) {
+    public void setResults(List<UserSearchResult> results) {
         this.results = results;
     }
 
@@ -101,7 +101,7 @@ public class UserSearchResponse implements Serializable {
      * @param results search matches for the first/only page
      * @return populated success response with pagination disabled
      */
-    public static UserSearchResponse success(List<UserSearchResultDTO> results) {
+    public static UserSearchResponse success(List<UserSearchResult> results) {
         UserSearchResponse r = new UserSearchResponse();
         r.setResults(results);
         r.setHasMore(false);
@@ -117,7 +117,7 @@ public class UserSearchResponse implements Serializable {
      * @param nextCursor cursor to request the next page
      * @return populated success response
      */
-    public static UserSearchResponse success(List<UserSearchResultDTO> results, boolean hasMore, String nextCursor) {
+    public static UserSearchResponse success(List<UserSearchResult> results, boolean hasMore, String nextCursor) {
         UserSearchResponse r = new UserSearchResponse();
         r.setResults(results);
         r.setHasMore(hasMore);

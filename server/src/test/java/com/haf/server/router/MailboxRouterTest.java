@@ -1,6 +1,6 @@
 package com.haf.server.router;
 
-import com.haf.server.db.EnvelopeDAO;
+import com.haf.server.db.Envelope;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.shared.constants.MessageHeader;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 class MailboxRouterTest {
 
     @Mock
-    private EnvelopeDAO envelopeDAO;
+    private Envelope envelopeDAO;
 
     @Mock
     private ScheduledExecutorService scheduler;

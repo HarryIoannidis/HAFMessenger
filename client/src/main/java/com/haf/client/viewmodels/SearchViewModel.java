@@ -4,7 +4,7 @@ import com.haf.client.core.NetworkSession;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.responses.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -71,8 +71,8 @@ public class SearchViewModel {
     private final SearchGateway searchGateway;
     private final CopyOnWriteArrayList<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final AtomicInteger generation = new AtomicInteger();
-    private final ObservableList<UserSearchResultDTO> results = FXCollections.observableArrayList();
-    private final ObservableList<UserSearchResultDTO> readOnlyResults = FXCollections
+    private final ObservableList<UserSearchResult> results = FXCollections.observableArrayList();
+    private final ObservableList<UserSearchResult> readOnlyResults = FXCollections
             .unmodifiableObservableList(results);
     private final StringProperty statusText = new SimpleStringProperty(STATUS_IDLE);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
@@ -240,7 +240,7 @@ public class SearchViewModel {
      *
      * @return observable list of current results
      */
-    public ObservableList<UserSearchResultDTO> resultsProperty() {
+    public ObservableList<UserSearchResult> resultsProperty() {
         return readOnlyResults;
     }
 
@@ -327,7 +327,7 @@ public class SearchViewModel {
             UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
             runOnUiThread(() -> applyResponse(response, append, searchGeneration));
         } catch (Exception ex) {
-            LOGGER.warn( "Search request failed", ex);
+            LOGGER.warn("Search request failed", ex);
             runOnUiThread(() -> {
                 if (searchGeneration != generation.get()) {
                     return;
@@ -372,8 +372,8 @@ public class SearchViewModel {
             return;
         }
 
-        List<UserSearchResultDTO> responseResults = response.getResults();
-        List<UserSearchResultDTO> normalizedResults = responseResults == null ? List.of() : responseResults;
+        List<UserSearchResult> responseResults = response.getResults();
+        List<UserSearchResult> normalizedResults = responseResults == null ? List.of() : responseResults;
 
         hasMore = response.isHasMore();
         nextCursor = hasMore ? response.getNextCursor() : null;
@@ -426,7 +426,8 @@ public class SearchViewModel {
     }
 
     /**
-     * Handles a null response by setting error status and publishing a runtime issue.
+     * Handles a null response by setting error status and publishing a runtime
+     * issue.
      *
      * @param append whether this was a pagination append request
      * @return always {@code true}, indicating processing should stop
@@ -445,7 +446,8 @@ public class SearchViewModel {
     }
 
     /**
-     * Handles an error present in the response by setting error status and publishing
+     * Handles an error present in the response by setting error status and
+     * publishing
      * a runtime issue.
      *
      * @param error  error message from the server response
@@ -471,7 +473,7 @@ public class SearchViewModel {
      * @param append            whether response belongs to pagination append
      * @return {@code true} when caller should stop further result processing
      */
-    private boolean handleEmptyResults(List<UserSearchResultDTO> normalizedResults, boolean append) {
+    private boolean handleEmptyResults(List<UserSearchResult> normalizedResults, boolean append) {
         if (!normalizedResults.isEmpty()) {
             return false;
         }
@@ -500,16 +502,16 @@ public class SearchViewModel {
      *
      * @param incoming incoming page of candidates
      */
-    private void appendUnique(List<UserSearchResultDTO> incoming) {
+    private void appendUnique(List<UserSearchResult> incoming) {
         Set<String> knownUserIds = new HashSet<>();
-        for (UserSearchResultDTO existing : results) {
+        for (UserSearchResult existing : results) {
             if (existing != null && existing.getUserId() != null) {
                 knownUserIds.add(existing.getUserId());
             }
         }
 
-        List<UserSearchResultDTO> additions = new ArrayList<>();
-        for (UserSearchResultDTO candidate : incoming) {
+        List<UserSearchResult> additions = new ArrayList<>();
+        for (UserSearchResult candidate : incoming) {
             if (candidate == null) {
                 continue;
             }
@@ -529,7 +531,7 @@ public class SearchViewModel {
      *
      * @param incoming incoming results to sort and apply
      */
-    private void setSortedResults(List<UserSearchResultDTO> incoming) {
+    private void setSortedResults(List<UserSearchResult> incoming) {
         results.setAll(sortSnapshot(incoming));
     }
 
@@ -541,7 +543,7 @@ public class SearchViewModel {
             return;
         }
 
-        List<UserSearchResultDTO> sorted = sortSnapshot(results);
+        List<UserSearchResult> sorted = sortSnapshot(results);
         if (!results.equals(sorted)) {
             results.setAll(sorted);
         }
@@ -553,12 +555,12 @@ public class SearchViewModel {
      * @param incoming source list to sort
      * @return sorted copy (or empty immutable list when input is null/empty)
      */
-    private List<UserSearchResultDTO> sortSnapshot(List<UserSearchResultDTO> incoming) {
+    private List<UserSearchResult> sortSnapshot(List<UserSearchResult> incoming) {
         if (incoming == null || incoming.isEmpty()) {
             return List.of();
         }
 
-        List<UserSearchResultDTO> sorted = new ArrayList<>(incoming);
+        List<UserSearchResult> sorted = new ArrayList<>(incoming);
         sorted.sort(SearchSortViewModel.comparator(sortOptions));
         return sorted;
     }
@@ -580,9 +582,9 @@ public class SearchViewModel {
     /**
      * Publishes a recoverable runtime issue to registered listeners.
      *
-     * @param dedupeKey issue dedupe key
-     * @param title issue title
-     * @param message issue message
+     * @param dedupeKey   issue dedupe key
+     * @param title       issue title
+     * @param message     issue message
      * @param retryAction retry callback
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
@@ -599,7 +601,7 @@ public class SearchViewModel {
     /**
      * Extracts readable throwable message with fallback text.
      *
-     * @param error throwable to inspect
+     * @param error    throwable to inspect
      * @param fallback fallback text
      * @return resolved message
      */

@@ -5,11 +5,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class UserSearchResultDTOTest {
+class UserSearchResultTest {
 
     @Test
     void constructor_supports_active_flag() {
-        UserSearchResultDTO dto = new UserSearchResultDTO(
+        UserSearchResult dto = new UserSearchResult(
                 "u-1",
                 "Jane Doe",
                 "123",
@@ -24,7 +24,7 @@ class UserSearchResultDTOTest {
 
     @Test
     void json_roundtrip_preserves_active_flag() {
-        UserSearchResultDTO dto = new UserSearchResultDTO(
+        UserSearchResult dto = new UserSearchResult(
                 "u-1",
                 "Jane Doe",
                 "123",
@@ -33,7 +33,7 @@ class UserSearchResultDTOTest {
                 true);
 
         String json = JsonCodec.toJson(dto);
-        UserSearchResultDTO decoded = JsonCodec.fromJson(json, UserSearchResultDTO.class);
+        UserSearchResult decoded = JsonCodec.fromJson(json, UserSearchResult.class);
 
         assertTrue(decoded.isActive());
     }

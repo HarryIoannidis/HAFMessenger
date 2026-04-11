@@ -1,7 +1,7 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
-import com.haf.server.db.ContactDAO;
+import com.haf.server.db.Contact;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
@@ -10,7 +10,7 @@ import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
-import com.haf.server.db.SessionDAO;
+import com.haf.server.db.Session;
 import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -53,10 +53,10 @@ class WebSocketIngressServerTest {
     private MetricsRegistry metricsRegistry;
 
     @Mock
-    private SessionDAO sessionDAO;
+    private Session sessionDAO;
 
     @Mock
-    private ContactDAO contactDAO;
+    private Contact contactDAO;
 
     private SSLContext sslContext;
     private WebSocketIngressServer server;
@@ -135,7 +135,7 @@ class WebSocketIngressServerTest {
                 .thenAnswer(inv -> new MailboxSubscription(userId, inv.getArgument(1)));
         when(mailboxRouter.fetchUndelivered(userId, 100)).thenReturn(List.of());
         when(contactDAO.getContacts(userId)).thenReturn(List.of(
-                new ContactDAO.ContactRecord(
+                new Contact.ContactRecord(
                         onlineContactId,
                         "Online Contact",
                         "001",
@@ -143,7 +143,7 @@ class WebSocketIngressServerTest {
                         "SMINIAS",
                         "6900000001",
                         "2026-01-01"),
-                new ContactDAO.ContactRecord(
+                new Contact.ContactRecord(
                         offlineContactId,
                         "Offline Contact",
                         "002",

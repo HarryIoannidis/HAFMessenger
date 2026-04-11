@@ -17,7 +17,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class FileUploadDAOTest {
+class FileUploadTest {
 
     @Mock
     private DataSource dataSource;
@@ -28,11 +28,11 @@ class FileUploadDAOTest {
     @Mock
     private PreparedStatement insertStatement;
 
-    private FileUploadDAO dao;
+    private FileUpload dao;
 
     @BeforeEach
     void setUp() {
-        dao = new FileUploadDAO(dataSource);
+        dao = new FileUpload(dataSource);
     }
 
     @Test

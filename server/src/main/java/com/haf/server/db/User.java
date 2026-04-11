@@ -20,9 +20,9 @@ import java.util.UUID;
 /**
  * Data-access object for the {@code users} table.
  *
- * Follows the same DataSource + AuditLogger pattern as {@link EnvelopeDAO}.
+ * Follows the same DataSource + AuditLogger pattern as {@link Envelope}.
  */
-public final class UserDAO {
+public final class User {
 
     private final DataSource dataSource;
     private final AuditLogger auditLogger;
@@ -95,12 +95,12 @@ public final class UserDAO {
     }
 
     /**
-     * Creates a UserDAO with a DataSource and AuditLogger.
+     * Creates a User with a DataSource and AuditLogger.
      *
      * @param dataSource  the DataSource
      * @param auditLogger the AuditLogger
      */
-    public UserDAO(DataSource dataSource, AuditLogger auditLogger) {
+    public User(DataSource dataSource, AuditLogger auditLogger) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
         this.auditLogger = Objects.requireNonNull(auditLogger, "auditLogger");
     }

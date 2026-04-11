@@ -1,13 +1,13 @@
 package com.haf.shared.responses;
 
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import java.util.List;
 
 /**
  * Response payload returned when loading a user's contact list.
  */
 public class ContactsResponse {
-    private List<UserSearchResultDTO> contacts;
+    private List<UserSearchResult> contacts;
     private String error;
 
     /**
@@ -22,7 +22,7 @@ public class ContactsResponse {
      *
      * @return contact list, or {@code null} when the request fails
      */
-    public List<UserSearchResultDTO> getContacts() {
+    public List<UserSearchResult> getContacts() {
         return contacts;
     }
 
@@ -31,7 +31,7 @@ public class ContactsResponse {
      *
      * @param contacts contact list payload
      */
-    public void setContacts(List<UserSearchResultDTO> contacts) {
+    public void setContacts(List<UserSearchResult> contacts) {
         this.contacts = contacts;
     }
 
@@ -59,7 +59,7 @@ public class ContactsResponse {
      * @param contacts resolved contact list
      * @return populated success response
      */
-    public static ContactsResponse success(List<UserSearchResultDTO> contacts) {
+    public static ContactsResponse success(List<UserSearchResult> contacts) {
         ContactsResponse response = new ContactsResponse();
         response.setContacts(contacts);
         return response;

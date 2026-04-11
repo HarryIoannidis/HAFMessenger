@@ -15,7 +15,7 @@ import java.util.UUID;
 /**
  * DAO for encrypted chat attachments and their chunks.
  */
-public final class AttachmentDAO {
+public final class Attachment {
 
     private static final String STATUS_COMPLETE = "COMPLETE";
     private static final String STATUS_BOUND = "BOUND";
@@ -119,7 +119,8 @@ public final class AttachmentDAO {
             """;
 
     /**
-     * SQL query for loading bind prerequisites by joining attachment and envelope rows.
+     * SQL query for loading bind prerequisites by joining attachment and envelope
+     * rows.
      */
     private static final String SELECT_BIND_JOIN_SQL = """
             SELECT a.sender_id, a.recipient_id, a.status, e.expires_at
@@ -179,19 +180,20 @@ public final class AttachmentDAO {
      * @param dataSource JDBC data source used for attachment persistence
      * @throws NullPointerException when {@code dataSource} is {@code null}
      */
-    public AttachmentDAO(DataSource dataSource) {
+    public Attachment(DataSource dataSource) {
         this.dataSource = Objects.requireNonNull(dataSource, PARAM_DATA_SOURCE);
     }
 
     /**
      * Initializes metadata for a new chunked attachment upload.
      *
-     * @param senderId sender user id
-     * @param recipientId recipient user id
-     * @param contentType payload content type
-     * @param expectedSize expected total encrypted size in bytes
-     * @param expectedChunks expected chunk count
-     * @param unboundTtlSeconds TTL before upload expires when not yet bound to an envelope
+     * @param senderId          sender user id
+     * @param recipientId       recipient user id
+     * @param contentType       payload content type
+     * @param expectedSize      expected total encrypted size in bytes
+     * @param expectedChunks    expected chunk count
+     * @param unboundTtlSeconds TTL before upload expires when not yet bound to an
+     *                          envelope
      * @return upload init result containing attachment id and expiry timestamp
      * @throws DatabaseOperationException when database write fails
      */
@@ -225,12 +227,13 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Stores one attachment chunk inside a transaction with ownership and state checks.
+     * Stores one attachment chunk inside a transaction with ownership and state
+     * checks.
      *
-     * @param callerId authenticated caller id
+     * @param callerId     authenticated caller id
      * @param attachmentId upload attachment id
-     * @param chunkIndex zero-based chunk index
-     * @param chunkData raw encrypted chunk bytes
+     * @param chunkIndex   zero-based chunk index
+     * @param chunkData    raw encrypted chunk bytes
      * @return chunk store result describing whether a new chunk was stored
      * @throws DatabaseOperationException when database operation fails
      */
@@ -248,12 +251,13 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Finalizes an attachment upload after validating chunk count and accumulated size.
+     * Finalizes an attachment upload after validating chunk count and accumulated
+     * size.
      *
-     * @param callerId authenticated caller id
-     * @param attachmentId upload attachment id
+     * @param callerId       authenticated caller id
+     * @param attachmentId   upload attachment id
      * @param expectedChunks expected chunk count from client
-     * @param expectedSize expected encrypted size from client
+     * @param expectedSize   expected encrypted size from client
      * @return completion result with received counters and resulting upload status
      * @throws DatabaseOperationException when database operation fails
      */
@@ -272,9 +276,9 @@ public final class AttachmentDAO {
     /**
      * Binds a completed attachment upload to a message envelope.
      *
-     * @param callerId authenticated caller id
+     * @param callerId     authenticated caller id
      * @param attachmentId upload attachment id
-     * @param envelopeId envelope id that references the attachment
+     * @param envelopeId   envelope id that references the attachment
      * @return bind result with attachment/envelope ids and final expiry
      * @throws DatabaseOperationException when database operation fails
      */
@@ -291,10 +295,11 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Loads a bound attachment for the intended recipient and rebuilds its encrypted blob.
+     * Loads a bound attachment for the intended recipient and rebuilds its
+     * encrypted blob.
      *
      * @param callerRecipientId recipient id of authenticated caller
-     * @param attachmentId attachment id to fetch
+     * @param attachmentId      attachment id to fetch
      * @return attachment download blob with metadata and encrypted payload bytes
      * @throws DatabaseOperationException when database access fails
      */
@@ -340,13 +345,14 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Transactional chunk-store implementation with authorization and lifecycle checks.
+     * Transactional chunk-store implementation with authorization and lifecycle
+     * checks.
      *
-     * @param conn active SQL connection in transaction mode
-     * @param callerId authenticated caller id
+     * @param conn         active SQL connection in transaction mode
+     * @param callerId     authenticated caller id
      * @param attachmentId upload attachment id
-     * @param chunkIndex zero-based chunk index
-     * @param chunkData encrypted chunk bytes
+     * @param chunkIndex   zero-based chunk index
+     * @param chunkData    encrypted chunk bytes
      * @return chunk-store outcome
      * @throws SQLException when SQL access fails
      */
@@ -379,13 +385,14 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Transactional upload-completion implementation validating metadata and accumulated chunks.
+     * Transactional upload-completion implementation validating metadata and
+     * accumulated chunks.
      *
-     * @param conn active SQL connection in transaction mode
-     * @param callerId authenticated caller id
-     * @param attachmentId upload attachment id
+     * @param conn           active SQL connection in transaction mode
+     * @param callerId       authenticated caller id
+     * @param attachmentId   upload attachment id
      * @param expectedChunks expected chunk count provided by caller
-     * @param expectedSize expected encrypted byte count provided by caller
+     * @param expectedSize   expected encrypted byte count provided by caller
      * @return completion result with current chunk/byte counters and status
      * @throws SQLException when SQL access fails
      */
@@ -419,12 +426,13 @@ public final class AttachmentDAO {
     }
 
     /**
-     * Transactional bind implementation linking completed attachment to envelope metadata.
+     * Transactional bind implementation linking completed attachment to envelope
+     * metadata.
      *
-     * @param conn active SQL connection in transaction mode
-     * @param callerId authenticated caller id
+     * @param conn         active SQL connection in transaction mode
+     * @param callerId     authenticated caller id
      * @param attachmentId attachment id being bound
-     * @param envelopeId envelope id to bind to
+     * @param envelopeId   envelope id to bind to
      * @return bind result containing effective expiry inherited from envelope
      * @throws SQLException when SQL access fails
      */
@@ -446,10 +454,10 @@ public final class AttachmentDAO {
     /**
      * Inserts one chunk row into the chunk table.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
-     * @param chunkIndex chunk index
-     * @param chunkData chunk bytes
+     * @param chunkIndex   chunk index
+     * @param chunkData    chunk bytes
      * @throws SQLException when insert fails
      */
     private void insertChunk(Connection conn, String attachmentId, int chunkIndex, byte[] chunkData)
@@ -466,7 +474,7 @@ public final class AttachmentDAO {
     /**
      * Moves upload status from INIT to UPLOADING when first chunks arrive.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
      * @throws SQLException when update fails
      */
@@ -480,7 +488,7 @@ public final class AttachmentDAO {
     /**
      * Marks an upload as COMPLETE.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
      * @throws SQLException when update fails
      */
@@ -494,8 +502,8 @@ public final class AttachmentDAO {
     /**
      * Loads sender/status/expiry data needed to bind an attachment to an envelope.
      *
-     * @param conn active SQL connection
-     * @param envelopeId envelope id
+     * @param conn         active SQL connection
+     * @param envelopeId   envelope id
      * @param attachmentId attachment id
      * @return bind lookup row
      * @throws SQLException when query fails
@@ -516,9 +524,9 @@ public final class AttachmentDAO {
     /**
      * Persists envelope binding metadata and final expiry for an attachment.
      *
-     * @param conn active SQL connection
-     * @param envelopeId envelope id
-     * @param attachmentId attachment id
+     * @param conn                  active SQL connection
+     * @param envelopeId            envelope id
+     * @param attachmentId          attachment id
      * @param envelopeExpiryEpochMs expiry timestamp inherited from envelope
      * @throws SQLException when update fails
      */
@@ -535,8 +543,8 @@ public final class AttachmentDAO {
     /**
      * Loads downloadable attachment metadata for an authorized recipient.
      *
-     * @param conn active SQL connection
-     * @param attachmentId attachment id
+     * @param conn              active SQL connection
+     * @param attachmentId      attachment id
      * @param callerRecipientId authenticated recipient id
      * @return download metadata
      * @throws SQLException when query fails
@@ -559,7 +567,7 @@ public final class AttachmentDAO {
     /**
      * Concatenates all attachment chunks in ascending chunk index order.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
      * @return rebuilt blob and chunk count
      * @throws SQLException when query fails
@@ -581,7 +589,7 @@ public final class AttachmentDAO {
     /**
      * Loads and locks upload metadata row for mutation paths.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
      * @return upload metadata
      * @throws SQLException when query fails
@@ -605,7 +613,7 @@ public final class AttachmentDAO {
     /**
      * Loads aggregate chunk counters (count and total bytes) for an upload.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
      * @return chunk stats
      * @throws SQLException when query fails
@@ -623,9 +631,9 @@ public final class AttachmentDAO {
     /**
      * Loads one specific chunk payload.
      *
-     * @param conn active SQL connection
+     * @param conn         active SQL connection
      * @param attachmentId attachment id
-     * @param chunkIndex chunk index
+     * @param chunkIndex   chunk index
      * @return chunk bytes, or empty array when chunk does not exist
      * @throws SQLException when query fails
      */
@@ -644,10 +652,11 @@ public final class AttachmentDAO {
      * Executes a SQL work unit inside a transaction with unified error mapping.
      *
      * @param failureMessage message used for wrapped database exception
-     * @param work transactional unit of work
-     * @param <T> result type
+     * @param work           transactional unit of work
+     * @param <T>            result type
      * @return work result
-     * @throws DatabaseOperationException when connection acquisition or SQL operations fail
+     * @throws DatabaseOperationException when connection acquisition or SQL
+     *                                    operations fail
      */
     private <T> T inTransaction(String failureMessage, SqlWork<T> work) {
         try (Connection conn = dataSource.getConnection()) {
@@ -663,7 +672,7 @@ public final class AttachmentDAO {
      *
      * @param conn active SQL connection
      * @param work transactional unit of work
-     * @param <T> result type
+     * @param <T>  result type
      * @return work result
      * @throws SQLException when SQL execution or commit fails
      */
@@ -681,7 +690,7 @@ public final class AttachmentDAO {
     /**
      * Attempts rollback while preserving the original failure as primary exception.
      *
-     * @param conn active SQL connection
+     * @param conn              active SQL connection
      * @param originalException original exception that triggered rollback
      */
     private static void rollbackQuietly(Connection conn, Exception originalException) {
@@ -695,8 +704,8 @@ public final class AttachmentDAO {
     /**
      * Executes bind lookup query after binding parameters.
      *
-     * @param ps prepared statement for bind lookup
-     * @param envelopeId envelope id parameter
+     * @param ps           prepared statement for bind lookup
+     * @param envelopeId   envelope id parameter
      * @param attachmentId attachment id parameter
      * @return result set from executed query
      * @throws SQLException when execution fails
@@ -711,8 +720,8 @@ public final class AttachmentDAO {
     /**
      * Executes attachment download query after binding parameters.
      *
-     * @param ps prepared statement for download lookup
-     * @param attachmentId attachment id parameter
+     * @param ps                prepared statement for download lookup
+     * @param attachmentId      attachment id parameter
      * @param callerRecipientId recipient id parameter
      * @return result set from executed query
      * @throws SQLException when execution fails
@@ -727,7 +736,7 @@ public final class AttachmentDAO {
     /**
      * Executes a single-parameter query that expects attachment id in position 1.
      *
-     * @param ps prepared statement
+     * @param ps           prepared statement
      * @param attachmentId attachment id parameter
      * @return result set from executed query
      * @throws SQLException when execution fails
@@ -741,9 +750,9 @@ public final class AttachmentDAO {
     /**
      * Executes chunk lookup query after binding attachment id and chunk index.
      *
-     * @param ps prepared statement for chunk lookup
+     * @param ps           prepared statement for chunk lookup
      * @param attachmentId attachment id parameter
-     * @param chunkIndex chunk index parameter
+     * @param chunkIndex   chunk index parameter
      * @return result set from executed query
      * @throws SQLException when execution fails
      */

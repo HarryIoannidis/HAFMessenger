@@ -12,7 +12,7 @@ import com.haf.server.exceptions.DatabaseOperationException;
 /**
  * Provides database access for contact relationships and contact listings.
  */
-public class ContactDAO {
+public class Contact {
 
     private final HikariDataSource dataSource;
 
@@ -56,7 +56,7 @@ public class ContactDAO {
      *
      * @param dataSource JDBC connection pool
      */
-    public ContactDAO(HikariDataSource dataSource) {
+    public Contact(HikariDataSource dataSource) {
         this.dataSource = dataSource;
     }
 

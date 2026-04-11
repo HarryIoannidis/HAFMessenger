@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class UserDAOTest {
+class UserTest {
 
     @Mock
     private DataSource dataSource;
@@ -39,11 +39,11 @@ class UserDAOTest {
     @Mock
     private ResultSet resultSet;
 
-    private UserDAO dao;
+    private User dao;
 
     @BeforeEach
     void setUp() {
-        dao = new UserDAO(dataSource, auditLogger);
+        dao = new User(dataSource, auditLogger);
     }
 
     @Test
@@ -108,12 +108,12 @@ class UserDAOTest {
 
     @Test
     void constructor_rejects_null_datasource() {
-        assertThrows(NullPointerException.class, () -> new UserDAO(null, auditLogger));
+        assertThrows(NullPointerException.class, () -> new User(null, auditLogger));
     }
 
     @Test
     void constructor_rejects_null_auditlogger() {
-        assertThrows(NullPointerException.class, () -> new UserDAO(dataSource, null));
+        assertThrows(NullPointerException.class, () -> new User(dataSource, null));
     }
 
     @Test
@@ -132,7 +132,7 @@ class UserDAOTest {
         when(resultSet.getDate("joined_date")).thenReturn(Date.valueOf("2026-01-01"));
         when(resultSet.getString("status")).thenReturn("APPROVED");
 
-        UserDAO.UserRecord userRecord = dao.findByEmail("john@haf.gr");
+        User.UserRecord userRecord = dao.findByEmail("john@haf.gr");
 
         assertNotNull(userRecord);
         assertEquals("uid-123", userRecord.userId());
@@ -198,7 +198,7 @@ class UserDAOTest {
         when(resultSet.getString("public_key_pem")).thenReturn("PEM");
         when(resultSet.getString("public_key_fingerprint")).thenReturn("fp-1");
 
-        UserDAO.PublicKeyRecord record = dao.getPublicKey("user-1");
+        User.PublicKeyRecord record = dao.getPublicKey("user-1");
 
         assertNotNull(record);
         assertEquals("PEM", record.publicKeyPem());
@@ -333,7 +333,7 @@ class UserDAOTest {
         when(resultSet.getString("email")).thenReturn("alice@haf.gr", "bob@haf.gr", "charlie@haf.gr");
         when(resultSet.getString("rank")).thenReturn("Σμηναγός", "Σμηνίας", "Αντισμήναρχος");
 
-        UserDAO.SearchPage page = dao.searchUsersPage("a", "caller-id", 2, null, null);
+        User.SearchPage page = dao.searchUsersPage("a", "caller-id", 2, null, null);
 
         assertEquals(2, page.results().size());
         assertTrue(page.hasMore());

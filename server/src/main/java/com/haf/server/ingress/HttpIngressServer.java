@@ -1,11 +1,11 @@
 package com.haf.server.ingress;
 
 import com.haf.server.config.ServerConfig;
-import com.haf.server.db.ContactDAO;
-import com.haf.server.db.FileUploadDAO;
-import com.haf.server.db.AttachmentDAO;
-import com.haf.server.db.SessionDAO;
-import com.haf.server.db.UserDAO;
+import com.haf.server.db.Contact;
+import com.haf.server.db.FileUpload;
+import com.haf.server.db.Attachment;
+import com.haf.server.db.Session;
+import com.haf.server.db.User;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
@@ -34,7 +34,7 @@ import com.haf.shared.responses.RefreshTokenResponse;
 import com.haf.shared.requests.RegisterRequest;
 import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.responses.UserSearchResponse;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.constants.AttachmentConstants;
@@ -95,11 +95,11 @@ public final class HttpIngressServer {
     private final AuditLogger auditLogger;
     private final MetricsRegistry metricsRegistry;
     private final EncryptedMessageValidator validator;
-    private final UserDAO userDAO;
-    private final SessionDAO sessionDAO;
-    private final FileUploadDAO fileUploadDAO;
-    private final AttachmentDAO attachmentDAO;
-    private final ContactDAO contactDAO;
+    private final User userDAO;
+    private final Session sessionDAO;
+    private final FileUpload fileUploadDAO;
+    private final Attachment attachmentDAO;
+    private final Contact contactDAO;
     private final PresenceRegistry presenceRegistry;
     private final ExecutorService executor;
     private final Object trustedProxyCacheLock = new Object();
@@ -239,7 +239,7 @@ public final class HttpIngressServer {
      */
     static void pushPresenceToWatchers(
             PresenceRegistry presenceRegistry,
-            ContactDAO contactDAO,
+            Contact contactDAO,
             AuditLogger auditLogger,
             String requestId,
             String userId) {
@@ -422,11 +422,11 @@ public final class HttpIngressServer {
             AuditLogger auditLogger,
             MetricsRegistry metricsRegistry,
             EncryptedMessageValidator validator,
-            UserDAO userDAO,
-            SessionDAO sessionDAO,
-            FileUploadDAO fileUploadDAO,
-            AttachmentDAO attachmentDAO,
-            ContactDAO contactDAO,
+            User userDAO,
+            Session sessionDAO,
+            FileUpload fileUploadDAO,
+            Attachment attachmentDAO,
+            Contact contactDAO,
             PresenceRegistry presenceRegistry) throws IOException {
         this.config = config;
         this.mailboxRouter = mailboxRouter;
@@ -664,7 +664,7 @@ public final class HttpIngressServer {
             if (recipientId == null || recipientId.isBlank()) {
                 return false;
             }
-            UserDAO.PublicKeyRecord recipientKey = userDAO.getPublicKey(recipientId);
+            User.PublicKeyRecord recipientKey = userDAO.getPublicKey(recipientId);
             if (recipientKey == null || recipientKey.fingerprint() == null || recipientKey.fingerprint().isBlank()) {
                 return false;
             }
@@ -1155,7 +1155,7 @@ public final class HttpIngressServer {
                 }
 
                 // Look up user by email
-                UserDAO.UserRecord user = userDAO.findByEmail(request.getEmail());
+                User.UserRecord user = userDAO.findByEmail(request.getEmail());
                 boolean passwordValid = verifyPasswordWithSentinel(
                         request.getPassword(),
                         user == null ? null : user.passwordHash());
@@ -1189,7 +1189,7 @@ public final class HttpIngressServer {
                 }
 
                 // Create session
-                SessionDAO.SessionTokens sessionTokens = sessionDAO.createSessionTokens(user.userId());
+                Session.SessionTokens sessionTokens = sessionDAO.createSessionTokens(user.userId());
                 rateLimiterService.clearLoginAttempts(request.getEmail(), sourceIp);
 
                 auditLogger.logLogin(requestId, user.userId(), request.getEmail());
@@ -1402,7 +1402,7 @@ public final class HttpIngressServer {
                     return;
                 }
 
-                SessionDAO.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
+                Session.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
                 if (rotated == null) {
                     String reason = sessionDAO.isRefreshSessionRevoked(request.getRefreshToken())
                             ? "session revoked by takeover"
@@ -1691,7 +1691,7 @@ public final class HttpIngressServer {
                 }
                 String targetUserId = remainder.substring(0, slashIndex);
 
-                UserDAO.PublicKeyRecord keyRecord = userDAO.getPublicKey(targetUserId);
+                User.PublicKeyRecord keyRecord = userDAO.getPublicKey(targetUserId);
                 if (keyRecord == null) {
                     sendPlain(exchange, 404, JsonCodec.toJson(PublicKeyResponse.error("user not found")));
                     return;
@@ -1825,15 +1825,15 @@ public final class HttpIngressServer {
                         cursor.isPresent());
 
                 try {
-                    UserDAO.SearchPage page = userDAO.searchUsersPage(
+                    User.SearchPage page = userDAO.searchUsersPage(
                             normalizedQuery,
                             callerId,
                             effectiveLimit,
                             cursor.fullName(),
                             cursor.userId());
 
-                    List<UserSearchResultDTO> results = page.results().stream()
-                            .map(r -> new UserSearchResultDTO(
+                    List<UserSearchResult> results = page.results().stream()
+                            .map(r -> new UserSearchResult(
                                     r.userId(),
                                     r.fullName(),
                                     r.regNumber(),
@@ -2174,11 +2174,11 @@ public final class HttpIngressServer {
          * @throws IOException when response write fails
          */
         private void handleGet(HttpExchange exchange, String callerId) throws IOException {
-            List<ContactDAO.ContactRecord> records = contactDAO.getContacts(callerId);
-            List<UserSearchResultDTO> results = records.stream()
+            List<Contact.ContactRecord> records = contactDAO.getContacts(callerId);
+            List<UserSearchResult> results = records.stream()
                     .map(r -> {
                         boolean active = isUserActiveForRuntime(r.userId());
-                        return new UserSearchResultDTO(
+                        return new UserSearchResult(
                                 r.userId(),
                                 r.fullName(),
                                 r.regNumber(),
@@ -2541,7 +2541,7 @@ public final class HttpIngressServer {
                 throw new IllegalArgumentException("expectedChunks does not match attachment size");
             }
 
-            AttachmentDAO.UploadInitResult result = attachmentDAO.initUpload(
+            Attachment.UploadInitResult result = attachmentDAO.initUpload(
                     callerId,
                     recipientId,
                     request.getContentType(),
@@ -2586,7 +2586,7 @@ public final class HttpIngressServer {
                 throw new IllegalArgumentException("chunk size is out of bounds");
             }
 
-            AttachmentDAO.ChunkStoreResult result = attachmentDAO.storeChunk(
+            Attachment.ChunkStoreResult result = attachmentDAO.storeChunk(
                     callerId,
                     attachmentId,
                     request.getChunkIndex(),
@@ -2616,7 +2616,7 @@ public final class HttpIngressServer {
                 throw new IllegalArgumentException("encryptedSizeBytes must be >= 1");
             }
 
-            AttachmentDAO.CompletionResult result = attachmentDAO.completeUpload(
+            Attachment.CompletionResult result = attachmentDAO.completeUpload(
                     callerId,
                     attachmentId,
                     request.getExpectedChunks(),
@@ -2644,7 +2644,7 @@ public final class HttpIngressServer {
                 throw new IllegalArgumentException("envelopeId is required");
             }
 
-            AttachmentDAO.BindResult result = attachmentDAO.bindUploadToEnvelope(
+            Attachment.BindResult result = attachmentDAO.bindUploadToEnvelope(
                     callerId,
                     attachmentId,
                     request.getEnvelopeId());
@@ -2664,7 +2664,7 @@ public final class HttpIngressServer {
          * @throws IOException when response write fails
          */
         private void handleDownload(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
-            AttachmentDAO.DownloadBlob blob = attachmentDAO.loadForRecipient(callerId, attachmentId);
+            Attachment.DownloadBlob blob = attachmentDAO.loadForRecipient(callerId, attachmentId);
             AttachmentDownloadResponse response = AttachmentDownloadResponse.success(
                     blob.attachmentId(),
                     blob.senderId(),

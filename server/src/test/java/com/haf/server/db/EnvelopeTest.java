@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class EnvelopeDAOTest {
+class EnvelopeTest {
 
     @Mock
     private DataSource dataSource;
@@ -52,11 +52,11 @@ class EnvelopeDAOTest {
     @Mock
     private PreparedStatement fetchByIdsStatement;
 
-    private EnvelopeDAO dao;
+    private Envelope dao;
 
     @BeforeEach
     void setUp() {
-        dao = new EnvelopeDAO(dataSource, auditLogger);
+        dao = new Envelope(dataSource, auditLogger);
     }
 
     @Test

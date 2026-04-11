@@ -7,7 +7,7 @@ import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.dto.EncryptedMessage;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.exceptions.MessageExpiredException;
 import com.haf.shared.exceptions.MessageTamperedException;
@@ -278,7 +278,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
         }
 
         java.util.Set<String> seenUsers = new java.util.HashSet<>();
-        for (UserSearchResultDTO contact : response.getContacts()) {
+        for (UserSearchResult contact : response.getContacts()) {
             if (contact == null || contact.getUserId() == null || contact.getUserId().isBlank()) {
                 continue;
             }

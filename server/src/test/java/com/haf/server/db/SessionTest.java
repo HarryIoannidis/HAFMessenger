@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SessionDAOTest {
+class SessionTest {
 
     @Mock
     private DataSource dataSource;
@@ -45,13 +45,13 @@ class SessionDAOTest {
     @Mock
     private ResultSet resultSet;
 
-    private SessionDAO dao;
+    private Session dao;
     private JwtTokenService jwtTokenService;
 
     @BeforeEach
     void setUp() {
         jwtTokenService = new JwtTokenService("unit-test-secret", "haf-server", 900L);
-        dao = new SessionDAO(dataSource, auditLogger, jwtTokenService, 2_592_000L, 2_592_000L);
+        dao = new Session(dataSource, auditLogger, jwtTokenService, 2_592_000L, 2_592_000L);
     }
 
     @Test
@@ -74,7 +74,7 @@ class SessionDAOTest {
         when(connection.prepareStatement(contains("INSERT INTO sessions"))).thenReturn(preparedStatement);
         when(preparedStatement.executeUpdate()).thenReturn(1);
 
-        SessionDAO.SessionTokens tokens = dao.createSessionTokens("user-123");
+        Session.SessionTokens tokens = dao.createSessionTokens("user-123");
 
         assertNotNull(tokens.accessToken());
         assertNotNull(tokens.refreshToken());
@@ -145,7 +145,7 @@ class SessionDAOTest {
         when(resultSet.getLong("absolute_expires_epoch")).thenReturn(Instant.now().plusSeconds(3600L).getEpochSecond());
         when(rotateStatement.executeUpdate()).thenReturn(1);
 
-        SessionDAO.SessionTokens tokens = dao.refreshSession("refresh-plain-token");
+        Session.SessionTokens tokens = dao.refreshSession("refresh-plain-token");
 
         assertNotNull(tokens);
         assertNotNull(tokens.accessToken());
@@ -182,14 +182,14 @@ class SessionDAOTest {
     void constructor_without_explicit_idle_ttl_uses_access_ttl_when_access_ttl_is_higher_than_default_idle()
             throws SQLException {
         JwtTokenService longAccessTtlService = new JwtTokenService("unit-test-secret", "haf-server", 1_800L);
-        SessionDAO adjustedDao = new SessionDAO(dataSource, auditLogger, longAccessTtlService, 2_592_000L, 2_592_000L);
+        Session adjustedDao = new Session(dataSource, auditLogger, longAccessTtlService, 2_592_000L, 2_592_000L);
 
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(contains("WHERE refresh_token_hash"))).thenReturn(selectStatement);
         when(selectStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
-        SessionDAO.SessionTokens tokens = adjustedDao.refreshSession("refresh-plain-token");
+        Session.SessionTokens tokens = adjustedDao.refreshSession("refresh-plain-token");
 
         assertNull(tokens);
         verify(selectStatement).setLong(2, 1_800L);
@@ -252,12 +252,12 @@ class SessionDAOTest {
 
     @Test
     void constructor_rejects_null_datasource() {
-        assertThrows(NullPointerException.class, () -> new SessionDAO(null, auditLogger));
+        assertThrows(NullPointerException.class, () -> new Session(null, auditLogger));
     }
 
     @Test
     void constructor_rejects_null_auditlogger() {
-        assertThrows(NullPointerException.class, () -> new SessionDAO(dataSource, null));
+        assertThrows(NullPointerException.class, () -> new Session(dataSource, null));
     }
 
     private String issueToken(String userId, String jti) {

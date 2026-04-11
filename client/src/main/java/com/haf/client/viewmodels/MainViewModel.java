@@ -6,7 +6,7 @@ import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.responses.ContactsResponse;
-import com.haf.shared.dto.UserSearchResultDTO;
+import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -81,12 +81,10 @@ public class MainViewModel {
     private static final long ADD_CONTACT_PRESENCE_FALLBACK_DELAY_MS = 700L;
     private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
     private static final String SESSION_TAKEOVER_TITLE = "Logged out";
-    private static final String SESSION_TAKEOVER_MESSAGE =
-            "You were logged out because this account was signed in on another device.";
+    private static final String SESSION_TAKEOVER_MESSAGE = "You were logged out because this account was signed in on another device.";
     private static final String REVOKED_SESSION_ISSUE_KEY = "messaging.session.revoked";
     private static final String REVOKED_SESSION_TITLE = "Session expired";
-    private static final String REVOKED_SESSION_MESSAGE =
-            "Your session expired due to inactivity. Please log in again.";
+    private static final String REVOKED_SESSION_MESSAGE = "Your session expired due to inactivity. Please log in again.";
 
     private final ContactsGateway contactsGateway;
     private final ObservableList<ContactInfo> contacts = FXCollections.observableArrayList();
@@ -305,7 +303,7 @@ public class MainViewModel {
      * @param result search result payload
      * @return existing or newly created contact entry
      */
-    public ContactInfo ensureChatContact(UserSearchResultDTO result) {
+    public ContactInfo ensureChatContact(UserSearchResult result) {
         if (result == null) {
             return null;
         }
@@ -390,7 +388,7 @@ public class MainViewModel {
      *
      * @param result search result payload
      */
-    public void addContact(UserSearchResultDTO result) {
+    public void addContact(UserSearchResult result) {
         if (result == null) {
             return;
         }
@@ -633,7 +631,7 @@ public class MainViewModel {
         }
 
         runOnUiThread(() -> {
-            for (UserSearchResultDTO contact : response.getContacts()) {
+            for (UserSearchResult contact : response.getContacts()) {
                 upsertContact(
                         contact.getUserId(),
                         contact.getFullName(),
