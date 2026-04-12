@@ -4,6 +4,16 @@ import com.haf.shared.dto.UserSearchResult;
 
 /**
  * View model for the profile popup.
+ * 
+ * @param userId      unique identifier of the user
+ * @param fullName    full name of the user
+ * @param rank        rank of the user
+ * @param regNumber   registration number of the user
+ * @param joinedDate  date when the user joined the HAFMessenger
+ * @param email       email address of the user
+ * @param telephone   telephone number of the user
+ * @param selfProfile {@code true} when the profile belongs to the logged-in
+ *                    user
  */
 public record UserProfileInfo(
         String userId,
