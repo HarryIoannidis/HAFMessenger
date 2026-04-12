@@ -1,18 +1,18 @@
 .root {
-    -fx-background-radius: 0 0 0 4;
+    -fx-background-radius: 0px 0px 0px 4px;
 }
 
 .card {
     -fx-background-color: #D9D9D9;
-    -fx-background-radius: 8;
-    -fx-background-insets: 2;
-    -fx-border-insets: 0;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 2px;
+    -fx-border-insets: 0px;
     -fx-text-base-color: #202020;
     -fx-text-background-color: #202020;
 }
 
 .card:hover {
-    -fx-effect: dropshadow(gaussian, rgba(32, 32, 32, 0.6), 10, 0, 0, 0);
+    -fx-effect: dropshadow(gaussian, rgba(32, 32, 32, 0.6), 10px, 0, 0px, 0px);
 }
 
 .card .plain-text-bold {
@@ -42,11 +42,11 @@
     -fx-text-fill: #202020;
     -fx-font-size: 16px;
     -fx-font-weight: 600;
-    -fx-background-radius: 4;
-    -fx-border-radius: 4;
-    -fx-border-width: 1;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-border-width: 1px;
     -fx-border-color: #A3A3A3;
-    -fx-min-height: 45;
+    -fx-min-height: 45px;
     -fx-cursor: hand;
 }
 

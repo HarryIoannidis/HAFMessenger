@@ -129,8 +129,8 @@
                                     </Text>
                                     <StackPane prefWidth="200.0">
                                        <children>
-                                          <PasswordField fx:id="passwordField" minHeight="50.0" minWidth="250.0" prefHeight="50.0" promptText="abc123!@#" />
-                                           <TextField fx:id="passwordVisibleField" managed="false" promptText="abc123!@#" styleClass="text-field" visible="false" />
+                                          <PasswordField fx:id="passwordField" minHeight="50.0" minWidth="250.0" prefHeight="50.0" promptText="Abc123!@#" />
+                                           <TextField fx:id="passwordVisibleField" managed="false" promptText="Abc123!@#" styleClass="text-field" visible="false" />
                                           <JFXButton fx:id="togglePasswordButton" contentDisplay="CENTER" focusTraversable="false" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
                                              <graphic>
                                                 <FontIcon fx:id="togglePasswordIcon" iconLiteral="mdi2e-eye" iconSize="25" />

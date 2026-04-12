@@ -1,19 +1,19 @@
 .preview-window {
     -fx-background-color: #f4f4f4;
-    -fx-background-radius: 4;
-    -fx-background-insets: 2;
-    -fx-border-insets: 0;
-    -fx-border-radius: 6;
+    -fx-background-radius: 4px;
+    -fx-background-insets: 2px;
+    -fx-border-insets: 0px;
+    -fx-border-radius: 6px;
     -fx-border-color: #acacac;
-    -fx-border-width: 2;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 10, 0.2, 0, 0);
+    -fx-border-width: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 10px, 0.2, 0px, 0px);
 }
 
 .button-download {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-border-radius: 30;
-    -fx-background-radius: 30;
+    -fx-border-radius: 30px;
+    -fx-background-radius: 30px;
     -fx-font-weight: 600;
     -fx-cursor: hand;
     -fx-text-fill: #2b2b2b;
