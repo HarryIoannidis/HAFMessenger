@@ -8,13 +8,14 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
+<?import javafx.scene.text.TextFlow?>
 
-<VBox alignment="TOP_CENTER" maxHeight="200.0" maxWidth="500.0" minHeight="-Infinity" minWidth="-Infinity" prefHeight="200.0" prefWidth="400.0" styleClass="card" stylesheets="@../css/search.css" xmlns="http://javafx.com/javafx/25.0.2" xmlns:fx="http://javafx.com/fxml/1">
+<VBox alignment="TOP_CENTER" maxHeight="200.0" maxWidth="500.0" minHeight="-Infinity" minWidth="-Infinity" prefHeight="200.0" prefWidth="400.0" styleClass="card" stylesheets="@../css/search.css" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
    <padding>
       <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
    </padding>
    <children>
-      <HBox alignment="CENTER_LEFT" prefWidth="200.0">
+      <HBox prefWidth="200.0">
          <children>
             <ImageView fx:id="avatarImage" fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
                <image>
@@ -36,7 +37,11 @@
                         <Insets bottom="8.0" />
                      </VBox.margin>
                   </Text>
-                  <Text fx:id="emailText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Email" VBox.vgrow="ALWAYS" />
+                  <TextFlow VBox.vgrow="ALWAYS">
+                     <children>
+                        <Text fx:id="emailText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="Email" />
+                     </children>
+                  </TextFlow>
                </children>
                <HBox.margin>
                   <Insets left="20.0" />

@@ -491,7 +491,7 @@
                               <Insets left="30.0" right="30.0" />
                            </VBox.margin>
                         </StackPane>
-                        <TextFlow>
+                        <TextFlow textAlignment="CENTER">
                            <children>
                               <Text fx:id="errorText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="error-text" />
                            </children>
