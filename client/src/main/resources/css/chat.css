@@ -1,7 +1,7 @@
 /* chat.css */
 
 .root {
-    -fx-background-radius: 0 0 4 0;
+    -fx-background-radius: 0px 0px 4px 0px;
 }
 
 .bottom-bar {
@@ -72,8 +72,8 @@
 }
 
 .chat-area .scroll-bar:horizontal {
-    -fx-pref-height: 0;
-    -fx-min-height: 0;
+    -fx-pref-height: 0px;
+    -fx-min-height: 0px;
     -fx-opacity: 0;
 }
 
@@ -88,7 +88,7 @@
 
 .bubble-out:hover {
     -fx-background-color: #176EA9;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.15, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8px, 0.15, 0px, 2px);
 }
 
 .bubble-out-pending {
@@ -108,13 +108,13 @@
 
 .bubble-in:hover {
     -fx-background-color: #DEDEDE;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.15, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8px, 0.15, 0px, 2px);
 }
 
 .bubble-ripple-overlay {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-padding: 0;
+    -fx-padding: 0px;
     -fx-cursor: hand;
 }
 
@@ -197,12 +197,12 @@
 
 .notification-badge {
     -fx-background-color: #007ABD;
-    -fx-background-radius: 999;
-    -fx-min-width: 25;
-    -fx-min-height: 25;
-    -fx-pref-height: 25;
-    -fx-max-height: 25;
-    -fx-padding: 0 6 0 6;
+    -fx-background-radius: 999px;
+    -fx-min-width: 25px;
+    -fx-min-height: 25px;
+    -fx-pref-height: 25px;
+    -fx-max-height: 25px;
+    -fx-padding: 0px 6px 0px 6px;
     -fx-alignment: center;
 }
 

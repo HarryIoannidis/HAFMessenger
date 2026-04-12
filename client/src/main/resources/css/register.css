@@ -2,49 +2,60 @@
 
 /* ComboBox */
 .combo-box {
-    -fx-background-color: #f6f7f9;
-    -fx-border-color: #cfd5dd;
-    -fx-border-width: 1.5;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-background-insets: 0;
-    -fx-border-insets: 0;
+    -fx-background-color: #d9d9d9;
+    -fx-border-color: #d9d9d9;
+    -fx-border-width: 2px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0px;
+    -fx-border-insets: 0px;
     -fx-font-size: 16px;
-    -fx-min-height: 50;
-    -fx-cursor: default;
+    -fx-min-height: 50px;
+    -fx-cursor: hand;
 }
 
 .combo-box:hover {
-    -fx-background-color: #ffffff;
-    -fx-border-color: #b8c2cf;
+    -fx-border-color: #c0c0c0;
 }
 
 .combo-box:focused {
     -fx-border-color: #007ABD;
-    -fx-background-color: #ffffff;
-    -fx-border-width: 1.5;
+    -fx-border-width: 2px;
 }
 
 
 .combo-box .arrow-button {
     -fx-background-color: transparent;
-    -fx-opacity: 0;
-    -fx-padding: 0;
 }
 
 .combo-box .arrow {
-    -fx-opacity: 0;
+    -fx-background-color: #d9d9d9;
+    -fx-shape: "M 0 0 L 12 0 L 6 6 Z";
+    -fx-padding: 6px;
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+}
+
+/* Closed-state text color: selected value vs prompt text */
+.combo-box > .list-cell {
+    -fx-text-fill: #2b2b2b;
+}
+
+.combo-box > .list-cell:empty,
+.combo-box > .list-cell:empty > .text {
+    -fx-text-fill: #8b8b8b;
+    -fx-fill: #8b8b8b;
 }
 
 .combo-box-popup .list-view {
     -fx-background-color: #FFFFFF;
     -fx-control-inner-background: #FFFFFF;
     -fx-border-color: #cfd5dd;
-    -fx-border-width: 1;
-    -fx-border-radius: 8;
-    -fx-padding: 4;
-    -fx-background-radius: 8;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10, 0.3, 0, 2);
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-padding: 4px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 10px, 0.3, 0px, 2px);
 }
 
 .combo-box-popup .list-view .virtual-flow,
@@ -56,17 +67,17 @@
 
 .combo-box-popup .list-cell {
     -fx-background-color: transparent;
-    -fx-background-radius: 0;
-    -fx-background-insets: 0;
+    -fx-background-radius: 0px;
+    -fx-background-insets: 0px;
     -fx-text-fill: #243447;
     -fx-font-size: 16px;
     -fx-font-weight: normal;
     -fx-cursor: default;
     -fx-alignment: center-left;
-    -fx-graphic-text-gap: 12;
-    -fx-padding: 10 12;
+    -fx-graphic-text-gap: 12px;
+    -fx-padding: 10px 12px;
     -fx-border-color: transparent transparent #eef2f6 transparent;
-    -fx-border-width: 0 0 1 0;
+    -fx-border-width: 0px 0px 1px 0px;
 }
 
 .combo-box-popup .list-cell:hover {
@@ -85,14 +96,14 @@
 }
 
 .combo-box-popup .list-cell .image-view {
-    -fx-fit-width: 36;
-    -fx-fit-height: 36;
+    -fx-fit-width: 36px;
+    -fx-fit-height: 36px;
     -fx-preserve-ratio: true;
 }
 
 .combo-box-popup .list-cell:empty {
     -fx-background-color: transparent;
-    -fx-padding: 0;
+    -fx-padding: 0px;
 }
 
 .combo-box-popup .list-cell:disabled {
@@ -126,15 +137,15 @@
 .combo-box-popup .list-view .scroll-bar:vertical .increment-button,
 .combo-box-popup .list-view .scroll-bar:vertical .decrement-button {
     -fx-background-color: transparent;
-    -fx-pref-height: 0;
-    -fx-min-height: 0;
-    -fx-max-height: 0;
+    -fx-pref-height: 0px;
+    -fx-min-height: 0px;
+    -fx-max-height: 0px;
     -fx-opacity: 0;
 }
 
 .combo-box-popup .list-view .scroll-bar:horizontal {
-    -fx-pref-height: 0;
-    -fx-min-height: 0;
+    -fx-pref-height: 0px;
+    -fx-min-height: 0px;
     -fx-opacity: 0;
 }
 
@@ -142,11 +153,11 @@
 .drop-zone {
     -fx-background-color: #f5f5f5;
     -fx-border-color: #2b2b2b;
-    -fx-border-width: 2;
+    -fx-border-width: 2px;
     -fx-border-style: dashed;
-    -fx-border-radius: 8;
-    -fx-background-radius: 7;
-    -fx-background-insets: 1;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 7px;
+    -fx-background-insets: 1px;
     -fx-cursor: hand;
 
 }

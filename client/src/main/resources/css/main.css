@@ -6,13 +6,13 @@
 
 .nav-indicator {
     -fx-background-color: #007ABD;
-    -fx-background-radius: 4 4 0 0;
+    -fx-background-radius: 4px 4px 0px 0px;
 }
 
 .nav-item {
     -fx-background-color: transparent;
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
     -fx-cursor: hand;
 }
 
@@ -32,15 +32,15 @@
 .search-field {
     -fx-background-color: #EDEDED;
     -fx-border-color: #A3A3A3;
-    -fx-border-width: 2;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-padding: 12 45 12 15;
+    -fx-border-width: 2px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 12px 45px 12px 15px;
     -fx-font-family: 'Montserrat', sans-serif;
     -fx-font-size: 16px;
     -fx-text-fill: #000000;
     -fx-prompt-text-fill: #191a1c;
-    -fx-min-height: 50;
+    -fx-min-height: 50px;
     -fx-effect: null;
     -fx-transition: -fx-border-color 0.5s ease;
 }
@@ -55,8 +55,8 @@
 
 .profile-popup-trigger {
     -fx-background-color: transparent;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
     -fx-cursor: hand;
 }
 

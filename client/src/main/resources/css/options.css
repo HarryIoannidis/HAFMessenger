@@ -1,14 +1,14 @@
 .dropdown-menu {
     -fx-background-color: #d9d9d9;
-    -fx-background-radius: 16;
-    -fx-padding: 6;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 16, 0.18, 0, 4);
+    -fx-background-radius: 16px;
+    -fx-padding: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 16px, 0.18, 0px, 4px);
 }
 
 .dropdown-menu .menu-item {
     -fx-background-color: transparent;
-    -fx-background-radius: 12;
-    -fx-padding: 10 14 10 14;
+    -fx-background-radius: 12px;
+    -fx-padding: 10px 14px 10px 14px;
     -fx-cursor: hand;
 }
 
@@ -55,19 +55,19 @@
 }
 
 .dropdown-menu .separator {
-    -fx-padding: 4 10 4 10;
+    -fx-padding: 4px 10px 4px 10px;
 }
 
 .dropdown-menu .separator .line {
     -fx-border-color: #a3a3a3;
-    -fx-border-width: 1 0 0 0;
+    -fx-border-width: 1px 0px 0px 0px;
 }
 
 .search-filter-menu .search-filter-popup {
 }
 
 .search-filter-menu .menu-item {
-    -fx-padding: 10 14 10 14;
+    -fx-padding: 10px 14px 10px 14px;
     -fx-background-color: transparent;
 }
 
@@ -77,14 +77,14 @@
     -fx-font-size: 15px;
     -fx-font-weight: 600;
     -fx-cursor: hand;
-    -fx-padding: 3 0 3 0;
+    -fx-padding: 3px 0px 3px 0px;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
 }
 
 .search-filter-menu .search-filter-radio .radio {
     -fx-background-color: transparent;
-    -fx-background-insets: 0;
+    -fx-background-insets: 0px;
     -fx-min-width: 18px;
     -fx-min-height: 18px;
     -fx-pref-width: 18px;
@@ -92,35 +92,35 @@
     -fx-max-width: 18px;
     -fx-max-height: 18px;
     -fx-border-color: #7f7f7f;
-    -fx-border-width: 2;
+    -fx-border-width: 2px;
     -fx-border-radius: 9px;
     -fx-background-radius: 9px;
-    -fx-padding: 0;
+    -fx-padding: 0px;
 }
 
 .search-filter-menu .search-filter-radio:selected .radio {
     -fx-background-color: #007abd;
     -fx-border-color: transparent;
-    -fx-border-width: 0;
+    -fx-border-width: 0px;
 }
 
 .search-filter-menu .search-filter-radio .dot {
     -fx-background-color: transparent;
-    -fx-padding: 0;
+    -fx-padding: 0px;
 }
 
 .search-filter-menu .search-filter-separator {
-    -fx-padding: 4 0 4 0;
+    -fx-padding: 4px 0px 4px 0px;
 }
 
 .search-filter-menu .search-filter-separator .line {
     -fx-border-color: #a3a3a3;
-    -fx-border-width: 1 0 0 0;
+    -fx-border-width: 1px 0px 0px 0px;
 }
 
 .search-filter-menu .search-filter-apply-button {
-    -fx-min-height: 42;
-    -fx-pref-height: 42;
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
     -fx-font-size: 15px;
 }
 

@@ -188,7 +188,11 @@
                                                 <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefHeight="50.0" prefWidth="200.0">
                                                    <children>
                                                       <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefWidth="200.0" promptText="Choose rank" visibleRowCount="6" />
-                                                      <FontIcon depthTest="DISABLE" iconColor="#4f5d6b" iconLiteral="mdi2m-menu-down" iconSize="34" mouseTransparent="true" pickOnBounds="false" StackPane.alignment="CENTER_RIGHT" />
+                                                      <FontIcon depthTest="DISABLE" iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="45" mouseTransparent="true" pickOnBounds="false" StackPane.alignment="CENTER_RIGHT">
+                                                         <StackPane.margin>
+                                                            <Insets right="5.0" />
+                                                         </StackPane.margin>
+                                                      </FontIcon>
                                                    </children>
                                                 </StackPane>
                                              </children>
@@ -267,7 +271,7 @@
                                                 </HBox>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="Abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -275,7 +279,7 @@
                                                             <Insets />
                                                          </StackPane.margin>
                                                       </PasswordField>
-                                                      <TextField fx:id="passwordVisibleField" managed="false" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#" styleClass="text-field" visible="false">
+                                                      <TextField fx:id="passwordVisibleField" managed="false" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="Abc123!@#" styleClass="text-field" visible="false">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
@@ -307,12 +311,12 @@
                                                 </Text>
                                                 <StackPane prefWidth="200.0">
                                                    <children>
-                                                      <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="abc123!@#">
+                                                      <PasswordField fx:id="passwordConfField" maxHeight="1.7976931348623157E308" minHeight="50.0" promptText="Abc123!@#">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
                                                       </PasswordField>
-                                                      <TextField fx:id="passwordConfVisibleField" managed="false" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="abc123!@#" styleClass="text-field" visible="false">
+                                                      <TextField fx:id="passwordConfVisibleField" managed="false" maxHeight="1.7976931348623157E308" minWidth="150.0" prefWidth="302.0" promptText="Abc123!@#" styleClass="text-field" visible="false">
                                                          <font>
                                                             <Font size="18.0" />
                                                          </font>
