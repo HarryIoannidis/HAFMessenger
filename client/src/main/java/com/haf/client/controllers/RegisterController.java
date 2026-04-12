@@ -101,8 +101,6 @@ public class RegisterController {
     private Text errorText;
     @FXML
     private ComboBox<String> rankComboBox;
-    @FXML
-    private FontIcon dropDownButton;
 
     // Step flow controls and status nodes
     @FXML
@@ -248,15 +246,6 @@ public class RegisterController {
         // Back button click
         if (backButton != null) {
             backButton.setOnAction(event -> handleBack());
-        }
-
-        // Dropdown button click to open rank ComboBox popup
-        if (dropDownButton != null && rankComboBox != null) {
-            dropDownButton.setOnMouseClicked(event -> {
-                // Ensure focus then show popup
-                rankComboBox.requestFocus();
-                rankComboBox.show();
-            });
         }
 
         // Navigate to Sign In
