@@ -188,14 +188,7 @@
                                                 <StackPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefHeight="50.0" prefWidth="200.0">
                                                    <children>
                                                       <ComboBox fx:id="rankComboBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="50.0" prefWidth="200.0" promptText="Choose rank" visibleRowCount="6" />
-                                                      <JFXButton contentDisplay="CENTER" ellipsisString=" " focusTraversable="false" styleClass="field-icon-button" text=" " StackPane.alignment="CENTER_RIGHT">
-                                                         <graphic>
-                                                            <FontIcon fx:id="dropDownButton" iconColor="#2b2b2b" iconLiteral="mdi2m-menu-down" iconSize="45" />
-                                                         </graphic>
-                                                         <StackPane.margin>
-                                                            <Insets right="5.0" />
-                                                         </StackPane.margin>
-                                                      </JFXButton>
+                                                      <FontIcon depthTest="DISABLE" iconColor="#4f5d6b" iconLiteral="mdi2m-menu-down" iconSize="34" mouseTransparent="true" pickOnBounds="false" StackPane.alignment="CENTER_RIGHT" />
                                                    </children>
                                                 </StackPane>
                                              </children>
