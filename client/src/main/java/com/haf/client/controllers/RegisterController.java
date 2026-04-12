@@ -1047,11 +1047,13 @@ public class RegisterController {
                 UiConstants.RANK_ANTIPTERARCHOS,
                 UiConstants.RANK_PTERARCHOS);
 
+        String promptText = rankComboBox.getPromptText();
+
         // Set cell factory for rank icons in the dropdown list
-        rankComboBox.setCellFactory(listView -> new RankListCell());
+        rankComboBox.setCellFactory(listView -> new RankListCell(false, promptText));
 
         // Set button cell for rank icon on the selected item
-        rankComboBox.setButtonCell(new RankListCell());
+        rankComboBox.setButtonCell(new RankListCell(true, promptText));
     }
 
     /**
@@ -1059,12 +1061,15 @@ public class RegisterController {
      */
     private static class RankListCell extends ListCell<String> {
         private final ImageView imageView = new ImageView();
+        private final boolean buttonCell;
+        private final String promptText;
 
         /**
          * Creates a rank list cell used by rank ComboBox list and button cell.
          */
-        public RankListCell() {
-            // Initialization handled by field declarations and updateItem
+        public RankListCell(boolean buttonCell, String promptText) {
+            this.buttonCell = buttonCell;
+            this.promptText = (promptText == null || promptText.isBlank()) ? "Choose rank" : promptText;
         }
 
         /**
@@ -1077,22 +1082,36 @@ public class RegisterController {
         protected void updateItem(String rank, boolean empty) {
             super.updateItem(rank, empty);
 
+            // ComboBox button cells can receive (empty=true, item=null) while
+            // displaying prompt text. Force prompt rendering and color explicitly.
+            if (buttonCell && rank == null) {
+                setText(promptText);
+                setTextFill(Color.web("#8b8b8b"));
+                setStyle("-fx-text-fill: #8b8b8b;");
+                setGraphic(null);
+                return;
+            }
+
             if (empty || rank == null) {
                 setText(null);
                 setGraphic(null);
-            } else {
-                setText(rank);
-                try {
-                    String iconPath = getRankIconPath(rank);
-                    Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream(iconPath)));
-                    imageView.setImage(image);
-                    imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
-                    imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
-                    imageView.setPreserveRatio(true);
-                    setGraphic(imageView);
-                } catch (Exception e) {
-                    setGraphic(null);
-                }
+                setStyle("");
+                return;
+            }
+
+            setText(rank);
+            setTextFill(Color.web("#2b2b2b"));
+            setStyle("-fx-text-fill: #2b2b2b;");
+            try {
+                String iconPath = getRankIconPath(rank);
+                Image image = new Image(Objects.requireNonNull(getClass().getResourceAsStream(iconPath)));
+                imageView.setImage(image);
+                imageView.setFitWidth(UiConstants.RANK_ICON_SIZE);
+                imageView.setFitHeight(UiConstants.RANK_ICON_SIZE);
+                imageView.setPreserveRatio(true);
+                setGraphic(imageView);
+            } catch (Exception e) {
+                setGraphic(null);
             }
         }
 
