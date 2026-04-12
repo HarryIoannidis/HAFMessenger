@@ -13,9 +13,10 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
+<?import javafx.scene.text.TextFlow?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="497.0" prefWidth="788.0" styleClass="window-card" xmlns="http://javafx.com/javafx/25.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.ProfileController">
+<BorderPane fx:id="rootContainer" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="497.0" prefWidth="788.0" styleClass="window-card" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.haf.client.controllers.ProfileController">
    <left>
       <VBox alignment="CENTER" prefHeight="700.0" prefWidth="260.0" styleClass="side-bar" BorderPane.alignment="CENTER">
          <children>
@@ -91,14 +92,18 @@
                               <Font size="16.0" />
                            </font>
                         </Text>
-                        <Text fx:id="fullNameValueText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="{Name}">
-                           <font>
-                              <Font size="15.0" />
-                           </font>
+                        <TextFlow>
                            <VBox.margin>
                               <Insets top="10.0" />
                            </VBox.margin>
-                        </Text>
+                           <children>
+                              <Text fx:id="fullNameValueText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="{Name}">
+                                 <font>
+                                    <Font size="15.0" />
+                                 </font>
+                              </Text>
+                           </children>
+                        </TextFlow>
                      </children>
                      <HBox.margin>
                         <Insets right="5.0" />
@@ -213,14 +218,18 @@
                               <Font size="16.0" />
                            </font>
                         </Text>
-                        <Text fx:id="emailValueText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="{Email}">
-                           <font>
-                              <Font size="15.0" />
-                           </font>
+                        <TextFlow>
                            <VBox.margin>
                               <Insets top="10.0" />
                            </VBox.margin>
-                        </Text>
+                           <children>
+                              <Text fx:id="emailValueText" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="plain-text" text="{Email}">
+                                 <font>
+                                    <Font size="15.0" />
+                                 </font>
+                              </Text>
+                           </children>
+                        </TextFlow>
                      </children>
                      <HBox.margin>
                         <Insets right="5.0" />
