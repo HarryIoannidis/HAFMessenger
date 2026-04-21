@@ -50,3 +50,30 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 - `server/src/main/java/com/haf/server/router/MailboxRouter.java`
 - `shared/src/main/java/com/haf/shared/dto/EncryptedMessage.java`
 - `shared/src/main/java/com/haf/shared/utils/MessageValidator.java`
+
+## Build Native macOS App (`.app`)
+
+Run this on a Mac with JDK 25+:
+
+```bash
+./scripts/package-mac-app.sh
+```
+
+This script:
+
+- Builds `shared` and `client`
+- Creates a custom runtime with `jlink`
+- Produces a native `.app` with `jpackage` (no separate Java install needed)
+
+Output path:
+
+- `client/target/native/HAFMessenger.app`
+
+Optional environment overrides:
+
+- `APP_NAME` (default: `HAFMessenger`)
+- `MAIN_JAR` (default: `haf-client.jar`)
+- `MAIN_CLASS` (default: `com.haf.client.core.Launcher`)
+- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.icns`)
+- `PACKAGE_TYPE` (default: `app-image`)
+- `OUTPUT_DIR` (default: `client/target/native`)
