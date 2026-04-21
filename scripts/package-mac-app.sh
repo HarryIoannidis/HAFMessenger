@@ -39,7 +39,15 @@ if [[ ! -d "$JAVA_HOME/jmods" ]]; then
 fi
 
 echo "[1/5] Build client + shared jars..."
-"$ROOT_DIR/mvnw" -pl client -am -DskipTests clean package
+if [[ -f "$ROOT_DIR/pom.xml" ]] && grep -q "<module>client</module>" "$ROOT_DIR/pom.xml"; then
+  "$ROOT_DIR/mvnw" -f "$ROOT_DIR/pom.xml" -pl client -am -DskipTests clean package
+else
+  echo "Reactor module 'client' not found in root pom.xml; using direct module builds."
+  if [[ -f "$ROOT_DIR/shared/pom.xml" ]]; then
+    "$ROOT_DIR/mvnw" -f "$ROOT_DIR/shared/pom.xml" -DskipTests clean install
+  fi
+  "$ROOT_DIR/mvnw" -f "$ROOT_DIR/client/pom.xml" -DskipTests clean package
+fi
 
 echo "[2/5] Copy client runtime dependencies..."
 "$ROOT_DIR/mvnw" -f "$ROOT_DIR/client/pom.xml" -DskipTests dependency:copy-dependencies \
