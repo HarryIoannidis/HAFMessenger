@@ -15,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -131,6 +132,19 @@ class WebSocketAdapterTest {
     }
 
     @Test
+    void authenticated_http_retries_once_on_timeout_error() {
+        FakeHttpClient client = new FakeHttpClient();
+        client.enqueueError(new HttpTimeoutException("timed out"));
+        client.enqueueResponse(response(200, "{\"ok\":2}", URI.create("https://localhost:8443/api/v1/retry-timeout")));
+
+        WebSocketAdapter adapter = new WebSocketAdapter(SERVER_URI, "session-timeout", client);
+        String body = adapter.getAuthenticated("/api/v1/retry-timeout").join();
+
+        assertEquals("{\"ok\":2}", body);
+        assertEquals(2, client.requests.size());
+    }
+
+    @Test
     void authenticated_http_maps_non_2xx_to_http_communication_exception() {
         FakeHttpClient client = new FakeHttpClient();
         client.enqueueResponse(response(500, "boom", URI.create("https://localhost:8443/api/v1/fail")));
@@ -241,7 +255,7 @@ class WebSocketAdapterTest {
     }
 
     @Test
-    void schedule_reconnect_does_not_run_when_user_closed_or_retries_exhausted() throws Exception {
+    void schedule_reconnect_does_not_run_when_user_closed_and_still_runs_after_many_attempts() throws Exception {
         FakeHttpClient client = new FakeHttpClient();
         AtomicInteger scheduledTasks = new AtomicInteger();
 
@@ -258,11 +272,11 @@ class WebSocketAdapterTest {
         invokePrivateNoArg(adapter, "scheduleReconnect");
         assertEquals(0, scheduledTasks.get());
 
-        // retries exhausted path
+        // many-attempts path: reconnect should continue with capped backoff.
         setField(adapter, "userClosed", false);
         setField(adapter, "retryAttempts", 3);
         invokePrivateNoArg(adapter, "scheduleReconnect");
-        assertEquals(0, scheduledTasks.get());
+        assertEquals(1, scheduledTasks.get());
     }
 
     @Test
@@ -314,11 +328,14 @@ class WebSocketAdapterTest {
         assertTrue(adapter.shouldRetry());
         assertTrue(adapter.shouldRetry());
         assertTrue(adapter.shouldRetry());
-        assertFalse(adapter.shouldRetry());
+        assertTrue(adapter.shouldRetry());
 
         adapter.resetRetryCounter();
         assertTrue(adapter.shouldRetry());
         assertEquals(1000L, adapter.getRetryDelayMs());
+
+        setField(adapter, "retryAttempts", 100);
+        assertEquals(30_000L, adapter.getRetryDelayMs());
     }
 
     private static void setField(Object target, String fieldName, Object value) {

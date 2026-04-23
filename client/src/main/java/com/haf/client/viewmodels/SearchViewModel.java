@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.core.AuthSessionState;
 import com.haf.client.core.NetworkSession;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +71,7 @@ public class SearchViewModel {
     }
 
     private final SearchGateway searchGateway;
+    private final BooleanSupplier sessionActiveSupplier;
     private final CopyOnWriteArrayList<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final AtomicInteger generation = new AtomicInteger();
     private final ObservableList<UserSearchResult> results = FXCollections.observableArrayList();
@@ -90,7 +93,20 @@ public class SearchViewModel {
      * @param searchGateway gateway used to execute server-side search requests
      */
     public SearchViewModel(SearchGateway searchGateway) {
+        this(searchGateway, () -> true);
+    }
+
+    /**
+     * Creates search view-model with explicit session liveness policy.
+     *
+     * @param searchGateway         gateway used to execute server-side search
+     *                              requests
+     * @param sessionActiveSupplier supplier returning whether search failures
+     *                              should be surfaced to UI
+     */
+    SearchViewModel(SearchGateway searchGateway, BooleanSupplier sessionActiveSupplier) {
         this.searchGateway = Objects.requireNonNull(searchGateway, "searchGateway");
+        this.sessionActiveSupplier = Objects.requireNonNull(sessionActiveSupplier, "sessionActiveSupplier");
         hasResults.bind(Bindings.isNotEmpty(results));
     }
 
@@ -98,29 +114,63 @@ public class SearchViewModel {
      * Factory using the current authenticated session.
      */
     public static SearchViewModel createDefault() {
-        return new SearchViewModel((query, limit, cursor) -> {
-            if (NetworkSession.get() == null) {
-                throw new IllegalStateException("No active network session.");
-            }
+        return new SearchViewModel(
+                SearchViewModel::executeDefaultSearchRequest,
+                SearchViewModel::isDefaultSessionActive);
+    }
 
-            String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String path = "/api/v1/search?q=" + encoded + "&limit=" + limit;
-            if (cursor != null && !cursor.isBlank()) {
-                path += "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8);
-            }
-            try {
-                return NetworkSession.get().getAuthenticated(path).get();
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Search request was interrupted.", ex);
-            } catch (ExecutionException ex) {
-                Throwable cause = ex.getCause();
-                if (cause instanceof IOException ioException) {
-                    throw ioException;
-                }
-                throw new IOException("Search request failed.", cause != null ? cause : ex);
-            }
-        });
+    /**
+     * Executes search request using the default authenticated network session.
+     *
+     * @param query  search query text
+     * @param limit  page size
+     * @param cursor optional pagination cursor
+     * @return raw JSON response body
+     * @throws IOException when request execution fails
+     */
+    private static String executeDefaultSearchRequest(String query, int limit, String cursor) throws IOException {
+        var adapter = NetworkSession.get();
+        if (adapter == null) {
+            throw new IllegalStateException("No active network session.");
+        }
+
+        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String path = "/api/v1/search?q=" + encoded + "&limit=" + limit;
+        if (cursor != null && !cursor.isBlank()) {
+            path += "&cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8);
+        }
+
+        try {
+            return adapter.getAuthenticated(path).get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Search request was interrupted.", ex);
+        } catch (ExecutionException ex) {
+            throw mapExecutionFailureToIOException(ex);
+        }
+    }
+
+    /**
+     * Returns whether the default session-backed search transport is active.
+     *
+     * @return {@code true} when both network and auth session state are present
+     */
+    private static boolean isDefaultSessionActive() {
+        return NetworkSession.get() != null && AuthSessionState.get() != null;
+    }
+
+    /**
+     * Maps execution-wrapper failures into consistent IO exceptions.
+     *
+     * @param executionException wrapped execution failure
+     * @return mapped IOException preserving cause details
+     */
+    private static IOException mapExecutionFailureToIOException(ExecutionException executionException) {
+        Throwable cause = executionException.getCause();
+        if (cause instanceof IOException ioException) {
+            return ioException;
+        }
+        return new IOException("Search request failed.", cause != null ? cause : executionException);
     }
 
     /**
@@ -323,36 +373,130 @@ public class SearchViewModel {
      */
     private void runSearch(String query, String cursor, boolean append, int searchGeneration) {
         try {
-            String json = searchGateway.searchUsers(query, pageSize, cursor);
-            UserSearchResponse response = JsonCodec.fromJson(json, UserSearchResponse.class);
+            UserSearchResponse response = requestSearchResponse(query, cursor);
             runOnUiThread(() -> applyResponse(response, append, searchGeneration));
         } catch (Exception ex) {
-            LOGGER.warn("Search request failed", ex);
-            runOnUiThread(() -> {
-                if (searchGeneration != generation.get()) {
-                    return;
-                }
-
-                if (append) {
-                    loadingMore.set(false);
-                    return;
-                }
-
-                loading.set(false);
-                loadingMore.set(false);
-                hasMore = false;
-                nextCursor = null;
-                results.clear();
-                statusText.set(STATUS_GENERIC_FAILURE);
-            });
-            publishRuntimeIssue(
-                    append ? "search.load-more.request.failed" : "search.request.failed",
-                    append ? "Could not load more results" : "Search failed",
-                    append
-                            ? "Could not load more search results. " + resolveErrorMessage(ex, "Please retry.")
-                            : "Search request failed. " + resolveErrorMessage(ex, "Please retry."),
-                    append ? this::loadMore : this::retryLastSearch);
+            handleSearchFailure(ex, append, searchGeneration);
         }
+    }
+
+    /**
+     * Executes one search request and parses response JSON.
+     *
+     * @param query  search query text
+     * @param cursor optional pagination cursor
+     * @return parsed search response
+     * @throws Exception when request or parsing fails
+     */
+    private UserSearchResponse requestSearchResponse(String query, String cursor) throws Exception {
+        String json = searchGateway.searchUsers(query, pageSize, cursor);
+        return JsonCodec.fromJson(json, UserSearchResponse.class);
+    }
+
+    /**
+     * Handles search request failures with stale/session suppression and runtime
+     * issue publishing.
+     *
+     * @param error            request failure
+     * @param append           whether this failure happened during load-more flow
+     * @param searchGeneration request generation token
+     */
+    private void handleSearchFailure(Exception error, boolean append, int searchGeneration) {
+        if (shouldSuppressSearchFailure(error, searchGeneration)) {
+            return;
+        }
+
+        LOGGER.warn("Search request failed", error);
+        runOnUiThread(() -> applySearchFailureUiState(append, searchGeneration));
+        publishSearchRequestFailureIssue(error, append);
+    }
+
+    /**
+     * Returns whether a search failure should be ignored/suppressed.
+     *
+     * @param error            failure candidate
+     * @param searchGeneration request generation token
+     * @return {@code true} when failure should not be surfaced
+     */
+    private boolean shouldSuppressSearchFailure(Exception error, int searchGeneration) {
+        if (isStaleGeneration(searchGeneration)) {
+            LOGGER.debug("Ignoring stale search failure for generation {}", searchGeneration, error);
+            return true;
+        }
+        if (!sessionActiveSupplier.getAsBoolean()) {
+            LOGGER.debug("Suppressing search failure because session is no longer active", error);
+            runOnUiThread(() -> clearStateAfterSessionEnded(searchGeneration));
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Applies UI error state for a failed search call.
+     *
+     * @param append           whether failure belongs to load-more flow
+     * @param searchGeneration request generation token
+     */
+    private void applySearchFailureUiState(boolean append, int searchGeneration) {
+        if (isStaleGeneration(searchGeneration)) {
+            return;
+        }
+
+        if (append) {
+            loadingMore.set(false);
+            return;
+        }
+
+        loading.set(false);
+        loadingMore.set(false);
+        hasMore = false;
+        nextCursor = null;
+        results.clear();
+        statusText.set(STATUS_GENERIC_FAILURE);
+    }
+
+    /**
+     * Publishes runtime issue describing failed search request.
+     *
+     * @param error  search request failure
+     * @param append whether failure belongs to load-more flow
+     */
+    private void publishSearchRequestFailureIssue(Exception error, boolean append) {
+        publishRuntimeIssue(
+                append ? "search.load-more.request.failed" : "search.request.failed",
+                append ? "Could not load more results" : "Search failed",
+                append
+                        ? "Could not load more search results. " + resolveErrorMessage(error, "Please retry.")
+                        : "Search request failed. " + resolveErrorMessage(error, "Please retry."),
+                append ? this::loadMore : this::retryLastSearch);
+    }
+
+    /**
+     * Clears visible search state when background request completes after session
+     * teardown (for example, logout while a search request is still in-flight).
+     *
+     * @param searchGeneration generation token for staleness checks
+     */
+    private void clearStateAfterSessionEnded(int searchGeneration) {
+        if (isStaleGeneration(searchGeneration)) {
+            return;
+        }
+        loading.set(false);
+        loadingMore.set(false);
+        hasMore = false;
+        nextCursor = null;
+        results.clear();
+        statusText.set(STATUS_IDLE);
+    }
+
+    /**
+     * Returns whether a response/failure belongs to an obsolete search generation.
+     *
+     * @param searchGeneration generation token to evaluate
+     * @return {@code true} when generation no longer matches current active search
+     */
+    private boolean isStaleGeneration(int searchGeneration) {
+        return searchGeneration != generation.get();
     }
 
     /**
