@@ -6,10 +6,14 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.net.URI;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
+import java.net.http.WebSocketHandshakeException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -61,9 +65,9 @@ public class WebSocketAdapter {
     private volatile boolean userClosed = false;
 
     // Reconnection policy
-    private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
-    private static final long MAX_RETRY_DELAY_MS = 5000;
+    private static final long MAX_RETRY_DELAY_MS = 30_000;
+    private static final int MAX_BACKOFF_EXPONENT = 5;
     private int retryAttempts = 0;
 
     @FunctionalInterface
@@ -482,7 +486,10 @@ public class WebSocketAdapter {
         Throwable cause = error;
         while (cause != null) {
             if (cause instanceof java.net.ConnectException
-                    || cause instanceof java.nio.channels.ClosedChannelException) {
+                    || cause instanceof java.nio.channels.ClosedChannelException
+                    || cause instanceof HttpTimeoutException
+                    || cause instanceof SocketException
+                    || cause instanceof UnknownHostException) {
                 return true;
             }
             cause = cause.getCause();
@@ -716,16 +723,17 @@ public class WebSocketAdapter {
     }
 
     /**
-     * Reconnection policy check. Evaluates whether reconnection should be attempted
-     * based on maximum retry limits.
+     * Reconnection policy check.
+     *
+     * In normal network-loss scenarios we keep retrying with bounded backoff until
+     * user closes the session or an auth failure (401/403) is detected.
      *
      * @return true if reconnection should be attempted
      */
     public boolean shouldRetry() {
-        if (retryAttempts >= MAX_RETRY_ATTEMPTS) {
-            return false;
+        if (retryAttempts < Integer.MAX_VALUE) {
+            retryAttempts++;
         }
-        retryAttempts++;
         return true;
     }
 
@@ -736,7 +744,9 @@ public class WebSocketAdapter {
      */
     public long getRetryDelayMs() {
         // Exponential backoff with cap
-        long base = INITIAL_RETRY_DELAY_MS * (1L << Math.max(0, retryAttempts - 1));
+        int attemptIndex = retryAttempts - 1;
+        int exponent = Math.clamp(attemptIndex, 0, MAX_BACKOFF_EXPONENT);
+        long base = INITIAL_RETRY_DELAY_MS * (1L << exponent);
         if (base < INITIAL_RETRY_DELAY_MS) {
             base = INITIAL_RETRY_DELAY_MS;
         }
@@ -826,43 +836,124 @@ public class WebSocketAdapter {
      * explicitly close.
      */
     private void scheduleReconnect() {
-        if (userClosed) {
-            return;
-        }
-        if (!shouldRetry()) {
+        if (shouldSkipReconnect()) {
             return;
         }
         long delay = getRetryDelayMs();
-        asyncRunner.run(() -> {
-            try {
-                delayStrategy.sleep(delay);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
+        asyncRunner.run(() -> runReconnectAttempt(delay));
+    }
+
+    /**
+     * Returns whether reconnect scheduling should be skipped.
+     *
+     * @return {@code true} when user closed the adapter or retry policy disallows
+     *         reconnect scheduling
+     */
+    private boolean shouldSkipReconnect() {
+        return userClosed || !shouldRetry();
+    }
+
+    /**
+     * Executes one delayed reconnect attempt.
+     *
+     * @param delay reconnect delay in milliseconds
+     */
+    private void runReconnectAttempt(long delay) {
+        if (!sleepReconnectDelay(delay)) {
+            return;
+        }
+
+        ReconnectContext reconnectContext = resolveReconnectContext();
+        if (reconnectContext == null) {
+            return;
+        }
+
+        reconnectOrReschedule(reconnectContext);
+    }
+
+    /**
+     * Sleeps until reconnect attempt should run.
+     *
+     * @param delay reconnect delay in milliseconds
+     * @return {@code true} when delay elapsed normally
+     */
+    private boolean sleepReconnectDelay(long delay) {
+        try {
+            delayStrategy.sleep(delay);
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * Resolves reconnect callback consumers only when reconnect is still valid.
+     *
+     * @return reconnect context, or {@code null} when reconnect should be aborted
+     */
+    private ReconnectContext resolveReconnectContext() {
+        synchronized (stateLock) {
+            if (isConnected || userClosed) {
+                return null;
+            }
+            return new ReconnectContext(messageConsumer, errorConsumer);
+        }
+    }
+
+    /**
+     * Attempts reconnect and schedules another attempt on recoverable failure.
+     *
+     * @param reconnectContext callback context captured from adapter state
+     */
+    private void reconnectOrReschedule(ReconnectContext reconnectContext) {
+        Consumer<String> mc = reconnectContext.messageConsumer();
+        Consumer<Throwable> ec = reconnectContext.errorConsumer();
+        try {
+            // Reuse previous consumers outside the lock to avoid deadlocks.
+            if (mc != null || ec != null) {
+                connect(mc, ec);
+            }
+        } catch (IOException e) {
+            if (ec != null) {
+                ec.accept(e);
+            }
+            if (isAuthenticationFailure(e)) {
+                LOGGER.info("Stopping reconnect attempts after authentication failure: {}", e.getMessage());
                 return;
             }
-            Consumer<String> mc;
-            Consumer<Throwable> ec;
+            // Chain next retry if still allowed
+            scheduleReconnect();
+        }
+    }
 
-            synchronized (stateLock) {
-                if (isConnected || userClosed) {
-                    return;
+    /**
+     * Detects authorization failures for WebSocket handshake reconnect attempts.
+     *
+     * @param error connection failure to inspect
+     * @return {@code true} when session is no longer authorized (401/403)
+     */
+    private static boolean isAuthenticationFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof WebSocketHandshakeException handshakeException
+                    && handshakeException.getResponse() != null) {
+                int statusCode = handshakeException.getResponse().statusCode();
+                if (statusCode == 401 || statusCode == 403) {
+                    return true;
                 }
-                mc = messageConsumer;
-                ec = errorConsumer;
             }
+            current = current.getCause();
+        }
+        return false;
+    }
 
-            try {
-                // Reuse previous consumers outside the lock to avoid deadlocks.
-                if (mc != null || ec != null) {
-                    connect(mc, ec);
-                }
-            } catch (IOException e) {
-                if (ec != null) {
-                    ec.accept(e);
-                }
-                // Chain next retry if still allowed
-                scheduleReconnect();
-            }
-        });
+    /**
+     * Snapshot of reconnect callbacks captured from adapter state.
+     *
+     * @param messageConsumer inbound message callback
+     * @param errorConsumer   transport error callback
+     */
+    private record ReconnectContext(Consumer<String> messageConsumer, Consumer<Throwable> errorConsumer) {
     }
 }

@@ -265,6 +265,26 @@ class SearchViewModelTest {
     }
 
     @Test
+    void search_exception_is_suppressed_when_session_is_inactive() {
+        SearchViewModel viewModel = new SearchViewModel(
+                (query, limit, cursor) -> {
+                    throw new RuntimeException("boom");
+                },
+                () -> false);
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.search("query");
+
+        awaitCondition(() -> !viewModel.loadingProperty().get()
+                && SearchViewModel.STATUS_IDLE.equals(viewModel.statusTextProperty().get()));
+
+        assertTrue(issues.isEmpty());
+        assertFalse(viewModel.hasResultsProperty().get());
+        assertTrue(viewModel.resultsProperty().isEmpty());
+    }
+
+    @Test
     void search_exception_emits_runtime_issue_and_retry_reexecutes_query() {
         AtomicInteger calls = new AtomicInteger();
         UserSearchResponse success = UserSearchResponse.success(List.of(

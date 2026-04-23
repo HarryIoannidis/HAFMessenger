@@ -307,7 +307,9 @@ public class DefaultMainSessionService implements MainSessionService {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             LOGGER.warn("Logout API call interrupted; continuing with local logout", ex);
-        } catch (ExecutionException | TimeoutException ex) {
+        } catch (TimeoutException ex) {
+            LOGGER.info("Logout API call timed out; continuing with local logout");
+        } catch (ExecutionException ex) {
             if (isExpectedInvalidSessionLogoutFailure(ex)) {
                 LOGGER.info("Logout API call returned invalid-session after revoke/takeover; continuing local logout");
             } else {
