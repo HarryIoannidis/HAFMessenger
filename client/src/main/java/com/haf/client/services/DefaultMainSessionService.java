@@ -218,11 +218,11 @@ public class DefaultMainSessionService implements MainSessionService {
                 try {
                     performLogout();
                     completion.complete(null);
-                } catch (Exception ex) {
+                } catch (Exception | LinkageError ex) {
                     completion.completeExceptionally(wrapThrowable(ex));
                 }
             });
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             completion.completeExceptionally(wrapThrowable(ex));
         }
         return completion;
@@ -259,7 +259,7 @@ public class DefaultMainSessionService implements MainSessionService {
     private SessionChannel resolveSessionChannelSafely() {
         try {
             return sessionContext.sessionChannel();
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             LOGGER.warn("Could not resolve session channel during logout; continuing with local cleanup", ex);
             return null;
         }
@@ -274,7 +274,7 @@ public class DefaultMainSessionService implements MainSessionService {
     private NetworkGateway resolveNetworkGatewaySafely() {
         try {
             return sessionContext.networkGateway();
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             LOGGER.warn("Could not resolve network gateway during logout; continuing with local cleanup", ex);
             return null;
         }
@@ -291,7 +291,7 @@ public class DefaultMainSessionService implements MainSessionService {
         }
         try {
             channel.stopReceiving();
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             LOGGER.warn("Error stopping message receiver on logout; continuing cleanup", ex);
         }
     }
@@ -315,7 +315,7 @@ public class DefaultMainSessionService implements MainSessionService {
             } else {
                 LOGGER.warn("Logout API call failed; continuing with local logout", ex);
             }
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             LOGGER.warn("Logout API call failed before completion; continuing with local logout", ex);
         }
     }
@@ -328,7 +328,7 @@ public class DefaultMainSessionService implements MainSessionService {
     private void closeGatewaySafely(NetworkGateway gateway) {
         try {
             gateway.close();
-        } catch (Exception ex) {
+        } catch (Exception | LinkageError ex) {
             LOGGER.warn("Error closing WebSocket on logout", ex);
         }
     }
