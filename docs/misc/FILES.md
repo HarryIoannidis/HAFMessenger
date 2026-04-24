@@ -10,6 +10,8 @@ Index the main source layout and notable classes without duplicating generated/b
   - `client`
   - `server`
   - `shared`
+- Packaging scripts live under:
+  - `scripts`
 - Each module uses `src/main/java` for production code and `src/test/java` for tests.
 
 ## Key Types/Interfaces
@@ -117,3 +119,6 @@ Index the main source layout and notable classes without duplicating generated/b
 - `shared/src/main/java`
 - `docs/client/REMEMBERED_CREDENTIALS_SECURITY.md`
 - `docs/misc/STRUCTURE.md`
+- `docs/misc/scripts.md`
+- `scripts/package-linux-appimage.sh`
+- `scripts/package-mac-app.sh`

@@ -97,6 +97,10 @@ HAFMessenger/
     server/
     shared/
 
+  scripts/
+    package-linux-appimage.sh
+    package-mac-app.sh
+
   .mvn/
     wrapper/
 
@@ -136,4 +140,7 @@ HAFMessenger/
 - `shared/src/main/java/module-info.java`
 - `client/src/main/java/com/haf/client/builders`
 - `server/src/main/java/com/haf/server/security/JwtTokenService.java`
+- `scripts/package-linux-appimage.sh`
+- `scripts/package-mac-app.sh`
+- `docs/misc/scripts.md`
 - `.gitignore`

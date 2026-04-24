@@ -62,8 +62,8 @@ Run this on a Mac with JDK 25+:
 This script:
 
 - Builds `shared` and `client`
-- Creates a custom runtime with `jlink`
-- Produces a native `.app` with `jpackage` (no separate Java install needed)
+- Stages runtime dependencies on the classpath
+- Produces a native macOS package with `jpackage` (no separate Java install needed)
 
 Output path:
 
@@ -74,6 +74,37 @@ Optional environment overrides:
 - `APP_NAME` (default: `HAFMessenger`)
 - `MAIN_JAR` (default: `haf-client.jar`)
 - `MAIN_CLASS` (default: `com.haf.client.core.Launcher`)
-- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.icns`)
+- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.icns`, if present)
 - `PACKAGE_TYPE` (default: `app-image`)
+- `APP_VERSION` (default: `1.0`)
 - `OUTPUT_DIR` (default: `client/target/native`)
+- `SKIP_TESTS` (default: `true`)
+
+## Build Linux AppImage (`.AppImage`)
+
+Run this on Linux with JDK 25+:
+
+```bash
+./scripts/package-linux-appimage.sh
+```
+
+This script:
+
+- Builds `shared` and `client`
+- Creates a Linux app image using `jpackage`
+- Produces a portable `.AppImage` using `appimagetool` (auto-downloads on x86_64 if missing)
+
+Output path:
+
+- `client/target/native/HAFMessenger-x86_64.AppImage`
+
+Optional environment overrides:
+
+- `APP_NAME` (default: `HAFMessenger`)
+- `MAIN_JAR` (default: `haf-client.jar`)
+- `MAIN_CLASS` (default: `com.haf.client.core.Launcher`)
+- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.png`)
+- `OUTPUT_DIR` (default: `client/target/native`)
+- `SKIP_TESTS` (default: `true`)
+- `APPIMAGE_TOOL` (default: auto-detect `appimagetool` or download tool)
+- `APPIMAGE_TOOL_URL` (default: official AppImageKit continuous build URL for x86_64)
