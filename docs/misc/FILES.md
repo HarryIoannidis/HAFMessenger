@@ -122,3 +122,4 @@ Index the main source layout and notable classes without duplicating generated/b
 - `docs/misc/scripts.md`
 - `scripts/package-linux-appimage.sh`
 - `scripts/package-mac-app.sh`
+- `scripts/package-windows-app.ps1`

@@ -10,7 +10,8 @@ Document repository automation scripts that package the desktop client for distr
 - Implemented scripts:
   - `scripts/package-linux-appimage.sh`
   - `scripts/package-mac-app.sh`
-- Both scripts:
+  - `scripts/package-windows-app.ps1`
+- All packaging scripts:
   - Build `shared` and `client` through `./mvnw`.
   - Stage runtime dependencies into a packaging input directory.
   - Ensure the freshly built local `shared` jar is included in the package input.
@@ -25,6 +26,11 @@ Document repository automation scripts that package the desktop client for distr
   - macOS-only (`uname -s` must be `Darwin`).
   - Uses `jpackage` with classpath-staged jars.
   - Supports `PACKAGE_TYPE=app-image|dmg|pkg`.
+- `scripts/package-windows-app.ps1`
+  - Windows-only.
+  - Uses `jpackage` with classpath-staged jars.
+  - Creates Start Menu and Desktop shortcuts.
+  - Supports `PACKAGE_TYPE=msi|exe`.
 
 ## Flow
 
@@ -43,5 +49,6 @@ Document repository automation scripts that package the desktop client for distr
 
 - `scripts/package-linux-appimage.sh`
 - `scripts/package-mac-app.sh`
+- `scripts/package-windows-app.ps1`
 - `README.md`
 - `docs/misc/STRUCTURE.md`

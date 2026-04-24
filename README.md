@@ -108,3 +108,36 @@ Optional environment overrides:
 - `SKIP_TESTS` (default: `true`)
 - `APPIMAGE_TOOL` (default: auto-detect `appimagetool` or download tool)
 - `APPIMAGE_TOOL_URL` (default: official AppImageKit continuous build URL for x86_64)
+
+## Build Windows Installer (`.msi` / `.exe`)
+
+Run this on Windows with JDK 25+ (PowerShell):
+
+```powershell
+.\scripts\package-windows-app.ps1
+```
+
+This script:
+
+- Builds `shared` and `client`
+- Stages runtime dependencies on the classpath
+- Produces a native Windows installer with `jpackage`
+- Creates Start Menu and Desktop shortcuts on install
+
+Output path:
+
+- `client/target/native/HAFMessenger-1.0.msi` (default)
+- `client/target/native/HAFMessenger-1.0.exe` (when `PACKAGE_TYPE=exe`)
+
+Optional environment overrides:
+
+- `APP_NAME` (default: `HAFMessenger`)
+- `MAIN_JAR` (default: `haf-client.jar`)
+- `MAIN_CLASS` (default: `com.haf.client.core.Launcher`)
+- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.ico`)
+- `PACKAGE_TYPE` (default: `msi`, supported: `msi`, `exe`)
+- `APP_VERSION` (default: `1.0`)
+- `OUTPUT_DIR` (default: `client/target/native`)
+- `PACKAGE_WORK_DIR` (default: `client/target/windows-package`)
+- `MVNW` (default: `mvnw.cmd`)
+- `SKIP_TESTS` (default: `true`)
