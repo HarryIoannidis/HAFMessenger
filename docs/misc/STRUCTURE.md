@@ -100,6 +100,7 @@ HAFMessenger/
   scripts/
     package-linux-appimage.sh
     package-mac-app.sh
+    package-windows-app.ps1
 
   .mvn/
     wrapper/
@@ -142,5 +143,6 @@ HAFMessenger/
 - `server/src/main/java/com/haf/server/security/JwtTokenService.java`
 - `scripts/package-linux-appimage.sh`
 - `scripts/package-mac-app.sh`
+- `scripts/package-windows-app.ps1`
 - `docs/misc/scripts.md`
 - `.gitignore`
