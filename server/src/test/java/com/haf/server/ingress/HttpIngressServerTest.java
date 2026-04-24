@@ -40,12 +40,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.Base64;
 import java.util.List;
@@ -78,9 +80,6 @@ class HttpIngressServerTest {
             CryptoConstants.ARGON2_OUTPUT_LENGTH,
             com.password4j.types.Argon2.ID);
 
-    private MetricsRegistry metricsRegistry;
-    private EncryptedMessageValidator validator;
-    private SSLContext sslContext;
     private HttpIngressServer server;
 
     @Mock
@@ -114,9 +113,9 @@ class HttpIngressServerTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        metricsRegistry = new MetricsRegistry();
-        validator = new EncryptedMessageValidator();
-        sslContext = createTestSSLContext();
+        MetricsRegistry metricsRegistry = new MetricsRegistry();
+        EncryptedMessageValidator validator = new EncryptedMessageValidator();
+        SSLContext sslContext = createTestSSLContext();
         presenceRegistry = new PresenceRegistry();
 
         when(config.getHttpPort()).thenReturn(0);
@@ -490,6 +489,7 @@ class HttpIngressServerTest {
     }
 
     @Test
+    @SuppressWarnings("java:S3011") // Reflective access is required to test private inner-class method
     void login_password_helper_uses_sentinel_when_hash_missing() throws Exception {
         Class<?> loginHandler = Class.forName(HttpIngressServer.class.getName() + "$LoginHandler");
         java.lang.reflect.Method verifyMethod = loginHandler.getDeclaredMethod(
@@ -1124,7 +1124,8 @@ class HttpIngressServerTest {
     @Test
     void messaging_config_is_rate_limited_for_authenticated_caller() throws Exception {
         HttpHandler handler = createHandler("MessagingConfigHandler");
-        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.MESSAGING_CONFIG),
+        when(rateLimiterService.checkAndConsumeApi(anyString(),
+                eq(RateLimiterService.ApiRateLimitScope.MESSAGING_CONFIG),
                 eq("caller")))
                 .thenReturn(RateLimiterService.RateLimitDecision.block(9));
         ExchangeHarness exchange = newExchange("GET", "/api/v1/config/messaging", "");
@@ -1163,7 +1164,8 @@ class HttpIngressServerTest {
     @Test
     void attachments_chunk_is_rate_limited() throws Exception {
         HttpHandler handler = createHandler("AttachmentsHandler");
-        when(rateLimiterService.checkAndConsumeApi(anyString(), eq(RateLimiterService.ApiRateLimitScope.ATTACHMENTS_CHUNK),
+        when(rateLimiterService.checkAndConsumeApi(anyString(),
+                eq(RateLimiterService.ApiRateLimitScope.ATTACHMENTS_CHUNK),
                 eq("caller")))
                 .thenReturn(RateLimiterService.RateLimitDecision.block(7));
         AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
@@ -1321,7 +1323,8 @@ class HttpIngressServerTest {
         assertTrue(exchange.responseBodyAsString().contains("invalid request path"));
     }
 
-    private HttpHandler createHandler(String nestedClassSimpleName) throws Exception {
+    @SuppressWarnings("java:S3011") // Reflective access is required to instantiate private inner-class handlers
+    private HttpHandler createHandler(String nestedClassSimpleName) throws ReflectiveOperationException {
         Class<?> handlerClass = Class.forName(HttpIngressServer.class.getName() + "$" + nestedClassSimpleName);
         Constructor<?> constructor = handlerClass.getDeclaredConstructor(HttpIngressServer.class);
         constructor.setAccessible(true);
@@ -1401,7 +1404,7 @@ class HttpIngressServerTest {
         }
     }
 
-    private SSLContext createTestSSLContext() throws Exception {
+    private SSLContext createTestSSLContext() throws GeneralSecurityException, IOException {
         KeyStore keyStore = KeyStore.getInstance("JKS");
         keyStore.load(null, "password".toCharArray());
 
