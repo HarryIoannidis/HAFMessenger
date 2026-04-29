@@ -82,8 +82,8 @@ public record MessageVM(
     }
 
     /**
-     * Convenience factory for incoming image placeholders while chunked payloads
-     * are downloading.
+     * Convenience factory for incoming image placeholders while payloads are
+     * resolving.
      *
      * @param timestamp message timestamp
      * @return incoming loading-image placeholder view-model
@@ -93,8 +93,8 @@ public record MessageVM(
     }
 
     /**
-     * Convenience factory for incoming image placeholders while chunked payloads
-     * are downloading.
+     * Convenience factory for incoming image placeholders while payloads are
+     * resolving.
      *
      * @param fileName  source file name
      * @param timestamp message timestamp
@@ -105,8 +105,8 @@ public record MessageVM(
     }
 
     /**
-     * Convenience factory for outgoing image placeholders while chunked payloads
-     * are uploading.
+     * Convenience factory for outgoing image placeholders while payloads are being
+     * sent.
      *
      * @param fileName  source file name
      * @param timestamp message timestamp

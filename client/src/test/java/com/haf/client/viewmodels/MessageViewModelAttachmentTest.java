@@ -15,6 +15,7 @@ import com.haf.shared.responses.AttachmentCompleteResponse;
 import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
+import com.haf.shared.dto.AttachmentInlinePayload;
 import com.haf.shared.dto.AttachmentReferencePayload;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.responses.MessagingPolicyResponse;
@@ -56,6 +57,38 @@ class MessageViewModelAttachmentTest {
         assertEquals(0, sender.initCalls);
         assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSentContentType);
         assertEquals(MessageType.IMAGE, viewModel.getMessages("bob").getFirst().type());
+    }
+
+    @Test
+    void outgoing_inline_image_shows_loading_then_swaps_to_image() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        sender.sendDelayMs = 120L;
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("small-photo.png");
+        Files.write(file, pseudoPngBytes(256));
+
+        viewModel.sendAttachment("bob", file, "image/png");
+
+        awaitCondition(() -> !viewModel.getMessages("bob").isEmpty());
+        MessageVM loading = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.IMAGE, loading.type());
+        assertTrue(loading.isLoading());
+        assertNull(loading.content());
+
+        awaitCondition(() -> {
+            MessageVM message = viewModel.getMessages("bob").getFirst();
+            return sender.sendCalls == 1
+                    && message.type() == MessageType.IMAGE
+                    && !message.isLoading()
+                    && message.content() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("bob").getFirst();
+        assertFalse(resolved.isLoading());
+        assertEquals("small-photo.png", resolved.fileName());
     }
 
     @Test
@@ -225,6 +258,37 @@ class MessageViewModelAttachmentTest {
     }
 
     @Test
+    void incoming_inline_image_notifies_loading_then_swaps_to_image() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        List<MessageVM> incomingNotifications = new CopyOnWriteArrayList<>();
+        viewModel.addIncomingMessageListener((senderId, message) -> incomingNotifications.add(message));
+
+        receiver.emitMessage(
+                inlinePayloadBytes("small-photo.png", "image/png", pseudoPngBytes(256)),
+                "alice",
+                AttachmentConstants.CONTENT_TYPE_INLINE,
+                Instant.now().toEpochMilli(),
+                "env-inline-1");
+
+        awaitCondition(() -> !incomingNotifications.isEmpty());
+        MessageVM notified = incomingNotifications.getFirst();
+        assertEquals(MessageType.IMAGE, notified.type());
+        assertTrue(notified.isLoading());
+        assertNull(notified.content());
+
+        awaitCondition(() -> {
+            MessageVM first = viewModel.getMessages("alice").getFirst();
+            return first.type() == MessageType.IMAGE && !first.isLoading() && first.content() != null;
+        });
+
+        MessageVM resolved = viewModel.getMessages("alice").getFirst();
+        assertFalse(resolved.isLoading());
+        assertEquals("small-photo.png", resolved.fileName());
+    }
+
+    @Test
     void chunked_image_reference_shows_loading_then_swaps_to_image() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(8_192, 512, 256);
@@ -284,7 +348,13 @@ class MessageViewModelAttachmentTest {
         Files.write(file, pseudoWebpBytes(128));
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+        awaitCondition(() -> {
+            if (sender.sendCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
+                return false;
+            }
+            MessageVM first = viewModel.getMessages("bob").getFirst();
+            return first.type() == MessageType.FILE && !first.isLoading() && first.localPath() != null;
+        });
 
         MessageVM message = viewModel.getMessages("bob").getFirst();
         assertEquals(MessageType.FILE, message.type());
@@ -328,7 +398,13 @@ class MessageViewModelAttachmentTest {
         Files.write(file, pseudoPngBytes(256));
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+        awaitCondition(() -> {
+            if (sender.sendCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
+                return false;
+            }
+            MessageVM first = viewModel.getMessages("bob").getFirst();
+            return first.type() == MessageType.IMAGE && !first.isLoading() && first.content() != null;
+        });
 
         assertTrue(notices.isEmpty());
     }
@@ -417,6 +493,15 @@ class MessageViewModelAttachmentTest {
         return JsonCodec.toJson(m).getBytes(StandardCharsets.UTF_8);
     }
 
+    private static byte[] inlinePayloadBytes(String fileName, String mediaType, byte[] fileBytes) {
+        AttachmentInlinePayload payload = new AttachmentInlinePayload();
+        payload.setFileName(fileName);
+        payload.setMediaType(mediaType);
+        payload.setSizeBytes(fileBytes.length);
+        payload.setDataB64(Base64.getEncoder().encodeToString(fileBytes));
+        return AttachmentPayloadCodec.toInlineJson(payload).getBytes(StandardCharsets.UTF_8);
+    }
+
     private static byte[] pseudoPngBytes(int size) {
         int length = Math.max(size, 8);
         byte[] bytes = new byte[length];
@@ -464,6 +549,7 @@ class MessageViewModelAttachmentTest {
         private AttachmentDownloadResponse downloadResponse;
         private long downloadDelayMs;
         private long chunkUploadDelayMs;
+        private long sendDelayMs;
 
         private int sendCalls;
         private int sendWithResultCalls;
@@ -477,6 +563,7 @@ class MessageViewModelAttachmentTest {
 
         @Override
         public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds) {
+            sleepQuietly(sendDelayMs);
             sendCalls++;
             lastSentContentType = contentType;
         }

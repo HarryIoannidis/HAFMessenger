@@ -1,9 +1,18 @@
 package com.haf.client.utils;
 
+import com.haf.client.builders.MessageBubbleFactory;
+import com.haf.client.models.MessageType;
+import com.haf.client.models.MessageVM;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignZ;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MessageBubbleFactoryTest {
@@ -43,5 +52,30 @@ class MessageBubbleFactoryTest {
 
         assertTrue(source.contains("bubble.pseudoClassStateChanged(HOVER_PSEUDO_CLASS, hovering)"));
         assertTrue(source.contains("bubble.pseudoClassStateChanged(PRESSED_PSEUDO_CLASS, pressed)"));
+    }
+
+    @Test
+    void file_icon_resolver_uses_existing_mdi2_icons_for_common_extensions() throws Exception {
+        assertSame(MaterialDesignF.FILE_PDF_BOX, resolveFileIcon("orders.pdf"));
+        assertSame(MaterialDesignF.FILE_WORD_BOX, resolveFileIcon("brief.docx"));
+        assertSame(MaterialDesignF.FILE_EXCEL_BOX, resolveFileIcon("sheet.xlsx"));
+        assertSame(MaterialDesignF.FILE_POWERPOINT_BOX, resolveFileIcon("deck.pptx"));
+        assertSame(MaterialDesignZ.ZIP_BOX, resolveFileIcon("archive.zip"));
+        assertSame(MaterialDesignF.FILE, resolveFileIcon("unknown.haf"));
+    }
+
+    private static Ikon resolveFileIcon(String fileName) throws Exception {
+        Method method = MessageBubbleFactory.class.getDeclaredMethod("resolveFileIcon", MessageVM.class);
+        method.setAccessible(true);
+        MessageVM message = new MessageVM(
+                false,
+                MessageType.FILE,
+                null,
+                null,
+                fileName,
+                "1 KB",
+                LocalDateTime.now(),
+                false);
+        return (Ikon) method.invoke(null, message);
     }
 }

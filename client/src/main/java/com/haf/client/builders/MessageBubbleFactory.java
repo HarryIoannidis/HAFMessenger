@@ -16,9 +16,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
+import org.kordamp.ikonli.Ikon;
 import org.kordamp.ikonli.javafx.FontIcon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignZ;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Factory that builds a chat-bubble {@link Node} ready to be inserted into
@@ -34,6 +38,67 @@ public final class MessageBubbleFactory {
     private static final double IMAGE_BUBBLE_MAX_WIDTH = 280.0;
     private static final PseudoClass HOVER_PSEUDO_CLASS = PseudoClass.getPseudoClass("hover");
     private static final PseudoClass PRESSED_PSEUDO_CLASS = PseudoClass.getPseudoClass("pressed");
+    private static final Ikon DEFAULT_FILE_ICON = MaterialDesignF.FILE;
+    private static final Map<String, Ikon> FILE_ICON_BY_EXTENSION = Map.ofEntries(
+            Map.entry("pdf", MaterialDesignF.FILE_PDF_BOX),
+            Map.entry("doc", MaterialDesignF.FILE_WORD_BOX),
+            Map.entry("docx", MaterialDesignF.FILE_WORD_BOX),
+            Map.entry("odt", MaterialDesignF.FILE_WORD_BOX),
+            Map.entry("rtf", MaterialDesignF.FILE_WORD_BOX),
+            Map.entry("xls", MaterialDesignF.FILE_EXCEL_BOX),
+            Map.entry("xlsx", MaterialDesignF.FILE_EXCEL_BOX),
+            Map.entry("ods", MaterialDesignF.FILE_EXCEL_BOX),
+            Map.entry("csv", MaterialDesignF.FILE_DELIMITED),
+            Map.entry("ppt", MaterialDesignF.FILE_POWERPOINT_BOX),
+            Map.entry("pptx", MaterialDesignF.FILE_POWERPOINT_BOX),
+            Map.entry("odp", MaterialDesignF.FILE_POWERPOINT_BOX),
+            Map.entry("png", MaterialDesignF.FILE_PNG_BOX),
+            Map.entry("jpg", MaterialDesignF.FILE_JPG_BOX),
+            Map.entry("jpeg", MaterialDesignF.FILE_JPG_BOX),
+            Map.entry("gif", MaterialDesignF.FILE_GIF_BOX),
+            Map.entry("bmp", MaterialDesignF.FILE_IMAGE),
+            Map.entry("svg", MaterialDesignF.FILE_IMAGE),
+            Map.entry("webp", MaterialDesignF.FILE_IMAGE),
+            Map.entry("tif", MaterialDesignF.FILE_IMAGE),
+            Map.entry("tiff", MaterialDesignF.FILE_IMAGE),
+            Map.entry("mp3", MaterialDesignF.FILE_MUSIC),
+            Map.entry("wav", MaterialDesignF.FILE_MUSIC),
+            Map.entry("ogg", MaterialDesignF.FILE_MUSIC),
+            Map.entry("flac", MaterialDesignF.FILE_MUSIC),
+            Map.entry("aac", MaterialDesignF.FILE_MUSIC),
+            Map.entry("m4a", MaterialDesignF.FILE_MUSIC),
+            Map.entry("mp4", MaterialDesignF.FILE_VIDEO),
+            Map.entry("mov", MaterialDesignF.FILE_VIDEO),
+            Map.entry("avi", MaterialDesignF.FILE_VIDEO),
+            Map.entry("mkv", MaterialDesignF.FILE_VIDEO),
+            Map.entry("webm", MaterialDesignF.FILE_VIDEO),
+            Map.entry("mpeg", MaterialDesignF.FILE_VIDEO),
+            Map.entry("mpg", MaterialDesignF.FILE_VIDEO),
+            Map.entry("zip", MaterialDesignZ.ZIP_BOX),
+            Map.entry("rar", MaterialDesignZ.ZIP_BOX),
+            Map.entry("7z", MaterialDesignZ.ZIP_BOX),
+            Map.entry("tar", MaterialDesignZ.ZIP_BOX),
+            Map.entry("gz", MaterialDesignZ.ZIP_BOX),
+            Map.entry("tgz", MaterialDesignZ.ZIP_BOX),
+            Map.entry("bz2", MaterialDesignZ.ZIP_BOX),
+            Map.entry("xz", MaterialDesignZ.ZIP_BOX),
+            Map.entry("xml", MaterialDesignF.FILE_XML_BOX),
+            Map.entry("html", MaterialDesignF.FILE_CODE),
+            Map.entry("htm", MaterialDesignF.FILE_CODE),
+            Map.entry("json", MaterialDesignF.FILE_CODE),
+            Map.entry("java", MaterialDesignF.FILE_CODE),
+            Map.entry("js", MaterialDesignF.FILE_CODE),
+            Map.entry("jsx", MaterialDesignF.FILE_CODE),
+            Map.entry("ts", MaterialDesignF.FILE_CODE),
+            Map.entry("tsx", MaterialDesignF.FILE_CODE),
+            Map.entry("css", MaterialDesignF.FILE_CODE),
+            Map.entry("scss", MaterialDesignF.FILE_CODE),
+            Map.entry("sql", MaterialDesignF.FILE_CODE),
+            Map.entry("py", MaterialDesignF.FILE_CODE),
+            Map.entry("sh", MaterialDesignF.FILE_CODE),
+            Map.entry("txt", MaterialDesignF.FILE_DOCUMENT_OUTLINE),
+            Map.entry("md", MaterialDesignF.FILE_DOCUMENT_OUTLINE),
+            Map.entry("log", MaterialDesignF.FILE_DOCUMENT_OUTLINE));
 
     /**
      * Prevents instantiation of this utility factory.
@@ -308,7 +373,7 @@ public final class MessageBubbleFactory {
      * @return the file attachment content node
      */
     private static HBox buildFile(MessageVM message) {
-        FontIcon icon = new FontIcon("mdi2f-file-pdf-box");
+        FontIcon icon = new FontIcon(resolveFileIcon(message));
         icon.setIconSize(24);
 
         boolean loadingPlaceholder = message.isLoading()
@@ -331,7 +396,8 @@ public final class MessageBubbleFactory {
             ProgressIndicator spinner = new ProgressIndicator();
             spinner.setPrefSize(18, 18);
             spinner.setMaxSize(18, 18);
-            spinner.getStyleClass().add("bubble-image-spinner");
+            spinner.getStyleClass().add("bubble-file-spinner");
+            spinner.getStyleClass().add(message.isOutgoing() ? "bubble-file-spinner-out" : "bubble-file-spinner-in");
             spinner.setMouseTransparent(true);
             fileRow.getChildren().add(spinner);
         }
@@ -341,6 +407,67 @@ public final class MessageBubbleFactory {
             fileRow.setCursor(Cursor.HAND);
         }
         return fileRow;
+    }
+
+    /**
+     * Resolves a Material Design 2 file icon that matches the attachment
+     * extension.
+     *
+     * @param message file message to inspect
+     * @return existing MDI2 icon for the file kind, or generic file fallback
+     */
+    private static Ikon resolveFileIcon(MessageVM message) {
+        String extension = extractFileExtension(message);
+        return FILE_ICON_BY_EXTENSION.getOrDefault(extension, DEFAULT_FILE_ICON);
+    }
+
+    /**
+     * Extracts a lowercase file extension from the display name, falling back to
+     * local path when needed.
+     *
+     * @param message file message to inspect
+     * @return lowercase extension without dot, or empty string
+     */
+    private static String extractFileExtension(MessageVM message) {
+        if (message == null) {
+            return "";
+        }
+        String extension = extractFileExtension(message.fileName());
+        if (!extension.isBlank()) {
+            return extension;
+        }
+        return extractFileExtension(message.localPath());
+    }
+
+    /**
+     * Extracts a lowercase file extension from a name or path-like string.
+     *
+     * @param candidate file name, path, or URL
+     * @return lowercase extension without dot, or empty string
+     */
+    private static String extractFileExtension(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return "";
+        }
+        String value = candidate.trim();
+        int queryIndex = value.indexOf('?');
+        int hashIndex = value.indexOf('#');
+        int endIndex = value.length();
+        if (queryIndex >= 0) {
+            endIndex = Math.min(endIndex, queryIndex);
+        }
+        if (hashIndex >= 0) {
+            endIndex = Math.min(endIndex, hashIndex);
+        }
+        value = value.substring(0, endIndex);
+
+        int separatorIndex = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
+        String name = separatorIndex >= 0 ? value.substring(separatorIndex + 1) : value;
+        int dotIndex = name.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == name.length() - 1) {
+            return "";
+        }
+        return name.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
     }
 
     /**
