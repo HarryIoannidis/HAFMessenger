@@ -135,113 +135,255 @@ public class MessagesViewModel {
 
     /**
      * Creates a MessagesViewModel.
+     *
+     * @param messageSender   sender used for outbound messages and attachment API
+     *                        calls
+     * @param messageReceiver receiver used for inbound messages and presence
+     *                        updates
      */
     public MessagesViewModel(MessageSender messageSender, MessageReceiver messageReceiver) {
         this.messageSender = messageSender;
         this.messageReceiver = messageReceiver;
 
-        messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
-            /**
-             * Handles a decrypted inbound envelope and converts it into a message item for
-             * the sender timeline.
-             *
-             * @param plaintext        decrypted payload bytes
-             * @param senderId         backend sender id
-             * @param contentType      payload MIME/content type
-             * @param timestampEpochMs server timestamp in epoch milliseconds
-             * @param envelopeId       backend envelope id
-             */
-            @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
-                    String envelopeId) {
-                String contactId = normalizeContactId(senderId);
-                try {
-                    if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
-                        AttachmentReferencePayload reference = AttachmentPayloadCodec.fromReferenceJson(plaintext);
-                        receiveChunkedReferenceAsync(contactId, reference, timestampEpochMs);
-                        return;
-                    }
+        messageReceiver.setMessageListener(new ViewModelMessageListener());
+    }
 
-                    DecodedMessage decoded = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
-                    runOnUiThread(() -> {
-                        getMessages(contactId).add(decoded.message());
-                        if (decoded.fallbackNotice() != null) {
-                            notifyImagePreviewFallbackListeners(decoded.fallbackNotice());
-                        }
-                        notifyIncomingMessageListeners(contactId, decoded.message());
-                        status.set("Message received from " + contactId);
-                    });
-                } catch (Exception ex) {
-                    runOnUiThread(() -> status.set("Failed to render message: " + ex.getMessage()));
-                    publishRuntimeIssue(
-                            "messaging.render.failed",
-                            "Message processing failed",
-                            "An incoming message could not be processed. " + resolveErrorMessage(ex, "Please retry."),
-                            MessagesViewModel.this::retryLastFailedOperation);
-                }
+    /**
+     * Receives transport callbacks and delegates them to focused handlers.
+     */
+    private final class ViewModelMessageListener implements MessageReceiver.MessageListener {
+        /**
+         * Handles a decrypted inbound envelope and converts it into a message item for
+         * the sender timeline.
+         *
+         * @param plaintext        decrypted payload bytes
+         * @param senderId         backend sender id
+         * @param contentType      payload MIME/content type
+         * @param timestampEpochMs server timestamp in epoch milliseconds
+         * @param envelopeId       backend envelope id
+         */
+        @Override
+        public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                String envelopeId) {
+            handleIncomingEnvelope(plaintext, senderId, contentType, timestampEpochMs);
+        }
+
+        /**
+         * Surfaces receiver-side pipeline failures to the status property on the UI
+         * thread.
+         *
+         * @param error failure raised by the receiver
+         */
+        @Override
+        public void onError(Throwable error) {
+            handleReceiverError(error);
+        }
+
+        /**
+         * Forwards incoming presence updates to registered presence listeners on the UI
+         * thread.
+         *
+         * @param userId user whose presence changed
+         * @param active latest activity flag
+         */
+        @Override
+        public void onPresenceUpdate(String userId, boolean active) {
+            runOnUiThread(() -> notifyPresenceListeners(userId, active));
+        }
+
+        /**
+         * Handles a decrypted inbound envelope and converts it into a message item for
+         * the sender timeline.
+         *
+         * @param plaintext        decrypted payload bytes
+         * @param senderId         backend sender id
+         * @param contentType      payload MIME/content type
+         * @param timestampEpochMs server timestamp in epoch milliseconds
+         */
+        private void handleIncomingEnvelope(byte[] plaintext,
+                String senderId,
+                String contentType,
+                long timestampEpochMs) {
+            String contactId = normalizeContactId(senderId);
+            try {
+                routeIncomingEnvelope(plaintext, contactId, contentType, timestampEpochMs);
+            } catch (Exception ex) {
+                handleIncomingRenderFailure(ex);
+            }
+        }
+
+        /**
+         * Routes incoming payloads through the transport-specific attachment handling
+         * path before falling back to ordinary payload decoding.
+         *
+         * @param plaintext        decrypted payload bytes
+         * @param contactId        normalized sender/contact id
+         * @param contentType      payload MIME/content type
+         * @param timestampEpochMs server timestamp in epoch milliseconds
+         * @throws Exception when payload decoding or attachment resolution setup fails
+         */
+        private void routeIncomingEnvelope(byte[] plaintext,
+                String contactId,
+                String contentType,
+                long timestampEpochMs) throws Exception {
+            if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
+                receiveReferencePayload(plaintext, contactId, timestampEpochMs);
+                return;
+            }
+            if (AttachmentConstants.CONTENT_TYPE_INLINE.equals(contentType)) {
+                receiveInlinePayload(plaintext, contactId, timestampEpochMs);
+                return;
             }
 
-            /**
-             * Surfaces receiver-side pipeline failures to the status property on the UI
-             * thread.
-             *
-             * @param error failure raised by the receiver
-             */
-            @Override
-            public void onError(Throwable error) {
-                if (isSessionTakeoverError(error)) {
-                    publishRuntimeIssue(
-                            SESSION_TAKEOVER_ISSUE_KEY,
-                            SESSION_TAKEOVER_TITLE,
-                            SESSION_TAKEOVER_MESSAGE,
-                            () -> {
-                            });
-                    return;
+            DecodedMessage decoded = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
+            appendDecodedIncomingMessage(contactId, decoded);
+        }
+
+        /**
+         * Starts the existing reference-attachment loading flow for incoming chunked
+         * attachments.
+         *
+         * @param plaintext        decrypted reference payload bytes
+         * @param contactId        normalized sender/contact id
+         * @param timestampEpochMs server timestamp in epoch milliseconds
+         */
+        private void receiveReferencePayload(byte[] plaintext, String contactId, long timestampEpochMs) {
+            AttachmentReferencePayload reference = AttachmentPayloadCodec.fromReferenceJson(plaintext);
+            receiveChunkedReferenceAsync(contactId, reference, timestampEpochMs);
+        }
+
+        /**
+         * Starts inline-image placeholder handling or directly appends non-image inline
+         * attachments.
+         *
+         * @param plaintext        decrypted inline payload bytes
+         * @param contactId        normalized sender/contact id
+         * @param timestampEpochMs server timestamp in epoch milliseconds
+         */
+        private void receiveInlinePayload(byte[] plaintext, String contactId, long timestampEpochMs) {
+            AttachmentInlinePayload inlinePayload = AttachmentPayloadCodec.fromInlineJson(plaintext);
+            if (shouldShowInlineLoadingPlaceholder(inlinePayload.getMediaType())) {
+                receiveInlineAttachmentAsync(contactId, inlinePayload, timestampEpochMs);
+                return;
+            }
+
+            DecodedMessage decoded = decodeInlineAttachment(contactId, inlinePayload,
+                    toLocalTimestamp(timestampEpochMs));
+            appendDecodedIncomingMessage(contactId, decoded);
+        }
+
+        /**
+         * Appends a decoded incoming message to the timeline on the UI thread.
+         *
+         * @param contactId normalized sender/contact id
+         * @param decoded   decoded message and optional fallback notice
+         */
+        private void appendDecodedIncomingMessage(String contactId, DecodedMessage decoded) {
+            runOnUiThread(() -> {
+                getMessages(contactId).add(decoded.message());
+                if (decoded.fallbackNotice() != null) {
+                    notifyImagePreviewFallbackListeners(decoded.fallbackNotice());
                 }
-                if (isRevokedSessionError(error)) {
-                    publishRuntimeIssue(
-                            "messaging.session.revoked",
-                            "Session expired",
-                            "Your session expired due to inactivity. Please log in again.",
-                            () -> {
-                            });
-                    return;
-                }
-                if (isUndecryptableEnvelopeError(error)) {
-                    publishRuntimeIssue(
-                            "messaging.undecryptable.envelopes",
-                            "Some messages could not be decrypted",
-                            "Some messages were encrypted with keys not available on this device and were skipped.",
-                            () -> {
-                            });
-                    return;
-                }
-                runOnUiThread(() -> status.set("Error: " + error.getMessage()));
+                notifyIncomingMessageListeners(contactId, decoded.message());
+                status.set("Message received from " + contactId);
+            });
+        }
+
+        /**
+         * Surfaces incoming render failures to status and runtime issue listeners.
+         *
+         * @param ex failure raised while rendering an incoming message
+         */
+        private void handleIncomingRenderFailure(Exception ex) {
+            runOnUiThread(() -> status.set("Failed to render message: " + ex.getMessage()));
+            publishRuntimeIssue(
+                    "messaging.render.failed",
+                    "Message processing failed",
+                    "An incoming message could not be processed. " + resolveErrorMessage(ex, "Please retry."),
+                    MessagesViewModel.this::retryLastFailedOperation);
+        }
+
+        /**
+         * Surfaces receiver-side pipeline failures to the status property on the UI
+         * thread.
+         *
+         * @param error failure raised by the receiver
+         */
+        private void handleReceiverError(Throwable error) {
+            if (publishReceiverIssueIfHandled(error)) {
+                return;
+            }
+            runOnUiThread(() -> status.set("Error: " + error.getMessage()));
+            publishRuntimeIssue(
+                    "messaging.receiver.error",
+                    "Connection issue",
+                    "The messaging channel reported an error. "
+                            + resolveErrorMessage(error, "Please retry."),
+                    MessagesViewModel.this::retryLastFailedOperation);
+        }
+
+        /**
+         * Publishes specialized receiver issues that do not need generic connection
+         * handling.
+         *
+         * @param error failure raised by the receiver
+         * @return {@code true} when a specialized issue was published
+         */
+        private boolean publishReceiverIssueIfHandled(Throwable error) {
+            if (isSessionTakeoverError(error)) {
                 publishRuntimeIssue(
-                        "messaging.receiver.error",
-                        "Connection issue",
-                        "The messaging channel reported an error. "
-                                + resolveErrorMessage(error, "Please retry."),
-                        MessagesViewModel.this::retryLastFailedOperation);
+                        SESSION_TAKEOVER_ISSUE_KEY,
+                        SESSION_TAKEOVER_TITLE,
+                        SESSION_TAKEOVER_MESSAGE,
+                        () -> {
+                        });
+                return true;
             }
+            if (isRevokedSessionError(error)) {
+                publishRuntimeIssue(
+                        "messaging.session.revoked",
+                        "Session expired",
+                        "Your session expired due to inactivity. Please log in again.",
+                        () -> {
+                        });
+                return true;
+            }
+            if (isUndecryptableEnvelopeError(error)) {
+                publishRuntimeIssue(
+                        "messaging.undecryptable.envelopes",
+                        "Some messages could not be decrypted",
+                        "Some messages were encrypted with keys not available on this device and were skipped.",
+                        () -> {
+                        });
+                return true;
+            }
+            return false;
+        }
 
-            /**
-             * Forwards incoming presence updates to registered presence listeners on the UI
-             * thread.
-             *
-             * @param userId user whose presence changed
-             * @param active latest activity flag
-             */
-            @Override
-            public void onPresenceUpdate(String userId, boolean active) {
-                runOnUiThread(() -> notifyPresenceListeners(userId, active));
+        /**
+         * Notifies all registered presence listeners while isolating failures per
+         * listener.
+         *
+         * @param userId user whose presence changed
+         * @param active latest active flag
+         */
+        private void notifyPresenceListeners(String userId, boolean active) {
+            for (PresenceListener listener : presenceListeners) {
+                try {
+                    listener.onPresenceUpdate(userId, active);
+                } catch (Exception ignored) {
+                    // A bad listener must not break dispatching for others.
+                }
             }
-        });
+        }
     }
 
     /**
      * Sends a plain-text message asynchronously and adds it locally as outgoing
      * bubble.
+     *
+     * @param recipientId recipient/contact id
+     * @param text        message body to send
      */
     public void sendTextMessage(String recipientId, String text) {
         String contactId = normalizeContactId(recipientId);
@@ -300,6 +442,10 @@ public class MessagesViewModel {
 
     /**
      * Sends one attachment using inline or chunked transport based on size.
+     *
+     * @param recipientId   recipient/contact id
+     * @param filePath      selected attachment path
+     * @param mediaTypeHint optional MIME hint from the UI/file chooser
      */
     public void sendAttachment(String recipientId, Path filePath, String mediaTypeHint) {
         String contactId = normalizeContactId(recipientId);
@@ -341,7 +487,11 @@ public class MessagesViewModel {
 
             LocalDateTime timestamp = LocalDateTime.now();
             if (shouldSendInlineAttachment(fileBytes, policy, fileName, mediaType)) {
-                sendInlineAttachmentAndRender(contactId, fileName, mediaType, fileBytes, timestamp);
+                if (shouldShowInlineLoadingPlaceholder(mediaType)) {
+                    loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, mediaType, fileName,
+                            fileBytes.length, timestamp);
+                }
+                sendInlineAttachmentAndRender(contactId, fileName, mediaType, fileBytes, timestamp, loadingVm);
             } else {
                 loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, mediaType, fileName, fileBytes.length,
                         timestamp);
@@ -410,34 +560,46 @@ public class MessagesViewModel {
     }
 
     /**
-     * Sends attachment using inline transport and appends the resolved outgoing
-     * message bubble.
+     * Sends attachment using inline transport and appends or replaces the resolved
+     * outgoing message bubble.
      *
      * @param contactId recipient/contact id
      * @param fileName  attachment file name
      * @param mediaType normalized media type
      * @param fileBytes attachment bytes
      * @param timestamp message timestamp
+     * @param loadingVm existing loading placeholder to replace, or {@code null}
+     *                  to append after send
      * @throws Exception when inline transport fails
      */
     private void sendInlineAttachmentAndRender(String contactId,
             String fileName,
             String mediaType,
             byte[] fileBytes,
-            LocalDateTime timestamp) throws Exception {
+            LocalDateTime timestamp,
+            MessageVM loadingVm) throws Exception {
         sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
         DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
+        MessageVM pendingVm = loadingVm;
         runOnUiThread(() -> {
-            getMessages(contactId).add(outgoing.message());
+            if (pendingVm == null) {
+                getMessages(contactId).add(outgoing.message());
+                status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
+            } else {
+                replaceLoadingMessage(
+                        contactId,
+                        pendingVm,
+                        outgoing.message(),
+                        buildAttachmentDeliveredStatus(contactId, mediaType, true));
+            }
             if (outgoing.fallbackNotice() != null) {
                 notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
             }
-            status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
         });
     }
 
     /**
-     * Shows outgoing loading placeholder while chunked upload is running.
+     * Shows outgoing loading placeholder while an attachment transfer is running.
      *
      * @param contactId     recipient/contact id
      * @param mediaType     normalized media type
@@ -610,6 +772,9 @@ public class MessagesViewModel {
 
     /**
      * Acknowledges all pending messages received from a specific sender.
+     *
+     * @param senderId sender/contact id whose pending envelopes should be
+     *                 acknowledged
      */
     public void acknowledgeMessagesFrom(String senderId) {
         messageReceiver.acknowledgeEnvelopes(normalizeContactId(senderId));
@@ -617,6 +782,9 @@ public class MessagesViewModel {
 
     /**
      * Observable list of chat messages for a specific contact.
+     *
+     * @param contactId contact id whose timeline should be returned
+     * @return mutable observable timeline for the normalized contact id
      */
     public ObservableList<MessageVM> getMessages(String contactId) {
         String normalizedContactId = normalizeContactId(contactId);
@@ -625,6 +793,8 @@ public class MessagesViewModel {
 
     /**
      * Status string property.
+     *
+     * @return observable status text property
      */
     public StringProperty statusProperty() {
         return status;
@@ -771,23 +941,6 @@ public class MessagesViewModel {
                         this::restoreReceiverTransportAfterSessionRefresh);
             }
         });
-    }
-
-    /**
-     * Notifies all registered presence listeners while isolating failures per
-     * listener.
-     *
-     * @param userId user whose presence changed
-     * @param active latest active flag
-     */
-    private void notifyPresenceListeners(String userId, boolean active) {
-        for (PresenceListener listener : presenceListeners) {
-            try {
-                listener.onPresenceUpdate(userId, active);
-            } catch (Exception ignored) {
-                // A bad listener must not break dispatching for others.
-            }
-        }
     }
 
     /**
@@ -1117,6 +1270,53 @@ public class MessagesViewModel {
     }
 
     /**
+     * Resolves an inline image attachment in the background after immediately
+     * materializing a loading bubble.
+     *
+     * @param senderId         sender/contact id whose timeline receives the
+     *                         attachment
+     * @param payload          inline attachment payload already decrypted from the
+     *                         envelope
+     * @param timestampEpochMs envelope timestamp in epoch milliseconds
+     */
+    private void receiveInlineAttachmentAsync(String senderId,
+            AttachmentInlinePayload payload,
+            long timestampEpochMs) {
+        LocalDateTime timestamp = toLocalTimestamp(timestampEpochMs);
+        String mediaType = AttachmentConstants.normalizeMimeType(payload.getMediaType());
+        MessageVM loadingVm = buildLoadingAttachmentVm(
+                false,
+                mediaType,
+                payload.getFileName(),
+                payload.getSizeBytes(),
+                timestamp);
+
+        runOnUiThread(() -> {
+            getMessages(senderId).add(loadingVm);
+            notifyIncomingMessageListeners(senderId, loadingVm);
+            status.set(buildAttachmentLoadingStatus(senderId, mediaType, false));
+        });
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                DecodedMessage loaded = decodeInlineAttachment(senderId, payload, timestamp);
+                runOnUiThread(() -> {
+                    replaceLoadingMessage(
+                            senderId,
+                            loadingVm,
+                            loaded.message(),
+                            buildAttachmentDeliveredStatus(senderId, mediaType, false));
+                    if (loaded.fallbackNotice() != null) {
+                        notifyImagePreviewFallbackListeners(loaded.fallbackNotice());
+                    }
+                });
+            } catch (Exception ex) {
+                runOnUiThread(() -> replaceLoadingWithFailure(senderId, loadingVm, timestamp, mediaType, ex));
+            }
+        });
+    }
+
+    /**
      * Replaces an in-place loading attachment bubble with its fully decoded
      * message.
      *
@@ -1310,9 +1510,7 @@ public class MessagesViewModel {
 
         if (AttachmentConstants.CONTENT_TYPE_INLINE.equals(contentType)) {
             AttachmentInlinePayload payload = AttachmentPayloadCodec.fromInlineJson(plaintext);
-            byte[] fileBytes = Base64.getDecoder().decode(payload.getDataB64());
-            return decodeAttachment(senderId, false, fileBytes, payload.getMediaType(), payload.getFileName(),
-                    timestamp);
+            return decodeInlineAttachment(senderId, payload, timestamp);
         }
 
         if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
@@ -1339,6 +1537,22 @@ public class MessagesViewModel {
         return new DecodedMessage(
                 new MessageVM(false, MessageType.FILE, null, localPath, fileName, fileSize, timestamp, false),
                 null);
+    }
+
+    /**
+     * Decodes an inline attachment payload into a renderable message model.
+     *
+     * @param senderId  sender/contact id owning the timeline message
+     * @param payload   inline attachment metadata and Base64 data
+     * @param timestamp timestamp to apply to the produced message model
+     * @return decoded attachment message plus optional fallback notice
+     */
+    private static DecodedMessage decodeInlineAttachment(String senderId,
+            AttachmentInlinePayload payload,
+            LocalDateTime timestamp) {
+        byte[] fileBytes = Base64.getDecoder().decode(payload.getDataB64());
+        return decodeAttachment(senderId, false, fileBytes, payload.getMediaType(), payload.getFileName(),
+                timestamp);
     }
 
     /**
@@ -1509,8 +1723,7 @@ public class MessagesViewModel {
     }
 
     /**
-     * Builds a loading placeholder message for chunked attachment send/receive
-     * flows.
+     * Builds a loading placeholder message for attachment send/receive flows.
      *
      * @param outgoing      {@code true} for outgoing placeholders, {@code false}
      *                      for incoming
@@ -1537,6 +1750,17 @@ public class MessagesViewModel {
         return outgoing
                 ? MessageVM.outgoingLoadingFile(safeFileName, fileSize, timestamp)
                 : MessageVM.incomingLoadingFile(safeFileName, fileSize, timestamp);
+    }
+
+    /**
+     * Returns whether inline transport should still show an image placeholder
+     * before final send/render completion.
+     *
+     * @param mediaType declared attachment media type
+     * @return {@code true} for inline image attachments
+     */
+    private static boolean shouldShowInlineLoadingPlaceholder(String mediaType) {
+        return isImageMediaType(mediaType);
     }
 
     /**
