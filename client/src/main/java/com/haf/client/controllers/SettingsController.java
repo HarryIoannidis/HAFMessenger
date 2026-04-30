@@ -591,6 +591,7 @@ public class SettingsController {
         wireDependentToggleRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
         wireDependentToggleRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
         wireDependentToggleRowState("chatShowMessageTimestampsToggle", "chatUse24HourTimeRow");
+        wireDependentToggleRowState("searchInfiniteScrollToggle", "searchResultsPerPageRow");
     }
 
     /**
