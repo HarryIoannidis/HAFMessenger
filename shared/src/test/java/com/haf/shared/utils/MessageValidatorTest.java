@@ -102,9 +102,17 @@ class MessageValidatorTest {
     }
 
     @Test
-    void contentType_unknown_is_rejected() {
+    void custom_valid_contentType_passes_validation() {
         EncryptedMessage m = valid();
         m.setContentType("application/x-shockwave-flash");
+        assertTrue(MessageValidator.isValid(m), errsMsg(m));
+        assertTrue(MessageValidator.validateOrCollectErrors(m).isEmpty(), errsMsg(m));
+    }
+
+    @Test
+    void contentType_invalid_is_rejected() {
+        EncryptedMessage m = valid();
+        m.setContentType("application-x-shockwave-flash");
         List<MessageValidator.ErrorCode> errs = MessageValidator.validateOrCollectErrors(m);
         assertTrue(errs.contains(MessageValidator.ErrorCode.BAD_CONTENT_TYPE), "Errors: " + errs);
     }

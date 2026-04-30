@@ -151,7 +151,7 @@ public class ChatController {
             imageButton.setOnAction(e -> chooseImageAttachment());
         }
         if (fileButton != null) {
-            fileButton.setOnAction(e -> chooseDocumentAttachment());
+            fileButton.setOnAction(e -> chooseFileAttachment());
         }
     }
 
@@ -551,14 +551,29 @@ public class ChatController {
     }
 
     /**
-     * Opens file chooser restricted to supported document extensions and sends
-     * selected file.
+     * Opens file chooser for any attachment type and sends the selected file.
      */
-    private void chooseDocumentAttachment() {
+    private void chooseFileAttachment() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Select Document");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Documents", "*.pdf", "*.docx", "*.xlsx"));
+        chooser.setTitle("Select File");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("All Files", "*.*"),
+                new FileChooser.ExtensionFilter("Documents",
+                        "*.pdf", "*.doc", "*.docx", "*.odt", "*.rtf", "*.xls", "*.xlsx", "*.ods", "*.csv",
+                        "*.ppt", "*.pptx", "*.odp"),
+                new FileChooser.ExtensionFilter("Images",
+                        "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.svg", "*.webp", "*.tif", "*.tiff"),
+                new FileChooser.ExtensionFilter("Audio",
+                        "*.mp3", "*.wav", "*.ogg", "*.flac", "*.aac", "*.m4a"),
+                new FileChooser.ExtensionFilter("Video",
+                        "*.mp4", "*.mov", "*.avi", "*.mkv", "*.webm", "*.mpeg", "*.mpg"),
+                new FileChooser.ExtensionFilter("Archives",
+                        "*.zip", "*.rar", "*.7z", "*.tar", "*.gz", "*.tgz", "*.bz2", "*.xz"),
+                new FileChooser.ExtensionFilter("Code and Text",
+                        "*.xml", "*.html", "*.htm", "*.json", "*.java", "*.js", "*.jsx", "*.ts", "*.tsx", "*.css",
+                        "*.scss", "*.sql", "*.py", "*.sh", "*.txt", "*.md", "*.log"),
+                new FileChooser.ExtensionFilter("Applications",
+                        "*.exe", "*.msi", "*.dmg", "*.app", "*.apk", "*.deb", "*.rpm", "*.bat", "*.cmd"));
         selectAndSendAttachment(chooser);
     }
 

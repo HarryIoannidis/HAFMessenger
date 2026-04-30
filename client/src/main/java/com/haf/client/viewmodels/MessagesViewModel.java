@@ -34,10 +34,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1626,17 +1624,10 @@ public class MessagesViewModel {
             throw new IllegalArgumentException("Attachment exceeds maximum allowed size");
         }
 
-        Set<String> allowed = new HashSet<>();
         if (policy.getAttachmentAllowedTypes() == null || policy.getAttachmentAllowedTypes().isEmpty()) {
             throw new IllegalArgumentException("Attachment policy allowlist is empty");
         }
-        for (String value : policy.getAttachmentAllowedTypes()) {
-            String normalized = AttachmentConstants.normalizeMimeType(value);
-            if (normalized != null) {
-                allowed.add(normalized);
-            }
-        }
-        if (!allowed.contains(mediaType)) {
+        if (!AttachmentConstants.isAttachmentTypeAllowedByPolicy(mediaType, policy.getAttachmentAllowedTypes())) {
             throw new IllegalArgumentException("Attachment type is not allowed: " + mediaType);
         }
     }
@@ -1647,8 +1638,8 @@ public class MessagesViewModel {
      *
      * @param hint     optional caller-provided MIME hint
      * @param filePath file path used for content probing and extension fallback
-     * @return normalized MIME/content type suitable for policy and transport
-     * @throws IllegalArgumentException when no supported MIME type can be inferred
+     * @return normalized MIME/content type suitable for policy and transport, or
+     *         octet-stream when no specific MIME type can be inferred
      */
     private static String normalizeMediaType(String hint, Path filePath) {
         String normalized = AttachmentConstants.normalizeMimeType(hint);
@@ -1688,7 +1679,7 @@ public class MessagesViewModel {
             return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         }
 
-        throw new IllegalArgumentException("Unable to detect attachment MIME type");
+        return AttachmentConstants.APPLICATION_OCTET_STREAM;
     }
 
     /**

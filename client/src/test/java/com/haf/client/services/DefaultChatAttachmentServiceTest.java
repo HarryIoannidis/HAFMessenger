@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DefaultChatAttachmentServiceTest {
 
@@ -22,7 +21,9 @@ class DefaultChatAttachmentServiceTest {
                 DefaultChatAttachmentService.resolveMimeType(Path.of("file.docx")));
         assertEquals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 DefaultChatAttachmentService.resolveMimeType(Path.of("file.xlsx")));
-        assertNull(DefaultChatAttachmentService.resolveMimeType(Path.of("file.unknown")));
+        assertEquals("application/vnd.microsoft.portable-executable",
+                DefaultChatAttachmentService.resolveMimeType(Path.of("setup.exe")));
+        assertEquals("application/octet-stream", DefaultChatAttachmentService.resolveMimeType(Path.of("file.unknown")));
     }
 
     @Test

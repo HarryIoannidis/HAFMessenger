@@ -173,7 +173,7 @@ resolve_appimagetool() {
 
   local downloaded_tool="${TOOLS_DIR}/appimagetool-x86_64.AppImage"
   if [[ ! -x "${downloaded_tool}" ]]; then
-    echo "Downloading appimagetool..."
+    echo "Downloading appimagetool..." >&2
     curl -fL "${APPIMAGE_TOOL_URL}" -o "${downloaded_tool}"
     chmod +x "${downloaded_tool}"
   fi

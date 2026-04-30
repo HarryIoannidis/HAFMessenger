@@ -625,7 +625,9 @@ public final class ServerConfig {
         List<String> allowed = new ArrayList<>();
         for (String part : parts) {
             String normalized = AttachmentConstants.normalizeMimeType(part);
-            if (normalized != null && !allowed.contains(normalized)) {
+            if (normalized != null
+                    && AttachmentConstants.isValidAttachmentPolicyType(normalized)
+                    && !allowed.contains(normalized)) {
                 allowed.add(normalized);
             }
         }

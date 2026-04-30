@@ -7,12 +7,12 @@ Summarize core protocol/crypto constants used across client and server.
 ## Current Implementation
 
 - `CryptoConstants` defines AES-GCM, X25519/XDH, Argon2, and salt/tag/IV sizes.
-- `MessageHeader` defines wire protocol constants and validation policy:
+- `MessageHeader` defines wire protocol constants and core message policy:
   - version/algo
   - identity and TTL bounds
   - ciphertext size limit
-  - content-type allowlist
-- `AttachmentConstants` defines default attachment size/chunk/allowlist policy.
+  - built-in content-type constants used by text and attachment envelopes
+- `AttachmentConstants` defines default attachment size/chunk policy and the attachment MIME allowlist, which defaults to `*/*`.
 - Notable policy bounds include TTL `60..86400` seconds and ciphertext Base64 max length `8 MiB` equivalent (`MAX_CIPHERTEXT_BASE64`).
 
 ## Key Types/Interfaces

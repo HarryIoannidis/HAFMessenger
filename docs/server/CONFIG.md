@@ -34,7 +34,7 @@ Document server runtime configuration loaded by `ServerConfig`.
   - JWT refresh TTL: `2592000` seconds
   - JWT absolute session TTL: `2592000` seconds
   - JWT idle session TTL: `max(600, HAF_JWT_ACCESS_TTL_SECONDS)` seconds when `HAF_JWT_IDLE_TTL_SECONDS` is unset
-  - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL)
+  - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL), and `HAF_ATTACHMENT_ALLOWED_TYPES` defaults to `*/*`
 
 ## Key Types/Interfaces
 

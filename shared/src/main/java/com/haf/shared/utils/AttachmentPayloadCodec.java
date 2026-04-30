@@ -149,7 +149,7 @@ public final class AttachmentPayloadCodec {
      */
     public static String validateAllowedMimeType(String mimeType) {
         String normalized = AttachmentConstants.normalizeMimeType(mimeType);
-        if (!AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains(normalized)) {
+        if (!AttachmentConstants.isAllowedAttachmentType(normalized)) {
             throw new IllegalArgumentException("Attachment MIME type is not allowed: " + mimeType);
         }
         return normalized;
