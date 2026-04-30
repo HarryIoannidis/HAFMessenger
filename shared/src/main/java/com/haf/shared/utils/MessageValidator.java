@@ -1,5 +1,6 @@
 package com.haf.shared.utils;
 
+import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageValidationException;
@@ -31,7 +32,7 @@ public final class MessageValidator {
         BAD_WRAPPED_KEY, // ephemeralPublicB64 invalid or too short for X25519 ECDHKeyAgreement
         BAD_TIMESTAMP, // timestampEpochMs <= 0
         BAD_CONTENT_LENGTH, // contentLength < 0
-        BAD_CONTENT_TYPE, // contentType null/empty/not allowed
+        BAD_CONTENT_TYPE, // contentType null/empty/not a valid MIME type
         BAD_AAD // aadB64 is null or empty
     }
 
@@ -155,7 +156,7 @@ public final class MessageValidator {
 
         // Content type – accepted
         String baseCt = normalizeContentType(m.getContentType());
-        if (baseCt == null || !MessageHeader.ALLOWED_CONTENT_TYPES.contains(baseCt)) {
+        if (baseCt == null || !AttachmentConstants.isValidMimeType(baseCt)) {
             errors.add(ErrorCode.BAD_CONTENT_TYPE);
         }
     }

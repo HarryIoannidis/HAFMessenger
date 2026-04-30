@@ -60,6 +60,26 @@ class MessageViewModelAttachmentTest {
     }
 
     @Test
+    void wildcard_policy_allows_arbitrary_file_attachment_types() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        sender.policy.setAttachmentAllowedTypes(List.of(AttachmentConstants.MIME_TYPE_WILDCARD));
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("installer.exe");
+        Files.write(file, new byte[256]);
+
+        viewModel.sendAttachment("bob", file, "application/vnd.microsoft.portable-executable");
+        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+
+        MessageVM message = viewModel.getMessages("bob").getFirst();
+        assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSentContentType);
+        assertEquals(MessageType.FILE, message.type());
+        assertEquals("installer.exe", message.fileName());
+    }
+
+    @Test
     void outgoing_inline_image_shows_loading_then_swaps_to_image() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(1_024, 512, 256);

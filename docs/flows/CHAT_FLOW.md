@@ -22,7 +22,7 @@ To keep the performance tight:
 
 When sending an image or document, heavy safeguards trigger:
 
-- `chooseImageAttachment/chooseDocumentAttachment` strictly isolates user `FileChooser` capability by extension filters (`*.pdf` vs `*.png`).
+- `chooseImageAttachment` keeps a quick image-only picker, while the paperclip `chooseFileAttachment` picker exposes all files with category filters for common document, media, archive, code/text, and application extensions.
 - Checks `MAX_ATTACHMENT_BYTES` explicitly, bounding payloads at a strict 10MB cutoff utilizing `java.nio.file.Files.size()`.
 - If an oversized file attempts to pass, a custom two-action alert blocks it, preventing a hard server disconnect for oversize blobs.
 - Success delegates the file pointer to the `ChatAttachmentService`, which manages background uploading securely.

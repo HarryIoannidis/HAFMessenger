@@ -98,7 +98,16 @@ public final class MessageBubbleFactory {
             Map.entry("sh", MaterialDesignF.FILE_CODE),
             Map.entry("txt", MaterialDesignF.FILE_DOCUMENT_OUTLINE),
             Map.entry("md", MaterialDesignF.FILE_DOCUMENT_OUTLINE),
-            Map.entry("log", MaterialDesignF.FILE_DOCUMENT_OUTLINE));
+            Map.entry("log", MaterialDesignF.FILE_DOCUMENT_OUTLINE),
+            Map.entry("exe", MaterialDesignF.FILE_COG),
+            Map.entry("msi", MaterialDesignF.FILE_COG),
+            Map.entry("dmg", MaterialDesignF.FILE_COG),
+            Map.entry("app", MaterialDesignF.FILE_COG),
+            Map.entry("apk", MaterialDesignF.FILE_COG),
+            Map.entry("deb", MaterialDesignF.FILE_COG),
+            Map.entry("rpm", MaterialDesignF.FILE_COG),
+            Map.entry("bat", MaterialDesignF.FILE_COG),
+            Map.entry("cmd", MaterialDesignF.FILE_COG));
 
     /**
      * Prevents instantiation of this utility factory.

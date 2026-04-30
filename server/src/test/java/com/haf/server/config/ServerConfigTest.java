@@ -60,7 +60,7 @@ class ServerConfigTest {
         assertEquals(AttachmentConstants.DEFAULT_INLINE_MAX_BYTES, config.getAttachmentInlineMaxBytes());
         assertEquals(AttachmentConstants.DEFAULT_CHUNK_BYTES, config.getAttachmentChunkBytes());
         assertEquals(AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS, config.getAttachmentUnboundTtlSeconds());
-        assertTrue(config.getAttachmentAllowedTypes().contains("application/pdf"));
+        assertEquals(java.util.List.of(AttachmentConstants.MIME_TYPE_WILDCARD), config.getAttachmentAllowedTypes());
     }
 
     @Test
@@ -213,6 +213,16 @@ class ServerConfigTest {
         ServerConfig config = ServerConfig.fromEnv(env);
 
         assertEquals(43200L, config.getJwtIdleTtlSeconds());
+    }
+
+    @Test
+    void load_accepts_attachment_policy_wildcards_and_deduplicates() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_ATTACHMENT_ALLOWED_TYPES", "image/*, image/png, */*, image/*");
+
+        ServerConfig config = ServerConfig.fromEnv(env);
+
+        assertEquals(java.util.List.of("image/*", "image/png", "*/*"), config.getAttachmentAllowedTypes());
     }
 
     @Test

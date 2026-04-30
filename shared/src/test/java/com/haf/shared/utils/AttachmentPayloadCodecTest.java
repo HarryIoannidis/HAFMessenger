@@ -30,10 +30,10 @@ class AttachmentPayloadCodecTest {
     }
 
     @Test
-    void inline_payload_rejects_disallowed_mime_type() {
+    void inline_payload_rejects_invalid_mime_type() {
         AttachmentInlinePayload payload = new AttachmentInlinePayload();
         payload.setFileName("evil.js");
-        payload.setMediaType("application/javascript");
+        payload.setMediaType("application-javascript");
         payload.setSizeBytes(4);
         payload.setDataB64(Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3, 4 }));
 
@@ -87,10 +87,9 @@ class AttachmentPayloadCodecTest {
 
     @Test
     void allowlist_contains_expected_defaults() {
-        assertTrue(AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains("image/webp"));
-        assertTrue(
-                AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-        assertFalse(AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains("text/plain"));
+        assertTrue(AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains(AttachmentConstants.MIME_TYPE_WILDCARD));
+        assertTrue(AttachmentConstants.isAllowedAttachmentType("image/webp"));
+        assertTrue(AttachmentConstants.isAllowedAttachmentType("text/plain"));
+        assertTrue(AttachmentConstants.isAllowedAttachmentType("application/vnd.android.package-archive"));
     }
 }
