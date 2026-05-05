@@ -23,7 +23,7 @@ public final class MessageHeader {
     public static final long MIN_TTL_SECONDS = 60;
 
     // Size limits
-    public static final int MAX_CIPHERTEXT_BASE64 = 1024 * 1024 * 8;
+    public static final int MAX_CIPHERTEXT_BASE64 = 1024 * 1024 * 16;
 
     // Content types
     public static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(

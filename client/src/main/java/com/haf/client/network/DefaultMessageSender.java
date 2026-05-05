@@ -36,20 +36,20 @@ public class DefaultMessageSender implements MessageSender {
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
-    private final WebSocketAdapter webSocketAdapter;
+    private final AuthHttpClient authHttpClient;
 
     /**
      * Creates a DefaultMessageSender with the specified dependencies.
      *
      * @param keyProvider      the key provider for retrieving recipient public keys
      * @param clockProvider    the clock provider for deterministic timestamps
-     * @param webSocketAdapter the WebSocket adapter for network communication
+     * @param authHttpClient authenticated HTTP adapter for network communication
      */
     public DefaultMessageSender(KeyProvider keyProvider, ClockProvider clockProvider,
-            WebSocketAdapter webSocketAdapter) {
+            AuthHttpClient authHttpClient) {
         this.keyProvider = keyProvider;
         this.clockProvider = clockProvider;
-        this.webSocketAdapter = webSocketAdapter;
+        this.authHttpClient = authHttpClient;
     }
 
     /**
@@ -201,7 +201,7 @@ public class DefaultMessageSender implements MessageSender {
             Map<String, String> headers = recipientKeyFingerprint == null || recipientKeyFingerprint.isBlank()
                     ? Map.of()
                     : Map.of(RECIPIENT_KEY_FINGERPRINT_HEADER, recipientKeyFingerprint);
-            response = webSocketAdapter.postAuthenticated("/api/v1/messages", json, headers).join();
+            response = authHttpClient.postAuthenticated("/api/v1/messages", json, headers).join();
         } catch (CompletionException ex) {
             Throwable cause = ex.getCause();
             if (cause instanceof IOException ioException) {
@@ -268,7 +268,7 @@ public class DefaultMessageSender implements MessageSender {
      */
     @Override
     public MessagingPolicyResponse fetchMessagingPolicy() throws IOException {
-        return decodeResponse(webSocketAdapter.getAuthenticated("/api/v1/config/messaging"),
+        return decodeResponse(authHttpClient.getAuthenticated("/api/v1/config/messaging"),
                 MessagingPolicyResponse.class);
     }
 
@@ -282,7 +282,7 @@ public class DefaultMessageSender implements MessageSender {
     @Override
     public AttachmentInitResponse initAttachmentUpload(AttachmentInitRequest request) throws IOException {
         String body = JsonCodec.toJson(request);
-        return decodeResponse(webSocketAdapter.postAuthenticated("/api/v1/attachments/" + "init", body),
+        return decodeResponse(authHttpClient.postAuthenticated("/api/v1/attachments/" + "init", body),
                 AttachmentInitResponse.class);
     }
 
@@ -299,7 +299,7 @@ public class DefaultMessageSender implements MessageSender {
             throws IOException {
         String body = JsonCodec.toJson(request);
         return decodeResponse(
-                webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/chunk", body),
+                authHttpClient.postAuthenticated("/api/v1/attachments/" + attachmentId + "/chunk", body),
                 AttachmentChunkResponse.class);
     }
 
@@ -316,7 +316,7 @@ public class DefaultMessageSender implements MessageSender {
             throws IOException {
         String body = JsonCodec.toJson(request);
         return decodeResponse(
-                webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/complete", body),
+                authHttpClient.postAuthenticated("/api/v1/attachments/" + attachmentId + "/complete", body),
                 AttachmentCompleteResponse.class);
     }
 
@@ -332,7 +332,7 @@ public class DefaultMessageSender implements MessageSender {
     public AttachmentBindResponse bindAttachmentUpload(String attachmentId, AttachmentBindRequest request)
             throws IOException {
         String body = JsonCodec.toJson(request);
-        return decodeResponse(webSocketAdapter.postAuthenticated("/api/v1/attachments/" + attachmentId + "/bind", body),
+        return decodeResponse(authHttpClient.postAuthenticated("/api/v1/attachments/" + attachmentId + "/bind", body),
                 AttachmentBindResponse.class);
     }
 
@@ -345,7 +345,7 @@ public class DefaultMessageSender implements MessageSender {
      */
     @Override
     public AttachmentDownloadResponse downloadAttachment(String attachmentId) throws IOException {
-        return decodeResponse(webSocketAdapter.getAuthenticated("/api/v1/attachments/" + attachmentId),
+        return decodeResponse(authHttpClient.getAuthenticated("/api/v1/attachments/" + attachmentId),
                 AttachmentDownloadResponse.class);
     }
 

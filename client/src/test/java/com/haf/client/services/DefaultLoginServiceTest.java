@@ -32,24 +32,21 @@ class DefaultLoginServiceTest {
     }
 
     @Test
-    void endpoint_resolution_uses_localhost_in_dev_mode() {
-        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(new Properties());
+    void endpoint_resolution_uses_configured_prod_server() {
+        Properties properties = new Properties();
+        properties.setProperty("server.url.prod", "https://localhost:8443");
+        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 
         assertEquals(URI.create("https://localhost:8443/api/v1/login"), DefaultLoginService.resolveLoginUri(config));
-        assertEquals(URI.create("wss://localhost:8444/"), DefaultLoginService.resolveWebSocketUri(config));
-        assertEquals(ClientRuntimeConfig.MessagingTransportMode.WEBSOCKET, config.messagingTransportMode());
     }
 
     @Test
-    void endpoint_resolution_uses_prod_endpoints_when_dev_is_disabled() {
+    void endpoint_resolution_uses_prod_endpoints() {
         Properties properties = new Properties();
-        properties.setProperty("app.isDev", "false");
         properties.setProperty("server.url.prod", "https://prod.example.test");
         ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 
         assertEquals(URI.create("https://prod.example.test/api/v1/login"), DefaultLoginService.resolveLoginUri(config));
-        assertEquals(URI.create("wss://prod.example.test/"), DefaultLoginService.resolveWebSocketUri(config));
-        assertEquals(ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING, config.messagingTransportMode());
     }
 
     @Test

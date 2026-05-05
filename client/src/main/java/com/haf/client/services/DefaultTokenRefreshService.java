@@ -38,7 +38,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
         try {
             ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
             HttpClient client = HttpClient.newBuilder()
-                    .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                    .sslContext(SslContextUtils.getStrictSslContext())
                     .sslParameters(SslContextUtils.createHttpsSslParameters())
                     .build();
 

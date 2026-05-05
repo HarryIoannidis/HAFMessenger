@@ -1,8 +1,9 @@
 package com.haf.client.network;
 
 import com.haf.client.exceptions.HttpCommunicationException;
-import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
@@ -13,13 +14,10 @@ import com.haf.shared.responses.AttachmentCompleteResponse;
 import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.responses.MessagingPolicyResponse;
-import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.JsonCodec;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -27,8 +25,15 @@ import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MessageSenderTest {
 
@@ -55,70 +60,28 @@ class MessageSenderTest {
         }
     }
 
-    static class MockWebSocketAdapter extends WebSocketAdapter {
-        private String lastSentMessage;
-        private boolean connected = false;
+    static class RecordingAuthHttpClient extends AuthHttpClient {
+        private String lastPostPath;
+        private String lastPostBody;
 
-        MockWebSocketAdapter() {
-            super(URI.create("ws://localhost:8080"), "test-session-id");
+        RecordingAuthHttpClient() {
+            super(URI.create("https://localhost:8443"), "test-session-id");
         }
 
         @Override
-        public void connect(java.util.function.Consumer<String> onMessage,
-                java.util.function.Consumer<Throwable> onError) throws IOException {
-            connected = true;
-        }
-
-        @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
-            return postAuthenticated(path, jsonBody, Map.of());
-        }
-
-        @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
-                String path,
-                String jsonBody,
-                Map<String, String> extraHeaders) {
-            if ("/api/v1/messages".equals(path)) {
-                try {
-                    sendText(jsonBody);
-                    return java.util.concurrent.CompletableFuture.completedFuture("{\"success\":true}");
-                } catch (IOException e) {
-                    return java.util.concurrent.CompletableFuture.failedFuture(e);
-                }
-            }
-            return super.postAuthenticated(path, jsonBody);
-        }
-
-        @Override
-        public void sendText(String message) throws IOException {
-            if (!connected) {
-                throw new IOException("Not connected");
-            }
-            lastSentMessage = message;
-        }
-
-        @Override
-        public boolean isConnected() {
-            return connected;
-        }
-
-        @Override
-        public void close() {
-            connected = false;
-        }
-
-        String getLastSentMessage() {
-            return lastSentMessage;
+        public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
+            lastPostPath = path;
+            lastPostBody = jsonBody;
+            return CompletableFuture.completedFuture("{\"envelopeId\":\"env-record\",\"expiresAt\":1111}");
         }
     }
 
-    static class ApiStubWebSocketAdapter extends WebSocketAdapter {
+    static class ApiStubAuthHttpClient extends AuthHttpClient {
         private final Map<String, String> postResponses = new HashMap<>();
         private final Map<String, String> getResponses = new HashMap<>();
 
-        ApiStubWebSocketAdapter() {
-            super(URI.create("ws://localhost:8080"), "api-test-session");
+        ApiStubAuthHttpClient() {
+            super(URI.create("https://localhost:8443"), "api-test-session");
         }
 
         void whenPost(String path, String responseBody) {
@@ -130,101 +93,64 @@ class MessageSenderTest {
         }
 
         @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
-            return postAuthenticated(path, jsonBody, Map.of());
-        }
-
-        @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
-                String path,
-                String jsonBody,
-                Map<String, String> extraHeaders) {
+        public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
             if (postResponses.containsKey(path)) {
-                return java.util.concurrent.CompletableFuture.completedFuture(postResponses.get(path));
+                return CompletableFuture.completedFuture(postResponses.get(path));
             }
-            return java.util.concurrent.CompletableFuture.failedFuture(
-                    new IOException("No POST stub for " + path));
+            return CompletableFuture.failedFuture(new IOException("No POST stub for " + path));
         }
 
         @Override
-        public java.util.concurrent.CompletableFuture<String> getAuthenticated(String path) {
+        public CompletableFuture<String> getAuthenticated(String path) {
             if (getResponses.containsKey(path)) {
-                return java.util.concurrent.CompletableFuture.completedFuture(getResponses.get(path));
+                return CompletableFuture.completedFuture(getResponses.get(path));
             }
-            return java.util.concurrent.CompletableFuture.failedFuture(
-                    new IOException("No GET stub for " + path));
+            return CompletableFuture.failedFuture(new IOException("No GET stub for " + path));
         }
     }
 
     private KeyProvider keyProvider;
     private ClockProvider clockProvider;
-    private MockWebSocketAdapter webSocketAdapter;
+    private RecordingAuthHttpClient authHttpClient;
     private MessageSender messageSender;
 
     @BeforeEach
     void setup() throws Exception {
         KeyPair kp = EccKeyIO.generate();
         keyProvider = new MockKeyProvider("sender-123", kp.getPublic());
-        clockProvider = new FixedClockProvider(1000000L);
-        webSocketAdapter = new MockWebSocketAdapter();
-        messageSender = new DefaultMessageSender(keyProvider, clockProvider, webSocketAdapter);
-
-        // Connect WebSocket
-        webSocketAdapter.connect(msg -> {
-        }, err -> {
-        });
+        clockProvider = new FixedClockProvider(1_000_000L);
+        authHttpClient = new RecordingAuthHttpClient();
+        messageSender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);
     }
 
     @Test
-    void send_message_encrypts_and_sends() throws Exception {
+    void send_message_encrypts_and_posts_json() throws Exception {
         byte[] payload = "Hello, World!".getBytes(StandardCharsets.UTF_8);
-
         messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
 
-        assertNotNull(webSocketAdapter.getLastSentMessage());
-        // Verify it's valid JSON
-        JsonCodec.fromJson(webSocketAdapter.getLastSentMessage(), EncryptedMessage.class);
+        assertEquals("/api/v1/messages", authHttpClient.lastPostPath);
+        assertNotNull(authHttpClient.lastPostBody);
+        JsonCodec.fromJson(authHttpClient.lastPostBody, EncryptedMessage.class);
     }
 
     @Test
     void send_message_throws_on_unknown_recipient() {
         byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-
-        assertThrows(KeyNotFoundException.class, () -> {
-            messageSender.sendMessage(payload, "unknown-recipient", "text/plain", 3600);
-        });
+        assertThrows(KeyNotFoundException.class, () ->
+                messageSender.sendMessage(payload, "unknown-recipient", "text/plain", 3600));
     }
 
     @Test
-    void send_message_validates_message() {
-        byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-
-        // This should work (validation happens after encryption)
-        assertDoesNotThrow(() -> {
-            messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
-        });
-    }
-
-    @Test
-    void send_message_throws_on_null_payload() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            messageSender.sendMessage(null, "recipient-123", "text/plain", 3600);
-        });
-    }
-
-    @Test
-    void send_message_throws_when_not_connected() {
-        webSocketAdapter.close();
-        byte[] payload = "Hello".getBytes(StandardCharsets.UTF_8);
-
-        assertThrows(IOException.class, () -> {
-            messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
-        });
+    void send_message_validates_arguments() {
+        assertThrows(IllegalArgumentException.class, () ->
+                messageSender.sendMessage(null, "recipient-123", "text/plain", 3600));
+        assertDoesNotThrow(() ->
+                messageSender.sendMessage("Hello".getBytes(StandardCharsets.UTF_8), "recipient-123", "text/plain", 3600));
     }
 
     @Test
     void send_encrypted_message_parses_envelope_metadata() throws Exception {
-        ApiStubWebSocketAdapter apiAdapter = new ApiStubWebSocketAdapter();
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
         apiAdapter.whenPost("/api/v1/messages", "{\"envelopeId\":\"env-1\",\"expiresAt\":123456}");
         MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
 
@@ -236,7 +162,7 @@ class MessageSenderTest {
 
     @Test
     void send_encrypted_message_defaults_expires_at_when_not_numeric() throws Exception {
-        ApiStubWebSocketAdapter apiAdapter = new ApiStubWebSocketAdapter();
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
         apiAdapter.whenPost("/api/v1/messages", "{\"envelopeId\":\"env-2\",\"expiresAt\":\"oops\"}");
         MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
 
@@ -249,24 +175,20 @@ class MessageSenderTest {
     @Test
     void send_message_retries_once_when_recipient_key_is_stale() throws Exception {
         AtomicInteger attempts = new AtomicInteger();
-        ApiStubWebSocketAdapter apiAdapter = new ApiStubWebSocketAdapter() {
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient() {
             @Override
-            public java.util.concurrent.CompletableFuture<String> postAuthenticated(
-                    String path,
-                    String jsonBody,
-                    Map<String, String> extraHeaders) {
+            public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
                 if (!"/api/v1/messages".equals(path)) {
                     return super.postAuthenticated(path, jsonBody, extraHeaders);
                 }
                 if (attempts.getAndIncrement() == 0) {
-                    return java.util.concurrent.CompletableFuture.failedFuture(
+                    return CompletableFuture.failedFuture(
                             new HttpCommunicationException(
                                     "stale key",
                                     409,
                                     "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}"));
                 }
-                return java.util.concurrent.CompletableFuture
-                        .completedFuture("{\"envelopeId\":\"env-retry\",\"expiresAt\":9999}");
+                return CompletableFuture.completedFuture("{\"envelopeId\":\"env-retry\",\"expiresAt\":9999}");
             }
         };
         MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
@@ -283,7 +205,7 @@ class MessageSenderTest {
 
     @Test
     void attachment_and_policy_apis_decode_payloads() throws Exception {
-        ApiStubWebSocketAdapter apiAdapter = new ApiStubWebSocketAdapter();
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
         MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
 
         MessagingPolicyResponse policy = MessagingPolicyResponse.success(1000, 100, 32, java.util.List.of("application/pdf"), 60);

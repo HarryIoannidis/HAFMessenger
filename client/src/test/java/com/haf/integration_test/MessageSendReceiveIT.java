@@ -1,96 +1,86 @@
 package com.haf.integration_test;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
-import com.haf.client.network.*;
+import com.haf.client.network.AuthHttpClient;
+import com.haf.client.network.DefaultMessageReceiver;
+import com.haf.client.network.DefaultMessageSender;
+import com.haf.client.network.MessageReceiver;
+import com.haf.client.network.MessageSender;
+import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.utils.ClockProvider;
-import com.haf.shared.utils.FixedClockProvider;
-import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.EccKeyIO;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import com.haf.shared.utils.FilePerms;
+import com.haf.shared.utils.FixedClockProvider;
+import com.haf.shared.utils.JsonCodec;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class MessageSendReceiveIT {
 
-    static class InMemoryWebSocketAdapter extends WebSocketAdapter {
-        private java.util.function.Consumer<String> messageConsumer;
-        private java.util.function.Consumer<Throwable> errorConsumer;
-        private boolean connected = false;
-        private InMemoryWebSocketAdapter peer;
+    static class InMemoryAuthHttpClient extends AuthHttpClient {
+        private static final Map<String, ArrayDeque<String>> MAILBOX_BY_USER = new ConcurrentHashMap<>();
+        private static int envelopeCounter = 0;
 
-        InMemoryWebSocketAdapter() {
-            super(java.net.URI.create("ws://localhost:8080"), "test-session-id");
-        }
+        private final String userId;
 
-        void setPeer(InMemoryWebSocketAdapter peer) {
-            this.peer = peer;
-        }
-
-        @Override
-        public void connect(java.util.function.Consumer<String> onMessage,
-                java.util.function.Consumer<Throwable> onError) throws java.io.IOException {
-            this.messageConsumer = onMessage;
-            this.errorConsumer = onError;
-            connected = true;
+        InMemoryAuthHttpClient(String userId) {
+            super(java.net.URI.create("https://localhost:8443"), "test-session-id");
+            this.userId = userId;
+            MAILBOX_BY_USER.computeIfAbsent(userId, ignored -> new ArrayDeque<>());
         }
 
         @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(String path, String jsonBody) {
-            return postAuthenticated(path, jsonBody, java.util.Map.of());
-        }
-
-        @Override
-        public java.util.concurrent.CompletableFuture<String> postAuthenticated(
-                String path,
-                String jsonBody,
-                java.util.Map<String, String> extraHeaders) {
+        public CompletableFuture<String> postAuthenticated(String path, String body, java.util.Map<String, String> extraHeaders) {
             if ("/api/v1/messages".equals(path)) {
-                try {
-                    sendText(jsonBody);
-                    return java.util.concurrent.CompletableFuture.completedFuture("{\"success\":true}");
-                } catch (java.io.IOException e) {
-                    return java.util.concurrent.CompletableFuture.failedFuture(e);
+                EncryptedMessage payload = JsonCodec.fromJson(body, EncryptedMessage.class);
+                String recipientId = payload.getRecipientId();
+                String envelopeId = nextEnvelopeId();
+                String wrapped = "{\"type\":\"message\",\"envelopeId\":\"" + envelopeId + "\",\"payload\":" + body + "}";
+                MAILBOX_BY_USER.computeIfAbsent(recipientId, ignored -> new ArrayDeque<>()).addLast(wrapped);
+                return CompletableFuture.completedFuture("{\"envelopeId\":\"" + envelopeId + "\",\"expiresAt\":9999999}");
+            }
+            if ("/api/v1/messages/ack".equals(path)) {
+                return CompletableFuture.completedFuture("{\"acknowledged\":true}");
+            }
+            return CompletableFuture.completedFuture("{}");
+        }
+
+        @Override
+        public CompletableFuture<String> getAuthenticated(String path) {
+            if (path.startsWith("/api/v1/messages")) {
+                ArrayDeque<String> mailbox = MAILBOX_BY_USER.computeIfAbsent(userId, ignored -> new ArrayDeque<>());
+                if (mailbox.isEmpty()) {
+                    return CompletableFuture.completedFuture("{\"messages\":[]}");
                 }
+                String message = mailbox.removeFirst();
+                return CompletableFuture.completedFuture("{\"messages\":[" + message + "]}");
             }
-            return super.postAuthenticated(path, jsonBody, extraHeaders);
+            if (path.startsWith("/api/v1/contacts")) {
+                return CompletableFuture.completedFuture("{\"contacts\":[]}");
+            }
+            return CompletableFuture.completedFuture("{}");
         }
 
-        @Override
-        public void sendText(String message) throws java.io.IOException {
-            if (!connected) {
-                throw new java.io.IOException("Not connected");
-            }
-            if (peer != null && peer.messageConsumer != null) {
-                String wrappedJson = "{\"type\":\"message\",\"payload\":" + message + "}";
-                // Simulate network delay
-                new Thread(() -> {
-                    try {
-                        peer.messageConsumer.accept(wrappedJson);
-                    } catch (Exception e) {
-                        if (peer.errorConsumer != null) {
-                            peer.errorConsumer.accept(e);
-                        }
-                    }
-                }).start();
-            }
-        }
-
-        @Override
-        public boolean isConnected() {
-            return connected;
-        }
-
-        @Override
-        public void close() {
-            connected = false;
+        private static synchronized String nextEnvelopeId() {
+            envelopeCounter++;
+            return "env-" + envelopeCounter;
         }
     }
 
@@ -104,8 +94,8 @@ class MessageSendReceiveIT {
     UserKeystoreKeyProvider senderKeyProvider;
     UserKeystoreKeyProvider recipientKeyProvider;
     ClockProvider clock;
-    InMemoryWebSocketAdapter senderWebSocket;
-    InMemoryWebSocketAdapter recipientWebSocket;
+    InMemoryAuthHttpClient senderHttpClient;
+    InMemoryAuthHttpClient recipientHttpClient;
     MessageSender messageSender;
     MessageReceiver messageReceiver;
     byte[] receivedPayload;
@@ -121,40 +111,34 @@ class MessageSendReceiveIT {
         FilePerms.ensureDir700(tmpRoot1);
         FilePerms.ensureDir700(tmpRoot2);
 
-        // Create sender and recipient keys
         UserKeystore senderKeyStore = new UserKeystore(tmpRoot1);
         UserKeystore recipientKeyStore = new UserKeystore(tmpRoot2);
 
         senderKeyId = "key-sender-001";
         recipientKeyId = "key-recipient-001";
-
         senderKp = EccKeyIO.generate();
         recipientKp = EccKeyIO.generate();
-
         senderKeyStore.saveKeypair(senderKeyId, senderKp, passphrase);
         recipientKeyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
 
-        // Also save recipient key in sender's keystore for lookup (Phase 4 placeholder)
+        // Sender knows recipient public key for encryption.
         senderKeyStore.saveKeypair(recipientKeyId, recipientKp, passphrase);
 
         senderKeyProvider = new UserKeystoreKeyProvider(tmpRoot1, senderKeyId, passphrase);
         recipientKeyProvider = new UserKeystoreKeyProvider(tmpRoot2, recipientKeyId, passphrase);
+        clock = new FixedClockProvider(1_000_000L);
 
-        clock = new FixedClockProvider(1000000L);
+        senderHttpClient = new InMemoryAuthHttpClient(senderKeyId);
+        recipientHttpClient = new InMemoryAuthHttpClient(recipientKeyId);
 
-        // Create in-memory WebSocket adapters
-        senderWebSocket = new InMemoryWebSocketAdapter();
-        recipientWebSocket = new InMemoryWebSocketAdapter();
-        senderWebSocket.setPeer(recipientWebSocket);
-        recipientWebSocket.setPeer(senderWebSocket);
-
-        messageSender = new DefaultMessageSender(senderKeyProvider, clock, senderWebSocket);
-        messageReceiver = new DefaultMessageReceiver(recipientKeyProvider, clock, recipientWebSocket, recipientKeyId);
+        messageSender = new DefaultMessageSender(senderKeyProvider, clock, senderHttpClient);
+        messageReceiver = new DefaultMessageReceiver(recipientKeyProvider, clock, recipientHttpClient, recipientKeyId);
 
         messageReceivedLatch = new CountDownLatch(1);
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
                 receivedPayload = plaintext;
                 receivedSenderId = senderId;
                 receivedContentType = contentType;
@@ -173,22 +157,22 @@ class MessageSendReceiveIT {
     void cleanup() throws Exception {
         if (tmpRoot1 != null) {
             try (var w = Files.walk(tmpRoot1)) {
-                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
                     try {
-                        Files.deleteIfExists(p);
+                        Files.deleteIfExists(path);
                     } catch (Exception ignored) {
-                        // Ignore failure
+                        // Ignore cleanup failures in tests.
                     }
                 });
             }
         }
         if (tmpRoot2 != null) {
             try (var w = Files.walk(tmpRoot2)) {
-                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
                     try {
-                        Files.deleteIfExists(p);
+                        Files.deleteIfExists(path);
                     } catch (Exception ignored) {
-                        // Ignore failure
+                        // Ignore cleanup failures in tests.
                     }
                 });
             }
@@ -197,48 +181,35 @@ class MessageSendReceiveIT {
 
     @Test
     void send_receive_decrypt_roundtrip() throws Exception {
-        // Start receiver
         messageReceiver.start();
 
-        // Connect sender WebSocket
-        senderWebSocket.connect(msg -> {
-        }, err -> {
-        });
-
-        // Send message
         byte[] payload = "Hello, World!".getBytes(StandardCharsets.UTF_8);
         String contentType = "text/plain";
         long ttlSeconds = 3600;
 
         messageSender.sendMessage(payload, recipientKeyId, contentType, ttlSeconds);
 
-        // Wait for message to be received and decrypted
-        assertTrue(messageReceivedLatch.await(5, TimeUnit.SECONDS),
-                "Message should be received within 5 seconds");
-
-        // Verify received message
+        assertTrue(messageReceivedLatch.await(5, TimeUnit.SECONDS), "Message should be received within 5 seconds");
         assertNotNull(receivedPayload);
         assertArrayEquals(payload, receivedPayload);
         assertEquals(senderKeyId, receivedSenderId);
         assertEquals(contentType, receivedContentType);
-        assertEquals(1000000L, receivedTimestamp);
+        assertEquals(1_000_000L, receivedTimestamp);
     }
 
     @Test
     void send_receive_with_deterministic_clock() throws Exception {
-        // Use deterministic clock for testing
-        ClockProvider testClock = new FixedClockProvider(2000000L);
-
-        // Recreate sender and receiver with test clock
-        MessageSender testSender = new DefaultMessageSender(senderKeyProvider, testClock, senderWebSocket);
-        MessageReceiver testReceiver = new DefaultMessageReceiver(recipientKeyProvider, testClock, recipientWebSocket,
+        ClockProvider testClock = new FixedClockProvider(2_000_000L);
+        MessageSender testSender = new DefaultMessageSender(senderKeyProvider, testClock, senderHttpClient);
+        MessageReceiver testReceiver = new DefaultMessageReceiver(recipientKeyProvider, testClock, recipientHttpClient,
                 recipientKeyId);
 
         CountDownLatch latch = new CountDownLatch(1);
         testReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
-            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
-                assertEquals(2000000L, timestampEpochMs);
+            public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                    String envelopeId) {
+                assertEquals(2_000_000L, timestampEpochMs);
                 latch.countDown();
             }
 
@@ -249,19 +220,13 @@ class MessageSendReceiveIT {
         });
 
         testReceiver.start();
-        senderWebSocket.connect(msg -> {
-        }, err -> {
-        });
-
-        byte[] payload = "Test message".getBytes(StandardCharsets.UTF_8);
-        testSender.sendMessage(payload, recipientKeyId, "text/plain", 3600);
+        testSender.sendMessage("Test message".getBytes(StandardCharsets.UTF_8), recipientKeyId, "text/plain", 3600);
 
         assertTrue(latch.await(5, TimeUnit.SECONDS), "Message should be received");
     }
 
     @Test
     void send_receive_with_directory_service_fetch_roundtrip() throws Exception {
-        // Create new keys and providers to isolate this test
         Path tmpSenderDir = Files.createTempDirectory("haf-test-ds-sender");
         Path tmpRecipientDir = Files.createTempDirectory("haf-test-ds-recipient");
 
@@ -271,22 +236,16 @@ class MessageSendReceiveIT {
 
             String newSenderKeyId = "sender-ds-001";
             String newRecipientKeyId = "recipient-ds-001";
-
             KeyPair newSenderKp = EccKeyIO.generate();
             KeyPair newRecipientKp = EccKeyIO.generate();
-
             newSenderKeyStore.saveKeypair(newSenderKeyId, newSenderKp, passphrase);
             newRecipientKeyStore.saveKeypair(newRecipientKeyId, newRecipientKp, passphrase);
-
-            // CRITICAL: DO NOT save the recipient key in the sender's keystore!
-            // The sender should not know the recipient's key yet.
 
             UserKeystoreKeyProvider newSenderKeyProvider = new UserKeystoreKeyProvider(tmpSenderDir, newSenderKeyId,
                     passphrase);
             UserKeystoreKeyProvider newRecipientKeyProvider = new UserKeystoreKeyProvider(tmpRecipientDir,
                     newRecipientKeyId, passphrase);
 
-            // Configure directory service callback on the sender
             final String recipientPem = EccKeyIO.publicPem(newRecipientKp.getPublic());
             newSenderKeyProvider.setDirectoryServiceFetcher(recipientId -> {
                 if (newRecipientKeyId.equals(recipientId)) {
@@ -295,19 +254,17 @@ class MessageSendReceiveIT {
                 return null;
             });
 
-            InMemoryWebSocketAdapter newSenderWs = new InMemoryWebSocketAdapter();
-            InMemoryWebSocketAdapter newRecipientWs = new InMemoryWebSocketAdapter();
-            newSenderWs.setPeer(newRecipientWs);
-            newRecipientWs.setPeer(newSenderWs);
-
-            MessageSender dsSender = new DefaultMessageSender(newSenderKeyProvider, clock, newSenderWs);
-            MessageReceiver dsReceiver = new DefaultMessageReceiver(newRecipientKeyProvider, clock, newRecipientWs,
+            InMemoryAuthHttpClient newSenderClient = new InMemoryAuthHttpClient(newSenderKeyId);
+            InMemoryAuthHttpClient newRecipientClient = new InMemoryAuthHttpClient(newRecipientKeyId);
+            MessageSender dsSender = new DefaultMessageSender(newSenderKeyProvider, clock, newSenderClient);
+            MessageReceiver dsReceiver = new DefaultMessageReceiver(newRecipientKeyProvider, clock, newRecipientClient,
                     newRecipientKeyId);
 
             CountDownLatch latch = new CountDownLatch(1);
             dsReceiver.setMessageListener(new MessageReceiver.MessageListener() {
                 @Override
-                public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs, String envelopeId) {
+                public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
+                        String envelopeId) {
                     receivedPayload = plaintext;
                     receivedSenderId = senderId;
                     receivedContentType = contentType;
@@ -322,39 +279,30 @@ class MessageSendReceiveIT {
             });
 
             dsReceiver.start();
-            newSenderWs.connect(msg -> {
-            }, err -> {
-            });
-
-            // Send message. This should trigger the fetcher callback.
             byte[] payload = "Hello, Directory Service!".getBytes(StandardCharsets.UTF_8);
-            String contentType = "text/plain";
-            dsSender.sendMessage(payload, newRecipientKeyId, contentType, 3600);
+            dsSender.sendMessage(payload, newRecipientKeyId, "text/plain", 3600);
 
             assertTrue(latch.await(5, TimeUnit.SECONDS), "Message should be received");
-
             assertNotNull(receivedPayload);
             assertArrayEquals(payload, receivedPayload);
             assertEquals(newSenderKeyId, receivedSenderId);
-            assertEquals(contentType, receivedContentType);
-
+            assertEquals("text/plain", receivedContentType);
         } finally {
-            // Cleanup local temp directories
             try (var w = Files.walk(tmpSenderDir)) {
-                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
                     try {
-                        Files.deleteIfExists(p);
+                        Files.deleteIfExists(path);
                     } catch (Exception ignored) {
-                        // Ignore failure
+                        // Ignore cleanup failures in tests.
                     }
                 });
             }
             try (var w = Files.walk(tmpRecipientDir)) {
-                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(p -> {
+                w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
                     try {
-                        Files.deleteIfExists(p);
+                        Files.deleteIfExists(path);
                     } catch (Exception ignored) {
-                        // Ignore failure
+                        // Ignore cleanup failures in tests.
                     }
                 });
             }

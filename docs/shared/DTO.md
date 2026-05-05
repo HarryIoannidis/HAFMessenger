@@ -26,7 +26,7 @@ Describe current shared DTO families used across client/server boundaries.
 
 ## Flow
 
-1. Client serializes request DTOs for HTTPS operations and dev-mode WSS operations.
+1. Client serializes request DTOs for HTTPS operations.
 2. Server deserializes, processes, and returns response DTOs.
 3. Shared DTOs guarantee consistent wire contracts between modules.
 4. Codec/validator rules enforce strict field handling on boundaries.

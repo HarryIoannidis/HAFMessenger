@@ -2,7 +2,6 @@ package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
 import com.haf.client.exceptions.HttpCommunicationException;
-import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.dto.KeyMetadata;
@@ -22,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -45,9 +43,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
-    private final WebSocketAdapter webSocketAdapter;
+    private final AuthHttpClient authHttpClient;
     private final String localRecipientId;
-    private final ClientRuntimeConfig.MessagingTransportMode transportMode;
     private MessageListener messageListener;
 
     // Tracks envelopeIds already processed to avoid duplicate delivery on
@@ -69,35 +66,16 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * @param keyProvider      the key provider (must be UserKeystoreKeyProvider to
      *                         access keystore)
      * @param clockProvider    the clock provider for deterministic expiry checks
-     * @param webSocketAdapter the WebSocket adapter for network communication
+     * @param authHttpClient   authenticated HTTP adapter
      * @param localRecipientId the local recipient's ID (must match message
      *                         recipientId)
      */
     public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
-            WebSocketAdapter webSocketAdapter, String localRecipientId) {
-        this(keyProvider, clockProvider, webSocketAdapter, localRecipientId,
-                ClientRuntimeConfig.MessagingTransportMode.WEBSOCKET);
-    }
-
-    /**
-     * Creates a DefaultMessageReceiver with an explicit transport mode.
-     *
-     * @param keyProvider      key provider
-     * @param clockProvider    clock provider
-     * @param webSocketAdapter adapter exposing authenticated HTTPS and optional WSS
-     * @param localRecipientId local recipient id
-     * @param transportMode    runtime transport mode
-     */
-    public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
-            WebSocketAdapter webSocketAdapter, String localRecipientId,
-            ClientRuntimeConfig.MessagingTransportMode transportMode) {
+            AuthHttpClient authHttpClient, String localRecipientId) {
         this.keyProvider = keyProvider;
         this.clockProvider = clockProvider;
-        this.webSocketAdapter = webSocketAdapter;
+        this.authHttpClient = authHttpClient;
         this.localRecipientId = localRecipientId;
-        this.transportMode = transportMode == null
-                ? ClientRuntimeConfig.MessagingTransportMode.WEBSOCKET
-                : transportMode;
     }
 
     /**
@@ -121,21 +99,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
             throw new IllegalStateException("MessageListener must be set before starting");
         }
         stopHttpPolling();
-        if (transportMode == ClientRuntimeConfig.MessagingTransportMode.HTTPS_POLLING) {
-            startHttpPolling();
-            return;
-        }
-        try {
-            // Register message handler with WebSocketAdapter.
-            webSocketAdapter.connect(
-                    this::handleIncomingMessage,
-                    this::handleError);
-            pollFailureCount.set(0);
-        } catch (IOException connectError) {
-            LOGGER.info("WebSocket receiver unavailable ({}). Falling back to HTTP mailbox polling.",
-                    connectError.getMessage());
-            startHttpPolling();
-        }
+        startHttpPolling();
     }
 
     /**
@@ -144,12 +108,11 @@ public class DefaultMessageReceiver implements MessageReceiver {
     @Override
     public void stop() {
         stopHttpPolling();
-        webSocketAdapter.close();
+        authHttpClient.close();
     }
 
     /**
-     * Starts background HTTP polling fallback when WebSocket transport cannot be
-     * established.
+     * Starts background HTTP polling for inbound envelopes.
      */
     private void startHttpPolling() {
         synchronized (pollingLock) {
@@ -172,7 +135,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Stops the HTTP polling fallback worker, if active.
+     * Stops the HTTP polling worker, if active.
      */
     private void stopHttpPolling() {
         synchronized (pollingLock) {
@@ -240,13 +203,13 @@ public class DefaultMessageReceiver implements MessageReceiver {
 
     /**
      * Fetches pending mailbox envelopes over authenticated HTTP and processes them
-     * through the same envelope pipeline used by WebSocket delivery.
+     * through the same envelope pipeline used by polling delivery.
      *
      * @throws IOException when polling request fails
      */
     private void pollMailboxMessagesOnce() throws IOException {
         String responseJson = requestWithIoMapping(
-                webSocketAdapter.getAuthenticated("/api/v1/messages?limit=" + HTTP_POLL_BATCH_LIMIT),
+                authHttpClient.getAuthenticated("/api/v1/messages?limit=" + HTTP_POLL_BATCH_LIMIT),
                 "Failed to poll mailbox");
         java.util.Map<?, ?> response = JsonCodec.fromJson(responseJson, java.util.Map.class);
         Object messagesNode = response.get("messages");
@@ -270,7 +233,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      */
     private void pollContactsPresenceOnce() throws IOException {
         String responseJson = requestWithIoMapping(
-                webSocketAdapter.getAuthenticated("/api/v1/contacts"),
+                authHttpClient.getAuthenticated("/api/v1/contacts"),
                 "Failed to poll contacts");
         ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
         if (response == null || response.getContacts() == null) {
@@ -296,9 +259,9 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Handles incoming JSON message from WebSocket.
+     * Handles incoming JSON envelope from polling response.
      *
-     * @param json the JSON string containing EncryptedMessage
+     * @param json the JSON string containing envelope data
      */
     private void handleIncomingMessage(String json) {
         try {
@@ -322,7 +285,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
     /**
      * Parses the JSON envelope and dispatches the message for processing.
      *
-     * @param json the raw JSON string from the WebSocket
+     * @param json the raw JSON string envelope
      * @return the envelope ID (may be {@code null})
      * @throws Exception when parsing, validation, or decryption fails
      */
@@ -529,7 +492,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Decrypts a detached encrypted message without requiring websocket envelope
+     * Decrypts a detached encrypted message without requiring envelope
      * context.
      *
      * @param encryptedMessage encrypted payload to decrypt
@@ -561,8 +524,8 @@ public class DefaultMessageReceiver implements MessageReceiver {
         if (senderId == null) {
             return;
         }
-        if (!webSocketAdapter.isConnected() && !httpPollingActive) {
-            LOGGER.debug("Deferring ACK for sender {} while websocket is disconnected", senderId);
+        if (!httpPollingActive) {
+            LOGGER.debug("Deferring ACK for sender {} while receiver is not polling", senderId);
             return;
         }
         List<String> ids = pendingAcks.remove(senderId);
@@ -572,33 +535,10 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             sendAck(ids);
         } catch (IOException e) {
-            if (isDisconnectedError(e)) {
-                LOGGER.debug("Deferring ACK for sender {} until websocket reconnects", senderId);
-            } else {
-                LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
-            }
+            LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
             // Put them back so we can try again later
             pendingAcks.computeIfAbsent(senderId, k -> new ArrayList<>()).addAll(ids);
         }
-    }
-
-    /**
-     * Detects send failures caused by websocket disconnect races.
-     *
-     * @param error send failure to inspect
-     * @return {@code true} when the exception chain indicates disconnected
-     *         transport
-     */
-    private static boolean isDisconnectedError(Throwable error) {
-        Throwable current = error;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null && message.toLowerCase(Locale.ROOT).contains("not connected")) {
-                return true;
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     /**
@@ -614,18 +554,6 @@ public class DefaultMessageReceiver implements MessageReceiver {
             MessageValidator.validateRecipientOrThrow(localRecipientId, encryptedMessage);
         } catch (IllegalArgumentException e) {
             throw new MessageValidationException("Recipient ID mismatch: " + e.getMessage(), List.of());
-        }
-    }
-
-    /**
-     * Handles errors from WebSocket.
-     *
-     * @param error the error that occurred
-     */
-    private void handleError(Throwable error) {
-        LOGGER.warn("WebSocket receiver error: {}", error.getMessage());
-        if (messageListener != null) {
-            messageListener.onError(error);
         }
     }
 
@@ -647,7 +575,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * Sends an acknowledgement for all provided envelope IDs.
      *
      * @param envelopeIds envelope ids to acknowledge
-     * @throws IOException when websocket send fails
+     * @throws IOException when HTTP ACK request fails
      */
     private void sendAck(List<String> envelopeIds) throws IOException {
         if (envelopeIds == null || envelopeIds.isEmpty()) {
@@ -661,16 +589,11 @@ public class DefaultMessageReceiver implements MessageReceiver {
             sb.append('\"').append(envelopeIds.get(i)).append('\"');
         }
         sb.append("]}");
-        if (webSocketAdapter.isConnected()) {
-            webSocketAdapter.sendText(sb.toString());
-            return;
-        }
-
         if (!httpPollingActive) {
-            throw new IOException("Messaging transport is not connected");
+            throw new IOException("Receiver polling is not active");
         }
         requestWithIoMapping(
-                webSocketAdapter.postAuthenticated("/api/v1/messages/ack", sb.toString()),
+                authHttpClient.postAuthenticated("/api/v1/messages/ack", sb.toString()),
                 "Failed to acknowledge mailbox envelopes");
     }
 
@@ -679,7 +602,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
      * not
      * replay them endlessly.
      *
-     * @param rawEnvelopeJson raw websocket envelope JSON
+     * @param rawEnvelopeJson raw envelope JSON
      */
     private void acknowledgeTamperedEnvelope(String rawEnvelopeJson) {
         String envelopeId = extractEnvelopeId(rawEnvelopeJson);
@@ -694,9 +617,9 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Extracts the envelope id from raw websocket envelope JSON.
+     * Extracts the envelope id from raw envelope JSON.
      *
-     * @param rawEnvelopeJson websocket message payload
+     * @param rawEnvelopeJson envelope payload
      * @return envelope id or {@code null} when not available
      */
     private String extractEnvelopeId(String rawEnvelopeJson) {

@@ -28,8 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class DefaultRegistrationServiceTest {
 
     @Test
-    void endpoint_resolution_uses_localhost_in_dev_mode() {
-        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(new Properties());
+    void endpoint_resolution_uses_configured_server() {
+        Properties properties = new Properties();
+        properties.setProperty("server.url.prod", "https://localhost:8443");
+        ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 
         assertEquals(
                 URI.create("https://localhost:8443/api/v1/config/admin-key"),
@@ -40,9 +42,8 @@ class DefaultRegistrationServiceTest {
     }
 
     @Test
-    void endpoint_resolution_uses_prod_endpoints_when_dev_is_disabled() {
+    void endpoint_resolution_uses_prod_endpoints() {
         Properties properties = new Properties();
-        properties.setProperty("app.isDev", "false");
         properties.setProperty("server.url.prod", "https://prod.example.test");
         ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 

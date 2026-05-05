@@ -14,8 +14,8 @@ public final class AttachmentConstants {
     public static final String APPLICATION_OCTET_STREAM = "application/octet-stream";
 
     public static final long DEFAULT_MAX_BYTES = 10L * 1024L * 1024L;
-    public static final long DEFAULT_INLINE_MAX_BYTES = 1L * 1024L * 1024L;
-    public static final int DEFAULT_CHUNK_BYTES = 512 * 1024;
+    public static final long DEFAULT_INLINE_MAX_BYTES = 2L * 1024L * 1024L;
+    public static final int DEFAULT_CHUNK_BYTES = 2 * 1024 * 1024;
     public static final long DEFAULT_UNBOUND_TTL_SECONDS = 1800L;
 
     public static final String CONTENT_TYPE_INLINE = "application/vnd.haf.attachment-inline+json";

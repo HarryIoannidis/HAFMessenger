@@ -329,7 +329,7 @@ public class DefaultMainSessionService implements MainSessionService {
         try {
             gateway.close();
         } catch (Exception | LinkageError ex) {
-            LOGGER.warn("Error closing WebSocket on logout", ex);
+            LOGGER.warn("Error closing network gateway on logout", ex);
         }
     }
 
@@ -413,7 +413,7 @@ public class DefaultMainSessionService implements MainSessionService {
                 }
 
                 /**
-                 * Closes active websocket/network adapter.
+                 * Closes active network adapter.
                  */
                 @Override
                 public void close() {

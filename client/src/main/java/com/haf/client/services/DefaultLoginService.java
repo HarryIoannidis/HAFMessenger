@@ -8,7 +8,7 @@ import com.haf.client.crypto.UserKeystoreKeyProvider;
 import com.haf.client.models.UserProfileInfo;
 import com.haf.client.network.DefaultMessageReceiver;
 import com.haf.client.network.DefaultMessageSender;
-import com.haf.client.network.WebSocketAdapter;
+import com.haf.client.network.AuthHttpClient;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.viewmodels.MessagesViewModel;
@@ -281,7 +281,7 @@ public class DefaultLoginService implements LoginService {
                         KEY_MISMATCH_FAILURE_MESSAGE);
             }
             if (isLastAttempt(attempt)) {
-                LOGGER.error("Failed to initialize WebSocket session", ex);
+                LOGGER.error("Failed to initialize authenticated session", ex);
                 return new LoginResult.Failure(resolveSessionInitializationFailureMessage(ex));
             }
             LOGGER.warn("Secure session initialization failed on attempt {}/{}, retrying...",
@@ -512,7 +512,7 @@ public class DefaultLoginService implements LoginService {
         String json = JsonCodec.toJson(request);
 
         HttpClient client = HttpClient.newBuilder()
-                .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                .sslContext(SslContextUtils.getStrictSslContext())
                 .sslParameters(SslContextUtils.createHttpsSslParameters())
                 .build();
 
@@ -526,10 +526,10 @@ public class DefaultLoginService implements LoginService {
     }
 
     /**
-     * Builds local websocket + messaging session state for authenticated users.
+     * Builds local authenticated HTTP + messaging session state for users.
      *
      * @param userId        authenticated user identifier
-     * @param sessionId     authenticated websocket session id
+     * @param sessionId     authenticated access token
      * @param passphraseStr passphrase used to unlock local keys
      * @throws IOException              when key-store or network I/O fails
      * @throws CryptoOperationException when cryptographic setup fails
@@ -542,19 +542,20 @@ public class DefaultLoginService implements LoginService {
         try {
             UserKeystoreKeyProvider keyProvider = new UserKeystoreKeyProvider(userId, passphrase);
 
-            WebSocketAdapter wsAdapter = new WebSocketAdapter(
-                    resolveWebSocketUri(runtimeConfig),
+            AuthHttpClient authHttpClient = new AuthHttpClient(
                     resolveServerBaseUri(runtimeConfig),
                     sessionId);
-            keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(wsAdapter, recipientId));
-            verifyLocalIdentityFingerprint(userId, keyProvider, wsAdapter);
+            keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(authHttpClient, recipientId));
+            verifyLocalIdentityFingerprint(userId, keyProvider, authHttpClient);
 
-            DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, wsAdapter);
-            DefaultMessageReceiver receiver = new DefaultMessageReceiver(keyProvider, clockProvider, wsAdapter,
-                    keyProvider.getSenderId(),
-                    runtimeConfig.messagingTransportMode());
+            DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);
+            DefaultMessageReceiver receiver = new DefaultMessageReceiver(
+                    keyProvider,
+                    clockProvider,
+                    authHttpClient,
+                    keyProvider.getSenderId());
 
-            NetworkSession.set(wsAdapter);
+            NetworkSession.set(authHttpClient);
             ChatSession.set(new MessagesViewModel(sender, receiver));
         } catch (GeneralSecurityException e) {
             throw new CryptoOperationException("Keystore initialization failed", e);
@@ -587,7 +588,7 @@ public class DefaultLoginService implements LoginService {
         try {
             ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
             HttpClient client = HttpClient.newBuilder()
-                    .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                    .sslContext(SslContextUtils.getStrictSslContext())
                     .sslParameters(SslContextUtils.createHttpsSslParameters())
                     .build();
             HttpRequest request = HttpRequest.newBuilder()
@@ -614,22 +615,18 @@ public class DefaultLoginService implements LoginService {
         return resolveServerBaseUri(runtimeConfig).resolve("/api/v1/login");
     }
 
-    static URI resolveWebSocketUri(ClientRuntimeConfig runtimeConfig) {
-        return runtimeConfig.webSocketBaseUri();
-    }
-
     /**
      * Fetches a recipient public key from the authenticated directory endpoint.
      *
-     * @param wsAdapter   authenticated websocket adapter used for REST call
+     * @param authHttpClient authenticated adapter used for REST call
      * @param recipientId recipient identifier to look up
      * @return PEM-encoded public key, or {@code null} when key is not available
      * @throws CryptoOperationException when network/json operations fail
      */
-    private static String fetchPublicKey(WebSocketAdapter wsAdapter, String recipientId) {
+    private static String fetchPublicKey(AuthHttpClient authHttpClient, String recipientId) {
         try {
             String path = "/api/v1/users/" + recipientId + "/key";
-            String jsonResponse = wsAdapter.getAuthenticated(path).get();
+            String jsonResponse = authHttpClient.getAuthenticated(path).get();
             PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse, PublicKeyResponse.class);
             if (keyRes.isSuccess() && keyRes.getPublicKeyPem() != null) {
                 return keyRes.getPublicKeyPem();
@@ -653,16 +650,16 @@ public class DefaultLoginService implements LoginService {
      *
      * @param userId      authenticated user id
      * @param keyProvider local keystore-backed key provider
-     * @param wsAdapter   authenticated adapter for key-lookup API
+     * @param authHttpClient authenticated adapter for key-lookup API
      * @throws CryptoOperationException when local fingerprint conflicts with server
      *                                  identity
      */
     private static void verifyLocalIdentityFingerprint(String userId,
             UserKeystoreKeyProvider keyProvider,
-            WebSocketAdapter wsAdapter) throws CryptoOperationException {
+            AuthHttpClient authHttpClient) throws CryptoOperationException {
         try {
             String path = "/api/v1/users/" + userId + "/key";
-            String jsonResponse = wsAdapter.getAuthenticated(path).get();
+            String jsonResponse = authHttpClient.getAuthenticated(path).get();
             PublicKeyResponse keyResponse = JsonCodec.fromJson(jsonResponse, PublicKeyResponse.class);
 
             if (keyResponse == null

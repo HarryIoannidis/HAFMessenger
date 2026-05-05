@@ -181,7 +181,7 @@ public final class MailboxRouter implements AutoCloseable {
     private void dispatch(String recipientId, QueuedEnvelope envelope) {
         Set<MailboxSubscriber> subs = subscribers.get(recipientId);
         if (subs != null) {
-            // Track delivery latency for WebSocket push.
+            // Track delivery latency from ingress to dequeue.
             // This is done here because the message is being pushed to the client.
             long latency = System.currentTimeMillis() - envelope.createdAtEpochMs();
             metricsRegistry.recordDeliveryLatency(latency);

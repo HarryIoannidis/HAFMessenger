@@ -7,8 +7,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +29,6 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
-        env.put("HAF_APP_IS_DEV", "true");
         env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
         env.put("HAF_JWT_SECRET", "test-jwt-secret");
 
@@ -43,7 +40,6 @@ class ServerConfigTest {
         assertEquals(20, config.getDbPoolSize()); // default
         assertEquals(tempDir, config.getKeystoreRoot());
         assertEquals(tempDir.resolve("keystore.p12"), config.getTlsKeystorePath());
-        assertTrue(config.isDevMode());
         assertEquals(20, config.getSearchPageSize());
         assertEquals(50, config.getSearchMaxPageSize());
         assertEquals(3, config.getSearchMinQueryLength());
@@ -116,39 +112,12 @@ class ServerConfigTest {
     }
 
     @Test
-    void load_uses_custom_ports() {
+    void load_uses_custom_http_port() {
         Map<String, String> env = createMinimalEnv();
         env.put("HAF_HTTP_PORT", "9000");
-        env.put("HAF_WS_PORT", "9001");
 
         ServerConfig config = ServerConfig.fromEnv(env);
         assertEquals(9000, config.getHttpPort());
-        assertEquals(9001, config.getWsPort());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = { "true", "false" })
-    void load_uses_explicit_app_is_dev_flag_when_provided(String appIsDevValue) {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_APP_IS_DEV", appIsDevValue);
-
-        ServerConfig config = ServerConfig.fromEnv(env);
-
-        assertEquals(Boolean.parseBoolean(appIsDevValue), config.isDevMode());
-    }
-
-    @ParameterizedTest
-    @NullSource
-    @ValueSource(strings = { "", " ", "nope" })
-    void load_fails_when_app_is_dev_is_missing_or_invalid(String appIsDevValue) {
-        Map<String, String> env = createMinimalEnv();
-        if (appIsDevValue == null) {
-            env.remove("HAF_APP_IS_DEV");
-        } else {
-            env.put("HAF_APP_IS_DEV", appIsDevValue);
-        }
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -266,7 +235,6 @@ class ServerConfigTest {
         env.put("HAF_KEY_PASS", "keypass");
         env.put("HAF_TLS_KEYSTORE_PATH", tempDir.resolve("keystore.p12").toString());
         env.put("HAF_TLS_KEYSTORE_PASS", "tlspass");
-        env.put("HAF_APP_IS_DEV", "true");
         env.put("HAF_SEARCH_CURSOR_SECRET", "test-search-cursor-secret");
         env.put("HAF_JWT_SECRET", "test-jwt-secret");
         return env;

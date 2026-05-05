@@ -309,10 +309,9 @@ public class DefaultRegistrationService implements RegistrationService {
      * @throws RegistrationFlowException when SSL context initialization fails
      */
     private static HttpClient createHttpClient() throws RegistrationFlowException {
-        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         try {
             return HttpClient.newBuilder()
-                    .sslContext(SslContextUtils.getSslContextForMode(runtimeConfig.isDev()))
+                    .sslContext(SslContextUtils.getStrictSslContext())
                     .sslParameters(SslContextUtils.createHttpsSslParameters())
                     .build();
         } catch (Exception ex) {
@@ -331,10 +330,9 @@ public class DefaultRegistrationService implements RegistrationService {
      */
     private static String fetchAdminPublicKeyPem(HttpClient client)
             throws InterruptedException, RegistrationFlowException {
-        ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         try {
             HttpRequest adminKeyRequest = HttpRequest.newBuilder()
-                    .uri(resolveAdminKeyUri(runtimeConfig))
+                    .uri(resolveAdminKeyUri(ClientRuntimeConfig.load()))
                     .GET()
                     .build();
             HttpResponse<String> adminKeyResponse = client.send(adminKeyRequest, HttpResponse.BodyHandlers.ofString());

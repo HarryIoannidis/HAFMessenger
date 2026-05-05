@@ -2,9 +2,9 @@ package com.haf.client.controllers;
 
 import com.haf.client.models.ContactInfo;
 import com.haf.client.utils.UiConstants;
-import com.jfoenix.controls.JFXButton;
 import javafx.animation.PauseTransition;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.control.Button;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -34,7 +34,7 @@ public class ContactCellController extends ListCell<ContactInfo> {
     private Circle activenessCircle;
     private StackPane unreadBadge;
     private Text unreadBadgeText;
-    private JFXButton overlayButton;
+    private Button overlayButton;
     private PauseTransition contextMenuDelay;
 
     /**
@@ -178,7 +178,7 @@ public class ContactCellController extends ListCell<ContactInfo> {
         activenessCircle = asNamespaceNode(namespace, "activenessCircle", Circle.class);
         unreadBadge = asNamespaceNode(namespace, "unreadBadge", StackPane.class);
         unreadBadgeText = asNamespaceNode(namespace, "unreadBadgeText", Text.class);
-        overlayButton = asNamespaceNode(namespace, "overlayButton", JFXButton.class);
+        overlayButton = asNamespaceNode(namespace, "overlayButton", Button.class);
     }
 
     /**

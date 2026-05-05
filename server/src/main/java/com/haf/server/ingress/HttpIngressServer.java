@@ -50,7 +50,6 @@ import com.sun.net.httpserver.HttpsServer;
 import com.haf.shared.constants.CryptoConstants;
 import com.password4j.Password;
 import com.password4j.Argon2Function;
-import org.java_websocket.WebSocket;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.ByteArrayOutputStream;
@@ -70,7 +69,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -100,7 +98,6 @@ public final class HttpIngressServer {
     private final FileUpload fileUploadDAO;
     private final Attachment attachmentDAO;
     private final Contact contactDAO;
-    private final PresenceRegistry presenceRegistry;
     private final ExecutorService executor;
     private final Object trustedProxyCacheLock = new Object();
     private final AtomicReference<TrustedProxyCache> trustedProxyCache = new AtomicReference<>(
@@ -193,178 +190,16 @@ public final class HttpIngressServer {
     }
 
     /**
-     * Pushes contact presence to all active requester connections after contact
-     * mutations.
-     *
-     * @param presenceRegistry presence registry used for active/visibility lookups
-     * @param auditLogger      logger used for push-failure diagnostics
-     * @param requestId        request identifier
-     * @param callerId         requester user id
-     * @param contactId        contact user id whose presence should be emitted
-     */
-    static void pushContactPresenceToRequester(PresenceRegistry presenceRegistry,
-            AuditLogger auditLogger,
-            String requestId,
-            String callerId,
-            String contactId) {
-        if (presenceRegistry == null || auditLogger == null) {
-            return;
-        }
-        if (callerId == null || callerId.isBlank() || contactId == null || contactId.isBlank()) {
-            return;
-        }
-
-        boolean active = presenceRegistry.isActive(contactId);
-        String payload = presenceJson(contactId, active);
-        for (WebSocket connection : presenceRegistry.getActiveConnections(callerId)) {
-            pushPresencePayload(
-                    connection,
-                    payload,
-                    auditLogger,
-                    "contacts_presence_push_error",
-                    requestId,
-                    callerId,
-                    Map.of("contactId", contactId, "active", active));
-        }
-    }
-
-    /**
-     * Pushes a user presence update to all watcher connections.
-     *
-     * @param presenceRegistry presence registry used for active/visibility lookups
-     * @param contactDAO       contact dao used for watcher lookup
-     * @param auditLogger      logger used for push-failure diagnostics
-     * @param requestId        request identifier
-     * @param userId           user id whose presence should be emitted
-     */
-    static void pushPresenceToWatchers(
-            PresenceRegistry presenceRegistry,
-            Contact contactDAO,
-            AuditLogger auditLogger,
-            String requestId,
-            String userId) {
-        if (presenceRegistry == null || contactDAO == null || auditLogger == null) {
-            return;
-        }
-        if (userId == null || userId.isBlank()) {
-            return;
-        }
-
-        boolean active = presenceRegistry.isActive(userId);
-        String payload = presenceJson(userId, active);
-
-        try {
-            List<String> watcherUserIds = contactDAO.getWatcherUserIds(userId);
-            if (watcherUserIds == null || watcherUserIds.isEmpty()) {
-                return;
-            }
-            for (String watcherUserId : watcherUserIds) {
-                for (WebSocket connection : presenceRegistry.getActiveConnections(watcherUserId)) {
-                    pushPresencePayload(
-                            connection,
-                            payload,
-                            auditLogger,
-                            "presence_visibility_push_error",
-                            requestId,
-                            watcherUserId,
-                            Map.of("userId", userId, "active", active));
-                }
-            }
-        } catch (Exception ex) {
-            auditLogger.logError("presence_watchers_lookup_error", requestId, userId, ex);
-        }
-    }
-
-    /**
-     * Sends presence payload to one websocket connection and logs failures.
-     *
-     * @param connection  target websocket connection
-     * @param payload     presence payload
-     * @param auditLogger logger used for error diagnostics
-     * @param eventName   audit event name for send failures
-     * @param requestId   request identifier
-     * @param actorId     user id associated with the push context
-     * @param context     additional context fields to log with failures
-     */
-    private static void pushPresencePayload(
-            WebSocket connection,
-            String payload,
-            AuditLogger auditLogger,
-            String eventName,
-            String requestId,
-            String actorId,
-            Map<String, Object> context) {
-        try {
-            connection.send(payload);
-        } catch (Exception ex) {
-            auditLogger.logError(eventName, requestId, actorId, ex, context);
-        }
-    }
-
-    /**
-     * Builds compact presence JSON payload.
-     *
-     * @param userId user id to include
-     * @param active active flag value
-     * @return serialized JSON payload
-     */
-    static String presenceJson(String userId, boolean active) {
-        return "{\"type\":\"presence\",\"userId\":\"" + escapeJson(userId) + "\",\"active\":" + active + "}";
-    }
-
-    /**
-     * Checks whether a login attempt is duplicate based on active presence state.
-     *
-     * @param presenceRegistry presence registry
-     * @param userId           user attempting login
-     * @return {@code true} when user already has active presence
-     */
-    static boolean isDuplicateLoginAttempt(PresenceRegistry presenceRegistry, String userId) {
-        if (presenceRegistry == null || userId == null || userId.isBlank()) {
-            return false;
-        }
-        return presenceRegistry.isActive(userId);
-    }
-
-    /**
-     * Resolves user active state using runtime mode policy.
-     *
-     * Dev mode uses websocket presence registry.
-     * Prod mode uses recent HTTPS session activity.
+     * Resolves user active state from recent authenticated session activity.
      *
      * @param userId user id to evaluate
      * @return {@code true} when user is currently active
      */
-    private boolean isUserActiveForRuntime(String userId) {
+    private boolean isUserRecentlyActive(String userId) {
         if (userId == null || userId.isBlank()) {
             return false;
         }
-        if (config.isDevMode()) {
-            return presenceRegistry.isActive(userId);
-        }
         return sessionDAO.isUserRecentlyActive(userId, PROD_ACTIVE_WINDOW_SECONDS);
-    }
-
-    /**
-     * Closes all active websocket presence connections for a user in development
-     * mode.
-     *
-     * @param userId    user id whose sockets should be closed
-     * @param requestId request id for error diagnostics
-     * @param reason    websocket close reason
-     */
-    private void closeUserPresenceConnections(String userId, String requestId, String reason) {
-        if (!config.isDevMode() || userId == null || userId.isBlank()) {
-            return;
-        }
-        Set<WebSocket> activeConnections = presenceRegistry.getActiveConnections(userId);
-        for (WebSocket connection : activeConnections) {
-            try {
-                connection.closeConnection(1000, reason);
-            } catch (Exception ex) {
-                auditLogger.logError("presence_ws_close_error", requestId, userId, ex, Map.of("reason", reason));
-            }
-        }
     }
 
     /**
@@ -426,8 +261,7 @@ public final class HttpIngressServer {
             Session sessionDAO,
             FileUpload fileUploadDAO,
             Attachment attachmentDAO,
-            Contact contactDAO,
-            PresenceRegistry presenceRegistry) throws IOException {
+            Contact contactDAO) throws IOException {
         this.config = config;
         this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
@@ -439,7 +273,6 @@ public final class HttpIngressServer {
         this.fileUploadDAO = fileUploadDAO;
         this.attachmentDAO = attachmentDAO;
         this.contactDAO = contactDAO;
-        this.presenceRegistry = presenceRegistry;
         refreshTrustedProxyRanges(config.getTrustedProxyCidrs());
         this.executor = createIngressExecutor(config);
         this.server = createServer(sslContext);
@@ -738,7 +571,7 @@ public final class HttpIngressServer {
         }
 
         /**
-         * Converts queued envelope to the wire format shared with WebSocket consumers.
+         * Converts queued envelope to the polling API wire format.
          *
          * @param envelope queued envelope
          * @return map payload serializable by JsonCodec
@@ -1176,7 +1009,7 @@ public final class HttpIngressServer {
 
                 boolean forceTakeover = Boolean.TRUE.equals(request.getForceTakeover());
 
-                if (!forceTakeover && isDuplicateLoginAttemptForRuntime(user.userId())) {
+                if (!forceTakeover && isDuplicateLoginAttempt(user.userId())) {
                     respond(exchange, requestId, 409,
                             JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
                     return;
@@ -1185,7 +1018,7 @@ public final class HttpIngressServer {
                 if (forceTakeover) {
                     validateTakeoverKeyRequest(request);
                     applyForcedTakeover(user.userId(), request.getTakeoverPublicKeyPem(),
-                            request.getTakeoverPublicKeyFingerprint(), requestId);
+                            request.getTakeoverPublicKeyFingerprint());
                 }
 
                 // Create session
@@ -1239,22 +1072,18 @@ public final class HttpIngressServer {
         }
 
         /**
-         * Applies forced takeover effects: key rotation, session revocation, and
-         * dev-mode websocket connection closure.
+         * Applies forced takeover effects: key rotation and session revocation.
          *
          * @param userId       authenticated user id
          * @param publicKeyPem takeover public key PEM
          * @param fingerprint  takeover key fingerprint
-         * @param requestId    request id used in audit logs
          */
         private void applyForcedTakeover(
                 String userId,
                 String publicKeyPem,
-                String fingerprint,
-                String requestId) {
+                String fingerprint) {
             userDAO.updatePublicKey(userId, publicKeyPem.trim(), fingerprint.trim());
             sessionDAO.revokeAllSessionsByUserId(userId);
-            closeUserPresenceConnections(userId, requestId, "takeover");
         }
 
         /**
@@ -1297,13 +1126,13 @@ public final class HttpIngressServer {
         }
 
         /**
-         * Checks duplicate-login state using runtime mode policy.
+         * Checks duplicate-login state using recent session activity.
          *
          * @param userId user attempting login
          * @return {@code true} when user is considered currently active
          */
-        private boolean isDuplicateLoginAttemptForRuntime(String userId) {
-            return isUserActiveForRuntime(userId);
+        private boolean isDuplicateLoginAttempt(String userId) {
+            return isUserRecentlyActive(userId);
         }
 
         /**
@@ -1522,10 +1351,8 @@ public final class HttpIngressServer {
                     return;
                 }
                 String sessionId = authResult.sessionId();
-                String callerId = authResult.callerId();
 
                 sessionDAO.revokeSession(sessionId);
-                closeUserPresenceConnections(callerId, requestId, "logout");
                 sendPlain(exchange, 200, "{\"success\":true}");
             } catch (Exception ex) {
                 auditLogger.logError("logout_error", requestId, null, ex);
@@ -2177,7 +2004,7 @@ public final class HttpIngressServer {
             List<Contact.ContactRecord> records = contactDAO.getContacts(callerId);
             List<UserSearchResult> results = records.stream()
                     .map(r -> {
-                        boolean active = isUserActiveForRuntime(r.userId());
+                        boolean active = isUserRecentlyActive(r.userId());
                         return new UserSearchResult(
                                 r.userId(),
                                 r.fullName(),
@@ -2193,8 +2020,7 @@ public final class HttpIngressServer {
         }
 
         /**
-         * Adds a contact for the caller and pushes immediate presence snapshot for the
-         * new contact.
+         * Adds a contact for the caller.
          *
          * @param exchange  HTTP exchange
          * @param requestId request id for diagnostics
@@ -2210,7 +2036,6 @@ public final class HttpIngressServer {
                 return;
             }
             contactDAO.addContact(callerId, contactId);
-            pushContactPresenceToRequester(presenceRegistry, auditLogger, requestId, callerId, contactId);
             sendPlain(exchange, 200, "{}");
         }
 

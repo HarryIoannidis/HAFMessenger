@@ -1,17 +1,17 @@
 package com.haf.client.core;
 
-import com.haf.client.network.WebSocketAdapter;
+import com.haf.client.network.AuthHttpClient;
 
 /**
- * Stores the authenticated {@link WebSocketAdapter} so that controllers other
+ * Stores the authenticated {@link AuthHttpClient} so that controllers other
  * than {@code LoginController} can make HTTP calls against the server.
  *
- * Set once at login time via {@link #set(WebSocketAdapter)} and cleared on
+ * Set once at login time via {@link #set(AuthHttpClient)} and cleared on
  * logout / disconnect.
  */
 public final class NetworkSession {
 
-    private static WebSocketAdapter instance;
+    private static AuthHttpClient instance;
 
     /**
      * Prevents instantiation of this static session holder.
@@ -24,7 +24,7 @@ public final class NetworkSession {
      *
      * @param adapter authenticated adapter to store for the current session
      */
-    public static void set(WebSocketAdapter adapter) {
+    public static void set(AuthHttpClient adapter) {
         instance = adapter;
     }
 
@@ -33,7 +33,7 @@ public final class NetworkSession {
      *
      * @return current session adapter, or {@code null} when no session is active
      */
-    public static WebSocketAdapter get() {
+    public static AuthHttpClient get() {
         return instance;
     }
 

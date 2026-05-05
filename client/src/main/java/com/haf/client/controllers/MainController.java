@@ -2698,6 +2698,13 @@ public class MainController implements SearchController.ContactActions {
      */
     private void registerPresenceListener() {
         mainSessionService.registerPresenceListener(new MessagesViewModel.PresenceListener() {
+            /**
+             * Forwards presence updates from the session service to controller UI
+             * handling.
+             *
+             * @param userId user id whose presence changed
+             * @param active current presence state
+             */
             @Override
             public void onPresenceUpdate(String userId, boolean active) {
                 applyPresenceUpdate(userId, active);
@@ -2722,7 +2729,7 @@ public class MainController implements SearchController.ContactActions {
             LOGGER.warn("Cannot start message receiving: chat session is not initialized.");
             return;
         }
-        // WebSocket connect can block briefly; start it off the JavaFX thread.
+        // Receiver startup can block briefly; start it off the JavaFX thread.
         CompletableFuture.runAsync(chatViewModel::startReceiving);
     }
 
