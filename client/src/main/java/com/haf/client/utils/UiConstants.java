@@ -107,6 +107,7 @@ public final class UiConstants {
     public static final String POPUP_IMAGE_FALLBACK_NOTICE = "popup-image-fallback-notice";
     public static final String POPUP_VIEW_LOAD_ERROR = "popup-view-load-error";
     public static final String POPUP_RUNTIME_ISSUE = "popup-runtime-issue";
+    public static final String POPUP_CONNECTION_LOSS = "popup-connection-loss";
     public static final String POPUP_SETTINGS = "popup-settings";
 
     // Stylesheets

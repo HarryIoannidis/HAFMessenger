@@ -317,7 +317,8 @@ public class MessagesViewModel {
                     "Connection issue",
                     "The messaging channel reported an error. "
                             + resolveErrorMessage(error, "Please retry."),
-                    MessagesViewModel.this::retryLastFailedOperation);
+                    MessagesViewModel.this::retryLastFailedOperation,
+                    RuntimeIssue.isConnectionFailure(error));
         }
 
         /**
@@ -416,7 +417,8 @@ public class MessagesViewModel {
                     "messaging.send.failed",
                     "Message could not be sent",
                     "Could not send your message. " + resolveErrorMessage(e, "Please retry."),
-                    this::retryLastFailedOperation);
+                    this::retryLastFailedOperation,
+                    RuntimeIssue.isConnectionFailure(e));
         }
     }
 
@@ -536,7 +538,8 @@ public class MessagesViewModel {
                 "messaging.attachment.send.failed",
                 "Attachment could not be sent",
                 "Could not send the selected attachment. " + resolveErrorMessage(ex, "Please retry."),
-                this::retryLastFailedOperation);
+                this::retryLastFailedOperation,
+                RuntimeIssue.isConnectionFailure(ex));
     }
 
     /**
@@ -751,7 +754,8 @@ public class MessagesViewModel {
                     "messaging.receive.start.failed",
                     "Connection issue",
                     "Could not start message receiving. " + resolveErrorMessage(e, "Please retry."),
-                    this::retryLastFailedOperation);
+                    this::retryLastFailedOperation,
+                    RuntimeIssue.isConnectionFailure(e));
         }
     }
 
@@ -898,7 +902,7 @@ public class MessagesViewModel {
     public void retryLastFailedOperation() {
         CompletableFuture.runAsync(() -> {
             try {
-                reconnectReceiver();
+                reconnectReceiverTransport();
                 Runnable retryAction = lastFailedSendRetryAction.get();
                 if (retryAction != null) {
                     retryAction.run();
@@ -911,7 +915,8 @@ public class MessagesViewModel {
                         "messaging.retry.failed",
                         "Retry failed",
                         "Could not restore messaging connection. " + resolveErrorMessage(ex, "Please retry."),
-                        this::retryLastFailedOperation);
+                        this::retryLastFailedOperation,
+                        RuntimeIssue.isConnectionFailure(ex));
             }
         });
     }
@@ -925,7 +930,7 @@ public class MessagesViewModel {
     public void restoreReceiverTransportAfterSessionRefresh() {
         CompletableFuture.runAsync(() -> {
             try {
-                reconnectReceiver();
+                reconnectReceiverTransport();
                 runOnUiThread(() -> status.set("Messaging connection restored"));
             } catch (Exception ex) {
                 runOnUiThread(() -> status.set(
@@ -935,7 +940,8 @@ public class MessagesViewModel {
                         "Connection issue",
                         "Session refreshed, but messaging connection could not be restored. "
                                 + resolveErrorMessage(ex, "Please retry."),
-                        this::restoreReceiverTransportAfterSessionRefresh);
+                        this::restoreReceiverTransportAfterSessionRefresh,
+                        RuntimeIssue.isConnectionFailure(ex));
             }
         });
     }
@@ -1001,7 +1007,25 @@ public class MessagesViewModel {
      * @param retryAction action to execute on retry
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
-        notifyRuntimeIssueListeners(new RuntimeIssue(dedupeKey, title, message, retryAction));
+        publishRuntimeIssue(dedupeKey, title, message, retryAction, false);
+    }
+
+    /**
+     * Publishes a recoverable runtime issue to registered listeners.
+     *
+     * @param dedupeKey       stable dedupe key
+     * @param title           popup title
+     * @param message         popup message
+     * @param retryAction     action to execute on retry
+     * @param connectionIssue {@code true} when issue represents connection loss
+     */
+    private void publishRuntimeIssue(
+            String dedupeKey,
+            String title,
+            String message,
+            Runnable retryAction,
+            boolean connectionIssue) {
+        notifyRuntimeIssueListeners(new RuntimeIssue(dedupeKey, title, message, retryAction, connectionIssue));
     }
 
     /**
@@ -1030,6 +1054,15 @@ public class MessagesViewModel {
         receivingStarted = false;
         messageReceiver.start();
         receivingStarted = true;
+    }
+
+    /**
+     * Reconnects receiver transport without replaying failed outbound actions.
+     *
+     * @throws Exception when receiver stop/start operations fail
+     */
+    public void reconnectReceiverTransport() throws Exception {
+        reconnectReceiver();
     }
 
     /**

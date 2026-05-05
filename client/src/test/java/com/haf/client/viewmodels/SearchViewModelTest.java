@@ -1,5 +1,6 @@
 package com.haf.client.viewmodels;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.utils.UiConstants;
 import com.haf.shared.responses.UserSearchResponse;
@@ -7,6 +8,7 @@ import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -306,6 +308,26 @@ class SearchViewModelTest {
 
         awaitCondition(() -> viewModel.resultsProperty().size() == 1);
         assertEquals(2, calls.get());
+    }
+
+    @Test
+    void search_http_5xx_exception_is_marked_as_connection_issue() {
+        SearchViewModel viewModel = new SearchViewModel((query, limit, cursor) -> {
+            throw new IOException(
+                    "request failed",
+                    new HttpCommunicationException(
+                            "HTTP GET failed with status 503: {\"error\":\"down\"}",
+                            503,
+                            "{\"error\":\"down\"}"));
+        });
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.search("query");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("search.request.failed", issues.getFirst().dedupeKey());
+        assertTrue(issues.getFirst().connectionIssue());
     }
 
     @Test

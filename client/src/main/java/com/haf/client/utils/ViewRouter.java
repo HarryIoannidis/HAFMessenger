@@ -289,6 +289,29 @@ public class ViewRouter {
     }
 
     /**
+     * Hides an already-cached popup window by key without removing it from cache.
+     *
+     * @param popupKey popup cache key
+     */
+    public static void hidePopup(String popupKey) {
+        if (popupKey == null || popupKey.isBlank()) {
+            return;
+        }
+        Runnable task = () -> {
+            PopupEntry entry = popupEntries.get(popupKey);
+            if (entry == null || entry.stage() == null || !entry.stage().isShowing()) {
+                return;
+            }
+            entry.stage().hide();
+        };
+        if (Platform.isFxApplicationThread()) {
+            task.run();
+        } else {
+            Platform.runLater(task);
+        }
+    }
+
+    /**
      * Closes the main application stage.
      */
     public static void close() {

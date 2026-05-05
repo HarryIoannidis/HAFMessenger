@@ -27,6 +27,7 @@ class PopupMessageControllerTest {
         assertTrue(source.contains("SESSION_REVOKED_POPUP_KEY"));
         assertTrue(source.contains("boolean showCloseButton = !isCloseDisabledPopup(spec.popupKey());"));
         assertTrue(source.contains("|| SESSION_REVOKED_POPUP_KEY.equals(popupKey)"));
+        assertTrue(source.contains("|| UiConstants.POPUP_CONNECTION_LOSS.equals(popupKey)"));
     }
 
     @Test
