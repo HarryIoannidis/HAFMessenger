@@ -14,7 +14,8 @@ Describe current shared DTO families used across client/server boundaries.
   - `shared.requests`
   - `shared.responses`
 - Metadata DTO: `KeyMetadata`.
-- Request/response families cover login/register/logout, user search, contacts, messaging policy, and attachment upload/download lifecycle.
+- Request/response families cover login/register/logout, user search, contacts, messaging policy, and attachment lifecycle metadata.
+- Attachment chunk bytes and encrypted download blobs are not JSON DTOs; they travel as binary HTTP bodies with shared `AttachmentConstants` headers.
 
 ## Key Types/Interfaces
 

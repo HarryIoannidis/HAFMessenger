@@ -62,6 +62,45 @@ class AuthHttpClientTest {
     }
 
     @Test
+    void post_authenticated_bytes_sets_content_type_extra_headers_and_body_publisher() {
+        FakeHttpClient fakeHttpClient = new FakeHttpClient();
+        fakeHttpClient.enqueueResponse(response(200, "{}", URI.create("https://api.test/api/v1/attachments/a/chunk")));
+
+        AuthHttpClient client = new AuthHttpClient(URI.create("https://api.test"), "session-bin", fakeHttpClient);
+        client.postAuthenticatedBytes(
+                "/api/v1/attachments/a/chunk",
+                new byte[] { 1, 2, 3 },
+                "application/octet-stream",
+                Map.of("X-Attachment-Chunk-Index", "2"))
+                .join();
+
+        HttpRequest request = fakeHttpClient.requests.getFirst();
+        assertEquals("POST", request.method());
+        assertEquals("application/octet-stream", request.headers().firstValue("Content-Type").orElse(null));
+        assertEquals("Bearer session-bin", request.headers().firstValue("Authorization").orElse(null));
+        assertEquals("2", request.headers().firstValue("X-Attachment-Chunk-Index").orElse(null));
+    }
+
+    @Test
+    void get_authenticated_bytes_preserves_response_headers_and_body() {
+        FakeHttpClient fakeHttpClient = new FakeHttpClient();
+        fakeHttpClient.enqueueResponse(byteResponse(
+                200,
+                new byte[] { 4, 5, 6 },
+                URI.create("https://api.test/api/v1/attachments/a"),
+                Map.of("X-Attachment-Id", List.of("a"))));
+
+        AuthHttpClient client = new AuthHttpClient(URI.create("https://api.test"), "session-download", fakeHttpClient);
+        HttpResponse<byte[]> response = client.getAuthenticatedBytes("/api/v1/attachments/a").join();
+
+        HttpRequest request = fakeHttpClient.requests.getFirst();
+        assertEquals("GET", request.method());
+        assertEquals("Bearer session-download", request.headers().firstValue("Authorization").orElse(null));
+        assertEquals("a", response.headers().firstValue("X-Attachment-Id").orElse(null));
+        assertEquals(3, response.body().length);
+    }
+
+    @Test
     void delete_authenticated_sets_bearer_header() {
         FakeHttpClient fakeHttpClient = new FakeHttpClient();
         fakeHttpClient.enqueueResponse(response(200, "{}", URI.create("https://api.test/api/v1/logout")));
@@ -160,11 +199,60 @@ class AuthHttpClientTest {
         };
     }
 
+    private static HttpResponse<byte[]> byteResponse(
+            int status,
+            byte[] body,
+            URI uri,
+            Map<String, List<String>> headers) {
+        HttpRequest request = HttpRequest.newBuilder().uri(uri).build();
+        return new HttpResponse<>() {
+            @Override
+            public int statusCode() {
+                return status;
+            }
+
+            @Override
+            public HttpRequest request() {
+                return request;
+            }
+
+            @Override
+            public Optional<HttpResponse<byte[]>> previousResponse() {
+                return Optional.empty();
+            }
+
+            @Override
+            public HttpHeaders headers() {
+                return HttpHeaders.of(headers, (name, value) -> true);
+            }
+
+            @Override
+            public byte[] body() {
+                return body;
+            }
+
+            @Override
+            public Optional<SSLSession> sslSession() {
+                return Optional.empty();
+            }
+
+            @Override
+            public URI uri() {
+                return uri;
+            }
+
+            @Override
+            public HttpClient.Version version() {
+                return HttpClient.Version.HTTP_1_1;
+            }
+        };
+    }
+
     private static final class FakeHttpClient extends HttpClient {
         private final List<HttpRequest> requests = new ArrayList<>();
         private final ArrayDeque<Object> queue = new ArrayDeque<>();
 
-        void enqueueResponse(HttpResponse<String> response) {
+        void enqueueResponse(HttpResponse<?> response) {
             queue.addLast(response);
         }
 

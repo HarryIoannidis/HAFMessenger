@@ -358,8 +358,35 @@ public class SettingsController {
         if (mediaRowsContainer != null) {
             mediaRowsContainer.getChildren().setAll(
                     SettingsRowBuilder.buildSectionHeader(
+                            "mediaUploadSection",
+                            "Upload"),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "mediaSendInMaxQualityRow",
+                            "mediaSendInMaxQualityToggle",
+                            "Send In Max Quality",
+                            "Send images using original quality without client-side optimization.",
+                            settings.isMediaSendInMaxQuality()),
+                    SettingsRowBuilder.buildSliderRow(
+                            "mediaImageSendQualityRow",
+                            "mediaImageSendQualitySlider",
+                            "Image Send Quality",
+                            "Lower values optimize images before sending.",
+                            60.0,
+                            100.0,
+                            settings.getMediaImageSendQuality(),
+                            5.0,
+                            true,
+                            true),
+                    SettingsRowBuilder.buildSectionSpacer("mediaPreviewSectionSpacer"),
+                    SettingsRowBuilder.buildSectionHeader(
                             "mediaPreviewSection",
-                            "Preview & Media"),
+                            "Preview"),
+                    SettingsRowBuilder.buildSwitchRow(
+                            "mediaOpenPreviewOnImageClickRow",
+                            "mediaOpenPreviewOnImageClickToggle",
+                            "Open Preview On Image Click",
+                            "Open the image preview popup when clicking image messages.",
+                            settings.isMediaOpenPreviewOnImageClick()),
                     SettingsRowBuilder.buildSwitchRow(
                             "mediaHoverZoomRow",
                             "mediaHoverZoomToggle",
@@ -382,13 +409,7 @@ public class SettingsController {
                             "mediaShowDownloadButtonToggle",
                             "Show Download Button",
                             "Display the download action in the preview popup toolbar.",
-                            settings.isMediaShowDownloadButton()),
-                    SettingsRowBuilder.buildSwitchRow(
-                            "mediaOpenPreviewOnImageClickRow",
-                            "mediaOpenPreviewOnImageClickToggle",
-                            "Open Preview On Image Click",
-                            "Open the image preview popup when clicking image messages.",
-                            settings.isMediaOpenPreviewOnImageClick()));
+                            settings.isMediaShowDownloadButton()));
         }
 
         if (chatRowsContainer != null) {
@@ -553,8 +574,10 @@ public class SettingsController {
         wireSwitch("searchRememberSortOptionsRow", "searchRememberSortOptionsToggle",
                 settings::setSearchRememberSortOptions);
 
+        wireSwitch("mediaSendInMaxQualityRow", "mediaSendInMaxQualityToggle", settings::setMediaSendInMaxQuality);
         wireSwitch("mediaHoverZoomRow", "mediaHoverZoomToggle", settings::setMediaHoverZoom);
         wireSlider("mediaHoverZoomScaleSlider", settings::setMediaHoverZoomScale);
+        wireSlider("mediaImageSendQualitySlider", settings::setMediaImageSendQuality);
         wireSwitch("mediaShowDownloadButtonRow", "mediaShowDownloadButtonToggle", settings::setMediaShowDownloadButton);
         wireSwitch("mediaOpenPreviewOnImageClickRow", "mediaOpenPreviewOnImageClickToggle",
                 settings::setMediaOpenPreviewOnImageClick);
@@ -588,6 +611,7 @@ public class SettingsController {
 
         wireSearchModeMutualExclusivity();
         wireDependentToggleRowState("privacyBlurOnFocusLossToggle", "privacyBlurStrengthRow");
+        wireInverseDependentToggleRowState("mediaSendInMaxQualityToggle", "mediaImageSendQualityRow");
         wireDependentToggleRowState("mediaHoverZoomToggle", "mediaHoverZoomScaleRow");
         wireDependentToggleRowState("notificationsShowUnreadBadgesToggle", "notificationsBadgeCapRow");
         wireDependentToggleRowState("chatShowMessageTimestampsToggle", "chatUse24HourTimeRow");
@@ -702,6 +726,24 @@ public class SettingsController {
         applyDependentRowState(dependentRow, toggle.isSelected());
         toggle.selectedProperty().addListener(
                 (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, Boolean.TRUE.equals(newValue)));
+    }
+
+    /**
+     * Enables/disables a dependent row based on the inverse toggle state.
+     *
+     * @param toggleId       toggle control id
+     * @param dependentRowId row id to enable/disable
+     */
+    private void wireInverseDependentToggleRowState(String toggleId, String dependentRowId) {
+        Node dependentRow = findById(dependentRowId, Node.class);
+        JFXToggleButton toggle = findById(toggleId, JFXToggleButton.class);
+        if (dependentRow == null || toggle == null) {
+            return;
+        }
+
+        applyDependentRowState(dependentRow, !toggle.isSelected());
+        toggle.selectedProperty().addListener(
+                (obs, oldValue, newValue) -> applyDependentRowState(dependentRow, !Boolean.TRUE.equals(newValue)));
     }
 
     /**

@@ -1,14 +1,13 @@
 package com.haf.client.network;
 
 import com.haf.client.exceptions.HttpCommunicationException;
+import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.responses.AttachmentChunkResponse;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.responses.AttachmentCompleteResponse;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.dto.EncryptedMessage;
@@ -22,6 +21,7 @@ import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
 import java.io.IOException;
+import java.net.http.HttpResponse;
 import java.security.PublicKey;
 import java.util.List;
 import java.util.Map;
@@ -295,11 +295,14 @@ public class DefaultMessageSender implements MessageSender {
      * @throws IOException if request or response decoding fails
      */
     @Override
-    public AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, AttachmentChunkRequest request)
+    public AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, int chunkIndex, byte[] chunkBytes)
             throws IOException {
-        String body = JsonCodec.toJson(request);
         return decodeResponse(
-                authHttpClient.postAuthenticated("/api/v1/attachments/" + attachmentId + "/chunk", body),
+                authHttpClient.postAuthenticatedBytes(
+                        "/api/v1/attachments/" + attachmentId + "/chunk",
+                        chunkBytes,
+                        AttachmentConstants.APPLICATION_OCTET_STREAM,
+                        Map.of(AttachmentConstants.HEADER_CHUNK_INDEX, String.valueOf(chunkIndex))),
                 AttachmentChunkResponse.class);
     }
 
@@ -344,9 +347,27 @@ public class DefaultMessageSender implements MessageSender {
      * @throws IOException if request or response decoding fails
      */
     @Override
-    public AttachmentDownloadResponse downloadAttachment(String attachmentId) throws IOException {
-        return decodeResponse(authHttpClient.getAuthenticated("/api/v1/attachments/" + attachmentId),
-                AttachmentDownloadResponse.class);
+    public AttachmentDownload downloadAttachment(String attachmentId) throws IOException {
+        try {
+            HttpResponse<byte[]> response = authHttpClient.getAuthenticatedBytes("/api/v1/attachments/" + attachmentId)
+                    .join();
+            byte[] body = response.body() == null ? new byte[0] : response.body();
+            String resolvedAttachmentId = header(response, AttachmentConstants.HEADER_ATTACHMENT_ID, attachmentId);
+            String contentType = header(response, AttachmentConstants.HEADER_ATTACHMENT_CONTENT_TYPE,
+                    AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB);
+            long encryptedSize = longHeader(response, AttachmentConstants.HEADER_ATTACHMENT_ENCRYPTED_SIZE,
+                    body.length);
+            int chunkCount = intHeader(response, AttachmentConstants.HEADER_ATTACHMENT_CHUNK_COUNT, 0);
+            return new AttachmentDownload(resolvedAttachmentId, contentType, encryptedSize, chunkCount, body);
+        } catch (CompletionException ex) {
+            Throwable cause = ex.getCause();
+            if (cause instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw new IOException("Failed to download attachment", cause != null ? cause : ex);
+        } catch (Exception ex) {
+            throw new IOException("Failed to download attachment", ex);
+        }
     }
 
     /**
@@ -373,5 +394,31 @@ public class DefaultMessageSender implements MessageSender {
         } catch (Exception ex) {
             throw new IOException("Failed to decode server response", ex);
         }
+    }
+
+    private static String header(HttpResponse<?> response, String name, String fallback) {
+        return response.headers().firstValue(name)
+                .filter(value -> !value.isBlank())
+                .orElse(fallback);
+    }
+
+    private static long longHeader(HttpResponse<?> response, String name, long fallback) {
+        String value = header(response, name, null);
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private static int intHeader(HttpResponse<?> response, String name, int fallback) {
+        long parsed = longHeader(response, name, fallback);
+        if (parsed < Integer.MIN_VALUE || parsed > Integer.MAX_VALUE) {
+            return fallback;
+        }
+        return (int) parsed;
     }
 }

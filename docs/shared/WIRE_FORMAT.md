@@ -18,6 +18,12 @@ Optional/auxiliary field:
 
 Protocol policy values come from shared constants (`MessageHeader`, `CryptoConstants`).
 
+Attachment transport wraps these encrypted envelopes differently by size:
+
+- Inline attachments place an attachment JSON payload inside a normal encrypted envelope.
+- Chunked attachments store a serialized encrypted envelope as binary upload chunks and return the same encrypted bytes on download.
+- Binary attachment HTTP metadata uses `AttachmentConstants` `X-Attachment-*` headers rather than Base64 fields.
+
 ## Key Types/Interfaces
 
 - `shared.dto.EncryptedMessage`

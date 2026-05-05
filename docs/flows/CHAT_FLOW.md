@@ -26,6 +26,9 @@ When sending an image or document, heavy safeguards trigger:
 - Checks `MAX_ATTACHMENT_BYTES` explicitly, bounding payloads at a strict 10MB cutoff utilizing `java.nio.file.Files.size()`.
 - If an oversized file attempts to pass, a custom two-action alert blocks it, preventing a hard server disconnect for oversize blobs.
 - Success delegates the file pointer to the `ChatAttachmentService`, which manages background uploading securely.
+- Image attachments honor the Media `Image Send Quality` setting: `100` sends original bytes, while `60..95` optimizes supported images before encryption.
+- Chunked attachments use binary HTTP chunk bodies and bounded parallel upload; the init/complete/bind/reference metadata remains JSON.
+- Referenced attachment downloads return the raw encrypted blob bytes with attachment metadata in response headers, avoiding Base64 wrapping.
 
 ## 4. Action Mechanics (Context Menus & Privacy)
 

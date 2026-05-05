@@ -12,12 +12,12 @@ import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
+import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.requests.AttachmentBindRequest;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.requests.RegisterRequest;
@@ -52,6 +52,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1137,11 +1138,9 @@ class HttpIngressServerTest {
                 eq(RateLimiterService.ApiRateLimitScope.ATTACHMENTS_CHUNK),
                 eq("caller")))
                 .thenReturn(RateLimiterService.RateLimitDecision.block(7));
-        AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
-        chunkReq.setChunkIndex(0);
-        chunkReq.setChunkDataB64(Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 }));
-
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/attachments/att-1/chunk", JsonCodec.toJson(chunkReq));
+        ExchangeHarness exchange = newExchangeBytes("POST", "/api/v1/attachments/att-1/chunk",
+                new byte[] { 1, 2, 3 });
+        exchange.requestHeaders().add(AttachmentConstants.HEADER_CHUNK_INDEX, "0");
         authenticate(exchange, "sess-attach-chunk-limit", "caller");
 
         handler.handle(exchange.exchange());
@@ -1153,19 +1152,17 @@ class HttpIngressServerTest {
     }
 
     @Test
-    void attachments_chunk_rejects_invalid_base64() throws Exception {
+    void attachments_chunk_rejects_invalid_chunk_index_header() throws Exception {
         HttpHandler handler = createHandler("AttachmentsHandler");
-        AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
-        chunkReq.setChunkIndex(0);
-        chunkReq.setChunkDataB64("%%%notbase64%%%");
-
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/attachments/att-1/chunk", JsonCodec.toJson(chunkReq));
+        ExchangeHarness exchange = newExchangeBytes("POST", "/api/v1/attachments/att-1/chunk",
+                new byte[] { 1, 2, 3 });
+        exchange.requestHeaders().add(AttachmentConstants.HEADER_CHUNK_INDEX, "not-a-number");
         authenticate(exchange, "sess-attach-chunk-invalid", "caller");
 
         handler.handle(exchange.exchange());
 
         assertEquals(400, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("chunkDataB64 is not valid base64"));
+        assertTrue(exchange.responseBodyAsString().contains("chunk index header is invalid"));
     }
 
     @Test
@@ -1223,11 +1220,9 @@ class HttpIngressServerTest {
         assertTrue(initExchange.responseBodyAsString().contains("\"attachmentId\":\"att-1\""));
 
         // chunk
-        AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
-        chunkReq.setChunkIndex(0);
-        chunkReq.setChunkDataB64(Base64.getEncoder().encodeToString(new byte[] { 1, 2, 3 }));
-        ExchangeHarness chunkExchange = newExchange("POST", "/api/v1/attachments/att-1/chunk",
-                JsonCodec.toJson(chunkReq));
+        ExchangeHarness chunkExchange = newExchangeBytes("POST", "/api/v1/attachments/att-1/chunk",
+                new byte[] { 1, 2, 3 });
+        chunkExchange.requestHeaders().add(AttachmentConstants.HEADER_CHUNK_INDEX, "0");
         authenticate(chunkExchange, "sess-attach", "caller");
         when(attachmentDAO.storeChunk(eq("caller"), eq("att-1"), eq(0), any(byte[].class)))
                 .thenReturn(new Attachment.ChunkStoreResult(0, true));
@@ -1277,7 +1272,10 @@ class HttpIngressServerTest {
 
         handler.handle(downloadExchange.exchange());
         assertEquals(200, downloadExchange.statusCode().get());
-        assertTrue(downloadExchange.responseBodyAsString().contains("\"attachmentId\":\"att-1\""));
+        assertEquals("att-1", downloadExchange.responseHeaders().getFirst(AttachmentConstants.HEADER_ATTACHMENT_ID));
+        assertEquals("3",
+                downloadExchange.responseHeaders().getFirst(AttachmentConstants.HEADER_ATTACHMENT_ENCRYPTED_SIZE));
+        assertArrayEquals(new byte[] { 9, 8, 7 }, downloadExchange.responseBody().toByteArray());
     }
 
     @Test
@@ -1338,6 +1336,11 @@ class HttpIngressServerTest {
     }
 
     private ExchangeHarness newExchange(String method, String path, String body) throws Exception {
+        byte[] payload = (body == null ? "" : body).getBytes(StandardCharsets.UTF_8);
+        return newExchangeBytes(method, path, payload);
+    }
+
+    private ExchangeHarness newExchangeBytes(String method, String path, byte[] payloadBytes) throws Exception {
         HttpExchange exchange = mock(HttpExchange.class);
         Headers requestHeaders = new Headers();
         Headers responseHeaders = new Headers();
@@ -1345,14 +1348,14 @@ class HttpIngressServerTest {
         AtomicInteger statusCode = new AtomicInteger(-1);
         InetSocketAddress remoteAddress = new InetSocketAddress("203.0.113.10", 443);
 
-        String payload = body == null ? "" : body;
+        byte[] payload = payloadBytes == null ? new byte[0] : payloadBytes;
         lenient().when(exchange.getRequestMethod()).thenReturn(method);
         lenient().when(exchange.getRequestURI()).thenReturn(URI.create(path));
         lenient().when(exchange.getRequestHeaders()).thenReturn(requestHeaders);
         lenient().when(exchange.getResponseHeaders()).thenReturn(responseHeaders);
         lenient().when(exchange.getRemoteAddress()).thenReturn(remoteAddress);
         lenient().when(exchange.getRequestBody())
-                .thenReturn(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)));
+                .thenReturn(new ByteArrayInputStream(payload));
         lenient().when(exchange.getResponseBody()).thenReturn(responseBody);
         org.mockito.Mockito.doAnswer(invocation -> {
             statusCode.set(invocation.getArgument(0, Integer.class));

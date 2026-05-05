@@ -2,11 +2,9 @@ package com.haf.client.network;
 
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.responses.AttachmentChunkResponse;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.responses.AttachmentCompleteResponse;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.dto.EncryptedMessage;
@@ -108,7 +106,7 @@ public interface MessageSender {
      * @param request      the attachment chunk request
      * @throws IOException if network communication fails
      */
-    default AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, AttachmentChunkRequest request)
+    default AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, int chunkIndex, byte[] chunkBytes)
             throws IOException {
         throw new UnsupportedOperationException("uploadAttachmentChunk is not implemented");
     }
@@ -143,7 +141,7 @@ public interface MessageSender {
      * @param attachmentId the attachment identifier
      * @throws IOException if network communication fails
      */
-    default AttachmentDownloadResponse downloadAttachment(String attachmentId) throws IOException {
+    default AttachmentDownload downloadAttachment(String attachmentId) throws IOException {
         throw new UnsupportedOperationException("downloadAttachment is not implemented");
     }
 
@@ -154,5 +152,22 @@ public interface MessageSender {
      * @param expiresAtEpochMs the expiration time in milliseconds
      */
     record SendResult(String envelopeId, long expiresAtEpochMs) {
+    }
+
+    /**
+     * Binary attachment download result returned by the attachment endpoint.
+     *
+     * @param attachmentId       attachment identifier
+     * @param contentType        stored encrypted blob content type
+     * @param encryptedSizeBytes encrypted blob byte length
+     * @param chunkCount         number of stored chunks
+     * @param encryptedBlob      raw encrypted blob bytes
+     */
+    record AttachmentDownload(
+            String attachmentId,
+            String contentType,
+            long encryptedSizeBytes,
+            int chunkCount,
+            byte[] encryptedBlob) {
     }
 }

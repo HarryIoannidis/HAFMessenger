@@ -8,11 +8,15 @@ Document authenticated HTTPS transport behavior used by the client runtime.
 
 - `AuthHttpClient` provides authenticated HTTP helpers:
   - `getAuthenticated(path)`
+  - `getAuthenticatedBytes(path)`
   - `postAuthenticated(path, body)`
+  - `postAuthenticatedBytes(path, body, contentType, headers)`
   - `deleteAuthenticated(path)`
 - `DefaultMessageReceiver` always uses HTTPS polling for inbound message envelopes and contact presence projection.
 - Envelope acknowledgements are submitted through `POST /api/v1/messages/ack`.
 - Envelope-size budgeting for inline media uses `haf.messaging.maxEnvelopeBytes` (default 4 MB).
+- Attachment chunk upload uses `application/octet-stream` bodies with `X-Attachment-Chunk-Index`.
+- Attachment download uses `application/octet-stream` response bytes with `X-Attachment-*` metadata headers.
 
 ## Key Types/Interfaces
 

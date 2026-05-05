@@ -125,6 +125,10 @@ public class ChatController {
             }
         };
         this.settings.addListener(this.settingsListener);
+        MessagesViewModel messageViewModel = ChatSession.get();
+        if (messageViewModel != null) {
+            messageViewModel.setSettings(this.settings);
+        }
     }
 
     /**

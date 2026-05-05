@@ -3,15 +3,14 @@ package com.haf.client.network;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.KeyNotFoundException;
+import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.requests.AttachmentBindRequest;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
 import com.haf.shared.responses.AttachmentChunkResponse;
 import com.haf.shared.responses.AttachmentCompleteResponse;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.utils.ClockProvider;
@@ -20,11 +19,16 @@ import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.JsonCodec;
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +83,10 @@ class MessageSenderTest {
     static class ApiStubAuthHttpClient extends AuthHttpClient {
         private final Map<String, String> postResponses = new HashMap<>();
         private final Map<String, String> getResponses = new HashMap<>();
+        private final Map<String, HttpResponse<byte[]>> getByteResponses = new HashMap<>();
+        private String lastPostBytesPath;
+        private byte[] lastPostBytesBody;
+        private Map<String, String> lastPostBytesHeaders;
 
         ApiStubAuthHttpClient() {
             super(URI.create("https://localhost:8443"), "api-test-session");
@@ -92,6 +100,10 @@ class MessageSenderTest {
             getResponses.put(path, responseBody);
         }
 
+        void whenGetBytes(String path, HttpResponse<byte[]> response) {
+            getByteResponses.put(path, response);
+        }
+
         @Override
         public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
             if (postResponses.containsKey(path)) {
@@ -101,11 +113,34 @@ class MessageSenderTest {
         }
 
         @Override
+        public CompletableFuture<String> postAuthenticatedBytes(
+                String path,
+                byte[] body,
+                String contentType,
+                Map<String, String> extraHeaders) {
+            lastPostBytesPath = path;
+            lastPostBytesBody = body;
+            lastPostBytesHeaders = extraHeaders;
+            if (postResponses.containsKey(path)) {
+                return CompletableFuture.completedFuture(postResponses.get(path));
+            }
+            return CompletableFuture.failedFuture(new IOException("No binary POST stub for " + path));
+        }
+
+        @Override
         public CompletableFuture<String> getAuthenticated(String path) {
             if (getResponses.containsKey(path)) {
                 return CompletableFuture.completedFuture(getResponses.get(path));
             }
             return CompletableFuture.failedFuture(new IOException("No GET stub for " + path));
+        }
+
+        @Override
+        public CompletableFuture<HttpResponse<byte[]>> getAuthenticatedBytes(String path) {
+            if (getByteResponses.containsKey(path)) {
+                return CompletableFuture.completedFuture(getByteResponses.get(path));
+            }
+            return CompletableFuture.failedFuture(new IOException("No binary GET stub for " + path));
         }
     }
 
@@ -223,9 +258,15 @@ class MessageSenderTest {
         AttachmentBindResponse bind = AttachmentBindResponse.success("att-1", "env-1", 5555);
         apiAdapter.whenPost("/api/v1/attachments/att-1/bind", JsonCodec.toJson(bind));
 
-        AttachmentDownloadResponse download = AttachmentDownloadResponse.success(
-                "att-1", "sender", "recipient", "application/pdf", 12, 1, "AQID");
-        apiAdapter.whenGet("/api/v1/attachments/att-1", JsonCodec.toJson(download));
+        apiAdapter.whenGetBytes("/api/v1/attachments/att-1", byteResponse(
+                200,
+                new byte[] { 1, 2, 3 },
+                Map.of(
+                        AttachmentConstants.HEADER_ATTACHMENT_ID, java.util.List.of("att-1"),
+                        AttachmentConstants.HEADER_ATTACHMENT_CONTENT_TYPE,
+                        java.util.List.of(AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB),
+                        AttachmentConstants.HEADER_ATTACHMENT_ENCRYPTED_SIZE, java.util.List.of("3"),
+                        AttachmentConstants.HEADER_ATTACHMENT_CHUNK_COUNT, java.util.List.of("1"))));
 
         MessagingPolicyResponse decodedPolicy = sender.fetchMessagingPolicy();
         assertEquals(1000L, decodedPolicy.getAttachmentMaxBytes());
@@ -239,10 +280,10 @@ class MessageSenderTest {
         initReq.setExpectedChunks(2);
         assertEquals("att-1", sender.initAttachmentUpload(initReq).getAttachmentId());
 
-        AttachmentChunkRequest chunkReq = new AttachmentChunkRequest();
-        chunkReq.setChunkIndex(0);
-        chunkReq.setChunkDataB64("AQID");
-        assertTrue(sender.uploadAttachmentChunk("att-1", chunkReq).isStored());
+        assertTrue(sender.uploadAttachmentChunk("att-1", 0, new byte[] { 1, 2, 3 }).isStored());
+        assertEquals("/api/v1/attachments/att-1/chunk", apiAdapter.lastPostBytesPath);
+        assertEquals("0", apiAdapter.lastPostBytesHeaders.get(AttachmentConstants.HEADER_CHUNK_INDEX));
+        assertEquals(3, apiAdapter.lastPostBytesBody.length);
 
         AttachmentCompleteRequest completeReq = new AttachmentCompleteRequest();
         completeReq.setExpectedChunks(1);
@@ -253,6 +294,53 @@ class MessageSenderTest {
         bindReq.setEnvelopeId("env-1");
         assertEquals("env-1", sender.bindAttachmentUpload("att-1", bindReq).getEnvelopeId());
 
-        assertEquals("att-1", sender.downloadAttachment("att-1").getAttachmentId());
+        MessageSender.AttachmentDownload downloaded = sender.downloadAttachment("att-1");
+        assertEquals("att-1", downloaded.attachmentId());
+        assertEquals(3, downloaded.encryptedBlob().length);
+    }
+
+    private static HttpResponse<byte[]> byteResponse(int status, byte[] body, Map<String, java.util.List<String>> headers) {
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://localhost")).build();
+        return new HttpResponse<>() {
+            @Override
+            public int statusCode() {
+                return status;
+            }
+
+            @Override
+            public HttpRequest request() {
+                return request;
+            }
+
+            @Override
+            public Optional<HttpResponse<byte[]>> previousResponse() {
+                return Optional.empty();
+            }
+
+            @Override
+            public HttpHeaders headers() {
+                return HttpHeaders.of(headers, (name, value) -> true);
+            }
+
+            @Override
+            public byte[] body() {
+                return body;
+            }
+
+            @Override
+            public Optional<javax.net.ssl.SSLSession> sslSession() {
+                return Optional.empty();
+            }
+
+            @Override
+            public URI uri() {
+                return request.uri();
+            }
+
+            @Override
+            public HttpClient.Version version() {
+                return HttpClient.Version.HTTP_1_1;
+            }
+        };
     }
 }
