@@ -6,12 +6,12 @@ import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
+import com.haf.client.services.AttachmentImageOptimizer;
+import com.haf.client.utils.ClientSettings;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.requests.AttachmentBindRequest;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.dto.AttachmentInlinePayload;
 import com.haf.shared.dto.AttachmentReferencePayload;
@@ -27,18 +27,26 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -107,6 +115,9 @@ public class MessagesViewModel {
     private record DecodedMessage(MessageVM message, ImagePreviewFallbackNotice fallbackNotice) {
     }
 
+    private record PreparedAttachment(byte[] bytes, String mediaType, String fileName) {
+    }
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
 
@@ -126,10 +137,16 @@ public class MessagesViewModel {
     private static final int MAX_ENVELOPE_BYTES = resolveMaxEnvelopeBytes();
     private static final int INLINE_WIRE_HEADROOM_BYTES = 16 * 1024;
     private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
+    private static final int TEMP_ENCRYPTED_BLOB_THRESHOLD_BYTES = 8 * 1024 * 1024;
+    private static final int DEFAULT_UPLOAD_CONCURRENCY = 4;
+    private static final int MIN_UPLOAD_CONCURRENCY = 1;
+    private static final int MAX_UPLOAD_CONCURRENCY = 6;
     private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
     private static final String SESSION_TAKEOVER_TITLE = "Logged out";
     private static final String SESSION_TAKEOVER_MESSAGE =
             "You were logged out because this account was signed in on another device.";
+
+    private volatile ClientSettings settings = ClientSettings.defaults();
 
     /**
      * Creates a MessagesViewModel.
@@ -144,6 +161,15 @@ public class MessagesViewModel {
         this.messageReceiver = messageReceiver;
 
         messageReceiver.setMessageListener(new ViewModelMessageListener());
+    }
+
+    /**
+     * Injects active client settings used by outbound attachment preparation.
+     *
+     * @param settings active settings instance
+     */
+    public void setSettings(ClientSettings settings) {
+        this.settings = settings == null ? ClientSettings.defaults() : settings;
     }
 
     /**
@@ -484,22 +510,25 @@ public class MessagesViewModel {
             if (fileBytes.length == 0) {
                 throw new IllegalArgumentException("Attachment file is empty");
             }
+            PreparedAttachment prepared = prepareOutboundAttachment(fileBytes, mediaType, fileName);
+            validateAgainstPolicy(prepared.mediaType(), prepared.bytes().length, policy);
 
             LocalDateTime timestamp = LocalDateTime.now();
-            if (shouldSendInlineAttachment(fileBytes, policy, fileName, mediaType)) {
-                if (shouldShowInlineLoadingPlaceholder(mediaType)) {
-                    loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, mediaType, fileName,
-                            fileBytes.length, timestamp);
+            if (shouldSendInlineAttachment(prepared.bytes(), policy, prepared.fileName(), prepared.mediaType())) {
+                if (shouldShowInlineLoadingPlaceholder(prepared.mediaType())) {
+                    loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, prepared.mediaType(),
+                            prepared.fileName(), prepared.bytes().length, timestamp);
                 }
-                sendInlineAttachmentAndRender(contactId, fileName, mediaType, fileBytes, timestamp, loadingVm);
+                sendInlineAttachmentAndRender(contactId, prepared.fileName(), prepared.mediaType(), prepared.bytes(),
+                        timestamp, loadingVm);
             } else {
-                loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, mediaType, fileName, fileBytes.length,
-                        timestamp);
+                loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, prepared.mediaType(),
+                        prepared.fileName(), prepared.bytes().length, timestamp);
                 sendChunkedAttachmentAndRender(
                         contactId,
-                        fileName,
-                        mediaType,
-                        fileBytes,
+                        prepared.fileName(),
+                        prepared.mediaType(),
+                        prepared.bytes(),
                         policy,
                         timestamp,
                         loadingVm);
@@ -558,6 +587,29 @@ public class MessagesViewModel {
             String mediaType) {
         return fileBytes.length <= policy.getAttachmentInlineMaxBytes()
                 && canSendInlineWithinEnvelopeBudget(fileName, mediaType, fileBytes.length);
+    }
+
+    /**
+     * Applies optional user-selected image optimization before encryption.
+     *
+     * @param fileBytes source file bytes
+     * @param mediaType normalized source media type
+     * @param fileName  sanitized source filename
+     * @return bytes and metadata to send
+     */
+    private PreparedAttachment prepareOutboundAttachment(byte[] fileBytes, String mediaType, String fileName) {
+        int quality = settings.isMediaSendInMaxQuality() ? 100 : settings.getMediaImageSendQuality();
+        AttachmentImageOptimizer.OptimizedAttachment optimized = AttachmentImageOptimizer.optimize(
+                fileBytes,
+                mediaType,
+                fileName,
+                quality);
+        String preparedMediaType = AttachmentConstants.normalizeMimeType(optimized.mediaType());
+        if (!AttachmentConstants.isValidMimeType(preparedMediaType)) {
+            preparedMediaType = mediaType;
+        }
+        String preparedFileName = sanitizeFileName(optimized.fileName());
+        return new PreparedAttachment(optimized.bytes(), preparedMediaType, preparedFileName);
     }
 
     /**
@@ -735,6 +787,24 @@ public class MessagesViewModel {
             // Fall through to default.
         }
         return DEFAULT_MAX_ENVELOPE_BYTES;
+    }
+
+    /**
+     * Resolves bounded attachment upload concurrency from system properties.
+     *
+     * @return number of concurrent chunk upload workers
+     */
+    private static int resolveUploadConcurrency() {
+        String configured = System.getProperty("haf.attachments.uploadConcurrency");
+        if (configured == null || configured.isBlank()) {
+            return DEFAULT_UPLOAD_CONCURRENCY;
+        }
+        try {
+            int parsed = Integer.parseInt(configured.trim());
+            return Math.clamp(parsed, MIN_UPLOAD_CONCURRENCY, MAX_UPLOAD_CONCURRENCY);
+        } catch (NumberFormatException ignored) {
+            return DEFAULT_UPLOAD_CONCURRENCY;
+        }
     }
 
     /**
@@ -1458,62 +1528,148 @@ public class MessagesViewModel {
                 mediaType,
                 MessageHeader.MAX_TTL_SECONDS);
         byte[] encryptedBlob = JsonCodec.toJson(encryptedAttachment).getBytes(StandardCharsets.UTF_8);
+        Path tempEncryptedBlob = null;
 
-        int chunkBytes = policy.getAttachmentChunkBytes();
-        int expectedChunks = (int) Math.ceil(encryptedBlob.length / (double) chunkBytes);
+        try {
+            int chunkBytes = policy.getAttachmentChunkBytes();
+            int expectedChunks = (int) Math.ceil(encryptedBlob.length / (double) chunkBytes);
 
-        AttachmentInitRequest initRequest = new AttachmentInitRequest();
-        initRequest.setRecipientId(recipientId);
-        initRequest.setContentType(AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB);
-        initRequest.setPlaintextSizeBytes(fileBytes.length);
-        initRequest.setEncryptedSizeBytes(encryptedBlob.length);
-        initRequest.setExpectedChunks(expectedChunks);
-        var initResponse = messageSender.initAttachmentUpload(initRequest);
-        ensureNoError(initResponse.getError());
-        String attachmentId = initResponse.getAttachmentId();
-        if (attachmentId == null || attachmentId.isBlank()) {
-            throw new IOException("Attachment init did not return attachmentId");
+            AttachmentInitRequest initRequest = new AttachmentInitRequest();
+            initRequest.setRecipientId(recipientId);
+            initRequest.setContentType(AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB);
+            initRequest.setPlaintextSizeBytes(fileBytes.length);
+            initRequest.setEncryptedSizeBytes(encryptedBlob.length);
+            initRequest.setExpectedChunks(expectedChunks);
+            var initResponse = messageSender.initAttachmentUpload(initRequest);
+            ensureNoError(initResponse.getError());
+            String attachmentId = initResponse.getAttachmentId();
+            if (attachmentId == null || attachmentId.isBlank()) {
+                throw new IOException("Attachment init did not return attachmentId");
+            }
+
+            if (encryptedBlob.length > TEMP_ENCRYPTED_BLOB_THRESHOLD_BYTES) {
+                tempEncryptedBlob = Files.createTempFile("haf-attachment-", ".encmsg");
+                Files.write(tempEncryptedBlob, encryptedBlob);
+            }
+            uploadAttachmentChunks(
+                    attachmentId,
+                    encryptedBlob,
+                    tempEncryptedBlob,
+                    encryptedBlob.length,
+                    chunkBytes,
+                    recipientId,
+                    mediaType);
+
+            AttachmentCompleteRequest completeRequest = new AttachmentCompleteRequest();
+            completeRequest.setExpectedChunks(expectedChunks);
+            completeRequest.setEncryptedSizeBytes(encryptedBlob.length);
+            var completeResponse = messageSender.completeAttachmentUpload(attachmentId, completeRequest);
+            ensureNoError(completeResponse.getError());
+
+            AttachmentReferencePayload referencePayload = new AttachmentReferencePayload();
+            referencePayload.setAttachmentId(attachmentId);
+            referencePayload.setFileName(fileName);
+            referencePayload.setMediaType(mediaType);
+            referencePayload.setSizeBytes(fileBytes.length);
+
+            String refJson = AttachmentPayloadCodec.toReferenceJson(referencePayload);
+            MessageSender.SendResult sendResult = messageSender.sendMessageWithResult(
+                    refJson.getBytes(StandardCharsets.UTF_8),
+                    recipientId,
+                    AttachmentConstants.CONTENT_TYPE_REFERENCE,
+                    MessageHeader.MAX_TTL_SECONDS);
+
+            if (sendResult == null || sendResult.envelopeId() == null || sendResult.envelopeId().isBlank()) {
+                throw new IOException("Attachment reference send did not return envelopeId");
+            }
+
+            AttachmentBindRequest bindRequest = new AttachmentBindRequest();
+            bindRequest.setEnvelopeId(sendResult.envelopeId());
+            var bindResponse = messageSender.bindAttachmentUpload(attachmentId, bindRequest);
+            ensureNoError(bindResponse.getError());
+        } finally {
+            if (tempEncryptedBlob != null) {
+                Files.deleteIfExists(tempEncryptedBlob);
+            }
         }
+    }
 
-        for (int chunkIndex = 0; chunkIndex < expectedChunks; chunkIndex++) {
-            int from = chunkIndex * chunkBytes;
-            int to = Math.min(encryptedBlob.length, from + chunkBytes);
-            byte[] chunk = java.util.Arrays.copyOfRange(encryptedBlob, from, to);
+    /**
+     * Uploads encrypted attachment chunks with bounded parallelism.
+     */
+    private void uploadAttachmentChunks(
+            String attachmentId,
+            byte[] encryptedBlob,
+            Path encryptedBlobPath,
+            int encryptedSizeBytes,
+            int chunkBytes,
+            String recipientId,
+            String mediaType) throws Exception {
+        int expectedChunks = (int) Math.ceil(encryptedSizeBytes / (double) chunkBytes);
+        int concurrency = resolveUploadConcurrency();
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        List<CompletableFuture<Void>> futures = new ArrayList<>(expectedChunks);
+        AtomicInteger uploadedBytes = new AtomicInteger(0);
 
-            AttachmentChunkRequest chunkRequest = new AttachmentChunkRequest();
-            chunkRequest.setChunkIndex(chunkIndex);
-            chunkRequest.setChunkDataB64(Base64.getEncoder().encodeToString(chunk));
-            var chunkResponse = messageSender.uploadAttachmentChunk(attachmentId, chunkRequest);
-            ensureNoError(chunkResponse.getError());
+        try {
+            for (int chunkIndex = 0; chunkIndex < expectedChunks; chunkIndex++) {
+                final int currentIndex = chunkIndex;
+                futures.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        int from = currentIndex * chunkBytes;
+                        int length = Math.min(chunkBytes, encryptedSizeBytes - from);
+                        byte[] chunk = encryptedBlobPath == null
+                                ? readChunk(encryptedBlob, from, length)
+                                : readChunk(encryptedBlobPath, from, length);
+                        var chunkResponse = messageSender.uploadAttachmentChunk(attachmentId, currentIndex, chunk);
+                        ensureNoError(chunkResponse.getError());
+                        int uploaded = uploadedBytes.addAndGet(chunk.length);
+                        updateAttachmentUploadProgress(recipientId, mediaType, uploaded, encryptedSizeBytes);
+                    } catch (Exception ex) {
+                        throw new CompletionException(ex);
+                    }
+                }, executor));
+            }
+
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+        } catch (CompletionException ex) {
+            futures.forEach(future -> future.cancel(true));
+            Throwable cause = ex.getCause();
+            if (cause instanceof Exception exception) {
+                throw exception;
+            }
+            throw ex;
+        } finally {
+            executor.shutdownNow();
         }
+    }
 
-        AttachmentCompleteRequest completeRequest = new AttachmentCompleteRequest();
-        completeRequest.setExpectedChunks(expectedChunks);
-        completeRequest.setEncryptedSizeBytes(encryptedBlob.length);
-        var completeResponse = messageSender.completeAttachmentUpload(attachmentId, completeRequest);
-        ensureNoError(completeResponse.getError());
-
-        AttachmentReferencePayload referencePayload = new AttachmentReferencePayload();
-        referencePayload.setAttachmentId(attachmentId);
-        referencePayload.setFileName(fileName);
-        referencePayload.setMediaType(mediaType);
-        referencePayload.setSizeBytes(fileBytes.length);
-
-        String refJson = AttachmentPayloadCodec.toReferenceJson(referencePayload);
-        MessageSender.SendResult sendResult = messageSender.sendMessageWithResult(
-                refJson.getBytes(StandardCharsets.UTF_8),
-                recipientId,
-                AttachmentConstants.CONTENT_TYPE_REFERENCE,
-                MessageHeader.MAX_TTL_SECONDS);
-
-        if (sendResult == null || sendResult.envelopeId() == null || sendResult.envelopeId().isBlank()) {
-            throw new IOException("Attachment reference send did not return envelopeId");
+    private void updateAttachmentUploadProgress(String recipientId, String mediaType, int uploaded, int total) {
+        if (total <= 0) {
+            return;
         }
+        int percent = Math.clamp((int) Math.round((uploaded * 100.0) / total), 0, 100);
+        runOnUiThread(() -> status.set(buildAttachmentLoadingStatus(recipientId, mediaType, true) + " " + percent + "%"));
+    }
 
-        AttachmentBindRequest bindRequest = new AttachmentBindRequest();
-        bindRequest.setEnvelopeId(sendResult.envelopeId());
-        var bindResponse = messageSender.bindAttachmentUpload(attachmentId, bindRequest);
-        ensureNoError(bindResponse.getError());
+    private static byte[] readChunk(byte[] source, int offset, int length) {
+        byte[] chunk = new byte[length];
+        System.arraycopy(source, offset, chunk, 0, length);
+        return chunk;
+    }
+
+    private static byte[] readChunk(Path source, int offset, int length) throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        try (SeekableByteChannel channel = Files.newByteChannel(source, StandardOpenOption.READ)) {
+            channel.position(offset);
+            while (buffer.hasRemaining() && channel.read(buffer) != -1) {
+                // Continue until the requested chunk window is full.
+            }
+        }
+        if (buffer.position() != length) {
+            throw new IOException("Could not read encrypted attachment chunk");
+        }
+        return buffer.array();
     }
 
     /**
@@ -1602,15 +1758,15 @@ public class MessagesViewModel {
             AttachmentReferencePayload ref,
             LocalDateTime timestamp)
             throws Exception {
-        AttachmentDownloadResponse downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
-        ensureNoError(downloadResponse.getError());
-        if (downloadResponse.getEncryptedBlobB64() == null || downloadResponse.getEncryptedBlobB64().isBlank()) {
+        MessageSender.AttachmentDownload downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
+        if (downloadResponse == null
+                || downloadResponse.encryptedBlob() == null
+                || downloadResponse.encryptedBlob().length == 0) {
             throw new IOException("Attachment download response is empty");
         }
 
-        byte[] encryptedBlob = Base64.getDecoder().decode(downloadResponse.getEncryptedBlobB64());
         EncryptedMessage encryptedMessage = JsonCodec.fromJson(
-                new String(encryptedBlob, StandardCharsets.UTF_8),
+                new String(downloadResponse.encryptedBlob(), StandardCharsets.UTF_8),
                 EncryptedMessage.class);
         byte[] fileBytes = messageReceiver.decryptDetachedMessage(encryptedMessage);
         return decodeAttachment(senderId, false, fileBytes, ref.getMediaType(), ref.getFileName(), timestamp);

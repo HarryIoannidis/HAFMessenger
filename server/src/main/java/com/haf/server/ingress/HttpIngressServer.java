@@ -18,11 +18,9 @@ import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.responses.AttachmentChunkResponse;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.responses.AttachmentCompleteResponse;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.responses.MessagingPolicyResponse;
@@ -2281,7 +2279,7 @@ public final class HttpIngressServer {
                 String method,
                 String attachmentId) throws IOException {
             if (!METHOD_GET.equalsIgnoreCase(method)) {
-                sendJson(exchange, 405, JsonCodec.toJson(AttachmentDownloadResponse.error(METHOD_NOT_ALLOWED)));
+                sendJson(exchange, 405, jsonError(METHOD_NOT_ALLOWED));
                 return;
             }
             if (!enforceApiRateLimit(exchange, requestId, ApiRateLimitScope.ATTACHMENTS_DOWNLOAD, callerId)) {
@@ -2388,25 +2386,8 @@ public final class HttpIngressServer {
          * @throws IOException when response write fails
          */
         private void handleChunk(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
-            String body = readBody(exchange.getRequestBody());
-            AttachmentChunkRequest request = JsonCodec.fromJson(body, AttachmentChunkRequest.class);
-            if (request == null) {
-                throw new IllegalArgumentException("attachment chunk payload is required");
-            }
-
-            if (request.getChunkIndex() < 0) {
-                throw new IllegalArgumentException("chunkIndex must be >= 0");
-            }
-            if (request.getChunkDataB64() == null || request.getChunkDataB64().isBlank()) {
-                throw new IllegalArgumentException("chunkDataB64 is required");
-            }
-
-            byte[] decodedChunk;
-            try {
-                decodedChunk = Base64.getDecoder().decode(request.getChunkDataB64());
-            } catch (IllegalArgumentException _) {
-                throw new IllegalArgumentException("chunkDataB64 is not valid base64");
-            }
+            int chunkIndex = parseChunkIndex(exchange);
+            byte[] decodedChunk = readBodyBytes(exchange.getRequestBody());
             if (decodedChunk.length == 0 || decodedChunk.length > config.getAttachmentChunkBytes()) {
                 throw new IllegalArgumentException("chunk size is out of bounds");
             }
@@ -2414,7 +2395,7 @@ public final class HttpIngressServer {
             Attachment.ChunkStoreResult result = attachmentDAO.storeChunk(
                     callerId,
                     attachmentId,
-                    request.getChunkIndex(),
+                    chunkIndex,
                     decodedChunk);
             sendJson(exchange, 200, JsonCodec.toJson(
                     AttachmentChunkResponse.success(attachmentId, result.chunkIndex(), result.stored())));
@@ -2490,15 +2471,35 @@ public final class HttpIngressServer {
          */
         private void handleDownload(HttpExchange exchange, String callerId, String attachmentId) throws IOException {
             Attachment.DownloadBlob blob = attachmentDAO.loadForRecipient(callerId, attachmentId);
-            AttachmentDownloadResponse response = AttachmentDownloadResponse.success(
-                    blob.attachmentId(),
-                    blob.senderId(),
-                    blob.recipientId(),
-                    blob.contentType(),
-                    blob.encryptedSizeBytes(),
-                    blob.chunkCount(),
-                    Base64.getEncoder().encodeToString(blob.encryptedBlob()));
-            sendJson(exchange, 200, JsonCodec.toJson(response));
+            Headers headers = exchange.getResponseHeaders();
+            headers.set(AttachmentConstants.HEADER_ATTACHMENT_ID, blob.attachmentId());
+            headers.set(AttachmentConstants.HEADER_ATTACHMENT_ENCRYPTED_SIZE,
+                    String.valueOf(blob.encryptedSizeBytes()));
+            headers.set(AttachmentConstants.HEADER_ATTACHMENT_CHUNK_COUNT, String.valueOf(blob.chunkCount()));
+            headers.set(AttachmentConstants.HEADER_ATTACHMENT_CONTENT_TYPE, blob.contentType());
+            sendBinary(exchange, 200, blob.encryptedBlob(), AttachmentConstants.APPLICATION_OCTET_STREAM);
+        }
+
+        /**
+         * Parses the required binary chunk index header.
+         *
+         * @param exchange HTTP exchange
+         * @return zero-based chunk index
+         */
+        private int parseChunkIndex(HttpExchange exchange) {
+            String value = exchange.getRequestHeaders().getFirst(AttachmentConstants.HEADER_CHUNK_INDEX);
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("chunk index header is required");
+            }
+            try {
+                int parsed = Integer.parseInt(value.trim());
+                if (parsed < 0) {
+                    throw new IllegalArgumentException("chunkIndex must be >= 0");
+                }
+                return parsed;
+            } catch (NumberFormatException _) {
+                throw new IllegalArgumentException("chunk index header is invalid");
+            }
         }
 
         /**
@@ -2538,6 +2539,28 @@ public final class HttpIngressServer {
                 buffer.write(chunk, 0, read);
             }
             return buffer.toString(StandardCharsets.UTF_8);
+        }
+
+        /**
+         * Reads raw request body bytes with hard byte-limit enforcement.
+         *
+         * @param body request body stream
+         * @return raw request bytes
+         * @throws IOException when read fails or body exceeds configured limit
+         */
+        private byte[] readBodyBytes(InputStream body) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            int total = 0;
+            while ((read = body.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toByteArray();
         }
     }
 
@@ -2926,6 +2949,27 @@ public final class HttpIngressServer {
     private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
         byte[] payload = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add(CONTENT_TYPE, APPLICATION_JSON);
+        exchange.sendResponseHeaders(status, payload.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(payload);
+        }
+    }
+
+    /**
+     * Sends a binary response body for attachment blob downloads.
+     *
+     * @param exchange    HTTP exchange
+     * @param status      HTTP status code
+     * @param body        binary response bytes
+     * @param contentType response content type
+     * @throws IOException when response write fails
+     */
+    private void sendBinary(HttpExchange exchange, int status, byte[] body, String contentType) throws IOException {
+        byte[] payload = body == null ? new byte[0] : body;
+        exchange.getResponseHeaders().set(CONTENT_TYPE,
+                contentType == null || contentType.isBlank()
+                        ? AttachmentConstants.APPLICATION_OCTET_STREAM
+                        : contentType);
         exchange.sendResponseHeaders(status, payload.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(payload);

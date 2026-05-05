@@ -90,6 +90,23 @@ public class AuthHttpClient {
     }
 
     /**
+     * Executes an authenticated HTTP GET request and returns binary response bytes
+     * together with response headers.
+     *
+     * @param path relative API path
+     * @return future with validated binary response
+     */
+    public CompletableFuture<HttpResponse<byte[]>> getAuthenticatedBytes(String path) {
+        URI requestUri = buildAuthenticatedRequestUri(path);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(requestUri)
+                .header("Authorization", authorizationHeaderValue())
+                .GET()
+                .build();
+        return sendBytesWithRetry(request, "GET");
+    }
+
+    /**
      * Executes an authenticated HTTP POST request with JSON content.
      *
      * @param path relative API path
@@ -116,13 +133,33 @@ public class AuthHttpClient {
                 .header("Authorization", authorizationHeaderValue())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
-        if (extraHeaders != null && !extraHeaders.isEmpty()) {
-            extraHeaders.forEach((name, value) -> {
-                if (name != null && !name.isBlank() && value != null) {
-                    builder.header(name, value);
-                }
-            });
-        }
+        addExtraHeaders(builder, extraHeaders);
+        return sendWithRetry(builder.build(), "POST");
+    }
+
+    /**
+     * Executes an authenticated HTTP POST request with binary request content.
+     *
+     * @param path         relative API path
+     * @param body         request bytes
+     * @param contentType  request content type
+     * @param extraHeaders optional extra headers to append
+     * @return future with response body for successful 2xx responses
+     */
+    public CompletableFuture<String> postAuthenticatedBytes(
+            String path,
+            byte[] body,
+            String contentType,
+            Map<String, String> extraHeaders) {
+        URI requestUri = buildAuthenticatedRequestUri(path);
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(requestUri)
+                .header("Authorization", authorizationHeaderValue())
+                .header("Content-Type", contentType == null || contentType.isBlank()
+                        ? "application/octet-stream"
+                        : contentType)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
+        addExtraHeaders(builder, extraHeaders);
         return sendWithRetry(builder.build(), "POST");
     }
 
@@ -187,6 +224,19 @@ public class AuthHttpClient {
                 });
     }
 
+    private CompletableFuture<HttpResponse<byte[]>> sendBytesWithRetry(HttpRequest request, String method) {
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+                .thenApply(response -> validateBytesResponse(response, method))
+                .exceptionallyCompose(error -> {
+                    if (isConnectionError(error)) {
+                        LOGGER.warn("HTTP {} failed with connection error, retrying once", method);
+                        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+                                .thenApply(response -> validateBytesResponse(response, method));
+                    }
+                    return CompletableFuture.failedFuture(error);
+                });
+    }
+
     private String validateResponse(HttpResponse<String> response, String method) {
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             return response.body();
@@ -195,6 +245,29 @@ public class AuthHttpClient {
                 "HTTP " + method + " failed with status " + response.statusCode() + ": " + response.body(),
                 response.statusCode(),
                 response.body());
+    }
+
+    private HttpResponse<byte[]> validateBytesResponse(HttpResponse<byte[]> response, String method) {
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            return response;
+        }
+        byte[] body = response.body();
+        String responseBody = body == null ? "" : new String(body, java.nio.charset.StandardCharsets.UTF_8);
+        throw new HttpCommunicationException(
+                "HTTP " + method + " failed with status " + response.statusCode() + ": " + responseBody,
+                response.statusCode(),
+                responseBody);
+    }
+
+    private static void addExtraHeaders(HttpRequest.Builder builder, Map<String, String> extraHeaders) {
+        if (extraHeaders == null || extraHeaders.isEmpty()) {
+            return;
+        }
+        extraHeaders.forEach((name, value) -> {
+            if (name != null && !name.isBlank() && value != null) {
+                builder.header(name, value);
+            }
+        });
     }
 
     private static boolean isConnectionError(Throwable error) {

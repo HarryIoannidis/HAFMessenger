@@ -9,6 +9,7 @@ Describe the settings popup scene that exposes per-user client preferences and r
 - Controller: `SettingsController`.
 - View: `settings.fxml`.
 - Settings rows are generated programmatically with `SettingsRowBuilder` and bound directly to `ClientSettings`.
+- Media settings include an `Image Send Quality` slider (`60..100`, step `5`, default `100`) that controls future outbound image optimization.
 - Left navigation uses `ListView<SettingsMenuItem>` with a custom cell backed by `settings_item_cell.fxml`.
 - Popup is opened/preloaded from main shell through `ViewRouter` using key `popup-settings`.
 

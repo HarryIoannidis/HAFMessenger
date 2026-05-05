@@ -28,7 +28,7 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
 3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
 4. Receiver consumes envelopes via HTTPS polling, validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.
-5. Attachments follow init/chunk/complete/bind/download endpoints and inherit policy/TTL controls.
+5. Attachments follow init/chunk/complete/bind/download endpoints, with binary chunk upload/download bodies and JSON lifecycle metadata.
 
 ## Error/Security Notes
 

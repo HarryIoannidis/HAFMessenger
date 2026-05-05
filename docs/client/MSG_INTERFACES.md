@@ -7,6 +7,7 @@ Define current client messaging interfaces used by ViewModels/controllers.
 ## Current Implementation
 
 - `MessageSender` supports plaintext send, encrypt-only, send-encrypted, and attachment-related REST operations.
+- Attachment chunks are uploaded as raw encrypted bytes; attachment downloads return raw encrypted blob bytes plus metadata headers through `MessageSender.AttachmentDownload`.
 - `MessageReceiver` supports polling receive lifecycle, envelope acknowledgement, and detached decrypt helper.
 - Implementations are `DefaultMessageSender` and `DefaultMessageReceiver`.
 
@@ -17,7 +18,7 @@ Define current client messaging interfaces used by ViewModels/controllers.
   - `sendMessageWithResult(...)`
   - `encryptMessage(...)`
   - `sendEncryptedMessage(...)`
-  - attachment operations (`init`, `chunk`, `complete`, `bind`, `download`)
+  - attachment operations (`init`, binary `chunk`, `complete`, `bind`, binary `download`)
 - `client.network.MessageReceiver`
   - `setMessageListener(...)`
   - `start()` / `stop()`

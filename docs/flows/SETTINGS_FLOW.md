@@ -7,11 +7,13 @@ This document provides a technical breakdown of how App settings are tracked, sa
 The `ClientSettings` engine utilizes a robust `Listener` publisher/subscriber model.
 
 - Subordinate controllers like `ChatController` or `MainController` register a callback action linking directly to a specific state key (e.g. `ClientSettings.Key.CHAT_SHOW_MESSAGE_TIMESTAMPS`).
+- Media settings include `Image Send Quality`, an immediate per-user slider from `60` to `100` in steps of `5`; the default `100` preserves original image bytes.
 
 ## 2. Memory vs Storage Tracking
 
 - Changes processed via sliders or toggle checkboxes within the `SettingsController` instantly update the in-memory variables to ensure zero UI-lag.
 - Writes are persisted synchronously in the same call chain: `setValue()` (ClientSettings.java, line 961) calls `persistValue()` (line 1019) which delegates to `java.util.prefs.Preferences` directly on the calling thread. By attaching to the OS native user registry/PLIST files, configurations easily survive application restarts.
+- `MessagesViewModel` reads the active `ClientSettings` instance for outbound image preparation, so changing the quality slider affects later sends without a restart.
 
 ## 3. Dynamic Re-Rendering
 

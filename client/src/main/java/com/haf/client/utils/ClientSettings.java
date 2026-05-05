@@ -37,7 +37,7 @@ public final class ClientSettings {
         GENERAL_RESTORE_LAST_TAB("general.restore_last_tab", true, ApplyMode.RESTART_REQUIRED),
 
         SEARCH_INSTANT_ON_TYPE("search.instant_on_type", false, ApplyMode.IMMEDIATE),
-        SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH("search.auto_open_filter_on_first_search", true, ApplyMode.IMMEDIATE),
+        SEARCH_AUTO_OPEN_FILTER_ON_FIRST_SEARCH("search.auto_open_filter_on_first_search", false, ApplyMode.IMMEDIATE),
         SEARCH_REQUIRE_ENTER_TO_SEARCH("search.require_enter_to_search", true, ApplyMode.IMMEDIATE),
         SEARCH_MINIMUM_QUERY_LENGTH("search.minimum_query_length", 3, ApplyMode.IMMEDIATE),
         SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
@@ -47,6 +47,8 @@ public final class ClientSettings {
 
         MEDIA_HOVER_ZOOM("media.hover_zoom", true, ApplyMode.IMMEDIATE),
         MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 1.15, ApplyMode.IMMEDIATE),
+        MEDIA_IMAGE_SEND_QUALITY("media.image_send_quality", 100, ApplyMode.IMMEDIATE),
+        MEDIA_SEND_IN_MAX_QUALITY("media.send_in_max_quality", true, ApplyMode.IMMEDIATE),
         MEDIA_SHOW_DOWNLOAD_BUTTON("media.show_download_button", true, ApplyMode.IMMEDIATE),
         MEDIA_OPEN_PREVIEW_ON_IMAGE_CLICK("media.open_preview_on_image_click", true, ApplyMode.IMMEDIATE),
         MEDIA_SHOW_IMAGE_FALLBACK_POPUP("media.show_image_fallback_popup", true, ApplyMode.IMMEDIATE),
@@ -504,6 +506,34 @@ public final class ClientSettings {
      */
     public void setMediaHoverZoomScale(double value) {
         setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 1.50, 0.05));
+    }
+
+    /**
+     * Returns whether attachments should always be sent in original quality.
+     */
+    public boolean isMediaSendInMaxQuality() {
+        return getBoolean(Key.MEDIA_SEND_IN_MAX_QUALITY);
+    }
+
+    /**
+     * Updates whether attachments should always be sent in original quality.
+     */
+    public void setMediaSendInMaxQuality(boolean enabled) {
+        setBoolean(Key.MEDIA_SEND_IN_MAX_QUALITY, enabled);
+    }
+
+    /**
+     * Returns image send quality. A value of 100 sends original bytes.
+     */
+    public int getMediaImageSendQuality() {
+        return getInt(Key.MEDIA_IMAGE_SEND_QUALITY);
+    }
+
+    /**
+     * Updates image send quality, snapping to 5-point steps from 60 to 100.
+     */
+    public void setMediaImageSendQuality(double value) {
+        setInt(Key.MEDIA_IMAGE_SEND_QUALITY, clampToStep(value, 60, 100, 5));
     }
 
     /**

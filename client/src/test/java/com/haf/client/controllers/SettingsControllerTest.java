@@ -113,6 +113,7 @@ class SettingsControllerTest {
     void dependent_slider_rows_follow_master_toggle_state_and_fade_class() throws Exception {
         ClientSettings settings = ClientSettings.defaults();
         settings.setPrivacyBlurOnFocusLoss(false);
+        settings.setMediaSendInMaxQuality(true);
         settings.setMediaHoverZoom(true);
         settings.setNotificationsShowUnreadBadges(true);
         settings.setChatShowMessageTimestamps(false);
@@ -127,6 +128,11 @@ class SettingsControllerTest {
         JFXToggleButton blurToggle = findById(loaded.root(), "privacyBlurOnFocusLossToggle", JFXToggleButton.class);
         Node hoverZoomScaleRow = findById(loaded.root(), "mediaHoverZoomScaleRow", Node.class);
         JFXToggleButton hoverZoomToggle = findById(loaded.root(), "mediaHoverZoomToggle", JFXToggleButton.class);
+        Node mediaImageSendQualityRow = findById(loaded.root(), "mediaImageSendQualityRow", Node.class);
+        JFXToggleButton mediaSendInMaxQualityToggle = findById(
+                loaded.root(),
+                "mediaSendInMaxQualityToggle",
+                JFXToggleButton.class);
         Node badgeCapRow = findById(loaded.root(), "notificationsBadgeCapRow", Node.class);
         JFXToggleButton badgeToggle = findById(loaded.root(), "notificationsShowUnreadBadgesToggle",
                 JFXToggleButton.class);
@@ -138,18 +144,22 @@ class SettingsControllerTest {
         assertNotNull(blurToggle);
         assertNotNull(hoverZoomScaleRow);
         assertNotNull(hoverZoomToggle);
+        assertNotNull(mediaImageSendQualityRow);
+        assertNotNull(mediaSendInMaxQualityToggle);
         assertNotNull(badgeCapRow);
         assertNotNull(badgeToggle);
         assertNotNull(chatUse24HourTimeRow);
         assertNotNull(chatTimestampsToggle);
 
         assertDependentRowState(blurStrengthRow, false);
+        assertDependentRowState(mediaImageSendQualityRow, false);
         assertDependentRowState(hoverZoomScaleRow, true);
         assertDependentRowState(badgeCapRow, true);
         assertDependentRowState(chatUse24HourTimeRow, false);
 
         onFxThread(() -> {
             blurToggle.setSelected(true);
+            mediaSendInMaxQualityToggle.setSelected(false);
             hoverZoomToggle.setSelected(false);
             badgeToggle.setSelected(false);
             chatTimestampsToggle.setSelected(true);
@@ -157,12 +167,14 @@ class SettingsControllerTest {
         });
 
         assertDependentRowState(blurStrengthRow, true);
+        assertDependentRowState(mediaImageSendQualityRow, true);
         assertDependentRowState(hoverZoomScaleRow, false);
         assertDependentRowState(badgeCapRow, false);
         assertDependentRowState(chatUse24HourTimeRow, true);
 
         onFxThread(() -> {
             blurToggle.setSelected(false);
+            mediaSendInMaxQualityToggle.setSelected(true);
             hoverZoomToggle.setSelected(true);
             badgeToggle.setSelected(true);
             chatTimestampsToggle.setSelected(false);
@@ -170,6 +182,7 @@ class SettingsControllerTest {
         });
 
         assertDependentRowState(blurStrengthRow, false);
+        assertDependentRowState(mediaImageSendQualityRow, false);
         assertDependentRowState(hoverZoomScaleRow, true);
         assertDependentRowState(badgeCapRow, true);
         assertDependentRowState(chatUse24HourTimeRow, false);
@@ -419,6 +432,27 @@ class SettingsControllerTest {
                 "wireDependentToggleRowState(\"notificationsShowUnreadBadgesToggle\", \"notificationsBadgeCapRow\");"));
         assertTrue(source.contains(
                 "wireDependentToggleRowState(\"chatShowMessageTimestampsToggle\", \"chatUse24HourTimeRow\");"));
+        assertTrue(source.contains(
+                "wireInverseDependentToggleRowState(\"mediaSendInMaxQualityToggle\", \"mediaImageSendQualityRow\");"));
+    }
+
+    @Test
+    void media_settings_are_split_into_upload_then_preview_sections() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        int uploadSectionIndex = source.indexOf("\"mediaUploadSection\"");
+        int maxQualityRowIndex = source.indexOf("\"mediaSendInMaxQualityRow\"");
+        int imageQualityRowIndex = source.indexOf("\"mediaImageSendQualityRow\"");
+        int previewSectionIndex = source.indexOf("\"mediaPreviewSection\"");
+        int previewClickRowIndex = source.indexOf("\"mediaOpenPreviewOnImageClickRow\"");
+
+        assertTrue(source.contains("\"Upload\""));
+        assertTrue(source.contains("\"Preview\""));
+        assertTrue(uploadSectionIndex >= 0);
+        assertTrue(maxQualityRowIndex > uploadSectionIndex);
+        assertTrue(imageQualityRowIndex > maxQualityRowIndex);
+        assertTrue(previewSectionIndex > imageQualityRowIndex);
+        assertTrue(previewClickRowIndex > previewSectionIndex);
     }
 
     @Test

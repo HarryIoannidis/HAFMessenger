@@ -9,6 +9,7 @@ Describe the active chat scene behavior for messages, compose actions, and attac
 - Controller: `ChatController`.
 - ViewModels: `ChatViewModel` on top of `MessagesViewModel` (`ChatSession.get()`).
 - Supports message rendering, compose/send, attachment triggers, and per-message context actions.
+- Attachment loading bubbles keep the existing layout; transfer progress is surfaced through the existing subtle loading state/status text.
 
 ## Key Types/Interfaces
 

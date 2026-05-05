@@ -20,7 +20,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Controllers: `MainController`, `ChatController`, `SearchController`, `SettingsController`, `ContactCellController`
   - ViewModels: `MainViewModel`, `MessagesViewModel`, `ChatViewModel`, `SearchViewModel`
   - Network: `AuthHttpClient`, `DefaultMessageSender`, `DefaultMessageReceiver`, `MessageSender`, `MessageReceiver`
-  - Services: `DefaultLoginService`, `DefaultRegistrationService`, `DefaultMainSessionService`, `DefaultTokenRefreshService`, `TokenRefreshService`, `DesktopNotificationService`
+  - Services: `AttachmentImageOptimizer`, `DefaultLoginService`, `DefaultRegistrationService`, `DefaultMainSessionService`, `DefaultTokenRefreshService`, `TokenRefreshService`, `DesktopNotificationService`
   - Builders: `ContextMenuBuilder`, `MessageBubbleFactory`, `PopupMessageBuilder`, `SettingsRowBuilder`
   - Security: `RememberedCredentialsStore`, `SecurePasswordVault`, `WindowsPasswordManager`, `MacOsKeychainPasswordVault`, `LinuxSecretToolPasswordVault`
 - Server notable classes:
@@ -57,7 +57,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Models: `ContactInfo.java`, `MessageType.java`, `MessageVM.java`, `SettingsMenuItem.java`, `UserProfileInfo.java`
   - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `AuthHttpClient.java`
   - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsPasswordManager.java`
-  - Services: `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DefaultTokenRefreshService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`, `TokenRefreshService.java`
+  - Services: `AttachmentImageOptimizer.java`, `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DefaultTokenRefreshService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`, `TokenRefreshService.java`
   - Utils: `ClientRuntimeConfig.java`, `ClientSettings.java`, `ImageSaveSupport.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
   - ViewModels: `ChatViewModel.java`, `LoginViewModel.java`, `MainViewModel.java`, `MessagesViewModel.java`, `RegisterViewModel.java`, `SearchSortViewModel.java`, `SearchViewModel.java`, `SplashViewModel.java`
 - Client files (`src/test/java`):
@@ -97,8 +97,8 @@ Index the main source layout and notable classes without duplicating generated/b
   - DTO: `AttachmentInlinePayload.java`, `AttachmentReferencePayload.java`, `EncryptedFile.java`, `EncryptedMessage.java`, `KeyMetadata.java`, `UserSearchResultDTO.java`
   - Exceptions: `CryptoOperationException.java`, `JsonCodecException.java`, `KeyNotFoundException.java`, `KeystoreOperationException.java`, `MessageDecryptionException.java`, `MessageExpiredException.java`, `MessageTamperedException.java`, `MessageValidationException.java`
   - Keystore: `KeyProvider.java`, `KeystoreBootstrap.java`, `KeystoreRoot.java`, `KeystoreSealing.java`, `UserKeystore.java`
-  - Requests: `AddContactRequest.java`, `AttachmentBindRequest.java`, `AttachmentChunkRequest.java`, `AttachmentCompleteRequest.java`, `AttachmentInitRequest.java`, `LoginRequest.java`, `RefreshTokenRequest.java`, `RegisterRequest.java`
-  - Responses: `AttachmentBindResponse.java`, `AttachmentChunkResponse.java`, `AttachmentCompleteResponse.java`, `AttachmentDownloadResponse.java`, `AttachmentInitResponse.java`, `ContactsResponse.java`, `LoginResponse.java`, `MessagingPolicyResponse.java`, `PublicKeyResponse.java`, `RefreshTokenResponse.java`, `RegisterResponse.java`, `UserSearchResponse.java`
+  - Requests: `AddContactRequest.java`, `AttachmentBindRequest.java`, `AttachmentCompleteRequest.java`, `AttachmentInitRequest.java`, `LoginRequest.java`, `RefreshTokenRequest.java`, `RegisterRequest.java`
+  - Responses: `AttachmentBindResponse.java`, `AttachmentChunkResponse.java`, `AttachmentCompleteResponse.java`, `AttachmentInitResponse.java`, `ContactsResponse.java`, `LoginResponse.java`, `MessagingPolicyResponse.java`, `PublicKeyResponse.java`, `RefreshTokenResponse.java`, `RegisterResponse.java`, `UserSearchResponse.java`
   - Utils: `AttachmentPayloadCodec.java`, `ClockProvider.java`, `EccKeyIO.java`, `FilePerms.java`, `FingerprintUtil.java`, `FixedClockProvider.java`, `JsonCodec.java`, `MessageValidator.java`, `PemCodec.java`, `SystemClockProvider.java`
 
 - Shared files (`src/test/java`):

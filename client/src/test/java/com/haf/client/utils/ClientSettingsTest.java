@@ -56,6 +56,8 @@ class ClientSettingsTest {
 
         assertTrue(defaults.isMediaHoverZoom());
         assertEquals(1.15, defaults.getMediaHoverZoomScale(), 0.0001);
+        assertEquals(100, defaults.getMediaImageSendQuality());
+        assertTrue(defaults.isMediaSendInMaxQuality());
         assertTrue(defaults.isMediaShowDownloadButton());
         assertTrue(defaults.isMediaOpenPreviewOnImageClick());
         assertTrue(defaults.isMediaShowImageFallbackPopup());
@@ -144,6 +146,13 @@ class ClientSettingsTest {
         settings.setMediaHoverZoomScale(2.0);
         assertEquals(1.50, settings.getMediaHoverZoomScale(), 0.0001);
 
+        settings.setMediaImageSendQuality(59);
+        assertEquals(60, settings.getMediaImageSendQuality());
+        settings.setMediaImageSendQuality(93);
+        assertEquals(95, settings.getMediaImageSendQuality());
+        settings.setMediaImageSendQuality(101);
+        assertEquals(100, settings.getMediaImageSendQuality());
+
         settings.setPrivacyBlurStrength(0.1);
         assertEquals(1.0, settings.getPrivacyBlurStrength(), 0.0001);
         settings.setPrivacyBlurStrength(8.6);
@@ -169,6 +178,7 @@ class ClientSettingsTest {
         settings.setSearchRememberSortOptions(false);
         settings.setNotificationsShowOsNotifications(false);
         settings.setMediaShowImageFallbackPopup(false);
+        settings.setMediaSendInMaxQuality(false);
         settings.setPrivacyBlurOnStartupUntilUnlock(true);
         settings.setPrivacyConfirmExternalLinkOpen(false);
         settings.setPrivacyShowNotificationMessagePreview(true);
@@ -177,6 +187,7 @@ class ClientSettingsTest {
         settings.setSearchMinimumQueryLength(5.9);
         settings.setNotificationsBadgeCap(95);
         settings.setMediaHoverZoomScale(2.0);
+        settings.setMediaImageSendQuality(63);
         settings.setPrivacyBlurStrength(8.6);
 
         ClientSettings reloaded = ClientSettings.forUser(userId);
@@ -192,10 +203,12 @@ class ClientSettingsTest {
         assertFalse(reloaded.isSearchRememberSortOptions());
         assertFalse(reloaded.isNotificationsShowOsNotifications());
         assertFalse(reloaded.isMediaShowImageFallbackPopup());
+        assertFalse(reloaded.isMediaSendInMaxQuality());
         assertEquals(50, reloaded.getSearchResultsPerPage());
         assertEquals(5, reloaded.getSearchMinimumQueryLength());
         assertEquals(100, reloaded.getNotificationsBadgeCap());
         assertEquals(1.50, reloaded.getMediaHoverZoomScale(), 0.0001);
+        assertEquals(65, reloaded.getMediaImageSendQuality());
         assertEquals(9.0, reloaded.getPrivacyBlurStrength(), 0.0001);
         assertTrue(reloaded.isPrivacyBlurOnStartupUntilUnlock());
         assertFalse(reloaded.isPrivacyConfirmExternalLinkOpen());

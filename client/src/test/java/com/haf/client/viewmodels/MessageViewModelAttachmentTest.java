@@ -4,15 +4,14 @@ import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
+import com.haf.client.utils.ClientSettings;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
-import com.haf.shared.requests.AttachmentChunkRequest;
 import com.haf.shared.responses.AttachmentChunkResponse;
 import com.haf.shared.requests.AttachmentCompleteRequest;
 import com.haf.shared.responses.AttachmentCompleteResponse;
-import com.haf.shared.responses.AttachmentDownloadResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.dto.AttachmentInlinePayload;
@@ -23,7 +22,9 @@ import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,6 +34,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
+import javax.imageio.ImageIO;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MessageViewModelAttachmentTest {
@@ -109,6 +111,78 @@ class MessageViewModelAttachmentTest {
         MessageVM resolved = viewModel.getMessages("bob").getFirst();
         assertFalse(resolved.isLoading());
         assertEquals("small-photo.png", resolved.fileName());
+    }
+
+    @Test
+    void image_quality_100_sends_original_inline_image_bytes() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_000_000, 1_000_000, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        byte[] original = realPngBytes(80, 80);
+        Path file = tempDir.resolve("photo.png");
+        Files.write(file, original);
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1);
+
+        AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
+                new String(sender.lastSentPayload, StandardCharsets.UTF_8));
+        assertEquals("image/png", sent.getMediaType());
+        assertEquals("photo.png", sent.getFileName());
+        assertArrayEquals(original, Base64.getDecoder().decode(sent.getDataB64()));
+    }
+
+    @Test
+    void lower_image_quality_optimizes_image_before_send() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(2_000_000, 2_000_000, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        ClientSettings settings = ClientSettings.defaults();
+        settings.setMediaSendInMaxQuality(false);
+        settings.setMediaImageSendQuality(60);
+        viewModel.setSettings(settings);
+
+        byte[] original = realPngBytes(360, 360);
+        Path file = tempDir.resolve("photo.png");
+        Files.write(file, original);
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1);
+
+        AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
+                new String(sender.lastSentPayload, StandardCharsets.UTF_8));
+        byte[] optimized = Base64.getDecoder().decode(sent.getDataB64());
+        assertEquals("image/jpeg", sent.getMediaType());
+        assertEquals("photo.jpg", sent.getFileName());
+        assertTrue(optimized.length < original.length);
+    }
+
+    @Test
+    void send_in_max_quality_ignores_lower_slider_quality() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(2_000_000, 2_000_000, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        ClientSettings settings = ClientSettings.defaults();
+        settings.setMediaImageSendQuality(60);
+        settings.setMediaSendInMaxQuality(true);
+        viewModel.setSettings(settings);
+
+        byte[] original = realPngBytes(360, 360);
+        Path file = tempDir.resolve("photo.png");
+        Files.write(file, original);
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendCalls == 1);
+
+        AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
+                new String(sender.lastSentPayload, StandardCharsets.UTF_8));
+        assertEquals("image/png", sent.getMediaType());
+        assertEquals("photo.png", sent.getFileName());
+        assertArrayEquals(original, Base64.getDecoder().decode(sent.getDataB64()));
     }
 
     @Test
@@ -250,14 +324,12 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
-        sender.downloadResponse = AttachmentDownloadResponse.success(
+        sender.downloadResponse = new MessageSender.AttachmentDownload(
                 "att-1",
-                "alice",
-                "me",
                 AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB,
                 fakeEncryptedBlob.length,
                 2,
-                Base64.getEncoder().encodeToString(fakeEncryptedBlob));
+                fakeEncryptedBlob);
 
         AttachmentReferencePayload ref = new AttachmentReferencePayload();
         ref.setAttachmentId("att-1");
@@ -319,14 +391,12 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
-        sender.downloadResponse = AttachmentDownloadResponse.success(
+        sender.downloadResponse = new MessageSender.AttachmentDownload(
                 "att-img-1",
-                "alice",
-                "me",
                 AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB,
                 fakeEncryptedBlob.length,
                 2,
-                Base64.getEncoder().encodeToString(fakeEncryptedBlob));
+                fakeEncryptedBlob);
 
         AttachmentReferencePayload ref = new AttachmentReferencePayload();
         ref.setAttachmentId("att-img-1");
@@ -440,14 +510,12 @@ class MessageViewModelAttachmentTest {
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
         byte[] fakeEncryptedBlob = buildEncryptedMessageJsonBytes();
-        sender.downloadResponse = AttachmentDownloadResponse.success(
+        sender.downloadResponse = new MessageSender.AttachmentDownload(
                 "att-file-1",
-                "alice",
-                "me",
                 AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB,
                 fakeEncryptedBlob.length,
                 2,
-                Base64.getEncoder().encodeToString(fakeEncryptedBlob));
+                fakeEncryptedBlob);
 
         AttachmentReferencePayload ref = new AttachmentReferencePayload();
         ref.setAttachmentId("att-file-1");
@@ -550,6 +618,22 @@ class MessageViewModelAttachmentTest {
         return bytes;
     }
 
+    private static byte[] realPngBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int r = (x * 37 + y * 11) & 0xFF;
+                int g = (x * 13 + y * 29) & 0xFF;
+                int b = (x * 17 + y * 19) & 0xFF;
+                image.setRGB(x, y, (r << 16) | (g << 8) | b);
+            }
+        }
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ImageIO.write(image, "png", output);
+            return output.toByteArray();
+        }
+    }
+
     private static void awaitCondition(BooleanSupplier condition) {
         long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
         while (System.nanoTime() < deadlineNanos) {
@@ -566,7 +650,7 @@ class MessageViewModelAttachmentTest {
 
     private static final class RecordingSender implements MessageSender {
         private MessagingPolicyResponse policy;
-        private AttachmentDownloadResponse downloadResponse;
+        private MessageSender.AttachmentDownload downloadResponse;
         private long downloadDelayMs;
         private long chunkUploadDelayMs;
         private long sendDelayMs;
@@ -580,12 +664,14 @@ class MessageViewModelAttachmentTest {
 
         private String lastSentContentType;
         private String lastSendWithResultContentType;
+        private byte[] lastSentPayload;
 
         @Override
         public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds) {
             sleepQuietly(sendDelayMs);
             sendCalls++;
             lastSentContentType = contentType;
+            lastSentPayload = payload;
         }
 
         @Override
@@ -628,10 +714,10 @@ class MessageViewModelAttachmentTest {
         }
 
         @Override
-        public AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, AttachmentChunkRequest request) {
+        public AttachmentChunkResponse uploadAttachmentChunk(String attachmentId, int chunkIndex, byte[] chunkBytes) {
             sleepQuietly(chunkUploadDelayMs);
             chunkCalls++;
-            return AttachmentChunkResponse.success(attachmentId, request.getChunkIndex(), true);
+            return AttachmentChunkResponse.success(attachmentId, chunkIndex, true);
         }
 
         @Override
@@ -650,7 +736,7 @@ class MessageViewModelAttachmentTest {
         }
 
         @Override
-        public AttachmentDownloadResponse downloadAttachment(String attachmentId) {
+        public MessageSender.AttachmentDownload downloadAttachment(String attachmentId) {
             sleepQuietly(downloadDelayMs);
             return downloadResponse;
         }
