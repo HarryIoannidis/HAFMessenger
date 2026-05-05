@@ -68,13 +68,6 @@
             <version>2.25.4</version>
         </dependency>
 
-        <!-- WebSocket ingress -->
-        <dependency>
-            <groupId>org.java-websocket</groupId>
-            <artifactId>Java-WebSocket</artifactId>
-            <version>1.6.0</version>
-        </dependency>
-
         <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

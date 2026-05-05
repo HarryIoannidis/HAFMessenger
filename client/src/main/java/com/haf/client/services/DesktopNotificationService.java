@@ -63,6 +63,14 @@ public class DesktopNotificationService {
             return;
         }
 
+        if (isLinuxOs()) {
+            // Avoid AWT SystemTray fallback on Linux. On several GTK stacks this
+            // path emits GLib-GObject critical warnings even when notification
+            // delivery is otherwise non-essential.
+            LOGGER.debug("Skipping SystemTray fallback on Linux because no native notifier is available.");
+            return;
+        }
+
         TrayIcon icon = getOrCreateTrayIcon();
         if (icon == null) {
             return;
@@ -205,6 +213,16 @@ public class DesktopNotificationService {
             return NativeNotifier.MAC_OSASCRIPT;
         }
         return NativeNotifier.NONE;
+    }
+
+    /**
+     * Returns whether current OS is Linux.
+     *
+     * @return {@code true} when running on Linux
+     */
+    private static boolean isLinuxOs() {
+        String osName = System.getProperty("os.name", "");
+        return osName.toLowerCase(Locale.ROOT).contains("linux");
     }
 
     /**

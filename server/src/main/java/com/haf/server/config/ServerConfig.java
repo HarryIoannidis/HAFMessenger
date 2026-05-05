@@ -18,7 +18,6 @@ public final class ServerConfig {
 
     private static final int DEFAULT_DB_POOL_SIZE = 20;
     private static final int DEFAULT_HTTP_PORT = 8443;
-    private static final int DEFAULT_WS_PORT = 8444;
     private static final int DEFAULT_SEARCH_PAGE_SIZE = 20;
     private static final int DEFAULT_SEARCH_MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_SEARCH_MIN_QUERY_LENGTH = 3;
@@ -35,8 +34,6 @@ public final class ServerConfig {
     private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
     private static final long DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS = AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS;
 
-    private static final String HAF_APP_IS_DEV = "HAF_APP_IS_DEV";
-
     private final String dbUrl;
     private final String dbUser;
     private final String dbPassword;
@@ -51,9 +48,7 @@ public final class ServerConfig {
     private final Path tlsKeystorePath;
     private final char[] tlsKeystorePassword;
 
-    private final boolean devMode;
     private final int httpPort;
-    private final int wsPort;
     private final String adminPublicKeyPem;
     private final int searchPageSize;
     private final int searchMaxPageSize;
@@ -139,9 +134,7 @@ public final class ServerConfig {
         this.tlsKeystorePath = tls;
         this.tlsKeystorePassword = require(env, "HAF_TLS_KEYSTORE_PASS").toCharArray();
 
-        this.devMode = parseBoolean(require(env, HAF_APP_IS_DEV), HAF_APP_IS_DEV);
         this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
-        this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
         this.adminPublicKeyPem = env.getOrDefault("HAF_ADMIN_PUBLIC_KEY", null);
 
         this.searchPageSize = parseInt(env.get("HAF_SEARCH_PAGE_SIZE"), DEFAULT_SEARCH_PAGE_SIZE);
@@ -274,20 +267,6 @@ public final class ServerConfig {
      */
     public int getHttpPort() {
         return httpPort;
-    }
-
-    /**
-     * Returns whether the runtime is configured for development mode.
-     */
-    public boolean isDevMode() {
-        return devMode;
-    }
-
-    /**
-     * Returns the WebSocket port.
-     */
-    public int getWsPort() {
-        return wsPort;
     }
 
     /**
@@ -764,9 +743,7 @@ public final class ServerConfig {
                 ", dbPoolSize=" + dbPoolSize +
                 ", dbTruststorePath=" + dbTruststorePath +
                 ", dbTruststoreType='" + dbTruststoreType + '\'' +
-                ", devMode=" + devMode +
                 ", httpPort=" + httpPort +
-                ", wsPort=" + wsPort +
                 ", keystoreRoot=" + keystoreRoot +
                 ", tlsKeystorePath=" + tlsKeystorePath +
                 ", searchPageSize=" + searchPageSize +

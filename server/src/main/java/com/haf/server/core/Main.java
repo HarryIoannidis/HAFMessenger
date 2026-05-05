@@ -9,8 +9,6 @@ import com.haf.server.db.Session;
 import com.haf.server.db.User;
 import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.ingress.HttpIngressServer;
-import com.haf.server.ingress.PresenceRegistry;
-import com.haf.server.ingress.WebSocketIngressServer;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
 import com.haf.server.router.MailboxRouter;
@@ -40,6 +38,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Bootstraps and runs the server runtime and ingress components.
@@ -66,10 +65,14 @@ public final class Main {
         HikariDataSource dataSource = createDataSource(config);
         ScheduledExecutorService scheduler = createScheduler();
         CountDownLatch shutdownLatch = new CountDownLatch(1);
+        AtomicBoolean shutdownOnce = new AtomicBoolean(false);
 
-        ScheduledFuture<?>[] metricsFutureRef = new ScheduledFuture<?>[1];
-        ScheduledFuture<?>[] attachmentCleanupFutureRef = new ScheduledFuture<?>[1];
-        try (dataSource; scheduler) {
+        ScheduledFuture<?> metricsFuture = null;
+        ScheduledFuture<?> attachmentCleanupFuture = null;
+        Thread shutdownHook = null;
+        HttpIngressServer httpServer = null;
+        MailboxRouter mailboxRouter = null;
+        try {
             SSLContext sslContext = buildSslContext(config);
             MetricsRegistry metricsRegistry = new MetricsRegistry();
             AuditLogger auditLogger = AuditLogger.create(metricsRegistry);
@@ -91,25 +94,19 @@ public final class Main {
             FileUpload fileUploadDAO = new FileUpload(dataSource);
             Attachment attachmentDAO = new Attachment(dataSource);
             Contact contactDAO = new Contact(dataSource);
-            MailboxRouter mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
+            mailboxRouter = new MailboxRouter(envelopeDAO, scheduler, auditLogger, metricsRegistry);
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
-            PresenceRegistry presenceRegistry = new PresenceRegistry();
 
-            HttpIngressServer httpServer = new HttpIngressServer(
+            httpServer = new HttpIngressServer(
                     config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
-                    sessionDAO, fileUploadDAO, attachmentDAO, contactDAO, presenceRegistry);
-            final WebSocketIngressServer webSocketServer = config.isDevMode()
-                    ? new WebSocketIngressServer(
-                            config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, sessionDAO,
-                            contactDAO, presenceRegistry)
-                    : null;
+                    sessionDAO, fileUploadDAO, attachmentDAO, contactDAO);
 
-            metricsFutureRef[0] = scheduler.scheduleAtFixedRate(
+            metricsFuture = scheduler.scheduleAtFixedRate(
                     () -> auditLogger.logMetricsSnapshot(metricsRegistry.snapshot()),
                     60,
                     60,
                     TimeUnit.SECONDS);
-            attachmentCleanupFutureRef[0] = scheduler.scheduleAtFixedRate(
+            attachmentCleanupFuture = scheduler.scheduleAtFixedRate(
                     () -> {
                         int deleted = attachmentDAO.deleteExpiredUploads();
                         if (deleted > 0) {
@@ -120,58 +117,45 @@ public final class Main {
                     300,
                     TimeUnit.SECONDS);
 
-            final ScheduledFuture<?> metricsFuture = metricsFutureRef[0];
-            final ScheduledFuture<?> attachmentCleanupFuture = attachmentCleanupFutureRef[0];
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    LOGGER.info("Shutdown initiated");
-                    if (webSocketServer != null) {
-                        webSocketServer.stop();
-                    }
-                    httpServer.stop();
-                    mailboxRouter.close();
-                    metricsFuture.cancel(true);
-                    attachmentCleanupFuture.cancel(true);
-                    scheduler.shutdownNow();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    LOGGER.warn("Shutdown hook interrupted", e);
-                } finally {
-                    dataSource.close();
-                    shutdownLatch.countDown();
-                }
-            }));
+            final MailboxRouter finalMailboxRouter = mailboxRouter;
+            final HttpIngressServer finalHttpServer = httpServer;
+            final ScheduledFuture<?> finalMetricsFuture = metricsFuture;
+            final ScheduledFuture<?> finalAttachmentCleanupFuture = attachmentCleanupFuture;
+            shutdownHook = new Thread(
+                    () -> shutdownRuntime(
+                            "Shutdown initiated",
+                            shutdownOnce,
+                            shutdownLatch,
+                            finalHttpServer,
+                            finalMailboxRouter,
+                            finalMetricsFuture,
+                            finalAttachmentCleanupFuture,
+                            scheduler,
+                            dataSource),
+                    "haf-shutdown-hook");
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
 
             mailboxRouter.start();
-            if (webSocketServer != null) {
-                webSocketServer.start();
-                webSocketServer.awaitStartup(Duration.ofSeconds(10));
-            }
             httpServer.start();
-
-            if (webSocketServer != null) {
-                LOGGER.info("Servers started on HTTP {} / WS {}", config.getHttpPort(), config.getWsPort());
-            } else {
-                LOGGER.info("Server started on HTTP {} (WS disabled: HAF_APP_IS_DEV=false)", config.getHttpPort());
-            }
+            LOGGER.info("Server started on HTTP {}", config.getHttpPort());
 
             awaitShutdown(shutdownLatch);
         } catch (Exception e) {
             LOGGER.error("Server startup failed", e);
 
-            shutdownLatch.countDown();
-
             throw new StartupException("Startup failed", e);
         } finally {
-            if (metricsFutureRef[0] != null) {
-                metricsFutureRef[0].cancel(true);
-            }
-            if (attachmentCleanupFutureRef[0] != null) {
-                attachmentCleanupFutureRef[0].cancel(true);
-            }
-
-            scheduler.shutdownNow();
-            dataSource.close();
+            removeShutdownHookSafely(shutdownHook);
+            shutdownRuntime(
+                    "Finalizing server resources",
+                    shutdownOnce,
+                    shutdownLatch,
+                    httpServer,
+                    mailboxRouter,
+                    metricsFuture,
+                    attachmentCleanupFuture,
+                    scheduler,
+                    dataSource);
         }
     }
 
@@ -193,6 +177,7 @@ public final class Main {
      * Creates a HikariDataSource instance for database connection.
      * 
      * @param config the server configuration.
+     * @return configured datasource
      */
     private static HikariDataSource createDataSource(ServerConfig config) {
         HikariConfig hikariConfig = new HikariConfig();
@@ -275,6 +260,77 @@ public final class Main {
         };
 
         return Executors.newScheduledThreadPool(2, factory);
+    }
+
+    /**
+     * Performs one-time runtime shutdown and ensures the shutdown latch is
+     * released.
+     *
+     * @param reason                    log context for the shutdown path
+     * @param shutdownOnce              single-execution guard
+     * @param shutdownLatch             latch used by the main thread
+     * @param httpServer                HTTP ingress server instance
+     * @param mailboxRouter             mailbox router instance
+     * @param metricsFuture             periodic metrics task
+     * @param attachmentCleanupFuture   periodic attachment cleanup task
+     * @param scheduler                 shared scheduler
+     * @param dataSource                database datasource
+     */
+    private static void shutdownRuntime(
+            String reason,
+            AtomicBoolean shutdownOnce,
+            CountDownLatch shutdownLatch,
+            HttpIngressServer httpServer,
+            MailboxRouter mailboxRouter,
+            ScheduledFuture<?> metricsFuture,
+            ScheduledFuture<?> attachmentCleanupFuture,
+            ScheduledExecutorService scheduler,
+            HikariDataSource dataSource) {
+        if (!shutdownOnce.compareAndSet(false, true)) {
+            shutdownLatch.countDown();
+            return;
+        }
+
+        LOGGER.info(reason);
+        if (httpServer != null) {
+            httpServer.stop();
+        }
+        if (mailboxRouter != null) {
+            mailboxRouter.close();
+        }
+        cancelScheduledTask(metricsFuture);
+        cancelScheduledTask(attachmentCleanupFuture);
+        scheduler.shutdownNow();
+        dataSource.close();
+        shutdownLatch.countDown();
+    }
+
+    /**
+     * Cancels a scheduled task if it is present.
+     *
+     * @param task scheduled task reference
+     */
+    private static void cancelScheduledTask(ScheduledFuture<?> task) {
+        if (task != null) {
+            task.cancel(true);
+        }
+    }
+
+    /**
+     * Removes a registered shutdown hook when the JVM is not already shutting
+     * down.
+     *
+     * @param shutdownHook hook thread previously registered by this runtime
+     */
+    private static void removeShutdownHookSafely(Thread shutdownHook) {
+        if (shutdownHook == null) {
+            return;
+        }
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException ignored) {
+            LOGGER.debug("JVM shutdown already in progress; skipping shutdown hook removal.");
+        }
     }
 
     /**

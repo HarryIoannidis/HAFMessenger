@@ -122,8 +122,8 @@ public class MessagesViewModel {
     private volatile boolean receivingStarted;
     private final AtomicReference<Runnable> lastFailedSendRetryAction = new AtomicReference<>();
     private static volatile boolean fxToolkitUnavailable;
-    private static final int DEFAULT_WS_INBOUND_MESSAGE_BYTES = 4 * 1024 * 1024;
-    private static final int MAX_WS_INBOUND_MESSAGE_BYTES = resolveWsInboundMessageBytes();
+    private static final int DEFAULT_MAX_ENVELOPE_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_ENVELOPE_BYTES = resolveMaxEnvelopeBytes();
     private static final int INLINE_WIRE_HEADROOM_BYTES = 16 * 1024;
     private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
     private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
@@ -554,7 +554,7 @@ public class MessagesViewModel {
             String fileName,
             String mediaType) {
         return fileBytes.length <= policy.getAttachmentInlineMaxBytes()
-                && canSendInlineWithinWsBudget(fileName, mediaType, fileBytes.length);
+                && canSendInlineWithinEnvelopeBudget(fileName, mediaType, fileBytes.length);
     }
 
     /**
@@ -658,17 +658,17 @@ public class MessagesViewModel {
 
     /**
      * Determines whether an inline attachment is expected to fit comfortably within
-     * the websocket inbound frame budget after JSON + crypto/Base64 expansion.
+     * the inbound envelope budget after JSON + crypto/Base64 expansion.
      *
      * @param fileName     attachment filename metadata
      * @param mediaType    normalized MIME type metadata
      * @param fileBytesLen plaintext attachment byte length
      * @return {@code true} when inline transport is expected to fit safely
      */
-    private boolean canSendInlineWithinWsBudget(String fileName, String mediaType, int fileBytesLen) {
+    private boolean canSendInlineWithinEnvelopeBudget(String fileName, String mediaType, int fileBytesLen) {
         long estimatedInlinePayloadBytes = estimateInlinePayloadBytes(fileName, mediaType, fileBytesLen);
         long estimatedWireBytes = estimateEncryptedEnvelopeWireBytes(estimatedInlinePayloadBytes);
-        long budget = Math.max(1L, (long) MAX_WS_INBOUND_MESSAGE_BYTES - (long) INLINE_WIRE_HEADROOM_BYTES);
+        long budget = Math.max(1L, (long) MAX_ENVELOPE_BYTES - (long) INLINE_WIRE_HEADROOM_BYTES);
         return estimatedWireBytes <= budget;
     }
 
@@ -690,10 +690,10 @@ public class MessagesViewModel {
     }
 
     /**
-     * Estimates serialized websocket envelope size for an encrypted payload.
+     * Estimates serialized envelope size for an encrypted payload.
      *
      * @param inlinePayloadBytes plaintext inline payload size in bytes
-     * @return estimated websocket message bytes
+     * @return estimated envelope bytes
      */
     private long estimateEncryptedEnvelopeWireBytes(long inlinePayloadBytes) {
         long ciphertextB64Bytes = base64EncodedLength(Math.max(0L, inlinePayloadBytes));
@@ -714,15 +714,14 @@ public class MessagesViewModel {
     }
 
     /**
-     * Resolves websocket inbound size budget from the same system property used by
-     * transport layer.
+     * Resolves inbound envelope budget from system properties.
      *
-     * @return max websocket inbound bytes budget used for inline decisioning
+     * @return max envelope bytes budget used for inline decisioning
      */
-    private static int resolveWsInboundMessageBytes() {
-        String configured = System.getProperty("haf.ws.maxInboundBytes");
+    private static int resolveMaxEnvelopeBytes() {
+        String configured = System.getProperty("haf.messaging.maxEnvelopeBytes");
         if (configured == null || configured.isBlank()) {
-            return DEFAULT_WS_INBOUND_MESSAGE_BYTES;
+            return DEFAULT_MAX_ENVELOPE_BYTES;
         }
         try {
             int parsed = Integer.parseInt(configured.trim());
@@ -732,7 +731,7 @@ public class MessagesViewModel {
         } catch (NumberFormatException ignored) {
             // Fall through to default.
         }
-        return DEFAULT_WS_INBOUND_MESSAGE_BYTES;
+        return DEFAULT_MAX_ENVELOPE_BYTES;
     }
 
     /**

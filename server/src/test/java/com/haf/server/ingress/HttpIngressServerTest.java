@@ -30,7 +30,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.password4j.Argon2Function;
 import com.password4j.Password;
-import org.java_websocket.WebSocket;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,17 +108,13 @@ class HttpIngressServerTest {
     @Mock
     private Contact contactDAO;
 
-    private PresenceRegistry presenceRegistry;
-
     @BeforeEach
     void setUp() throws Exception {
         MetricsRegistry metricsRegistry = new MetricsRegistry();
         EncryptedMessageValidator validator = new EncryptedMessageValidator();
         SSLContext sslContext = createTestSSLContext();
-        presenceRegistry = new PresenceRegistry();
 
         when(config.getHttpPort()).thenReturn(0);
-        lenient().when(config.isDevMode()).thenReturn(true);
         lenient().when(config.getAdminPublicKeyPem())
                 .thenReturn("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----");
 
@@ -156,8 +151,7 @@ class HttpIngressServerTest {
                     sessionDAO,
                     fileUploadDAO,
                     attachmentDAO,
-                    contactDAO,
-                    presenceRegistry);
+                    contactDAO);
         } catch (java.net.SocketException socketEx) {
             Assumptions.assumeTrue(false, "Socket bind is not permitted in this execution environment");
         }
@@ -359,30 +353,10 @@ class HttpIngressServerTest {
     }
 
     @Test
-    void login_rejects_when_account_is_already_online() throws Exception {
+    void login_rejects_when_account_is_recently_active() throws Exception {
         String userId = "user-1";
         String email = "pilot@haf.gr";
         String password = "correct horse battery staple";
-        when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
-        presenceRegistry.registerConnection(userId, mock(WebSocket.class));
-
-        HttpHandler handler = createHandler("LoginHandler");
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
-                "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(409, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("Account is already logged in."));
-        verify(sessionDAO, never()).createSessionTokens(anyString());
-    }
-
-    @Test
-    void login_rejects_when_account_is_recently_active_in_prod_mode() throws Exception {
-        String userId = "user-1";
-        String email = "pilot@haf.gr";
-        String password = "correct horse battery staple";
-        when(config.isDevMode()).thenReturn(false);
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
         when(sessionDAO.isUserRecentlyActive(eq(userId), anyLong())).thenReturn(true);
 
@@ -546,9 +520,6 @@ class HttpIngressServerTest {
         when(sessionDAO.createSessionTokens(userId))
                 .thenReturn(new Session.SessionTokens("jwt-takeover", "refresh-takeover", 100L, 200L));
 
-        WebSocket oldConnection = mock(WebSocket.class);
-        presenceRegistry.registerConnection(userId, oldConnection);
-
         HttpHandler handler = createHandler("LoginHandler");
         ExchangeHarness exchange = newExchange("POST", "/api/v1/login",
                 "{"
@@ -566,7 +537,6 @@ class HttpIngressServerTest {
         verify(userDAO, times(1)).updatePublicKey(userId, takeoverPem.trim(), takeoverFp);
         verify(sessionDAO, times(1)).revokeAllSessionsByUserId(userId);
         verify(sessionDAO, times(1)).createSessionTokens(userId);
-        verify(oldConnection, times(1)).closeConnection(1000, "takeover");
     }
 
     @Test
@@ -1042,8 +1012,7 @@ class HttpIngressServerTest {
     }
 
     @Test
-    void contacts_get_uses_recent_session_presence_in_prod_mode() throws Exception {
-        when(config.isDevMode()).thenReturn(false);
+    void contacts_get_uses_recent_session_presence() throws Exception {
         when(sessionDAO.isUserRecentlyActive(eq("u-2"), anyLong())).thenReturn(true);
 
         HttpHandler handler = createHandler("ContactsHandler");

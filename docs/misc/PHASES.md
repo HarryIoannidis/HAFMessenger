@@ -9,7 +9,7 @@ Track implementation status by phase while separating completed functionality fr
 Completed/active areas in current codebase:
 
 - Phase 1-4 foundations: shared wire format, validation, crypto, keystore workflows, client send/receive integration.
-- Server ingress/routing/persistence: HTTPS ingress (all modes), dev websocket ingress, mailbox routing, rate limiting, DAO persistence, audit/metrics.
+- Server ingress/routing/persistence: HTTPS ingress, mailbox routing, rate limiting, DAO persistence, audit/metrics.
 - UI expansion: chat/search/profile/preview/settings controllers and corresponding ViewModels.
 - Attachment transport: init/chunk/complete/bind/download endpoint and client integration.
 
@@ -17,13 +17,13 @@ Completed/active areas in current codebase:
 
 - Shared: `MessageHeader`, `MessageValidator`, `MessageEncryptor`, `MessageDecryptor`, `KeyProvider`.
 - Client: `MessageSender`, `MessageReceiver`, `MessagesViewModel`, `SearchViewModel`.
-- Server: `HttpIngressServer`, `WebSocketIngressServer`, `MailboxRouter`, `RateLimiterService`, `DAO` classes.
+- Server: `HttpIngressServer`, `MailboxRouter`, `RateLimiterService`, `DAO` classes.
 
 ## Flow
 
 1. Shared contracts and validators define packet rules.
 2. Client encrypts and transmits envelopes/attachments.
-3. Server validates, routes, stores, and pushes updates.
+3. Server validates, routes, stores, and serves mailbox updates.
 4. Receiver decrypts, updates UI state, and acknowledges envelopes.
 
 ## Error/Security Notes
@@ -36,7 +36,7 @@ Completed/active areas in current codebase:
 - `docs/shared/WIRE_FORMAT.md`
 - `docs/server/INGRESS.md`
 - `docs/server/PERSISTENCE.md`
-- `docs/client/WEBSOCKET.md`
+- `docs/client/TRANSPORT.md`
 - `docs/misc/WORKFLOW.md`
 
 ## Future/Planned

@@ -13,7 +13,7 @@ Summarize core protocol/crypto constants used across client and server.
   - ciphertext size limit
   - built-in content-type constants used by text and attachment envelopes
 - `AttachmentConstants` defines default attachment size/chunk policy and the attachment MIME allowlist, which defaults to `*/*`.
-- Notable policy bounds include TTL `60..86400` seconds and ciphertext Base64 max length `8 MiB` equivalent (`MAX_CIPHERTEXT_BASE64`).
+- Notable policy bounds include TTL `60..86400` seconds and ciphertext Base64 max length `16 MiB` equivalent (`MAX_CIPHERTEXT_BASE64`).
 
 ## Key Types/Interfaces
 

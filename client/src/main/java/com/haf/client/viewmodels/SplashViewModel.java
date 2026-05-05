@@ -455,7 +455,7 @@ public class SplashViewModel {
 
             javax.net.ssl.SSLContext sslContext;
             try {
-                sslContext = SslContextUtils.getSslContextForMode(runtimeConfig.isDev());
+                sslContext = SslContextUtils.getStrictSslContext();
             } catch (Exception e) {
                 throw new IOException("Failed to initialize SSL context for network check", e);
             }

@@ -19,14 +19,14 @@ Index the main source layout and notable classes without duplicating generated/b
 - Client notable classes:
   - Controllers: `MainController`, `ChatController`, `SearchController`, `SettingsController`, `ContactCellController`
   - ViewModels: `MainViewModel`, `MessagesViewModel`, `ChatViewModel`, `SearchViewModel`
-  - Network: `WebSocketAdapter`, `DefaultMessageSender`, `DefaultMessageReceiver`, `MessageSender`, `MessageReceiver`
+  - Network: `AuthHttpClient`, `DefaultMessageSender`, `DefaultMessageReceiver`, `MessageSender`, `MessageReceiver`
   - Services: `DefaultLoginService`, `DefaultRegistrationService`, `DefaultMainSessionService`, `DefaultTokenRefreshService`, `TokenRefreshService`, `DesktopNotificationService`
   - Builders: `ContextMenuBuilder`, `MessageBubbleFactory`, `PopupMessageBuilder`, `SettingsRowBuilder`
   - Security: `RememberedCredentialsStore`, `SecurePasswordVault`, `WindowsPasswordManager`, `MacOsKeychainPasswordVault`, `LinuxSecretToolPasswordVault`
 - Server notable classes:
   - `Main`, `ServerConfig`
-  - `HttpIngressServer`, `WebSocketIngressServer`
-  - `MailboxRouter`, `RateLimiterService`, `PresenceRegistry`
+  - `HttpIngressServer`
+  - `MailboxRouter`, `RateLimiterService`
   - `MetricsRegistry`, `AuditLogger`, `EncryptedMessageValidator`, `JwtTokenService`
   - DAOs in `server.db`
 - Shared notable classes:
@@ -55,7 +55,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Crypto: `UserKeystoreKeyProvider.java`
   - Exceptions: `ClientConfigurationException.java`, `HttpCommunicationException.java`, `RegistrationFlowException.java`, `SslConfigurationException.java`, `UiDispatchException.java`
   - Models: `ContactInfo.java`, `MessageType.java`, `MessageVM.java`, `SettingsMenuItem.java`, `UserProfileInfo.java`
-  - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `WebSocketAdapter.java`
+  - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `AuthHttpClient.java`
   - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsPasswordManager.java`
   - Services: `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DefaultTokenRefreshService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`, `TokenRefreshService.java`
   - Utils: `ClientRuntimeConfig.java`, `ClientSettings.java`, `ImageSaveSupport.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
@@ -63,7 +63,7 @@ Index the main source layout and notable classes without duplicating generated/b
 - Client files (`src/test/java`):
   - Controllers: `ChatControllerTest.java`, `ContactCellTest.java`, `LoginControllerTest.java`, `MainContentLoaderTest.java`, `MainControllerTest.java`, `PopupMessageControllerTest.java`, `PreviewControllerTest.java`, `RegisterControllerTest.java`, `SearchControllerTest.java`, `SearchFilterUiTest.java`, `SettingsControllerRememberCredentialsTest.java`, `SettingsControllerTest.java`, `SplashControllerTest.java`
   - Crypto: `UserKeystoreKeyProviderTest.java`
-  - Network: `MessageReceiverTest.java`, `MessageSenderTest.java`, `WebSocketAdapterTest.java`
+  - Network: `AuthHttpClientTest.java`, `MessageReceiverTest.java`, `MessageSenderTest.java`
   - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsPasswordManagerTest.java`
   - Services: `DefaultChatAttachmentServiceTest.java`, `DefaultLoginServiceTest.java`, `DefaultMainSessionServiceTest.java`, `DefaultRegistrationServiceTest.java`
   - Utils: `ClientRuntimeConfigTest.java`, `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
@@ -77,7 +77,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - DB: `AttachmentDAO.java`, `ContactDAO.java`, `EnvelopeDAO.java`, `FileUploadDAO.java`, `SessionDAO.java`, `UserDAO.java`
   - Exceptions: `ConfigurationException.java`, `DatabaseOperationException.java`, `RateLimitException.java`, `StartupException.java`
   - Handlers: `EncryptedMessageValidator.java`
-  - Ingress: `HttpIngressServer.java`, `PresenceRegistry.java`, `WebSocketIngressServer.java`
+  - Ingress: `HttpIngressServer.java`
   - Metrics: `AuditLogger.java`, `MetricsRegistry.java`
   - Router: `MailboxRouter.java`, `QueuedEnvelope.java`, `RateLimiterService.java`
   - Security: `JwtTokenService.java`
@@ -87,7 +87,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Core: `MainTest.java`
   - DB: `AttachmentDAOTest.java`, `ContactDAOTest.java`, `EnvelopeDAOTest.java`, `FileUploadDAOTest.java`, `SessionDAOTest.java`, `UserDAOTest.java`
   - Handlers: `EncryptedMessageValidatorTest.java`
-  - Ingress: `HttpIngressServerTest.java`, `LoginPresenceGuardTest.java`, `PresencePushTest.java`, `WebSocketIngressServerTest.java`
+  - Ingress: `HttpIngressServerTest.java`
   - Metrics: `AuditLoggerTest.java`, `MetricsRegistryTest.java`
   - Router: `MailboxRouterTest.java`, `QueuedEnvelopeTest.java`, `RateLimiterServiceTest.java`
 - Shared files (`src/main/java`):

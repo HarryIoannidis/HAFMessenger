@@ -135,7 +135,7 @@ class MessageViewModelAttachmentTest {
     }
 
     @Test
-    void chunked_path_is_used_when_inline_would_exceed_websocket_budget() throws Exception {
+    void chunked_path_is_used_when_inline_would_exceed_envelope_budget() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(10_000_000, 10_000_000, 1_048_576);
         StubReceiver receiver = new StubReceiver();
