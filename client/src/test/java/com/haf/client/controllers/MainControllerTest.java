@@ -3,7 +3,6 @@ package com.haf.client.controllers;
 import com.haf.client.models.ContactInfo;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
-import com.haf.client.utils.RuntimeIssue;
 import com.haf.client.viewmodels.MainViewModel;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
@@ -141,26 +140,27 @@ class MainControllerTest {
     }
 
     @Test
-    void messaging_runtime_issue_detection_matches_expected_namespace() {
-        RuntimeIssue messagingIssue = new RuntimeIssue("messaging.send.failed", "x", "y", () -> {
-        });
-        RuntimeIssue searchIssue = new RuntimeIssue("search.request.failed", "x", "y", () -> {
-        });
+    void connection_runtime_issue_flow_uses_dedicated_popup_and_mandatory_branch() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(MainController.isMessagingRuntimeIssue(messagingIssue));
-        assertFalse(MainController.isMessagingRuntimeIssue(searchIssue));
-        assertFalse(MainController.isMessagingRuntimeIssue(null));
+        assertTrue(source.contains("if (issue.connectionIssue()) {"));
+        assertTrue(source.contains("handleConnectionLossRuntimeIssue(issue);"));
+        assertTrue(source.contains(".popupKey(UiConstants.POPUP_CONNECTION_LOSS)"));
+        assertTrue(source.contains(".actionText(\"Retry\")"));
+        assertTrue(source.contains(".cancelText(\"Dismiss\")"));
+        assertTrue(source.contains(".movable(false)"));
     }
 
     @Test
-    void auto_retry_excludes_retry_failed_issue_key() {
-        RuntimeIssue sendIssue = new RuntimeIssue("messaging.send.failed", "x", "y", () -> {
-        });
-        RuntimeIssue retryFailedIssue = new RuntimeIssue("messaging.retry.failed", "x", "y", () -> {
-        });
+    void connection_runtime_retry_loop_runs_every_five_seconds_and_supports_manual_retry() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(MainController.shouldAutoRetryMessagingIssue(sendIssue));
-        assertFalse(MainController.shouldAutoRetryMessagingIssue(retryFailedIssue));
+        assertTrue(source.contains("private static final long CONNECTION_RECOVERY_RETRY_SECONDS = 5L;"));
+        assertTrue(source.contains("scheduleWithFixedDelay("));
+        assertTrue(source.contains("CONNECTION_RECOVERY_RETRY_SECONDS"));
+        assertTrue(source.contains("connectionRecoveryDismissed.set(true);"));
+        assertTrue(source.contains("triggerImmediateConnectionRecoveryAttempt();"));
+        assertTrue(source.contains("runRuntimeIssueRetry(currentIssue.retryAction())"));
     }
 
     @Test
@@ -347,13 +347,23 @@ class MainControllerTest {
     void takeover_session_flow_uses_forced_logout_popup_without_refresh_option() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("resolveInvalidSessionRuntimeIssue(result.errorMessage())"));
+        assertTrue(source.contains("handleConfirmedInvalidSession(result.errorMessage())"));
         assertTrue(source.contains("private void handleSessionTakeoverIssue() {"));
         assertTrue(source.contains(".popupKey(POPUP_SESSION_TAKEOVER)"));
         assertTrue(source.contains(".title(\"Logged out\")"));
         assertTrue(source.contains(".message(\"A new device logged into this account. You have been logged out.\")"));
         assertTrue(source.contains(".actionText(\"Go to Login\")"));
         assertTrue(source.contains(".singleAction(true)"));
+    }
+
+    @Test
+    void revoked_session_issue_attempts_silent_recovery_when_auto_refresh_is_enabled() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("if (autoRefreshTokenEnabled.get()) {"));
+        assertTrue(source.contains("attemptSilentRecoveryForRevokedSessionIssue();"));
+        assertTrue(source.contains("private void attemptSilentRecoveryForRevokedSessionIssue() {"));
+        assertTrue(source.contains("handleConnectionLossRuntimeIssue(new RuntimeIssue("));
     }
 
     private static final class NoOpContactsGateway implements MainViewModel.ContactsGateway {

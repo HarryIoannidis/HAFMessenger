@@ -280,7 +280,8 @@ public class MainViewModel {
                             "contacts.fetch.failed",
                             "Contacts could not be loaded",
                             "Failed to load contacts from server. " + resolveErrorMessage(ex, "Please retry."),
-                            this::fetchContacts);
+                            this::fetchContacts,
+                            RuntimeIssue.isConnectionFailure(ex));
                     return null;
                 });
     }
@@ -887,7 +888,8 @@ public class MainViewModel {
                             "contacts.add.failed",
                             "Contact could not be added",
                             "Failed to sync contact add with server. " + resolveErrorMessage(ex, "Please retry."),
-                            () -> syncAddContactWithServer(userId, baselinePresenceSignal));
+                            () -> syncAddContactWithServer(userId, baselinePresenceSignal),
+                            RuntimeIssue.isConnectionFailure(ex));
                     return null;
                 });
     }
@@ -916,7 +918,8 @@ public class MainViewModel {
                             "contacts.remove.failed",
                             "Contact removal failed",
                             "Failed to sync contact removal with server. " + resolveErrorMessage(ex, "Please retry."),
-                            () -> syncRemoveContactWithServer(userId));
+                            () -> syncRemoveContactWithServer(userId),
+                            RuntimeIssue.isConnectionFailure(ex));
                     return null;
                 });
     }
@@ -930,7 +933,25 @@ public class MainViewModel {
      * @param retryAction retry callback
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
-        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction);
+        publishRuntimeIssue(dedupeKey, title, message, retryAction, false);
+    }
+
+    /**
+     * Dispatches a runtime issue to registered listeners.
+     *
+     * @param dedupeKey       issue dedupe key
+     * @param title           issue title
+     * @param message         issue message
+     * @param retryAction     retry callback
+     * @param connectionIssue {@code true} when issue represents connection loss
+     */
+    private void publishRuntimeIssue(
+            String dedupeKey,
+            String title,
+            String message,
+            Runnable retryAction,
+            boolean connectionIssue) {
+        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction, connectionIssue);
         for (Consumer<RuntimeIssue> listener : runtimeIssueListeners) {
             try {
                 listener.accept(issue);

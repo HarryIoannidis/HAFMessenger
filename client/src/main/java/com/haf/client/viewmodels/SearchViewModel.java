@@ -468,7 +468,8 @@ public class SearchViewModel {
                 append
                         ? "Could not load more search results. " + resolveErrorMessage(error, "Please retry.")
                         : "Search request failed. " + resolveErrorMessage(error, "Please retry."),
-                append ? this::loadMore : this::retryLastSearch);
+                append ? this::loadMore : this::retryLastSearch,
+                RuntimeIssue.isConnectionFailure(error));
     }
 
     /**
@@ -732,7 +733,25 @@ public class SearchViewModel {
      * @param retryAction retry callback
      */
     private void publishRuntimeIssue(String dedupeKey, String title, String message, Runnable retryAction) {
-        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction);
+        publishRuntimeIssue(dedupeKey, title, message, retryAction, false);
+    }
+
+    /**
+     * Publishes a recoverable runtime issue to registered listeners.
+     *
+     * @param dedupeKey       issue dedupe key
+     * @param title           issue title
+     * @param message         issue message
+     * @param retryAction     retry callback
+     * @param connectionIssue {@code true} when issue represents connection loss
+     */
+    private void publishRuntimeIssue(
+            String dedupeKey,
+            String title,
+            String message,
+            Runnable retryAction,
+            boolean connectionIssue) {
+        RuntimeIssue issue = new RuntimeIssue(dedupeKey, title, message, retryAction, connectionIssue);
         for (Consumer<RuntimeIssue> listener : runtimeIssueListeners) {
             try {
                 listener.accept(issue);

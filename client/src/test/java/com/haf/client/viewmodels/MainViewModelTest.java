@@ -147,6 +147,24 @@ class MainViewModelTest {
     }
 
     @Test
+    void fetch_contacts_http_5xx_failure_is_marked_as_connection_issue() {
+        MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
+                () -> CompletableFuture.failedFuture(
+                        new HttpCommunicationException(
+                                "HTTP GET failed with status 503: {\"error\":\"down\"}",
+                                503,
+                                "{\"error\":\"down\"}"))));
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.fetchContacts();
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("contacts.fetch.failed", issues.getFirst().dedupeKey());
+        assertTrue(issues.getFirst().connectionIssue());
+    }
+
+    @Test
     void fetch_contacts_invalid_session_emits_revoked_session_issue() {
         MainViewModel viewModel = new MainViewModel(new StubContactsGateway(
                 () -> CompletableFuture.failedFuture(

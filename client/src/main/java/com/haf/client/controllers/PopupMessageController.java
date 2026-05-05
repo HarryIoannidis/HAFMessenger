@@ -1,6 +1,7 @@
 package com.haf.client.controllers;
 
 import com.haf.client.utils.PopupMessageSpec;
+import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
@@ -176,7 +177,8 @@ public class PopupMessageController {
     private static boolean isCloseDisabledPopup(String popupKey) {
         return STARTUP_PRIVACY_UNLOCK_POPUP_KEY.equals(popupKey)
                 || SESSION_REVOKED_POPUP_KEY.equals(popupKey)
-                || SESSION_TAKEOVER_POPUP_KEY.equals(popupKey);
+                || SESSION_TAKEOVER_POPUP_KEY.equals(popupKey)
+                || UiConstants.POPUP_CONNECTION_LOSS.equals(popupKey);
     }
 
     /**

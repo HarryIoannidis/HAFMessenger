@@ -9,6 +9,7 @@ import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -66,6 +67,22 @@ class MessageViewModelRuntimeTest {
         assertEquals(1, receiver.startCalls.get());
         assertFalse(issues.isEmpty());
         assertEquals("messaging.receive.start.failed", issues.getFirst().dedupeKey());
+    }
+
+    @Test
+    void send_connection_failure_is_marked_as_connection_issue() throws Exception {
+        MessageSender sender = (payload, recipientId, contentType, ttlSeconds) -> {
+            throw new IOException("network down", new ConnectException("refused"));
+        };
+        MessagesViewModel viewModel = new MessagesViewModel(sender, new CountingReceiver());
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+
+        viewModel.sendTextMessage("bob", "hello");
+        awaitCondition(() -> !issues.isEmpty());
+
+        assertEquals("messaging.send.failed", issues.getFirst().dedupeKey());
+        assertTrue(issues.getFirst().connectionIssue());
     }
 
     @Test

@@ -78,9 +78,9 @@ public class MainController implements SearchController.ContactActions {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainController.class);
     private static final long RUNTIME_ISSUE_POPUP_COOLDOWN_MS = 10_000L;
-    private static final long CHAT_AUTO_RETRY_COOLDOWN_MS = 1_500L;
     private static final long LOGOUT_ON_EXIT_TIMEOUT_SECONDS = 5L;
     private static final long SEARCH_INSTANT_DEBOUNCE_MS = 300L;
+    private static final long CONNECTION_RECOVERY_RETRY_SECONDS = 5L;
     private static final String HIDDEN_ACTIVITY_LABEL = "Hidden Activity";
     private static final String POPUP_SESSION_REVOKED = "popup-session-revoked";
     private static final String POPUP_SESSION_TAKEOVER = "popup-session-takeover";
@@ -171,27 +171,33 @@ public class MainController implements SearchController.ContactActions {
     private final MainViewModel viewModel = MainViewModel.createDefault();
     private final RuntimeIssuePopupGate runtimeIssuePopupGate = new RuntimeIssuePopupGate(
             RUNTIME_ISSUE_POPUP_COOLDOWN_MS);
-    private final RuntimeIssuePopupGate chatAutoRetryGate = new RuntimeIssuePopupGate(
-            CHAT_AUTO_RETRY_COOLDOWN_MS);
     private final AtomicBoolean shutdownInProgress = new AtomicBoolean(false);
     private final AtomicBoolean revokedSessionHandlingInProgress = new AtomicBoolean(false);
     private final AtomicBoolean logoutInProgress = new AtomicBoolean(false);
     private final AtomicBoolean undecryptableMessagesPopupShown = new AtomicBoolean(false);
+    private final AtomicBoolean connectionRecoveryActive = new AtomicBoolean(false);
+    private final AtomicBoolean connectionRecoveryDismissed = new AtomicBoolean(false);
+    private final AtomicBoolean connectionRecoveryInFlight = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
     private final TokenRefreshService tokenRefreshService;
     private final ScheduledExecutorService tokenRefreshScheduler;
+    private final ScheduledExecutorService connectionRecoveryScheduler = createConnectionRecoveryScheduler();
     private final Object tokenRefreshLock = new Object();
+    private final Object connectionRecoveryLock = new Object();
     private final ClientSettings settings = ClientSettings.forCurrentUserOrDefaults();
     private final AtomicBoolean autoRefreshTokenEnabled = new AtomicBoolean(true);
     private final AtomicBoolean tokenRefreshInFlight = new AtomicBoolean(false);
     private final AtomicBoolean sessionExpired = new AtomicBoolean(false);
+    private final AtomicBoolean revokedIssueAutoRecoveryInFlight = new AtomicBoolean(false);
     private PauseTransition instantSearchDebounce;
     private final GaussianBlur privacyBlurEffect = new GaussianBlur();
     private boolean startupBlurLocked;
     private boolean startupBlurPopupQueued;
     private ScheduledFuture<?> scheduledTokenRefresh;
     private ScheduledFuture<?> scheduledSessionExpiryIndicatorUpdate;
+    private ScheduledFuture<?> scheduledConnectionRecovery;
+    private RuntimeIssue lastConnectionIssue;
     private MainContentLoader contentLoader;
     private SearchFilterController searchFilterUi;
     private SearchController runtimeIssueSearchController;
@@ -277,6 +283,22 @@ public class MainController implements SearchController.ContactActions {
         ThreadFactory threadFactory = runnable -> {
             Thread thread = new Thread(runnable);
             thread.setName("haf-token-refresh-" + threadCounter.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+        return Executors.newSingleThreadScheduledExecutor(threadFactory);
+    }
+
+    /**
+     * Creates single-threaded scheduler used for connection-recovery retries.
+     *
+     * @return daemon single-threaded scheduled executor
+     */
+    private static ScheduledExecutorService createConnectionRecoveryScheduler() {
+        AtomicInteger threadCounter = new AtomicInteger();
+        ThreadFactory threadFactory = runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setName("haf-connection-recovery-" + threadCounter.incrementAndGet());
             thread.setDaemon(true);
             return thread;
         };
@@ -1566,7 +1588,7 @@ public class MainController implements SearchController.ContactActions {
             }
 
             if (result.invalidSession()) {
-                Platform.runLater(() -> handleRuntimeIssue(resolveInvalidSessionRuntimeIssue(result.errorMessage())));
+                Platform.runLater(() -> handleConfirmedInvalidSession(result.errorMessage()));
                 return;
             }
 
@@ -1714,6 +1736,15 @@ public class MainController implements SearchController.ContactActions {
         autoRefreshTokenEnabled.set(false);
         cancelScheduledTokenRefresh();
         tokenRefreshScheduler.shutdownNow();
+        shutdownConnectionRecoveryFlow();
+    }
+
+    /**
+     * Stops connection-recovery scheduling and shuts down reconnect executor.
+     */
+    private void shutdownConnectionRecoveryFlow() {
+        stopConnectionRecoveryLoop();
+        connectionRecoveryScheduler.shutdownNow();
     }
 
     /**
@@ -2355,8 +2386,8 @@ public class MainController implements SearchController.ContactActions {
             handleUndecryptableMessagesIssue(issue);
             return true;
         }
-        if (isMessagingRuntimeIssue(issue)) {
-            handleMessagingRuntimeIssue(issue);
+        if (issue.connectionIssue()) {
+            handleConnectionLossRuntimeIssue(issue);
             return true;
         }
         return false;
@@ -2392,6 +2423,354 @@ public class MainController implements SearchController.ContactActions {
                 .showCancel(true)
                 .onAction(() -> runRuntimeIssueRetry(issue.retryAction()))
                 .show();
+    }
+
+    /**
+     * Handles connection-related runtime issues by showing a mandatory popup and
+     * starting/reusing background reconnect scheduling.
+     *
+     * @param issue connection-related runtime issue
+     */
+    private void handleConnectionLossRuntimeIssue(RuntimeIssue issue) {
+        if (issue == null) {
+            return;
+        }
+        if (logoutInProgress.get() || shutdownInProgress.get() || revokedSessionHandlingInProgress.get()) {
+            return;
+        }
+        LOGGER.warn("Connection runtime issue: key={}, message={}", issue.dedupeKey(), issue.message());
+        lastConnectionIssue = issue;
+        startConnectionRecoveryLoop();
+        if (!connectionRecoveryDismissed.get()) {
+            showConnectionLossPopup(issue);
+        }
+    }
+
+    /**
+     * Shows the dedicated connection-loss popup with Retry and Dismiss actions.
+     *
+     * @param issue current connection issue snapshot
+     */
+    private void showConnectionLossPopup(RuntimeIssue issue) {
+        PopupMessageBuilder.create()
+                .popupKey(UiConstants.POPUP_CONNECTION_LOSS)
+                .title(issue.title())
+                .message(issue.message())
+                .actionText("Retry")
+                .cancelText("Dismiss")
+                .showCancel(true)
+                .movable(false)
+                .onAction(this::handleConnectionLossRetry)
+                .onCancel(this::handleConnectionLossDismiss)
+                .show();
+    }
+
+    /**
+     * Handles user-initiated dismiss from the connection-loss popup while keeping
+     * background recovery active.
+     */
+    private void handleConnectionLossDismiss() {
+        connectionRecoveryDismissed.set(true);
+        ViewRouter.hidePopup(UiConstants.POPUP_CONNECTION_LOSS);
+    }
+
+    /**
+     * Handles user-initiated retry from the connection-loss popup.
+     * Retry runs an immediate recovery attempt and replays the issue's retry action
+     * once (manual replay only).
+     */
+    private void handleConnectionLossRetry() {
+        connectionRecoveryDismissed.set(false);
+        RuntimeIssue currentIssue = lastConnectionIssue;
+        if (currentIssue != null) {
+            CompletableFuture.runAsync(() -> runRuntimeIssueRetry(currentIssue.retryAction()));
+        }
+        triggerImmediateConnectionRecoveryAttempt();
+    }
+
+    /**
+     * Starts the periodic connection-recovery loop when not already active.
+     * The first attempt is scheduled immediately, then every fixed retry interval.
+     */
+    private void startConnectionRecoveryLoop() {
+        if (!connectionRecoveryActive.compareAndSet(false, true)) {
+            return;
+        }
+        if (connectionRecoveryScheduler.isShutdown()) {
+            connectionRecoveryActive.set(false);
+            return;
+        }
+        synchronized (connectionRecoveryLock) {
+            cancelScheduledConnectionRecoveryLocked();
+            scheduledConnectionRecovery = connectionRecoveryScheduler.scheduleWithFixedDelay(
+                    this::runConnectionRecoveryAttemptSafely,
+                    0L,
+                    CONNECTION_RECOVERY_RETRY_SECONDS,
+                    TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * Stops connection-recovery scheduling and clears in-memory reconnect state.
+     */
+    private void stopConnectionRecoveryLoop() {
+        connectionRecoveryActive.set(false);
+        connectionRecoveryInFlight.set(false);
+        lastConnectionIssue = null;
+        connectionRecoveryDismissed.set(false);
+        synchronized (connectionRecoveryLock) {
+            cancelScheduledConnectionRecoveryLocked();
+        }
+        ViewRouter.hidePopup(UiConstants.POPUP_CONNECTION_LOSS);
+    }
+
+    /**
+     * Triggers one immediate connection-recovery attempt without waiting for the
+     * next periodic tick.
+     */
+    private void triggerImmediateConnectionRecoveryAttempt() {
+        if (!connectionRecoveryActive.get() || connectionRecoveryScheduler.isShutdown()) {
+            return;
+        }
+        connectionRecoveryScheduler.execute(this::runConnectionRecoveryAttemptSafely);
+    }
+
+    /**
+     * Runs one connection-recovery cycle while isolating unexpected scheduler
+     * errors.
+     */
+    private void runConnectionRecoveryAttemptSafely() {
+        if (!connectionRecoveryActive.get()) {
+            return;
+        }
+        if (!connectionRecoveryInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            ConnectionRecoveryResult result = runConnectionRecoveryCycle();
+            if (!connectionRecoveryActive.get()) {
+                return;
+            }
+            if (result.recovered()) {
+                Platform.runLater(this::stopConnectionRecoveryLoop);
+                return;
+            }
+            if (result.invalidSessionIssue() != null) {
+                Platform.runLater(() -> {
+                    stopConnectionRecoveryLoop();
+                    handleRuntimeIssue(result.invalidSessionIssue());
+                });
+            }
+        } catch (Exception ex) {
+            LOGGER.debug("Connection recovery attempt failed unexpectedly: {}", ex.getMessage());
+        } finally {
+            connectionRecoveryInFlight.set(false);
+        }
+    }
+
+    /**
+     * Executes one recovery cycle:
+     * validates session snapshot, refreshes token when needed, reconnects message
+     * transport, then probes authenticated connectivity.
+     *
+     * @return recovery result state for loop control
+     */
+    private ConnectionRecoveryResult runConnectionRecoveryCycle() {
+        AuthSessionState.Snapshot snapshot = AuthSessionState.get();
+        if (snapshot == null) {
+            return ConnectionRecoveryResult.invalidSessionResult(resolveInvalidSessionRuntimeIssue("invalid session"));
+        }
+
+        if (shouldRefreshTokenForConnectionRecovery(snapshot)) {
+            if (snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
+                return ConnectionRecoveryResult.invalidSessionResult(resolveInvalidSessionRuntimeIssue("invalid session"));
+            }
+            TokenRefreshService.TokenRefreshResult refreshResult = tokenRefreshService.refresh(snapshot.refreshToken());
+            if (refreshResult.success()) {
+                applyConnectionRecoveryTokenRefresh(refreshResult);
+            } else if (refreshResult.invalidSession()) {
+                return ConnectionRecoveryResult.invalidSessionResult(
+                        resolveInvalidSessionRuntimeIssue(refreshResult.errorMessage()));
+            } else {
+                LOGGER.debug("Connection recovery refresh attempt failed: {}",
+                        sanitizeRefreshFailureForLog(refreshResult.errorMessage()));
+                return ConnectionRecoveryResult.keepRetryingResult();
+            }
+        }
+
+        if (!restoreMessagingReceiverTransportForRecovery()) {
+            return ConnectionRecoveryResult.keepRetryingResult();
+        }
+
+        ProbeResult probeResult = probeAuthenticatedConnectivity();
+        if (probeResult.success()) {
+            return ConnectionRecoveryResult.recoveredResult();
+        }
+        if (probeResult.invalidSessionIssue() != null) {
+            return ConnectionRecoveryResult.invalidSessionResult(probeResult.invalidSessionIssue());
+        }
+        return ConnectionRecoveryResult.keepRetryingResult();
+    }
+
+    /**
+     * Returns whether a connection-recovery cycle should refresh tokens before
+     * probing transport.
+     *
+     * @param snapshot authenticated session snapshot
+     * @return {@code true} when refresh should run first
+     */
+    private boolean shouldRefreshTokenForConnectionRecovery(AuthSessionState.Snapshot snapshot) {
+        if (snapshot == null) {
+            return false;
+        }
+        String accessToken = snapshot.accessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            return true;
+        }
+        if (isSessionExpiredByTimestamp(snapshot.accessExpiresAtEpochSeconds())) {
+            return true;
+        }
+        return sessionExpired.get();
+    }
+
+    /**
+     * Applies a successful token refresh result to session/network state during
+     * connection recovery.
+     *
+     * @param result successful refresh result
+     */
+    private void applyConnectionRecoveryTokenRefresh(TokenRefreshService.TokenRefreshResult result) {
+        AuthSessionState.set(
+                result.accessToken(),
+                result.refreshToken(),
+                result.accessExpiresAtEpochSeconds(),
+                result.refreshExpiresAtEpochSeconds());
+        sessionExpired.set(false);
+        var adapter = NetworkSession.get();
+        if (adapter != null) {
+            adapter.updateAccessToken(result.accessToken());
+        }
+    }
+
+    /**
+     * Attempts to reconnect inbound/presence receiver transport.
+     *
+     * @return {@code true} when reconnect succeeded or no chat session is active
+     */
+    private boolean restoreMessagingReceiverTransportForRecovery() {
+        MessagesViewModel chatViewModel = ChatSession.get();
+        if (chatViewModel == null) {
+            return true;
+        }
+        try {
+            chatViewModel.reconnectReceiverTransport();
+            return true;
+        } catch (Exception ex) {
+            LOGGER.debug("Connection recovery transport reconnect failed: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Probes an authenticated API path to verify session + backend reachability.
+     *
+     * @return probe result with success/invalid-session classification
+     */
+    private ProbeResult probeAuthenticatedConnectivity() {
+        var adapter = NetworkSession.get();
+        if (adapter == null) {
+            return ProbeResult.invalidSessionResult(resolveInvalidSessionRuntimeIssue("invalid session"));
+        }
+        try {
+            adapter.getAuthenticated("/api/v1/contacts").join();
+            return ProbeResult.successResult();
+        } catch (Exception ex) {
+            Throwable root = unwrapCompletionError(ex);
+            if (isAuthenticationFailure(root)) {
+                String reason = extractInvalidSessionMessage(root);
+                return ProbeResult.invalidSessionResult(resolveInvalidSessionRuntimeIssue(reason));
+            }
+            if (RuntimeIssue.isConnectionFailure(root)) {
+                LOGGER.debug("Connection probe still failing: {}", root.getMessage());
+                return ProbeResult.connectionDownResult();
+            }
+            LOGGER.debug("Connection probe failed with non-connection error: {}", root.getMessage());
+            return ProbeResult.connectionDownResult();
+        }
+    }
+
+    /**
+     * Unwraps completion wrappers to their most relevant underlying throwable.
+     *
+     * @param error wrapped error
+     * @return unwrapped throwable (or original input when no cause exists)
+     */
+    private static Throwable unwrapCompletionError(Throwable error) {
+        Throwable current = error;
+        while ((current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current == null ? error : current;
+    }
+
+    /**
+     * Detects whether an error chain indicates invalid/expired authorization.
+     *
+     * @param error error candidate
+     * @return {@code true} when chain contains auth failure markers
+     */
+    private static boolean isAuthenticationFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof com.haf.client.exceptions.HttpCommunicationException communicationException) {
+                int statusCode = communicationException.getStatusCode();
+                if (statusCode == 401 || statusCode == 403) {
+                    return true;
+                }
+            }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("invalid session")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Extracts best-effort session failure reason text for takeover/revoked mapping.
+     *
+     * @param error error candidate
+     * @return normalized message string, or "invalid session" fallback
+     */
+    private static String extractInvalidSessionMessage(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof com.haf.client.exceptions.HttpCommunicationException communicationException) {
+                String responseBody = communicationException.getResponseBody();
+                if (responseBody != null && !responseBody.isBlank()) {
+                    return responseBody;
+                }
+            }
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                return current.getMessage();
+            }
+            current = current.getCause();
+        }
+        return "invalid session";
+    }
+
+    /**
+     * Cancels scheduled connection-recovery task while caller holds lock.
+     */
+    private void cancelScheduledConnectionRecoveryLocked() {
+        if (scheduledConnectionRecovery == null) {
+            return;
+        }
+        scheduledConnectionRecovery.cancel(false);
+        scheduledConnectionRecovery = null;
     }
 
     /**
@@ -2438,9 +2817,108 @@ public class MainController implements SearchController.ContactActions {
      * confirmation.
      */
     private void handleRevokedSessionIssue() {
+        if (autoRefreshTokenEnabled.get()) {
+            attemptSilentRecoveryForRevokedSessionIssue();
+            return;
+        }
+        showRevokedSessionPopup();
+    }
+
+    /**
+     * Shows blocking takeover-session popup and routes the user to login.
+     */
+    private void handleSessionTakeoverIssue() {
+        if (!runtimeIssuePopupGate.shouldShow(SESSION_TAKEOVER_ISSUE_KEY)) {
+            return;
+        }
+        stopConnectionRecoveryLoop();
+        sessionExpired.set(true);
+        cancelScheduledTokenRefresh();
+        updateSessionExpiryIndicator();
+        PopupMessageBuilder.create()
+                .popupKey(POPUP_SESSION_TAKEOVER)
+                .title("Logged out")
+                .message("A new device logged into this account. You have been logged out.")
+                .actionText("Go to Login")
+                .singleAction(true)
+                .movable(false)
+                .onAction(this::completeRevokedSessionLogout)
+                .show();
+    }
+
+    /**
+     * Performs one silent refresh attempt when a revoked-session issue arrives
+     * while auto-refresh is enabled.
+     *
+     * On success, session/network state is restored without popup interruption.
+     * On confirmed invalid session/takeover, existing blocking popup flows are
+     * shown.
+     * On transient failures, connection-loss recovery flow is started.
+     */
+    private void attemptSilentRecoveryForRevokedSessionIssue() {
+        if (!revokedIssueAutoRecoveryInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        sessionExpired.set(true);
+        cancelScheduledTokenRefresh();
+        updateSessionExpiryIndicator();
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                AuthSessionState.Snapshot snapshot = AuthSessionState.get();
+                if (snapshot == null || snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
+                    Platform.runLater(() -> handleConfirmedInvalidSession("invalid session"));
+                    return;
+                }
+
+                TokenRefreshService.TokenRefreshResult result = tokenRefreshService.refresh(snapshot.refreshToken());
+                if (result.success()) {
+                    applySuccessfulTokenRefresh(result);
+                    return;
+                }
+                if (result.invalidSession()) {
+                    Platform.runLater(() -> handleConfirmedInvalidSession(result.errorMessage()));
+                    return;
+                }
+
+                LOGGER.warn(
+                        "Silent revoked-session recovery failed (reason={})",
+                        sanitizeRefreshFailureForLog(result.errorMessage()));
+                Platform.runLater(() -> handleConnectionLossRuntimeIssue(new RuntimeIssue(
+                        "messaging.connection.recovery.failed",
+                        "Connection issue",
+                        "Could not verify your session right now. Retrying automatically.",
+                        this::triggerImmediateConnectionRecoveryAttempt,
+                        true)));
+            } finally {
+                revokedIssueAutoRecoveryInFlight.set(false);
+            }
+        });
+    }
+
+    /**
+     * Handles a confirmed invalid-session outcome and routes to the existing
+     * takeover/revoked popup flows.
+     *
+     * @param errorMessage invalid-session reason text
+     */
+    private void handleConfirmedInvalidSession(String errorMessage) {
+        if (isTakeoverSessionMessage(errorMessage)) {
+            handleSessionTakeoverIssue();
+            return;
+        }
+        showRevokedSessionPopup();
+    }
+
+    /**
+     * Shows the revoked-session blocking popup and routes user to refresh/logout
+     * actions.
+     */
+    private void showRevokedSessionPopup() {
         if (!runtimeIssuePopupGate.shouldShow("messaging.session.revoked")) {
             return;
         }
+        stopConnectionRecoveryLoop();
         sessionExpired.set(true);
         cancelScheduledTokenRefresh();
         updateSessionExpiryIndicator();
@@ -2454,27 +2932,6 @@ public class MainController implements SearchController.ContactActions {
                 .movable(false)
                 .onAction(this::attemptManualSessionRefresh)
                 .onCancel(this::completeRevokedSessionLogout)
-                .show();
-    }
-
-    /**
-     * Shows blocking takeover-session popup and routes the user to login.
-     */
-    private void handleSessionTakeoverIssue() {
-        if (!runtimeIssuePopupGate.shouldShow(SESSION_TAKEOVER_ISSUE_KEY)) {
-            return;
-        }
-        sessionExpired.set(true);
-        cancelScheduledTokenRefresh();
-        updateSessionExpiryIndicator();
-        PopupMessageBuilder.create()
-                .popupKey(POPUP_SESSION_TAKEOVER)
-                .title("Logged out")
-                .message("A new device logged into this account. You have been logged out.")
-                .actionText("Go to Login")
-                .singleAction(true)
-                .movable(false)
-                .onAction(this::completeRevokedSessionLogout)
                 .show();
     }
 
@@ -2616,6 +3073,7 @@ public class MainController implements SearchController.ContactActions {
         if (!revokedSessionHandlingInProgress.compareAndSet(false, true)) {
             return;
         }
+        stopConnectionRecoveryLoop();
         shutdownTokenRefreshFlow();
         mainSessionService.logout().whenComplete((unused, throwable) -> Platform.runLater(() -> {
             if (throwable != null) {
@@ -2632,51 +3090,6 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Logs chat runtime issues and performs silent automatic retries without
-     * showing popup UI.
-     *
-     * @param issue runtime issue originating from messaging/chat flows
-     */
-    private void handleMessagingRuntimeIssue(RuntimeIssue issue) {
-        LOGGER.warn("Chat runtime issue: key={}, message={}", issue.dedupeKey(), issue.message());
-
-        if (!shouldAutoRetryMessagingIssue(issue)) {
-            return;
-        }
-
-        String autoRetryKey = issue.dedupeKey() + ".auto-retry";
-        if (!chatAutoRetryGate.shouldShow(autoRetryKey)) {
-            LOGGER.debug("Skipping duplicate chat auto-retry for key: {}", issue.dedupeKey());
-            return;
-        }
-
-        CompletableFuture.runAsync(() -> runRuntimeIssueRetry(issue.retryAction()));
-    }
-
-    /**
-     * Checks whether the provided issue originates from chat messaging workflows.
-     *
-     * @param issue runtime issue candidate
-     * @return {@code true} when issue key belongs to messaging namespace
-     */
-    static boolean isMessagingRuntimeIssue(RuntimeIssue issue) {
-        if (issue == null || issue.dedupeKey() == null) {
-            return false;
-        }
-        return issue.dedupeKey().startsWith("messaging.");
-    }
-
-    /**
-     * Determines whether a chat runtime issue should trigger automatic retry.
-     *
-     * @param issue runtime issue candidate
-     * @return {@code true} when automatic retry should run
-     */
-    static boolean shouldAutoRetryMessagingIssue(RuntimeIssue issue) {
-        return isMessagingRuntimeIssue(issue) && !"messaging.retry.failed".equals(issue.dedupeKey());
-    }
-
-    /**
      * Executes runtime issue retry callback with guarded error handling.
      *
      * @param retryAction retry callback
@@ -2689,6 +3102,40 @@ public class MainController implements SearchController.ContactActions {
             retryAction.run();
         } catch (Exception ex) {
             LOGGER.warn("Runtime issue retry action failed", ex);
+        }
+    }
+
+    /**
+     * Immutable result for one connection-recovery cycle.
+     */
+    private record ConnectionRecoveryResult(boolean recovered, RuntimeIssue invalidSessionIssue) {
+        private static ConnectionRecoveryResult recoveredResult() {
+            return new ConnectionRecoveryResult(true, null);
+        }
+
+        private static ConnectionRecoveryResult keepRetryingResult() {
+            return new ConnectionRecoveryResult(false, null);
+        }
+
+        private static ConnectionRecoveryResult invalidSessionResult(RuntimeIssue issue) {
+            return new ConnectionRecoveryResult(false, issue);
+        }
+    }
+
+    /**
+     * Immutable result for authenticated connectivity probes.
+     */
+    private record ProbeResult(boolean success, RuntimeIssue invalidSessionIssue) {
+        private static ProbeResult successResult() {
+            return new ProbeResult(true, null);
+        }
+
+        private static ProbeResult connectionDownResult() {
+            return new ProbeResult(false, null);
+        }
+
+        private static ProbeResult invalidSessionResult(RuntimeIssue issue) {
+            return new ProbeResult(false, issue);
         }
     }
 
