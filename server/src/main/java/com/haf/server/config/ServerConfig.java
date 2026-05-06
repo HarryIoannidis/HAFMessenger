@@ -16,6 +16,8 @@ import java.util.Map;
  */
 public final class ServerConfig {
 
+    private static final String ENV_FILE_OVERRIDE_PROPERTY = "haf.server.env.path";
+    private static final String ENV_FILE_OVERRIDE_ENV = "HAF_SERVER_ENV_FILE";
     private static final int DEFAULT_DB_POOL_SIZE = 20;
     private static final int DEFAULT_HTTP_PORT = 8443;
     private static final int DEFAULT_SEARCH_PAGE_SIZE = 20;
@@ -76,28 +78,9 @@ public final class ServerConfig {
     public static ServerConfig load() {
         Map<String, String> env = new java.util.HashMap<>(System.getenv());
 
-        java.io.File envFile = new java.io.File("server/src/main/resources/config/variables.env");
-        if (!envFile.exists()) {
-            envFile = new java.io.File("src/main/resources/config/variables.env");
-        }
-
-        if (envFile.exists()) {
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    line = line.trim();
-                    if (!line.isEmpty() && !line.startsWith("#")) {
-                        int eqIndex = line.indexOf('=');
-                        if (eqIndex > 0) {
-                            String key = line.substring(0, eqIndex).trim();
-                            String value = line.substring(eqIndex + 1).trim();
-                            env.put(key, value);
-                        }
-                    }
-                }
-            } catch (java.io.IOException e) {
-                // Ignore
-            }
+        Path envFile = resolveEnvFilePath(env);
+        if (envFile != null) {
+            mergeEnvFile(env, envFile);
         }
 
         return new ServerConfig(env);
@@ -183,6 +166,72 @@ public final class ServerConfig {
      */
     static ServerConfig fromEnv(Map<String, String> env) {
         return new ServerConfig(env);
+    }
+
+    /**
+     * Resolves the optional env-file location used to overlay process environment
+     * values.
+     *
+     * Lookup precedence:
+     * 1. JVM property `haf.server.env.path`
+     * 2. Environment variable `HAF_SERVER_ENV_FILE`
+     * 3. Legacy default project paths used in local development
+     *
+     * @param env process environment map
+     * @return resolved env-file path, or {@code null} when not configured/found
+     */
+    static Path resolveEnvFilePath(Map<String, String> env) {
+        String configured = System.getProperty(ENV_FILE_OVERRIDE_PROPERTY);
+        if (configured == null || configured.isBlank()) {
+            configured = env.get(ENV_FILE_OVERRIDE_ENV);
+        }
+
+        if (configured != null && !configured.isBlank()) {
+            Path overridePath = Path.of(configured.trim());
+            if (!java.nio.file.Files.exists(overridePath)) {
+                throw new ConfigurationException("Configured server env file does not exist: " + overridePath);
+            }
+            return overridePath;
+        }
+
+        Path repoPath = Path.of("server/src/main/resources/config/variables.env");
+        if (java.nio.file.Files.exists(repoPath)) {
+            return repoPath;
+        }
+
+        Path modulePath = Path.of("src/main/resources/config/variables.env");
+        if (java.nio.file.Files.exists(modulePath)) {
+            return modulePath;
+        }
+
+        return null;
+    }
+
+    /**
+     * Overlays key/value pairs from an env file onto the provided environment map.
+     *
+     * @param env     mutable env map
+     * @param envFile env file path
+     */
+    static void mergeEnvFile(Map<String, String> env, Path envFile) {
+        try (java.io.BufferedReader reader = java.nio.file.Files.newBufferedReader(envFile)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                int eqIndex = trimmed.indexOf('=');
+                if (eqIndex <= 0) {
+                    continue;
+                }
+                String key = trimmed.substring(0, eqIndex).trim();
+                String value = trimmed.substring(eqIndex + 1).trim();
+                env.put(key, value);
+            }
+        } catch (java.io.IOException e) {
+            throw new ConfigurationException("Failed to read server env file: " + envFile, e);
+        }
     }
 
     /**

@@ -3,7 +3,7 @@
     <Properties>
         <!-- Change this to 'dev' for local development or 'prod' for production -->
         <Property name="log.environment">dev</Property>
-        <Property name="log.path">logs</Property>
+        <Property name="log.path">${sys:haf.log.path:-logs}</Property>
     </Properties>
 
     <Appenders>

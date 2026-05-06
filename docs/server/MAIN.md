@@ -8,7 +8,7 @@ Document server bootstrap and shutdown orchestration performed by `Main`.
 
 - Startup sequence:
   - load config
-  - run Flyway migrations
+  - run Flyway migrations from classpath resources (`db/migration`)
   - build datasource/scheduler
   - initialize services/DAOs/router/ingress
   - start mailbox router + HTTPS ingress
