@@ -7,6 +7,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 ## Current Implementation
 
 - `ServerConfig.load()` starts with environment variables and overlays values from `server/src/main/resources/config/variables.env` when present.
+- Env-file lookup can be overridden via JVM property `haf.server.env.path` or environment variable `HAF_SERVER_ENV_FILE`.
 - Required vars include DB credentials, TLS keystore, key passphrase, search cursor secret, and JWT signing secret.
 - `HAF_KEY_PASS` is consumed by server runtime only and is not used by client keystore bootstrap.
 - Optional vars control pool sizing, ports, search limits, and attachment policy.

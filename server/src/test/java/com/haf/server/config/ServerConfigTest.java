@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -15,6 +16,8 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ServerConfigTest {
+
+    private static final String ENV_FILE_OVERRIDE_PROPERTY = "haf.server.env.path";
 
     @TempDir
     Path tempDir;
@@ -224,6 +227,51 @@ class ServerConfigTest {
 
         assertNotSame(first, second);
         assertArrayEquals(first, second);
+    }
+
+    @Test
+    void resolve_env_file_path_uses_system_property_override() throws Exception {
+        Path envFile = tempDir.resolve("server.env");
+        Files.writeString(envFile, "HAF_DB_USER=override-user\n");
+
+        System.setProperty(ENV_FILE_OVERRIDE_PROPERTY, envFile.toString());
+        try {
+            Path resolved = ServerConfig.resolveEnvFilePath(new HashMap<>());
+            assertEquals(envFile, resolved);
+        } finally {
+            System.clearProperty(ENV_FILE_OVERRIDE_PROPERTY);
+        }
+    }
+
+    @Test
+    void resolve_env_file_path_fails_when_override_is_missing() {
+        Path missing = tempDir.resolve("missing.env");
+        System.setProperty(ENV_FILE_OVERRIDE_PROPERTY, missing.toString());
+        try {
+            assertThrows(ConfigurationException.class, () -> ServerConfig.resolveEnvFilePath(new HashMap<>()));
+        } finally {
+            System.clearProperty(ENV_FILE_OVERRIDE_PROPERTY);
+        }
+    }
+
+    @Test
+    void merge_env_file_overlays_entries() throws Exception {
+        Path envFile = tempDir.resolve("values.env");
+        Files.writeString(
+                envFile,
+                "# comment\n" +
+                        "HAF_DB_USER=repo-user\n" +
+                        "HAF_DB_PASS=repo-pass\n");
+
+        Map<String, String> env = new HashMap<>();
+        env.put("HAF_DB_USER", "process-user");
+        env.put("HAF_HTTP_PORT", "8443");
+
+        ServerConfig.mergeEnvFile(env, envFile);
+
+        assertEquals("repo-user", env.get("HAF_DB_USER"));
+        assertEquals("repo-pass", env.get("HAF_DB_PASS"));
+        assertEquals("8443", env.get("HAF_HTTP_PORT"));
     }
 
     private Map<String, String> createMinimalEnv() {

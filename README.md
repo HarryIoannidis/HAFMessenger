@@ -108,6 +108,45 @@ Optional environment overrides:
 - `APPIMAGE_TOOL` (default: auto-detect `appimagetool` or download tool)
 - `APPIMAGE_TOOL_URL` (default: official AppImageKit continuous build URL for x86_64)
 
+## Build Linux Server AppImage (`.AppImage`)
+
+Run this on Linux with JDK 25+:
+
+```bash
+./scripts/package-linux-server-appimage.sh
+```
+
+This script:
+
+- Builds `shared` and `server`
+- Creates a Linux server app image using `jpackage`
+- Bundles a first-run server launcher that:
+  - checks `devtunnel` availability and login status
+  - creates/reuses a persistent tunnel ID
+  - configures public access on port `8443`
+  - starts tunnel host + server and prints the forwarding URL
+
+Output path:
+
+- `server/target/native/HAFMessengerServer-x86_64.AppImage`
+
+Optional environment overrides:
+
+- `APP_NAME` (default: `HAFMessengerServer`)
+- `MAIN_JAR` (default: `server-1.0-SNAPSHOT.jar`)
+- `MAIN_CLASS` (default: `com.haf.server.core.Main`)
+- `ICON_PATH` (default: `client/src/main/resources/images/logo/app_logo.png`)
+- `OUTPUT_DIR` (default: `server/target/native`)
+- `SKIP_TESTS` (default: `true`)
+- `APPIMAGE_TOOL` (default: auto-detect `appimagetool` or download tool)
+- `APPIMAGE_TOOL_URL` (default: official AppImageKit continuous build URL for x86_64)
+
+Runtime notes:
+
+- The server launcher writes first-run config under `~/.config/hafmessenger-server/`.
+- Tunnel metadata is persisted at `~/.config/hafmessenger-server/runtime/devtunnel.env`.
+- The host must have `devtunnel` installed and authenticated once via `devtunnel user login`.
+
 ## Build Windows Installer (`.msi` / `.exe`)
 
 Run this on Windows with JDK 25+ (PowerShell):

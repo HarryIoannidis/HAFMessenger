@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class Main {
 
     private static final Logger LOGGER = LogManager.getLogger(Main.class);
+    private static final String FLYWAY_MIGRATION_LOCATION = "classpath:db/migration";
 
     /**
      * Starts the HAF server.
@@ -167,7 +168,7 @@ public final class Main {
     private static void runFlywayMigrations(ServerConfig config) {
         Flyway flyway = Flyway.configure()
                 .dataSource(config.getDbUrl(), config.getDbUser(), config.getDbPassword())
-                .locations("filesystem:server/src/main/resources/db/migration")
+                .locations(FLYWAY_MIGRATION_LOCATION)
                 .baselineOnMigrate(true)
                 .load();
         flyway.migrate();
