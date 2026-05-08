@@ -21,7 +21,7 @@ TUNNEL_HOST_LOG="${RUNTIME_DIR}/devtunnel-host.log"
 LOCK_DIR="${RUNTIME_DIR}/server.lock"
 LOCK_PID_FILE="${LOCK_DIR}/pid"
 # Avoid killing the AppImage parent process directly; doing so can unmount /tmp/.mount_* mid-start.
-AUTO_KILL_PATTERN="${HAF_AUTO_KILL_PATTERN:-server-launcher.sh|devtunnel host hafmessenger-8443|/tmp/.mount_HAFMes.*/bin/HAFMessengerServer}"
+AUTO_KILL_PATTERN="${HAF_AUTO_KILL_PATTERN:-server-launcher.sh|devtunnel host hafmessenger-8443|/tmp/.mount_HAFMes.*/bin/HAFMessengerServer|com.haf.server.core.Main}"
 
 prepend_path_if_dir() {
   local dir="$1"
@@ -153,6 +153,94 @@ kill_stale_processes_on_start() {
 
   # If a stale launcher was killed abruptly, its lock directory may remain.
   rm -rf "${LOCK_DIR}" >/dev/null 2>&1 || true
+}
+
+resolve_server_http_port() {
+  local default_port="${DEVTUNNEL_PORT}"
+
+  if [[ ! -f "${SERVER_ENV_FILE}" ]]; then
+    printf '%s\n' "${default_port}"
+    return 0
+  fi
+
+  local configured_port
+  configured_port="$(sed -n 's/^[[:space:]]*HAF_HTTP_PORT[[:space:]]*=[[:space:]]*//p' "${SERVER_ENV_FILE}" | tail -n 1)"
+  configured_port="${configured_port%%#*}"
+  configured_port="${configured_port//\"/}"
+  configured_port="${configured_port//\'/}"
+  configured_port="${configured_port//[[:space:]]/}"
+
+  if [[ "${configured_port}" =~ ^[0-9]+$ ]] && (( configured_port >= 1 && configured_port <= 65535 )); then
+    printf '%s\n' "${configured_port}"
+    return 0
+  fi
+
+  printf '%s\n' "${default_port}"
+}
+
+find_listening_pid_for_port() {
+  local port="$1"
+  local pid=""
+
+  if command -v lsof >/dev/null 2>&1; then
+    pid="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${pid}" ]]; then
+      printf '%s\n' "${pid}"
+      return 0
+    fi
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    pid="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p"$" {
+      if (match($0, /pid=[0-9]+/)) {
+        print substr($0, RSTART + 4, RLENGTH - 4)
+        exit
+      }
+    }')"
+    if [[ -n "${pid}" ]]; then
+      printf '%s\n' "${pid}"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+stop_pid_with_escalation() {
+  local pid="$1"
+  kill "${pid}" >/dev/null 2>&1 || true
+  sleep 1
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    kill -9 "${pid}" >/dev/null 2>&1 || true
+  fi
+}
+
+ensure_server_port_available() {
+  local port="$1"
+  local protected_set
+  protected_set="$(collect_protected_pids)"
+
+  local pid=""
+  local cmd=""
+  while true; do
+    pid="$(find_listening_pid_for_port "${port}" || true)"
+    if [[ -z "${pid}" ]]; then
+      return 0
+    fi
+
+    cmd="$(ps -o args= -p "${pid}" 2>/dev/null || true)"
+    if is_protected_pid "${pid}" "${protected_set}"; then
+      cat <<MSG >&2
+Port ${port} is in use by protected PID ${pid}; refusing to self-terminate it.
+Command: ${cmd}
+Stop it manually, then retry.
+MSG
+      exit 1
+    fi
+
+    echo "Stopping process on port ${port} (PID ${pid})..."
+    stop_pid_with_escalation "${pid}"
+  done
 }
 
 acquire_single_instance_lock() {
@@ -350,6 +438,8 @@ seed_runtime_config
 ensure_terminal_window "$@"
 kill_stale_processes_on_start
 acquire_single_instance_lock
+SERVER_HTTP_PORT="$(resolve_server_http_port)"
+ensure_server_port_available "${SERVER_HTTP_PORT}"
 require_devtunnel_cli
 ensure_devtunnel_login
 ensure_tunnel_exists

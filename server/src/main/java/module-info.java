@@ -11,5 +11,6 @@ module server {
     requires org.slf4j;
     requires transitive shared;
 
+    opens db.migration;
     opens com.haf.server.ingress to com.fasterxml.jackson.databind;
 }
