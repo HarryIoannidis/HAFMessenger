@@ -121,6 +121,7 @@ public final class HttpIngressServer {
     private static final String METHOD_NOT_ALLOWED = "method not allowed";
     private static final String INTERNAL_SERVER_ERROR = "internal server error";
     private static final String INVALID_REQUEST_PATH = "invalid request path";
+    private static final String SENDER_MISMATCH = "senderId does not match authenticated user";
     private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
@@ -445,6 +446,13 @@ public final class HttpIngressServer {
                         validationResult.reason());
                 respond(exchange, requestId, 400,
                         JSON_ERROR_PREFIX + validationResult.reason() + JSON_ERROR_SUFFIX);
+                return;
+            }
+
+            if (!userId.equals(message.getSenderId())) {
+                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
+                        "SENDER_MISMATCH");
+                respond(exchange, requestId, 403, JSON_ERROR_PREFIX + SENDER_MISMATCH + JSON_ERROR_SUFFIX);
                 return;
             }
 

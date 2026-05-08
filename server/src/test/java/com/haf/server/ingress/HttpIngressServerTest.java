@@ -203,6 +203,22 @@ class HttpIngressServerTest {
     }
 
     @Test
+    void ingress_rejects_sender_mismatch_with_authenticated_user() throws Exception {
+        HttpHandler handler = createHandler("IngressHandler");
+        EncryptedMessage message = validMessage("sender-2", "recipient-1");
+
+        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
+        authenticate(exchange, "session-ok", "sender-1");
+
+        handler.handle(exchange.exchange());
+
+        assertEquals(403, exchange.statusCode().get());
+        assertTrue(exchange.responseBodyAsString().contains("senderId does not match authenticated user"));
+        verify(rateLimiterService, never()).checkAndConsume(anyString(), anyString());
+        verify(mailboxRouter, never()).ingress(any(EncryptedMessage.class));
+    }
+
+    @Test
     void ingress_rejects_stale_recipient_key_fingerprint_header() throws Exception {
         HttpHandler handler = createHandler("IngressHandler");
         EncryptedMessage message = validMessage("sender-1", "recipient-1");
