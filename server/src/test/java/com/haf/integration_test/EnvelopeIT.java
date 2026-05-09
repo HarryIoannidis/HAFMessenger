@@ -148,6 +148,9 @@ class EnvelopeIT {
         message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
         message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
         message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        message.setSignatureB64(Base64.getEncoder().encodeToString(new byte[64]));
+        message.setSignatureAlgorithm("Ed25519");
+        message.setSenderSigningKeyFingerprint("sign-fp-" + senderId);
         message.setContentType("text/plain");
         message.setContentLength(4);
         message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));
@@ -160,12 +163,15 @@ class EnvelopeIT {
         String email = username + "@it.local";
         String fingerprint = sha256Hex("fp:" + userId);
         String publicKeyPem = "-----BEGIN PUBLIC KEY-----\n" + userId + "\n-----END PUBLIC KEY-----";
+        String signingFingerprint = sha256Hex("sign-fp:" + userId);
+        String signingPublicKeyPem = "-----BEGIN PUBLIC KEY-----\nSIGN-" + userId + "\n-----END PUBLIC KEY-----";
 
         String sql = """
                 INSERT INTO users (
                     user_id, username, email, password_hash, `rank`, reg_number, full_name,
-                    joined_date, telephone, public_key_fingerprint, public_key_pem, `status`, `role`
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, 'APPROVED', 'USER')
+                    joined_date, telephone, public_key_fingerprint, public_key_pem,
+                    signing_public_key_fingerprint, signing_public_key_pem, `status`, `role`
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE(), ?, ?, ?, ?, ?, 'APPROVED', 'USER')
                 ON DUPLICATE KEY UPDATE user_id = user_id
                 """;
         try (Connection connection = dataSource.getConnection();
@@ -180,6 +186,8 @@ class EnvelopeIT {
             ps.setString(8, "+3000000000");
             ps.setString(9, fingerprint);
             ps.setString(10, publicKeyPem);
+            ps.setString(11, signingFingerprint);
+            ps.setString(12, signingPublicKeyPem);
             ps.executeUpdate();
         } catch (SQLException ex) {
             fail("Failed to seed test user " + userId + ": " + ex.getMessage());

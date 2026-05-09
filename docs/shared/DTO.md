@@ -10,11 +10,13 @@ Describe current shared DTO families used across client/server boundaries.
   - `EncryptedMessage`
   - `EncryptedFile`
   - attachment payload DTOs
+- `EncryptedMessage` includes detached-signature metadata (`signatureAlgorithm`, `senderSigningKeyFingerprint`, `signatureB64`).
 - Auth/search/contact and attachment request/response DTOs are split under:
   - `shared.requests`
   - `shared.responses`
 - Metadata DTO: `KeyMetadata`.
 - Request/response families cover login/register/logout, user search, contacts, messaging policy, and attachment lifecycle metadata.
+- Register/login/user-key DTOs include both encryption and signing public-key material for mandatory key distribution/rotation.
 - Attachment chunk bytes and encrypted download blobs are not JSON DTOs; they travel as binary HTTP bodies with shared `AttachmentConstants` headers.
 
 ## Key Types/Interfaces

@@ -5,6 +5,7 @@ import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
+import com.haf.shared.utils.SigningKeyIO;
 import com.haf.shared.exceptions.KeystoreOperationException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -25,6 +26,11 @@ import java.util.stream.Stream;
  * Note: JavaDoc only in public methods.
  */
 public final class UserKeystore {
+
+    private static final String ENCRYPTION_PUBLIC_FILE = "public.pem";
+    private static final String ENCRYPTION_PRIVATE_FILE = "private.enc";
+    private static final String SIGNING_PUBLIC_FILE = "signing_public.pem";
+    private static final String SIGNING_PRIVATE_FILE = "signing_private.enc";
 
     private final Path root;
 
@@ -70,20 +76,42 @@ public final class UserKeystore {
      * @throws Exception if encryption or I/O fails
      */
     public void saveKeypair(String keyId, KeyPair kp, char[] passphrase) throws Exception {
+        KeyPair signingPair = SigningKeyIO.generate();
+        saveKeypair(keyId, kp, signingPair, passphrase);
+    }
+
+    /**
+     * Stores paired X25519 encryption and Ed25519 signing key material.
+     *
+     * @param keyId       key ID (UUID/label)
+     * @param encPair     encryption X25519 pair
+     * @param signingPair signing Ed25519 pair
+     * @param passphrase  secret phrase to protect private keys
+     * @throws Exception if encryption or I/O fails
+     */
+    public void saveKeypair(String keyId, KeyPair encPair, KeyPair signingPair, char[] passphrase) throws Exception {
         requirePassphrase(passphrase);
+        Objects.requireNonNull(encPair, "encPair");
+        Objects.requireNonNull(signingPair, "signingPair");
 
         Path dir = root.resolve(keyId);
         FilePerms.ensureDir700(dir);
 
-        FilePerms.writeFile600(dir.resolve("public.pem"),
-                EccKeyIO.publicPem(kp.getPublic()).getBytes(StandardCharsets.US_ASCII));
+        FilePerms.writeFile600(dir.resolve(ENCRYPTION_PUBLIC_FILE),
+                EccKeyIO.publicPem(encPair.getPublic()).getBytes(StandardCharsets.US_ASCII));
 
-        byte[] prvPem = EccKeyIO.privatePem(kp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
+        byte[] prvPem = EccKeyIO.privatePem(encPair.getPrivate()).getBytes(StandardCharsets.US_ASCII);
         byte[] enc = KeystoreSealing.sealWithPass(passphrase, prvPem);
-        FilePerms.writeFile600(dir.resolve("private.enc"), enc);
+        FilePerms.writeFile600(dir.resolve(ENCRYPTION_PRIVATE_FILE), enc);
 
-        String alg = algorithmName(kp.getPublic());
-        String fp = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(kp.getPublic()));
+        FilePerms.writeFile600(dir.resolve(SIGNING_PUBLIC_FILE),
+                SigningKeyIO.publicPem(signingPair.getPublic()).getBytes(StandardCharsets.US_ASCII));
+        byte[] signingPrvPem = SigningKeyIO.privatePem(signingPair.getPrivate()).getBytes(StandardCharsets.US_ASCII);
+        byte[] signingEnc = KeystoreSealing.sealWithPass(passphrase, signingPrvPem);
+        FilePerms.writeFile600(dir.resolve(SIGNING_PRIVATE_FILE), signingEnc);
+
+        String alg = algorithmName(encPair.getPublic());
+        String fp = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(encPair.getPublic()));
         long nowSec = Instant.now().getEpochSecond();
         KeyMetadata meta = new KeyMetadata(keyId, alg, fp, "Primary-" + keyId, nowSec, "CURRENT");
 
@@ -103,7 +131,7 @@ public final class UserKeystore {
     public PrivateKey loadPrivate(String keyId, char[] passphrase) throws Exception {
         requirePassphrase(passphrase);
 
-        Path encPath = root.resolve(keyId).resolve("private.enc");
+        Path encPath = root.resolve(keyId).resolve(ENCRYPTION_PRIVATE_FILE);
         byte[] blob = Files.readAllBytes(encPath);
         byte[] pem = KeystoreSealing.openWithPass(passphrase, blob);
 
@@ -187,7 +215,7 @@ public final class UserKeystore {
         requirePassphrase(passphrase);
 
         Path dir = selectCurrentKeyDir();
-        byte[] blob = Files.readAllBytes(dir.resolve("private.enc"));
+        byte[] blob = Files.readAllBytes(dir.resolve(ENCRYPTION_PRIVATE_FILE));
         byte[] pem = KeystoreSealing.openWithPass(passphrase, blob);
 
         return EccKeyIO.privateFromPem(new String(pem, StandardCharsets.US_ASCII));
@@ -201,7 +229,7 @@ public final class UserKeystore {
      */
     public PublicKey loadCurrentPublic() throws Exception {
         Path dir = selectCurrentKeyDir();
-        String pem = Files.readString(dir.resolve("public.pem"), StandardCharsets.US_ASCII);
+        String pem = Files.readString(dir.resolve(ENCRYPTION_PUBLIC_FILE), StandardCharsets.US_ASCII);
         return EccKeyIO.publicFromPem(pem);
     }
 
@@ -214,7 +242,7 @@ public final class UserKeystore {
      */
     public PublicKey loadPublicKeyByKeyId(String keyId) throws Exception {
         Path keyDir = root.resolve(keyId);
-        Path publicPemPath = keyDir.resolve("public.pem");
+        Path publicPemPath = keyDir.resolve(ENCRYPTION_PUBLIC_FILE);
 
         if (!Files.exists(publicPemPath)) {
             throw new KeystoreOperationException("Public key not found for keyId: " + keyId);
@@ -222,6 +250,66 @@ public final class UserKeystore {
 
         String pem = Files.readString(publicPemPath, StandardCharsets.US_ASCII);
         return EccKeyIO.publicFromPem(pem);
+    }
+
+    /**
+     * Loads Ed25519 signing private key for specific key ID.
+     *
+     * @param keyId      key ID
+     * @param passphrase key passphrase
+     * @return signing private key
+     * @throws Exception when key cannot be loaded
+     */
+    public PrivateKey loadSigningPrivate(String keyId, char[] passphrase) throws Exception {
+        requirePassphrase(passphrase);
+        Path encPath = root.resolve(keyId).resolve(SIGNING_PRIVATE_FILE);
+        byte[] blob = Files.readAllBytes(encPath);
+        byte[] pem = KeystoreSealing.openWithPass(passphrase, blob);
+        return SigningKeyIO.privateFromPem(new String(pem, StandardCharsets.US_ASCII));
+    }
+
+    /**
+     * Loads current Ed25519 signing private key.
+     *
+     * @param passphrase key passphrase
+     * @return signing private key
+     * @throws Exception when key cannot be loaded
+     */
+    public PrivateKey loadCurrentSigningPrivate(char[] passphrase) throws Exception {
+        requirePassphrase(passphrase);
+        Path dir = selectCurrentKeyDir();
+        byte[] blob = Files.readAllBytes(dir.resolve(SIGNING_PRIVATE_FILE));
+        byte[] pem = KeystoreSealing.openWithPass(passphrase, blob);
+        return SigningKeyIO.privateFromPem(new String(pem, StandardCharsets.US_ASCII));
+    }
+
+    /**
+     * Loads current Ed25519 signing public key.
+     *
+     * @return signing public key
+     * @throws Exception when key cannot be loaded
+     */
+    public PublicKey loadCurrentSigningPublic() throws Exception {
+        Path dir = selectCurrentKeyDir();
+        String pem = Files.readString(dir.resolve(SIGNING_PUBLIC_FILE), StandardCharsets.US_ASCII);
+        return SigningKeyIO.publicFromPem(pem);
+    }
+
+    /**
+     * Loads Ed25519 signing public key by key ID.
+     *
+     * @param keyId key ID
+     * @return signing public key
+     * @throws Exception when key cannot be loaded
+     */
+    public PublicKey loadSigningPublicKeyByKeyId(String keyId) throws Exception {
+        Path keyDir = root.resolve(keyId);
+        Path publicPemPath = keyDir.resolve(SIGNING_PUBLIC_FILE);
+        if (!Files.exists(publicPemPath)) {
+            throw new KeystoreOperationException("Signing public key not found for keyId: " + keyId);
+        }
+        String pem = Files.readString(publicPemPath, StandardCharsets.US_ASCII);
+        return SigningKeyIO.publicFromPem(pem);
     }
 
     /**
@@ -262,6 +350,27 @@ public final class UserKeystore {
      */
     public KeyMetadata rotate(String currentKeyId, String newKeyId, KeyPair newPair, char[] passphrase)
             throws Exception {
+        KeyPair signingPair = SigningKeyIO.generate();
+        return rotate(currentKeyId, newKeyId, newPair, signingPair, passphrase);
+    }
+
+    /**
+     * Rotates to explicit encryption/signing keypairs.
+     *
+     * @param currentKeyId current key id to demote
+     * @param newKeyId     new key id
+     * @param newEncPair   new encryption keypair
+     * @param newSigningPair new signing keypair
+     * @param passphrase   passphrase for private-key sealing
+     * @return metadata of the newly stored key entry
+     * @throws Exception if I/O or crypto fails
+     */
+    public KeyMetadata rotate(
+            String currentKeyId,
+            String newKeyId,
+            KeyPair newEncPair,
+            KeyPair newSigningPair,
+            char[] passphrase) throws Exception {
         Path curMeta = root.resolve(currentKeyId).resolve("metadata.json");
 
         if (Files.isRegularFile(curMeta)) {
@@ -270,7 +379,7 @@ public final class UserKeystore {
                     m.createdAtEpochSec(), "PREVIOUS");
             Files.writeString(curMeta, JsonCodec.toJson(demoted), StandardOpenOption.TRUNCATE_EXISTING);
         }
-        saveKeypair(newKeyId, newPair, passphrase);
+        saveKeypair(newKeyId, newEncPair, newSigningPair, passphrase);
 
         return JsonCodec.fromJson(Files.readString(root.resolve(newKeyId).resolve("metadata.json")), KeyMetadata.class);
     }

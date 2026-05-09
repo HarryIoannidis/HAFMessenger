@@ -9,6 +9,7 @@ public final class MessageHeader {
     // Wire protocol
     public static final String VERSION = "1";
     public static final String ALGO_AEAD = "AES-256-GCM+X25519";
+    public static final String ALGO_SIGNATURE = CryptoConstants.ED25519_SIGNATURE_ALGO;
 
     // AEAD sizes (derived from crypto constants to avoid drift)
     public static final int IV_BYTES = CryptoConstants.GCM_IV_BYTES;

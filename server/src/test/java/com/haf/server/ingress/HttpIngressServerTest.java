@@ -15,6 +15,7 @@ import com.haf.server.router.RateLimiterService;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.CryptoConstants;
 import com.haf.shared.constants.MessageHeader;
+import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.requests.AttachmentBindRequest;
@@ -25,6 +26,7 @@ import com.haf.shared.responses.UserSearchResponse;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -47,6 +49,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.KeyPair;
 import java.security.KeyStore;
 import java.util.Base64;
 import java.util.List;
@@ -222,7 +225,8 @@ class HttpIngressServerTest {
     void ingress_rejects_stale_recipient_key_fingerprint_header() throws Exception {
         HttpHandler handler = createHandler("IngressHandler");
         EncryptedMessage message = validMessage("sender-1", "recipient-1");
-        when(userDAO.getPublicKey("recipient-1")).thenReturn(new User.PublicKeyRecord("pem", "fp-current"));
+        when(userDAO.getPublicKey("recipient-1")).thenReturn(
+                new User.PublicKeyRecord("pem", "fp-current", "sign-pem", "sign-fp-current"));
 
         ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
         exchange.requestHeaders().add("X-Recipient-Key-Fingerprint", "fp-stale");
@@ -333,8 +337,7 @@ class HttpIngressServerTest {
         request.setFullName("Test Pilot");
         request.setEmail("pilot@haf.gr");
         request.setPassword("Strongpass1!");
-        request.setPublicKeyPem("pem");
-        request.setPublicKeyFingerprint("fingerprint");
+        applyValidRegistrationKeys(request);
 
         ExchangeHarness exchange = newExchange("POST", "/api/v1/register", JsonCodec.toJson(request));
         when(userDAO.existsByEmail("pilot@haf.gr")).thenReturn(false);
@@ -357,8 +360,7 @@ class HttpIngressServerTest {
         request.setFullName("Test Pilot");
         request.setEmail("pilot@haf.gr");
         request.setPassword("Strongpass1!");
-        request.setPublicKeyPem("pem");
-        request.setPublicKeyFingerprint("fingerprint");
+        applyValidRegistrationKeys(request);
         ExchangeHarness exchange = newExchange("POST", "/api/v1/register", JsonCodec.toJson(request));
 
         handler.handle(exchange.exchange());
@@ -530,8 +532,11 @@ class HttpIngressServerTest {
         String email = "pilot@haf.gr";
         String password = "correct horse battery staple";
         var takeoverPair = EccKeyIO.generate();
+        var takeoverSigningPair = SigningKeyIO.generate();
         String takeoverPem = EccKeyIO.publicPem(takeoverPair.getPublic());
         String takeoverFp = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(takeoverPair.getPublic()));
+        String takeoverSigningPem = SigningKeyIO.publicPem(takeoverSigningPair.getPublic());
+        String takeoverSigningFp = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(takeoverSigningPair.getPublic()));
 
         when(userDAO.findByEmail(email)).thenReturn(approvedUser(userId, password));
         when(sessionDAO.createSessionTokens(userId))
@@ -544,14 +549,21 @@ class HttpIngressServerTest {
                         + "\"password\":\"" + password + "\","
                         + "\"forceTakeover\":true,"
                         + "\"takeoverPublicKeyPem\":\"" + takeoverPem.replace("\n", "\\n") + "\","
-                        + "\"takeoverPublicKeyFingerprint\":\"" + takeoverFp + "\""
+                        + "\"takeoverPublicKeyFingerprint\":\"" + takeoverFp + "\","
+                        + "\"takeoverSigningPublicKeyPem\":\"" + takeoverSigningPem.replace("\n", "\\n") + "\","
+                        + "\"takeoverSigningPublicKeyFingerprint\":\"" + takeoverSigningFp + "\""
                         + "}");
 
         handler.handle(exchange.exchange());
 
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"sessionId\":\"jwt-takeover\""));
-        verify(userDAO, times(1)).updatePublicKey(userId, takeoverPem.trim(), takeoverFp);
+        verify(userDAO, times(1)).updatePublicKey(
+                userId,
+                takeoverPem.trim(),
+                takeoverFp,
+                takeoverSigningPem.trim(),
+                takeoverSigningFp);
         verify(sessionDAO, times(1)).revokeAllSessionsByUserId(userId);
         verify(sessionDAO, times(1)).createSessionTokens(userId);
     }
@@ -575,7 +587,7 @@ class HttpIngressServerTest {
         handler.handle(exchange.exchange());
 
         assertEquals(400, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("takeoverPublicKeyPem"));
+        assertTrue(exchange.responseBodyAsString().contains("takeover public/signing keys"));
         verify(sessionDAO, never()).createSessionTokens(anyString());
     }
 
@@ -750,7 +762,8 @@ class HttpIngressServerTest {
     @Test
     void user_key_returns_public_key_payload() throws Exception {
         HttpHandler handler = createHandler("UserKeyHandler");
-        when(userDAO.getPublicKey("u-1")).thenReturn(new User.PublicKeyRecord("PEM", "fp-1"));
+        when(userDAO.getPublicKey("u-1")).thenReturn(
+                new User.PublicKeyRecord("PEM", "fp-1", "SIGNING_PEM", "sign-fp-1"));
         ExchangeHarness exchange = newExchange("GET", "/api/v1/users/u-1/key", "");
         authenticate(exchange, "sess-user-key", "caller");
 
@@ -759,6 +772,8 @@ class HttpIngressServerTest {
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("\"publicKeyPem\":\"PEM\""));
         assertTrue(exchange.responseBodyAsString().contains("\"fingerprint\":\"fp-1\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"signingPublicKeyPem\":\"SIGNING_PEM\""));
+        assertTrue(exchange.responseBodyAsString().contains("\"signingFingerprint\":\"sign-fp-1\""));
     }
 
     @Test
@@ -783,7 +798,8 @@ class HttpIngressServerTest {
         HttpHandler userKeyHandler = createHandler("UserKeyHandler");
         ExchangeHarness userKeyExchange = newExchange("GET", "/api/v1/users/u-1/key", "");
         authenticate(userKeyExchange, "sess-user-key-close", "caller");
-        when(userDAO.getPublicKey("u-1")).thenReturn(new User.PublicKeyRecord("PEM", "fp-1"));
+        when(userDAO.getPublicKey("u-1")).thenReturn(
+                new User.PublicKeyRecord("PEM", "fp-1", "SIGNING_PEM", "sign-fp-1"));
         userKeyHandler.handle(userKeyExchange.exchange());
         verify(userKeyExchange.exchange(), times(1)).close();
 
@@ -1319,7 +1335,18 @@ class HttpIngressServerTest {
         when(sessionDAO.getUserIdForSessionAndTouch(sessionId)).thenReturn(userId);
     }
 
-    private static EncryptedMessage validMessage(String senderId, String recipientId) {
+    private void applyValidRegistrationKeys(RegisterRequest request) throws Exception {
+        KeyPair encryptionPair = EccKeyIO.generate();
+        request.setPublicKeyPem(EccKeyIO.publicPem(encryptionPair.getPublic()));
+        request.setPublicKeyFingerprint(FingerprintUtil.sha256Hex(EccKeyIO.publicDer(encryptionPair.getPublic())));
+
+        KeyPair signingPair = SigningKeyIO.generate();
+        request.setSigningPublicKeyPem(SigningKeyIO.publicPem(signingPair.getPublic()));
+        request.setSigningPublicKeyFingerprint(
+                FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPair.getPublic())));
+    }
+
+    private EncryptedMessage validMessage(String senderId, String recipientId) throws Exception {
         EncryptedMessage message = new EncryptedMessage();
         message.setVersion(MessageHeader.VERSION);
         message.setAlgorithm(MessageHeader.ALGO_AEAD);
@@ -1334,6 +1361,14 @@ class HttpIngressServerTest {
         message.setContentType("text/plain");
         message.setContentLength(4);
         message.setE2e(true);
+
+        KeyPair signingPair = SigningKeyIO.generate();
+        String signingPem = SigningKeyIO.publicPem(signingPair.getPublic());
+        String signingFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPair.getPublic()));
+        MessageSignatureService.sign(message, signingPair.getPrivate(), signingFingerprint);
+        lenient().when(userDAO.getPublicKey(senderId)).thenReturn(
+                new User.PublicKeyRecord("enc-pem", "enc-fp", signingPem, signingFingerprint));
+
         return message;
     }
 

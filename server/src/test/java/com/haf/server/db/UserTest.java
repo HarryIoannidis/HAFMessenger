@@ -197,12 +197,16 @@ class UserTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getString("public_key_pem")).thenReturn("PEM");
         when(resultSet.getString("public_key_fingerprint")).thenReturn("fp-1");
+        when(resultSet.getString("signing_public_key_pem")).thenReturn("SIGNING_PEM");
+        when(resultSet.getString("signing_public_key_fingerprint")).thenReturn("sign-fp-1");
 
-        User.PublicKeyRecord record = dao.getPublicKey("user-1");
+        User.PublicKeyRecord publicRecord = dao.getPublicKey("user-1");
 
-        assertNotNull(record);
-        assertEquals("PEM", record.publicKeyPem());
-        assertEquals("fp-1", record.fingerprint());
+        assertNotNull(publicRecord);
+        assertEquals("PEM", publicRecord.publicKeyPem());
+        assertEquals("fp-1", publicRecord.fingerprint());
+        assertEquals("SIGNING_PEM", publicRecord.signingPublicKeyPem());
+        assertEquals("sign-fp-1", publicRecord.signingFingerprint());
     }
 
     @Test
@@ -230,11 +234,13 @@ class UserTest {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.prepareStatement(contains("SET public_key_pem"))).thenReturn(existsStatement);
 
-        dao.updatePublicKey("user-1", "PEM", "fp-1");
+        dao.updatePublicKey("user-1", "PEM", "fp-1", "SIGNING_PEM", "sign-fp-1");
 
         verify(existsStatement).setString(1, "PEM");
         verify(existsStatement).setString(2, "fp-1");
-        verify(existsStatement).setString(3, "user-1");
+        verify(existsStatement).setString(3, "SIGNING_PEM");
+        verify(existsStatement).setString(4, "sign-fp-1");
+        verify(existsStatement).setString(5, "user-1");
         verify(existsStatement).executeUpdate();
     }
 
@@ -244,7 +250,8 @@ class UserTest {
         when(connection.prepareStatement(contains("SET public_key_pem"))).thenReturn(existsStatement);
         when(existsStatement.executeUpdate()).thenThrow(new SQLException("DB error"));
 
-        assertThrows(DatabaseOperationException.class, () -> dao.updatePublicKey("user-1", "PEM", "fp-1"));
+        assertThrows(DatabaseOperationException.class,
+                () -> dao.updatePublicKey("user-1", "PEM", "fp-1", "SIGNING_PEM", "sign-fp-1"));
         verify(auditLogger, times(1)).logError(eq("db_update_public_key"), isNull(), eq("user-1"), any());
     }
 

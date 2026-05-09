@@ -314,6 +314,21 @@ class MainControllerTest {
     }
 
     @Test
+    void profile_header_updates_from_presence_are_gated_to_messages_tab() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("""
+                ContactInfo updated = viewModel.updateContactPresence(userId, active);
+                if (updated == null) {
+                    return;
+                }
+
+                if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
+                    return;
+                }"""));
+    }
+
+    @Test
     void manual_refresh_failure_message_uses_default_for_empty_or_generic_errors() {
         assertEquals(
                 "Could not refresh your session. Please log in again.",

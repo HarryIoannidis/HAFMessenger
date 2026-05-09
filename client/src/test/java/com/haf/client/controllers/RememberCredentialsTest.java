@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SettingsControllerRememberCredentialsTest {
+class RememberCredentialsTest {
 
     private static final String PREF_REMEMBER_ME = "remember_me";
     private static final String PREF_REMEMBERED_EMAIL = "remembered_email";

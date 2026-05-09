@@ -3224,6 +3224,10 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
 
+        if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
+            return;
+        }
+
         String trackedContactId = resolveTrackedContactId();
         if (trackedContactId != null && trackedContactId.equals(userId)) {
             ContactInfo selected = contactsList.getSelectionModel().getSelectedItem();

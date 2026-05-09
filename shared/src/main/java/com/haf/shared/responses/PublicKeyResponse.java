@@ -7,6 +7,8 @@ public class PublicKeyResponse {
     private String userId;
     private String publicKeyPem;
     private String fingerprint;
+    private String signingPublicKeyPem;
+    private String signingFingerprint;
     private String error;
     private boolean success;
 
@@ -72,6 +74,42 @@ public class PublicKeyResponse {
     }
 
     /**
+     * Returns signing public key in PEM format.
+     *
+     * @return signing public key PEM
+     */
+    public String getSigningPublicKeyPem() {
+        return signingPublicKeyPem;
+    }
+
+    /**
+     * Sets signing public key in PEM format.
+     *
+     * @param signingPublicKeyPem signing public key PEM
+     */
+    public void setSigningPublicKeyPem(String signingPublicKeyPem) {
+        this.signingPublicKeyPem = signingPublicKeyPem;
+    }
+
+    /**
+     * Returns signing-key fingerprint value.
+     *
+     * @return signing-key fingerprint
+     */
+    public String getSigningFingerprint() {
+        return signingFingerprint;
+    }
+
+    /**
+     * Sets signing-key fingerprint value.
+     *
+     * @param signingFingerprint signing-key fingerprint
+     */
+    public void setSigningFingerprint(String signingFingerprint) {
+        this.signingFingerprint = signingFingerprint;
+    }
+
+    /**
      * Returns error text for failed responses.
      *
      * @return error text
@@ -116,11 +154,32 @@ public class PublicKeyResponse {
      * @return populated success response
      */
     public static PublicKeyResponse success(String userId, String publicKeyPem, String fingerprint) {
+        return success(userId, publicKeyPem, fingerprint, null, null);
+    }
+
+    /**
+     * Creates a successful public-key response including signing-key metadata.
+     *
+     * @param userId target user id
+     * @param publicKeyPem encryption public key PEM
+     * @param fingerprint encryption key fingerprint
+     * @param signingPublicKeyPem signing public key PEM
+     * @param signingFingerprint signing key fingerprint
+     * @return populated success response
+     */
+    public static PublicKeyResponse success(
+            String userId,
+            String publicKeyPem,
+            String fingerprint,
+            String signingPublicKeyPem,
+            String signingFingerprint) {
         PublicKeyResponse r = new PublicKeyResponse();
         r.setSuccess(true);
         r.setUserId(userId);
         r.setPublicKeyPem(publicKeyPem);
         r.setFingerprint(fingerprint);
+        r.setSigningPublicKeyPem(signingPublicKeyPem);
+        r.setSigningFingerprint(signingFingerprint);
         return r;
     }
 

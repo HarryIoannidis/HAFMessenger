@@ -9,8 +9,8 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 - Architecture: JavaFX 25 desktop client + plain Java server + shared contract/crypto module.
 - Build: Maven multi-module (`shared`, `client`, `server`) targeting Java 25 (`maven.compiler.release=25`).
 - Transport: TLS 1.3 with authenticated HTTPS APIs and mailbox polling for receive/ACK flows.
-- Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption with detached tag.
-- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V15`).
+- Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption + mandatory Ed25519 signatures on message envelopes.
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V17`).
 - Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
 
 ## Key Types/Interfaces
@@ -34,7 +34,7 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 
 - Server never decrypts message payloads.
 - TLS is restricted to `TLSv1.3` with hardened cipher suites.
-- Validation and recipient checks happen before decrypt.
+- Validation, recipient checks, and Ed25519 signature verification happen before decrypt.
 - Rate limiting and audit logging are server-side enforcement points.
 - Docs distinguish implemented behavior from future/planned features.
 

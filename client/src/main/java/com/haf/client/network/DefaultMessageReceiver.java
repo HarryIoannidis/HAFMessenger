@@ -4,6 +4,7 @@ import com.haf.client.crypto.UserKeystoreKeyProvider;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
+import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.dto.UserSearchResult;
@@ -13,10 +14,13 @@ import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.utils.ClockProvider;
+import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
+import com.haf.shared.utils.SigningKeyIO;
 import java.io.IOException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
@@ -380,6 +384,9 @@ public class DefaultMessageReceiver implements MessageReceiver {
         // Check expiry using ClockProvider (before decrypt)
         validateExpiry(encryptedMessage);
 
+        // Verify detached Ed25519 signature before attempting decrypt.
+        verifySignature(encryptedMessage);
+
         // Decrypt message (with fallback to older local keys when available)
         byte[] plaintext = decryptWithFallbackKeys(encryptedMessage, envelopeId);
 
@@ -508,11 +515,37 @@ public class DefaultMessageReceiver implements MessageReceiver {
         try {
             validateRecipient(encryptedMessage);
             validateExpiry(encryptedMessage);
+            verifySignature(encryptedMessage);
             return decryptWithFallbackKeys(encryptedMessage, null);
         } catch (com.haf.shared.exceptions.MessageDecryptionException e) {
             throw e;
         } catch (Exception e) {
             throw new com.haf.shared.exceptions.MessageDecryptionException("Failed to decrypt detached message", e);
+        }
+    }
+
+    /**
+     * Verifies sender Ed25519 signature and fingerprint binding.
+     *
+     * @param encryptedMessage inbound envelope
+     * @throws Exception when sender key cannot be resolved or signature fails
+     */
+    private void verifySignature(EncryptedMessage encryptedMessage) throws Exception {
+        String senderId = encryptedMessage.getSenderId();
+        if (senderId == null || senderId.isBlank()) {
+            throw new MessageTamperedException("Missing sender identity");
+        }
+
+        PublicKey senderSigningPublic = keyProvider.getRecipientSigningPublicKey(senderId);
+        String calculatedFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(senderSigningPublic));
+        String providedFingerprint = encryptedMessage.getSenderSigningKeyFingerprint();
+        if (providedFingerprint == null
+                || providedFingerprint.isBlank()
+                || !calculatedFingerprint.equalsIgnoreCase(providedFingerprint.trim())) {
+            throw new MessageTamperedException("Sender signing key fingerprint mismatch");
+        }
+        if (!MessageSignatureService.verify(encryptedMessage, senderSigningPublic)) {
+            throw new MessageTamperedException("Invalid message signature");
         }
     }
 

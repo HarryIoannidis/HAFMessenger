@@ -23,6 +23,7 @@ This document provides a deep-dive technical breakdown of the login orchestratio
 - **State Clearing**: The service immediately clears `CurrentUserSession` and `AuthSessionState` to purge any lingering artifacts from previous sessions or logouts.
 - **Retries**: A loop iterates up to `MAX_LOGIN_ATTEMPTS` (currently `3`). If a network or parsing error occurs, a `Thread.sleep` (400ms delay) triggers before it retries. *(Note: This retry logic is explicitly bypassed if the server outright rejects the credentials; it only triggers on connection hiccups or timeout).*
 - **Transport**: `LoginRequest` is serialized to JSON and sent over Java `HttpClient` with strict TLS context (`SslContextUtils.getStrictSslContext()`) to runtime-resolved login URI (`ClientRuntimeConfig`). There is a hard 10-second timeout.
+- **Forced takeover payload**: when takeover is requested, login submits both takeover keypairs' public metadata (X25519 + Ed25519 fingerprints/PEMs).
 - **Rate-Limit Rejection UX**: HTTP `429` login responses are mapped to a static minute-based message (`Too many login attempts. Try again in X minutes.`), without countdown auto-updates.
 
 ## 4. Authentication Acceptance, JWT Session, & Crypto-Bootstrapping
@@ -32,9 +33,10 @@ When the HTTP call yields a `200 OK` without error payloads in the `LoginRespons
 1. **Keystore Unlock**: It initializes `UserKeystoreKeyProvider`. Critically, it passes the clear-text password (`char[] passphrase`) used during login to unlock the user's local keystore on disk.
 2. **Token Hydration**: Server returns an access JWT in `sessionId` plus a refresh token. The access JWT is used as `Authorization: Bearer ...` for authenticated HTTPS calls.
 3. **Transport Hydration**: It sets up `AuthHttpClient` with the runtime-resolved server URI and the access JWT emitted by the server HTTP response.
-4. **Directory Routing**: Overrides the `KeyProvider`'s directory fetcher to pipe missing public-key lookups back out over the REST API (`/api/v1/users/{id}/key`), utilizing the newly authenticated adapter.
-5. **Messenger Tying**: It bundles the crypto-provider and adapter into `DefaultMessageSender` and `DefaultMessageReceiver` for HTTPS send + polling receive.
-6. **Session Injection**: Finally, it persists all these singletons synchronously into `NetworkSession` (transport), `ChatSession` (view model orchestration), `CurrentUserSession` (profile), and `AuthSessionState` (access/refresh tokens + expiries).
+4. **Directory Routing**: Overrides the `KeyProvider`'s directory fetchers to pipe missing encryption and signing public-key lookups over the REST API (`/api/v1/users/{id}/key`), utilizing the newly authenticated adapter.
+5. **Local Key Identity Check**: Client verifies local encryption and signing key fingerprints against the authenticated server identity record before session activation.
+6. **Messenger Tying**: It bundles the crypto-provider and adapter into `DefaultMessageSender` and `DefaultMessageReceiver` for HTTPS send + polling receive.
+7. **Session Injection**: Finally, it persists all these singletons synchronously into `NetworkSession` (transport), `ChatSession` (view model orchestration), `CurrentUserSession` (profile), and `AuthSessionState` (access/refresh tokens + expiries).
 
 ## 4.1 Main-Screen Token Lifecycle
 

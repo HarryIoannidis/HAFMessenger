@@ -16,6 +16,7 @@ import com.haf.server.router.RateLimiterService.ApiRateLimitScope;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
 import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
 import com.haf.shared.responses.AttachmentChunkResponse;
@@ -36,9 +37,11 @@ import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.constants.AttachmentConstants;
+import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
+import com.haf.shared.utils.SigningKeyIO;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -122,6 +125,7 @@ public final class HttpIngressServer {
     private static final String INTERNAL_SERVER_ERROR = "internal server error";
     private static final String INVALID_REQUEST_PATH = "invalid request path";
     private static final String SENDER_MISMATCH = "senderId does not match authenticated user";
+    private static final String INVALID_SIGNATURE = "invalid message signature";
     private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
@@ -456,6 +460,12 @@ public final class HttpIngressServer {
                 return;
             }
 
+            if (!verifyIngressSignature(message, userId)) {
+                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(), "INVALID_SIGNATURE");
+                respond(exchange, requestId, 400, JSON_ERROR_PREFIX + INVALID_SIGNATURE + JSON_ERROR_SUFFIX);
+                return;
+            }
+
             if (isRecipientKeyFingerprintStale(exchange, message)) {
                 respond(exchange, requestId, 409,
                         "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}");
@@ -482,6 +492,54 @@ public final class HttpIngressServer {
             String response = JsonCodec
                     .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
             respond(exchange, requestId, 202, response);
+        }
+
+        /**
+         * Verifies sender Ed25519 signature and fingerprint binding on ingress
+         * messages.
+         *
+         * @param message               message envelope
+         * @param authenticatedSenderId authenticated caller identity
+         * @return {@code true} when signature is valid
+         */
+        private boolean verifyIngressSignature(EncryptedMessage message, String authenticatedSenderId) {
+            if (message == null || authenticatedSenderId == null || authenticatedSenderId.isBlank()) {
+                return false;
+            }
+            if (!MessageHeader.ALGO_SIGNATURE.equals(message.getSignatureAlgorithm())) {
+                return false;
+            }
+            if (message.getSignatureB64() == null || message.getSignatureB64().isBlank()) {
+                return false;
+            }
+            if (message.getSenderSigningKeyFingerprint() == null
+                    || message.getSenderSigningKeyFingerprint().isBlank()) {
+                return false;
+            }
+
+            User.PublicKeyRecord senderKey = userDAO.getPublicKey(authenticatedSenderId);
+            if (senderKey == null
+                    || senderKey.signingPublicKeyPem() == null
+                    || senderKey.signingPublicKeyPem().isBlank()
+                    || senderKey.signingFingerprint() == null
+                    || senderKey.signingFingerprint().isBlank()) {
+                return false;
+            }
+
+            String providedFingerprint = message.getSenderSigningKeyFingerprint().trim();
+            if (!providedFingerprint.equalsIgnoreCase(senderKey.signingFingerprint().trim())) {
+                return false;
+            }
+            try {
+                PublicKey signingPublicKey = SigningKeyIO.publicFromPem(senderKey.signingPublicKeyPem());
+                String recomputedFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPublicKey));
+                if (!recomputedFingerprint.equalsIgnoreCase(senderKey.signingFingerprint().trim())) {
+                    return false;
+                }
+                return MessageSignatureService.verify(message, signingPublicKey);
+            } catch (Exception ignored) {
+                return false;
+            }
         }
 
         /**
@@ -833,7 +891,51 @@ public final class HttpIngressServer {
                 return "publicKeyPem is required";
             if (isBlank(r.getPublicKeyFingerprint()))
                 return "publicKeyFingerprint is required";
+            if (isBlank(r.getSigningPublicKeyPem()))
+                return "signingPublicKeyPem is required";
+            if (isBlank(r.getSigningPublicKeyFingerprint()))
+                return "signingPublicKeyFingerprint is required";
+            if (!fingerprintMatchesEncryptionKey(r.getPublicKeyPem(), r.getPublicKeyFingerprint())) {
+                return "publicKeyFingerprint mismatch";
+            }
+            if (!fingerprintMatchesSigningKey(r.getSigningPublicKeyPem(), r.getSigningPublicKeyFingerprint())) {
+                return "signingPublicKeyFingerprint mismatch";
+            }
             return null;
+        }
+
+        /**
+         * Validates encryption key fingerprint against supplied PEM.
+         *
+         * @param publicKeyPem PEM-encoded X25519 public key
+         * @param fingerprint  caller-provided fingerprint
+         * @return {@code true} when fingerprint matches PEM
+         */
+        private boolean fingerprintMatchesEncryptionKey(String publicKeyPem, String fingerprint) {
+            try {
+                PublicKey publicKey = EccKeyIO.publicFromPem(publicKeyPem);
+                String calculated = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(publicKey));
+                return calculated.equalsIgnoreCase(fingerprint.trim());
+            } catch (Exception ex) {
+                return false;
+            }
+        }
+
+        /**
+         * Validates signing key fingerprint against supplied PEM.
+         *
+         * @param signingPublicKeyPem PEM-encoded Ed25519 public key
+         * @param fingerprint         caller-provided signing fingerprint
+         * @return {@code true} when fingerprint matches PEM
+         */
+        private boolean fingerprintMatchesSigningKey(String signingPublicKeyPem, String fingerprint) {
+            try {
+                PublicKey publicKey = SigningKeyIO.publicFromPem(signingPublicKeyPem);
+                String calculated = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(publicKey));
+                return calculated.equalsIgnoreCase(fingerprint.trim());
+            } catch (Exception ex) {
+                return false;
+            }
         }
 
         /**
@@ -1023,8 +1125,12 @@ public final class HttpIngressServer {
 
                 if (forceTakeover) {
                     validateTakeoverKeyRequest(request);
-                    applyForcedTakeover(user.userId(), request.getTakeoverPublicKeyPem(),
-                            request.getTakeoverPublicKeyFingerprint());
+                    applyForcedTakeover(
+                            user.userId(),
+                            request.getTakeoverPublicKeyPem(),
+                            request.getTakeoverPublicKeyFingerprint(),
+                            request.getTakeoverSigningPublicKeyPem(),
+                            request.getTakeoverSigningPublicKeyFingerprint());
                 }
 
                 // Create session
@@ -1065,30 +1171,50 @@ public final class HttpIngressServer {
         private void validateTakeoverKeyRequest(LoginRequest request) {
             String takeoverPublicKeyPem = request.getTakeoverPublicKeyPem();
             String takeoverFingerprint = request.getTakeoverPublicKeyFingerprint();
-            if (isBlank(takeoverPublicKeyPem) || isBlank(takeoverFingerprint)) {
+            String takeoverSigningPublicKeyPem = request.getTakeoverSigningPublicKeyPem();
+            String takeoverSigningFingerprint = request.getTakeoverSigningPublicKeyFingerprint();
+            if (isBlank(takeoverPublicKeyPem)
+                    || isBlank(takeoverFingerprint)
+                    || isBlank(takeoverSigningPublicKeyPem)
+                    || isBlank(takeoverSigningFingerprint)) {
                 throw new IllegalArgumentException(
-                        "takeoverPublicKeyPem and takeoverPublicKeyFingerprint are required when forceTakeover=true");
+                        "takeover public/signing keys and fingerprints are required when forceTakeover=true");
             }
 
             String normalizedProvidedFingerprint = takeoverFingerprint.trim();
-            String normalizedCalculatedFingerprint = calculateFingerprint(takeoverPublicKeyPem);
+            String normalizedCalculatedFingerprint = calculateEncryptionFingerprint(takeoverPublicKeyPem);
             if (!normalizedCalculatedFingerprint.equalsIgnoreCase(normalizedProvidedFingerprint)) {
                 throw new IllegalArgumentException("takeover key fingerprint mismatch");
+            }
+
+            String normalizedProvidedSigningFingerprint = takeoverSigningFingerprint.trim();
+            String normalizedCalculatedSigningFingerprint = calculateSigningFingerprint(takeoverSigningPublicKeyPem);
+            if (!normalizedCalculatedSigningFingerprint.equalsIgnoreCase(normalizedProvidedSigningFingerprint)) {
+                throw new IllegalArgumentException("takeover signing key fingerprint mismatch");
             }
         }
 
         /**
          * Applies forced takeover effects: key rotation and session revocation.
          *
-         * @param userId       authenticated user id
-         * @param publicKeyPem takeover public key PEM
-         * @param fingerprint  takeover key fingerprint
+         * @param userId              authenticated user id
+         * @param publicKeyPem        takeover encryption public key PEM
+         * @param fingerprint         takeover encryption key fingerprint
+         * @param signingPublicKeyPem takeover signing public key PEM
+         * @param signingFingerprint  takeover signing key fingerprint
          */
         private void applyForcedTakeover(
                 String userId,
                 String publicKeyPem,
-                String fingerprint) {
-            userDAO.updatePublicKey(userId, publicKeyPem.trim(), fingerprint.trim());
+                String fingerprint,
+                String signingPublicKeyPem,
+                String signingFingerprint) {
+            userDAO.updatePublicKey(
+                    userId,
+                    publicKeyPem.trim(),
+                    fingerprint.trim(),
+                    signingPublicKeyPem.trim(),
+                    signingFingerprint.trim());
             sessionDAO.revokeAllSessionsByUserId(userId);
         }
 
@@ -1098,12 +1224,27 @@ public final class HttpIngressServer {
          * @param publicKeyPem public key in PEM format
          * @return lowercase fingerprint hex
          */
-        private String calculateFingerprint(String publicKeyPem) {
+        private String calculateEncryptionFingerprint(String publicKeyPem) {
             try {
                 PublicKey publicKey = EccKeyIO.publicFromPem(publicKeyPem);
                 return FingerprintUtil.sha256Hex(EccKeyIO.publicDer(publicKey));
             } catch (Exception ex) {
                 throw new IllegalArgumentException("invalid takeoverPublicKeyPem", ex);
+            }
+        }
+
+        /**
+         * Computes SHA-256 fingerprint for a PEM-encoded signing public key.
+         *
+         * @param signingPublicKeyPem Ed25519 signing key in PEM format
+         * @return lowercase fingerprint hex
+         */
+        private String calculateSigningFingerprint(String signingPublicKeyPem) {
+            try {
+                PublicKey publicKey = SigningKeyIO.publicFromPem(signingPublicKeyPem);
+                return FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(publicKey));
+            } catch (Exception ex) {
+                throw new IllegalArgumentException("invalid takeoverSigningPublicKeyPem", ex);
             }
         }
 
@@ -1531,7 +1672,12 @@ public final class HttpIngressServer {
                 }
 
                 sendPlain(exchange, 200, JsonCodec.toJson(
-                        PublicKeyResponse.success(targetUserId, keyRecord.publicKeyPem(), keyRecord.fingerprint())));
+                        PublicKeyResponse.success(
+                                targetUserId,
+                                keyRecord.publicKeyPem(),
+                                keyRecord.fingerprint(),
+                                keyRecord.signingPublicKeyPem(),
+                                keyRecord.signingFingerprint())));
             } catch (Exception ex) {
                 auditLogger.logError("user_key_lookup_error", requestId, null, ex);
                 sendPlain(exchange, 500, JsonCodec.toJson(PublicKeyResponse.error(INTERNAL_SERVER_ERROR)));

@@ -20,6 +20,9 @@ import java.io.Serializable;
  * @contentLength the length of the message in bytes.
  * @e2e whether the message is end-to-end encrypted.
  * @aadB64 the authenticated additional data of the message in base64.
+ * @signatureAlgorithm the signature algorithm identifier.
+ * @senderSigningKeyFingerprint the sender signing key fingerprint used for the signature.
+ * @signatureB64 the signature bytes in base64.
  */
 public class EncryptedMessage implements Serializable {
     private String version;
@@ -35,6 +38,9 @@ public class EncryptedMessage implements Serializable {
     private String contentType;
     private long contentLength;
     private boolean e2e = true;
+    private String signatureAlgorithm;
+    private String senderSigningKeyFingerprint;
+    private String signatureB64;
 
     @JsonIgnore
     private String aadB64;
@@ -278,6 +284,60 @@ public class EncryptedMessage implements Serializable {
      */
     public void setE2e(boolean e2e) {
         this.e2e = e2e;
+    }
+
+    /**
+     * Returns message signature algorithm identifier.
+     *
+     * @return signature algorithm identifier
+     */
+    public String getSignatureAlgorithm() {
+        return signatureAlgorithm;
+    }
+
+    /**
+     * Sets message signature algorithm identifier.
+     *
+     * @param signatureAlgorithm signature algorithm identifier
+     */
+    public void setSignatureAlgorithm(String signatureAlgorithm) {
+        this.signatureAlgorithm = signatureAlgorithm;
+    }
+
+    /**
+     * Returns sender signing key fingerprint bound to this signature.
+     *
+     * @return signing key fingerprint
+     */
+    public String getSenderSigningKeyFingerprint() {
+        return senderSigningKeyFingerprint;
+    }
+
+    /**
+     * Sets sender signing key fingerprint bound to this signature.
+     *
+     * @param senderSigningKeyFingerprint signing key fingerprint
+     */
+    public void setSenderSigningKeyFingerprint(String senderSigningKeyFingerprint) {
+        this.senderSigningKeyFingerprint = senderSigningKeyFingerprint;
+    }
+
+    /**
+     * Returns base64-encoded signature bytes.
+     *
+     * @return signature base64
+     */
+    public String getSignatureB64() {
+        return signatureB64;
+    }
+
+    /**
+     * Sets base64-encoded signature bytes.
+     *
+     * @param signatureB64 signature base64
+     */
+    public void setSignatureB64(String signatureB64) {
+        this.signatureB64 = signatureB64;
     }
 
     /**

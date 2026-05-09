@@ -14,6 +14,7 @@ import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.net.URI;
@@ -41,6 +42,17 @@ public class DefaultRegistrationService implements RegistrationService {
          * Generates registration key pair.
          *
          * @return generated key pair
+         * @throws RegistrationFlowException when key generation fails
+         */
+        KeyPair generate() throws RegistrationFlowException;
+    }
+
+    @FunctionalInterface
+    interface SigningKeyPairProvider {
+        /**
+         * Generates Ed25519 signing key pair for registration.
+         *
+         * @return generated signing key pair
          * @throws RegistrationFlowException when key generation fails
          */
         KeyPair generate() throws RegistrationFlowException;
@@ -103,15 +115,21 @@ public class DefaultRegistrationService implements RegistrationService {
         /**
          * Persists generated registration key pair to local keystore.
          *
-         * @param registrationKeyPair generated key pair
+         * @param registrationKeyPair generated encryption key pair
+         * @param signingKeyPair      generated signing key pair
          * @param userId              registered user id
          * @param passphrase          passphrase used for key protection
          * @throws RegistrationFlowException when persistence fails
          */
-        void save(KeyPair registrationKeyPair, String userId, char[] passphrase) throws RegistrationFlowException;
+        void save(
+                KeyPair registrationKeyPair,
+                KeyPair signingKeyPair,
+                String userId,
+                char[] passphrase) throws RegistrationFlowException;
     }
 
     private final KeyPairProvider keyPairProvider;
+    private final SigningKeyPairProvider signingKeyPairProvider;
     private final HttpClientProvider httpClientProvider;
     private final AdminKeyProvider adminKeyProvider;
     private final RegistrationGateway registrationGateway;
@@ -123,6 +141,7 @@ public class DefaultRegistrationService implements RegistrationService {
      */
     public DefaultRegistrationService() {
         this(EccKeyIO::generate,
+                SigningKeyIO::generate,
                 DefaultRegistrationService::createHttpClient,
                 DefaultRegistrationService::fetchAdminPublicKeyPem,
                 DefaultRegistrationService::sendRegistrationRequest,
@@ -134,6 +153,7 @@ public class DefaultRegistrationService implements RegistrationService {
      * Creates registration service with injectable dependencies.
      *
      * @param keyPairProvider     registration keypair provider
+     * @param signingKeyPairProvider signing keypair provider
      * @param httpClientProvider  HTTP client factory
      * @param adminKeyProvider    admin key fetch strategy
      * @param registrationGateway registration submission gateway
@@ -141,12 +161,14 @@ public class DefaultRegistrationService implements RegistrationService {
      * @param keystoreSaver       local keystore persistence strategy
      */
     DefaultRegistrationService(KeyPairProvider keyPairProvider,
+            SigningKeyPairProvider signingKeyPairProvider,
             HttpClientProvider httpClientProvider,
             AdminKeyProvider adminKeyProvider,
             RegistrationGateway registrationGateway,
             PhotoEncryptor photoEncryptor,
             KeystoreSaver keystoreSaver) {
         this.keyPairProvider = keyPairProvider;
+        this.signingKeyPairProvider = signingKeyPairProvider;
         this.httpClientProvider = httpClientProvider;
         this.adminKeyProvider = adminKeyProvider;
         this.registrationGateway = registrationGateway;
@@ -168,7 +190,8 @@ public class DefaultRegistrationService implements RegistrationService {
         }
         try {
             KeyPair registrationKeyPair = keyPairProvider.generate();
-            RegisterRequest request = buildRegistrationRequest(command, registrationKeyPair);
+            KeyPair signingKeyPair = signingKeyPairProvider.generate();
+            RegisterRequest request = buildRegistrationRequest(command, registrationKeyPair, signingKeyPair);
 
             HttpClient client = httpClientProvider.create();
             String adminPem = fetchAdminKeySafely(client);
@@ -178,7 +201,7 @@ public class DefaultRegistrationService implements RegistrationService {
             RegisterResponse response = JsonCodec.fromJson(httpResponse.body(), RegisterResponse.class);
 
             if (isSuccessful(httpResponse.statusCode(), response)) {
-                persistKeypair(registrationKeyPair, response.getUserId(), command.password());
+                persistKeypair(registrationKeyPair, signingKeyPair, response.getUserId(), command.password());
                 return new RegistrationResult.Success(response.getUserId());
             }
 
@@ -243,14 +266,19 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Persists generated keypair locally after successful backend registration.
      *
-     * @param registrationKeyPair generated registration keypair
+     * @param registrationKeyPair generated registration encryption keypair
+     * @param signingKeyPair      generated registration signing keypair
      * @param userId              backend-assigned user id
      * @param password            user password used as passphrase
      */
-    private void persistKeypair(KeyPair registrationKeyPair, String userId, String password) {
+    private void persistKeypair(
+            KeyPair registrationKeyPair,
+            KeyPair signingKeyPair,
+            String userId,
+            String password) {
         try {
             char[] passphrase = password == null ? new char[0] : password.toCharArray();
-            keystoreSaver.save(registrationKeyPair, userId, passphrase);
+            keystoreSaver.save(registrationKeyPair, signingKeyPair, userId, passphrase);
         } catch (RegistrationFlowException e) {
             LOGGER.error("Failed to save Keystore after successful registration", e);
         }
@@ -259,11 +287,15 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Maps registration command + public key into backend register request DTO.
      *
-     * @param command             registration command payload
-     * @param registrationKeyPair generated registration keypair
+     * @param command              registration command payload
+     * @param registrationKeyPair  generated registration encryption keypair
+     * @param signingKeyPair       generated registration signing keypair
      * @return register request DTO ready for submission
      */
-    private static RegisterRequest buildRegistrationRequest(RegistrationCommand command, KeyPair registrationKeyPair) {
+    private static RegisterRequest buildRegistrationRequest(
+            RegistrationCommand command,
+            KeyPair registrationKeyPair,
+            KeyPair signingKeyPair) {
         RegisterRequest request = new RegisterRequest();
         request.setFullName(command.name());
         request.setRegNumber(command.regNum());
@@ -274,6 +306,9 @@ public class DefaultRegistrationService implements RegistrationService {
         request.setPassword(command.password());
         request.setPublicKeyPem(EccKeyIO.publicPem(registrationKeyPair.getPublic()));
         request.setPublicKeyFingerprint(FingerprintUtil.sha256Hex(EccKeyIO.publicDer(registrationKeyPair.getPublic())));
+        request.setSigningPublicKeyPem(SigningKeyIO.publicPem(signingKeyPair.getPublic()));
+        request.setSigningPublicKeyFingerprint(
+                FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingKeyPair.getPublic())));
         return request;
     }
 
@@ -430,18 +465,23 @@ public class DefaultRegistrationService implements RegistrationService {
     /**
      * Saves registration keypair into user's keystore root directory.
      *
-     * @param registrationKeyPair generated registration keypair
+     * @param registrationKeyPair generated registration encryption keypair
+     * @param signingKeyPair      generated registration signing keypair
      * @param userId              registered user id
      * @param passphrase          passphrase used to encrypt private key
      * @throws RegistrationFlowException when persistence fails
      */
-    private static void saveKeypairToKeystore(KeyPair registrationKeyPair, String userId, char[] passphrase)
+    private static void saveKeypairToKeystore(
+            KeyPair registrationKeyPair,
+            KeyPair signingKeyPair,
+            String userId,
+            char[] passphrase)
             throws RegistrationFlowException {
         try {
             Path root = getOrCreateKeystoreRoot(userId);
             UserKeystore keystore = new UserKeystore(root);
             String keyId = UserKeystore.todayKeyId();
-            keystore.saveKeypair(keyId, registrationKeyPair, passphrase);
+            keystore.saveKeypair(keyId, registrationKeyPair, signingKeyPair, passphrase);
         } catch (RegistrationFlowException registrationFlowException) {
             throw registrationFlowException;
         } catch (Exception ex) {

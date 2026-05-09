@@ -21,6 +21,7 @@ import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import com.haf.shared.utils.SystemClockProvider;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -69,21 +70,38 @@ public class DefaultLoginService implements LoginService {
      * Typed takeover payload submitted to the login endpoint when forced takeover
      * is requested.
      *
-     * @param publicKeyPem public key PEM used for takeover rotation
-     * @param fingerprint  SHA-256 fingerprint of the provided public key
+     * @param publicKeyPem              encryption public key PEM used for takeover
+     *                                  rotation
+     * @param fingerprint               SHA-256 fingerprint of encryption public key
+     * @param signingPublicKeyPem       signing public key PEM used for takeover
+     *                                  rotation
+     * @param signingPublicKeyFingerprint SHA-256 fingerprint of signing public key
      */
-    record TakeoverPayload(String publicKeyPem, String fingerprint) {
+    record TakeoverPayload(
+            String publicKeyPem,
+            String fingerprint,
+            String signingPublicKeyPem,
+            String signingPublicKeyFingerprint) {
     }
 
     /**
      * In-memory generated takeover key material used for one takeover attempt
      * sequence.
      *
-     * @param keyPair      generated X25519 key pair
-     * @param publicKeyPem PEM-encoded public key
-     * @param fingerprint  SHA-256 fingerprint of the generated public key
+     * @param keyPair                   generated X25519 key pair
+     * @param signingKeyPair            generated Ed25519 key pair
+     * @param publicKeyPem              PEM-encoded X25519 public key
+     * @param fingerprint               SHA-256 fingerprint of X25519 public key
+     * @param signingPublicKeyPem       PEM-encoded Ed25519 public key
+     * @param signingPublicKeyFingerprint SHA-256 fingerprint of Ed25519 public key
      */
-    private record GeneratedTakeoverKey(KeyPair keyPair, String publicKeyPem, String fingerprint) {
+    private record GeneratedTakeoverKey(
+            KeyPair keyPair,
+            KeyPair signingKeyPair,
+            String publicKeyPem,
+            String fingerprint,
+            String signingPublicKeyPem,
+            String signingPublicKeyFingerprint) {
     }
 
     @FunctionalInterface
@@ -215,7 +233,11 @@ public class DefaultLoginService implements LoginService {
         try {
             TakeoverPayload takeoverPayload = takeoverKey == null
                     ? null
-                    : new TakeoverPayload(takeoverKey.publicKeyPem(), takeoverKey.fingerprint());
+                    : new TakeoverPayload(
+                            takeoverKey.publicKeyPem(),
+                            takeoverKey.fingerprint(),
+                            takeoverKey.signingPublicKeyPem(),
+                            takeoverKey.signingPublicKeyFingerprint());
             HttpResponse<String> httpResponse = loginGateway.send(command, takeoverPayload);
             LoginResponse response = JsonCodec.fromJson(httpResponse.body(), LoginResponse.class);
 
@@ -424,9 +446,18 @@ public class DefaultLoginService implements LoginService {
      */
     private static GeneratedTakeoverKey generateTakeoverKey() throws Exception {
         KeyPair keyPair = EccKeyIO.generate();
+        KeyPair signingKeyPair = SigningKeyIO.generate();
         String publicKeyPem = EccKeyIO.publicPem(keyPair.getPublic());
         String fingerprint = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(keyPair.getPublic()));
-        return new GeneratedTakeoverKey(keyPair, publicKeyPem, fingerprint);
+        String signingPublicKeyPem = SigningKeyIO.publicPem(signingKeyPair.getPublic());
+        String signingFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingKeyPair.getPublic()));
+        return new GeneratedTakeoverKey(
+                keyPair,
+                signingKeyPair,
+                publicKeyPem,
+                fingerprint,
+                signingPublicKeyPem,
+                signingFingerprint);
     }
 
     /**
@@ -448,9 +479,18 @@ public class DefaultLoginService implements LoginService {
             String currentKeyId = resolveCurrentKeyId(metadata);
             String nextKeyId = buildTakeoverKeyId();
             if (currentKeyId == null || currentKeyId.isBlank()) {
-                keyProvider.getKeyStore().saveKeypair(nextKeyId, takeoverKey.keyPair(), passphraseChars);
+                keyProvider.getKeyStore().saveKeypair(
+                        nextKeyId,
+                        takeoverKey.keyPair(),
+                        takeoverKey.signingKeyPair(),
+                        passphraseChars);
             } else {
-                keyProvider.getKeyStore().rotate(currentKeyId, nextKeyId, takeoverKey.keyPair(), passphraseChars);
+                keyProvider.getKeyStore().rotate(
+                        currentKeyId,
+                        nextKeyId,
+                        takeoverKey.keyPair(),
+                        takeoverKey.signingKeyPair(),
+                        passphraseChars);
             }
         } catch (Exception ex) {
             throw new CryptoOperationException("Failed to persist takeover key material locally", ex);
@@ -508,6 +548,8 @@ public class DefaultLoginService implements LoginService {
             request.setForceTakeover(Boolean.TRUE);
             request.setTakeoverPublicKeyPem(takeoverPayload.publicKeyPem());
             request.setTakeoverPublicKeyFingerprint(takeoverPayload.fingerprint());
+            request.setTakeoverSigningPublicKeyPem(takeoverPayload.signingPublicKeyPem());
+            request.setTakeoverSigningPublicKeyFingerprint(takeoverPayload.signingPublicKeyFingerprint());
         }
         String json = JsonCodec.toJson(request);
 
@@ -538,7 +580,7 @@ public class DefaultLoginService implements LoginService {
             throws IOException, CryptoOperationException {
         ClientRuntimeConfig runtimeConfig = ClientRuntimeConfig.load();
         ClockProvider clockProvider = SystemClockProvider.getInstance();
-        char[] passphrase = passphraseStr.toCharArray();
+        char[] passphrase = passphraseStr == null ? new char[0] : passphraseStr.toCharArray();
         try {
             UserKeystoreKeyProvider keyProvider = new UserKeystoreKeyProvider(userId, passphrase);
 
@@ -546,6 +588,7 @@ public class DefaultLoginService implements LoginService {
                     resolveServerBaseUri(runtimeConfig),
                     sessionId);
             keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(authHttpClient, recipientId));
+            keyProvider.setSigningDirectoryServiceFetcher(recipientId -> fetchSigningPublicKey(authHttpClient, recipientId));
             verifyLocalIdentityFingerprint(userId, keyProvider, authHttpClient);
 
             DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);
@@ -641,6 +684,33 @@ public class DefaultLoginService implements LoginService {
     }
 
     /**
+     * Fetches a recipient signing public key from the authenticated directory
+     * endpoint.
+     *
+     * @param authHttpClient authenticated adapter used for REST call
+     * @param recipientId    recipient identifier to look up
+     * @return PEM-encoded signing public key, or {@code null} when key is not
+     *         available
+     * @throws CryptoOperationException when network/json operations fail
+     */
+    private static String fetchSigningPublicKey(AuthHttpClient authHttpClient, String recipientId) {
+        try {
+            String path = "/api/v1/users/" + recipientId + "/key";
+            String jsonResponse = authHttpClient.getAuthenticated(path).get();
+            PublicKeyResponse keyRes = JsonCodec.fromJson(jsonResponse, PublicKeyResponse.class);
+            if (keyRes.isSuccess() && keyRes.getSigningPublicKeyPem() != null) {
+                return keyRes.getSigningPublicKeyPem();
+            }
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CryptoOperationException("Directory service signing-key fetch interrupted", e);
+        } catch (ExecutionException | JsonCodecException e) {
+            throw new CryptoOperationException("Directory service signing-key fetch failed", e);
+        }
+    }
+
+    /**
      * Verifies that the local current public key fingerprint matches server-side
      * identity for the authenticated account.
      *
@@ -673,6 +743,16 @@ public class DefaultLoginService implements LoginService {
             String localFingerprint = FingerprintUtil.sha256Hex(
                     EccKeyIO.publicDer(keyProvider.getKeyStore().loadCurrentPublic()));
             if (!serverFingerprint.equalsIgnoreCase(localFingerprint)) {
+                throw new CryptoOperationException(KEY_MISMATCH_FAILURE_MESSAGE);
+            }
+
+            if (keyResponse.getSigningFingerprint() == null || keyResponse.getSigningFingerprint().isBlank()) {
+                throw new CryptoOperationException(KEY_MISMATCH_FAILURE_MESSAGE);
+            }
+            String serverSigningFingerprint = keyResponse.getSigningFingerprint().trim();
+            String localSigningFingerprint = FingerprintUtil.sha256Hex(
+                    SigningKeyIO.publicDer(keyProvider.getKeyStore().loadCurrentSigningPublic()));
+            if (!serverSigningFingerprint.equalsIgnoreCase(localSigningFingerprint)) {
                 throw new CryptoOperationException(KEY_MISMATCH_FAILURE_MESSAGE);
             }
         } catch (InterruptedException e) {

@@ -12,6 +12,7 @@ import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
+import com.haf.shared.utils.SigningKeyIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,12 +75,19 @@ public final class KeystoreBootstrap {
         FilePerms.ensureDir700(dir);
 
         KeyPair kp = EccKeyIO.generate();
+        KeyPair signingKp = SigningKeyIO.generate();
         FilePerms.writeFile600(dir.resolve("public.pem"),
                 EccKeyIO.publicPem(kp.getPublic()).getBytes(StandardCharsets.US_ASCII));
 
         byte[] prvPem = EccKeyIO.privatePem(kp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
         byte[] sealed = KeystoreSealing.sealWithPass(passphrase, prvPem);
         FilePerms.writeFile600(dir.resolve("private.enc"), sealed);
+
+        FilePerms.writeFile600(dir.resolve("signing_public.pem"),
+                SigningKeyIO.publicPem(signingKp.getPublic()).getBytes(StandardCharsets.US_ASCII));
+        byte[] signingPrvPem = SigningKeyIO.privatePem(signingKp.getPrivate()).getBytes(StandardCharsets.US_ASCII);
+        byte[] signingSealed = KeystoreSealing.sealWithPass(passphrase, signingPrvPem);
+        FilePerms.writeFile600(dir.resolve("signing_private.enc"), signingSealed);
 
         String fp = FingerprintUtil
                 .sha256Hex(EccKeyIO.publicDer(kp.getPublic()));

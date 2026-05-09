@@ -3,13 +3,16 @@ package com.haf.client.network;
 import com.haf.client.crypto.UserKeystoreKeyProvider;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.crypto.MessageEncryptor;
+import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.keystore.UserKeystore;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.FixedClockProvider;
+import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -93,6 +96,7 @@ class MessageReceiverTest {
     KeyPair recipientKp;
     String senderKeyId;
     String recipientKeyId;
+    UserKeystore keyStore;
     UserKeystoreKeyProvider keyProvider;
     ClockProvider clockProvider;
     MockAuthHttpClient authHttpClient;
@@ -106,7 +110,7 @@ class MessageReceiverTest {
         tmpRoot = Files.createTempDirectory("haf-test-receiver");
         FilePerms.ensureDir700(tmpRoot);
 
-        UserKeystore keyStore = new UserKeystore(tmpRoot);
+        keyStore = new UserKeystore(tmpRoot);
         senderKeyId = "key-sender-001";
         recipientKeyId = "key-recipient-001";
         senderKp = EccKeyIO.generate();
@@ -167,6 +171,12 @@ class MessageReceiverTest {
                 recipientKeyId,
                 clockProvider);
         EncryptedMessage encrypted = encryptor.encrypt(payload, "text/plain", 3600);
+        String senderSigningFingerprint = FingerprintUtil.sha256Hex(
+                SigningKeyIO.publicDer(keyStore.loadSigningPublicKeyByKeyId(senderKeyId)));
+        MessageSignatureService.sign(
+                encrypted,
+                keyStore.loadSigningPrivate(senderKeyId, passphrase),
+                senderSigningFingerprint);
         String envelope = "{\"type\":\"message\",\"envelopeId\":\"env-1\",\"payload\":" + JsonCodec.toJson(encrypted) + "}";
         authHttpClient.enqueueMessagePoll("{\"messages\":[" + envelope + "]}");
 

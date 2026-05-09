@@ -16,7 +16,9 @@ import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FixedClockProvider;
+import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -25,6 +27,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,17 +46,25 @@ class MessageSenderTest {
 
     static class MockKeyProvider implements KeyProvider {
         private final String senderId;
-        private final PublicKey publicKey;
+        private final PublicKey recipientPublicKey;
+        private final PrivateKey senderSigningPrivateKey;
+        private final String senderSigningFingerprint;
 
-        MockKeyProvider(String senderId, PublicKey publicKey) {
+        MockKeyProvider(
+                String senderId,
+                PublicKey recipientPublicKey,
+                PrivateKey senderSigningPrivateKey,
+                String senderSigningFingerprint) {
             this.senderId = senderId;
-            this.publicKey = publicKey;
+            this.recipientPublicKey = recipientPublicKey;
+            this.senderSigningPrivateKey = senderSigningPrivateKey;
+            this.senderSigningFingerprint = senderSigningFingerprint;
         }
 
         @Override
         public PublicKey getRecipientPublicKey(String recipientId) throws KeyNotFoundException {
             if ("recipient-123".equals(recipientId)) {
-                return publicKey;
+                return recipientPublicKey;
             }
             throw new KeyNotFoundException("Recipient not found: " + recipientId);
         }
@@ -61,6 +72,16 @@ class MessageSenderTest {
         @Override
         public String getSenderId() {
             return senderId;
+        }
+
+        @Override
+        public PrivateKey getSenderSigningPrivateKey() {
+            return senderSigningPrivateKey;
+        }
+
+        @Override
+        public String getSenderSigningKeyFingerprint() {
+            return senderSigningFingerprint;
         }
     }
 
@@ -151,8 +172,14 @@ class MessageSenderTest {
 
     @BeforeEach
     void setup() throws Exception {
-        KeyPair kp = EccKeyIO.generate();
-        keyProvider = new MockKeyProvider("sender-123", kp.getPublic());
+        KeyPair recipientEncKey = EccKeyIO.generate();
+        KeyPair senderSigningKey = SigningKeyIO.generate();
+        String senderSigningFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(senderSigningKey.getPublic()));
+        keyProvider = new MockKeyProvider(
+                "sender-123",
+                recipientEncKey.getPublic(),
+                senderSigningKey.getPrivate(),
+                senderSigningFingerprint);
         clockProvider = new FixedClockProvider(1_000_000L);
         authHttpClient = new RecordingAuthHttpClient();
         messageSender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);

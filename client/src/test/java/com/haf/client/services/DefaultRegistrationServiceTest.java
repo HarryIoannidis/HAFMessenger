@@ -5,6 +5,7 @@ import com.haf.shared.dto.EncryptedFile;
 import com.haf.shared.responses.RegisterResponse;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.SigningKeyIO;
 import org.junit.jupiter.api.Test;
 import javax.net.ssl.SSLSession;
 import java.io.File;
@@ -63,11 +64,12 @@ class DefaultRegistrationServiceTest {
 
         DefaultRegistrationService service = new DefaultRegistrationService(
                 EccKeyIO::generate,
+                SigningKeyIO::generate,
                 HttpClient::newHttpClient,
                 client -> "",
                 (client, request) -> response(201, JsonCodec.toJson(RegisterResponse.success("user-1"))),
                 (file, adminPublicKey) -> new EncryptedFile(),
-                (registrationKeyPair, userId, passphrase) -> {
+                (registrationKeyPair, signingKeyPair, userId, passphrase) -> {
                     saveCalls.incrementAndGet();
                     savedUserId.set(userId);
                     savedPassphrase.set(passphrase);
@@ -89,11 +91,12 @@ class DefaultRegistrationServiceTest {
 
         DefaultRegistrationService service = new DefaultRegistrationService(
                 EccKeyIO::generate,
+                SigningKeyIO::generate,
                 HttpClient::newHttpClient,
                 client -> "",
                 (client, request) -> response(400, JsonCodec.toJson(RegisterResponse.error("Email already exists"))),
                 (file, adminPublicKey) -> new EncryptedFile(),
-                (registrationKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
+                (registrationKeyPair, signingKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));
 
@@ -115,6 +118,7 @@ class DefaultRegistrationServiceTest {
 
         DefaultRegistrationService service = new DefaultRegistrationService(
                 EccKeyIO::generate,
+                SigningKeyIO::generate,
                 HttpClient::newHttpClient,
                 client -> {
                     throw new RuntimeException("admin key endpoint unavailable");
@@ -128,7 +132,7 @@ class DefaultRegistrationServiceTest {
                     encryptCalls.incrementAndGet();
                     return new EncryptedFile();
                 },
-                (registrationKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
+                (registrationKeyPair, signingKeyPair, userId, passphrase) -> saveCalls.incrementAndGet());
 
         RegistrationService.RegistrationResult result = service.register(command(idPath.toFile(), selfiePath.toFile()));
 
@@ -143,13 +147,14 @@ class DefaultRegistrationServiceTest {
     void register_exception_path_returns_failure() {
         DefaultRegistrationService service = new DefaultRegistrationService(
                 EccKeyIO::generate,
+                SigningKeyIO::generate,
                 HttpClient::newHttpClient,
                 client -> "",
                 (client, request) -> {
                     throw new RuntimeException("transport failure");
                 },
                 (file, adminPublicKey) -> new EncryptedFile(),
-                (registrationKeyPair, userId, passphrase) -> {
+                (registrationKeyPair, signingKeyPair, userId, passphrase) -> {
                 });
 
         RegistrationService.RegistrationResult result = service.register(command(null, null));

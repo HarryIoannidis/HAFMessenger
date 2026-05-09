@@ -3,6 +3,7 @@ package com.haf.client.network;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.crypto.MessageEncryptor;
+import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
 import com.haf.shared.responses.AttachmentChunkResponse;
@@ -22,6 +23,7 @@ import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
 import java.io.IOException;
 import java.net.http.HttpResponse;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.List;
 import java.util.Map;
@@ -150,9 +152,12 @@ public class DefaultMessageSender implements MessageSender {
 
         try {
             String senderId = keyProvider.getSenderId();
+            PrivateKey senderSigningPrivateKey = keyProvider.getSenderSigningPrivateKey();
+            String senderSigningFingerprint = keyProvider.getSenderSigningKeyFingerprint();
             PublicKey recipientPublicKey = keyProvider.getRecipientPublicKey(recipientId);
             MessageEncryptor encryptor = new MessageEncryptor(recipientPublicKey, senderId, recipientId, clockProvider);
             EncryptedMessage encryptedMessage = encryptor.encrypt(payload, contentType, ttlSeconds);
+            MessageSignatureService.sign(encryptedMessage, senderSigningPrivateKey, senderSigningFingerprint);
             String recipientFingerprint = FingerprintUtil.sha256Hex(EccKeyIO.publicDer(recipientPublicKey));
 
             List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);

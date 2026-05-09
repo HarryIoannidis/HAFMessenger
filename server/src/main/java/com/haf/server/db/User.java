@@ -43,9 +43,11 @@ public final class User {
                 telephone,
                 public_key_fingerprint,
                 public_key_pem,
+                signing_public_key_fingerprint,
+                signing_public_key_pem,
                 `status`,
                 `role`
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'USER')
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'USER')
             """;
 
     /**
@@ -74,7 +76,8 @@ public final class User {
      * SQL query for selecting stored public-key material by user id.
      */
     private static final String SELECT_PUBLIC_KEY_SQL = """
-            SELECT public_key_pem, public_key_fingerprint FROM users WHERE user_id = ?
+            SELECT public_key_pem, public_key_fingerprint, signing_public_key_pem, signing_public_key_fingerprint
+            FROM users WHERE user_id = ?
             """;
 
     /**
@@ -82,7 +85,8 @@ public final class User {
      */
     private static final String UPDATE_PUBLIC_KEY_SQL = """
             UPDATE users
-            SET public_key_pem = ?, public_key_fingerprint = ?
+            SET public_key_pem = ?, public_key_fingerprint = ?,
+                signing_public_key_pem = ?, signing_public_key_fingerprint = ?
             WHERE user_id = ?
             """;
 
@@ -130,6 +134,8 @@ public final class User {
             ps.setString(9, request.getTelephone());
             ps.setString(10, request.getPublicKeyFingerprint());
             ps.setString(11, request.getPublicKeyPem());
+            ps.setString(12, request.getSigningPublicKeyFingerprint());
+            ps.setString(13, request.getSigningPublicKeyPem());
 
             ps.executeUpdate();
 
@@ -219,7 +225,8 @@ public final class User {
     /**
      * DTO for returning public key information.
      */
-    public record PublicKeyRecord(String publicKeyPem, String fingerprint) {
+    public record PublicKeyRecord(String publicKeyPem, String fingerprint, String signingPublicKeyPem,
+            String signingFingerprint) {
     }
 
     /**
@@ -238,7 +245,9 @@ public final class User {
                 if (rs.next()) {
                     return new PublicKeyRecord(
                             rs.getString("public_key_pem"),
-                            rs.getString("public_key_fingerprint"));
+                            rs.getString("public_key_fingerprint"),
+                            rs.getString("signing_public_key_pem"),
+                            rs.getString("signing_public_key_fingerprint"));
                 }
                 return null;
             }
@@ -251,17 +260,26 @@ public final class User {
     /**
      * Updates the public key material for a user account.
      *
-     * @param userId      user id whose key should be rotated
-     * @param publicKeyPem PEM-encoded X25519 public key
-     * @param fingerprint SHA-256 fingerprint of the public key
+     * @param userId              user id whose key should be rotated
+     * @param publicKeyPem        PEM-encoded X25519 public key
+     * @param fingerprint         SHA-256 fingerprint of the public key
+     * @param signingPublicKeyPem PEM-encoded Ed25519 signing public key
+     * @param signingFingerprint  SHA-256 fingerprint of signing public key
      * @throws DatabaseOperationException when update fails
      */
-    public void updatePublicKey(String userId, String publicKeyPem, String fingerprint) {
+    public void updatePublicKey(
+            String userId,
+            String publicKeyPem,
+            String fingerprint,
+            String signingPublicKeyPem,
+            String signingFingerprint) {
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement ps = connection.prepareStatement(UPDATE_PUBLIC_KEY_SQL)) {
             ps.setString(1, publicKeyPem);
             ps.setString(2, fingerprint);
-            ps.setString(3, userId);
+            ps.setString(3, signingPublicKeyPem);
+            ps.setString(4, signingFingerprint);
+            ps.setString(5, userId);
             ps.executeUpdate();
         } catch (SQLException ex) {
             auditLogger.logError("db_update_public_key", null, userId, ex);
