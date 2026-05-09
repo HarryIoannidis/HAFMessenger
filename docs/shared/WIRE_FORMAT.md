@@ -11,6 +11,7 @@ Required envelope fields include:
 - version, senderId, recipientId
 - timestampEpochMs, ttlSeconds, algorithm
 - ivB64, ephemeralPublicB64, ciphertextB64, tagB64
+- signatureAlgorithm, senderSigningKeyFingerprint, signatureB64
 - contentType, contentLength
 Optional/auxiliary field:
 - `e2e`
@@ -34,15 +35,18 @@ Attachment transport wraps these encrypted envelopes differently by size:
 ## Flow
 
 1. Sender constructs envelope and serializes with `JsonCodec`.
-2. Server/client validators enforce schema/policy.
-3. Receiver reconstructs AAD from metadata and decrypts ciphertext/tag.
-4. ACK paths refer to server envelope IDs rather than plaintext message identifiers.
+2. Sender signs canonical envelope bytes with Ed25519 before transport.
+3. Server/client validators enforce schema/policy.
+4. Receiver verifies Ed25519 signature and sender signing-key fingerprint.
+5. Receiver reconstructs AAD from metadata and decrypts ciphertext/tag.
+6. ACK paths refer to server envelope IDs rather than plaintext message identifiers.
 
 ## Error/Security Notes
 
 - Unknown JSON properties are rejected by codec configuration.
 - Content-type and ciphertext-size limits are enforced by validator policy.
 - `ephemeralPublicB64` carries sender ephemeral public key (not a wrapped symmetric key field).
+- Message signatures are mandatory in protocol version `1` and unsigned envelopes are rejected.
 
 ## Related Files
 

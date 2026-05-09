@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -140,16 +141,9 @@ class SettingsControllerTest {
         JFXToggleButton chatTimestampsToggle = findById(loaded.root(), "chatShowMessageTimestampsToggle",
                 JFXToggleButton.class);
 
-        assertNotNull(blurStrengthRow);
-        assertNotNull(blurToggle);
-        assertNotNull(hoverZoomScaleRow);
-        assertNotNull(hoverZoomToggle);
-        assertNotNull(mediaImageSendQualityRow);
-        assertNotNull(mediaSendInMaxQualityToggle);
-        assertNotNull(badgeCapRow);
-        assertNotNull(badgeToggle);
-        assertNotNull(chatUse24HourTimeRow);
-        assertNotNull(chatTimestampsToggle);
+        requireAllPresent(blurStrengthRow, blurToggle, hoverZoomScaleRow, hoverZoomToggle,
+                mediaImageSendQualityRow, mediaSendInMaxQualityToggle, badgeCapRow, badgeToggle,
+                chatUse24HourTimeRow, chatTimestampsToggle);
 
         assertDependentRowState(blurStrengthRow, false);
         assertDependentRowState(mediaImageSendQualityRow, false);
@@ -272,16 +266,16 @@ class SettingsControllerTest {
         JFXToggleButton autoClearToggle = findById(loaded.root(), "searchAutoClearOnTabExitToggle",
                 JFXToggleButton.class);
         assertNotNull(autoClearToggle);
-        assertTrue(autoClearToggle.isSelected());
-        assertFalse(settings.isSearchPreserveLastQuery());
+        assertFalse(autoClearToggle.isSelected());
+        assertTrue(settings.isSearchPreserveLastQuery());
 
         onFxThread(() -> {
-            autoClearToggle.setSelected(false);
+            autoClearToggle.setSelected(true);
             return null;
         });
 
-        assertFalse(autoClearToggle.isSelected());
-        assertTrue(settings.isSearchPreserveLastQuery());
+        assertTrue(autoClearToggle.isSelected());
+        assertFalse(settings.isSearchPreserveLastQuery());
     }
 
     private static LoadedSettingsView loadSettingsView() throws Exception {
@@ -296,6 +290,14 @@ class SettingsControllerTest {
     private static void assertDependentRowState(Node row, boolean enabled) {
         assertEquals(!enabled, row.isDisable());
         assertEquals(!enabled, row.getStyleClass().contains("settings-row-disabled"));
+    }
+
+    private static void requireAllPresent(Node... nodes) {
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i] == null) {
+                throw new AssertionError("Expected node at index " + i + " to be non-null");
+            }
+        }
     }
 
     private static <T extends Node> T findById(Node root, String id, Class<T> type) {

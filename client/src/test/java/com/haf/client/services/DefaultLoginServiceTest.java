@@ -250,7 +250,11 @@ class DefaultLoginServiceTest {
                             || takeoverPayload.publicKeyPem() == null
                             || takeoverPayload.publicKeyPem().isBlank()
                             || takeoverPayload.fingerprint() == null
-                            || takeoverPayload.fingerprint().isBlank()) {
+                            || takeoverPayload.fingerprint().isBlank()
+                            || takeoverPayload.signingPublicKeyPem() == null
+                            || takeoverPayload.signingPublicKeyPem().isBlank()
+                            || takeoverPayload.signingPublicKeyFingerprint() == null
+                            || takeoverPayload.signingPublicKeyFingerprint().isBlank()) {
                         return response(400, JsonCodec.toJson(LoginResponse.error("missing takeover payload")));
                     }
                     return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));

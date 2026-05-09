@@ -40,12 +40,12 @@ class ClientSettingsTest {
         ClientSettings defaults = ClientSettings.defaults();
 
         assertFalse(defaults.isSearchInstantOnType());
-        assertTrue(defaults.isSearchAutoOpenFilterOnFirstSearch());
+        assertFalse(defaults.isSearchAutoOpenFilterOnFirstSearch());
         assertTrue(defaults.isSearchRequireEnterToSearch());
         assertEquals(3, defaults.getSearchMinimumQueryLength());
         assertTrue(defaults.isSearchInfiniteScroll());
-        assertEquals(20, defaults.getSearchResultsPerPage());
-        assertFalse(defaults.isSearchPreserveLastQuery());
+        assertEquals(100, defaults.getSearchResultsPerPage());
+        assertTrue(defaults.isSearchPreserveLastQuery());
         assertTrue(defaults.isSearchRememberSortOptions());
         assertEquals(SearchSortViewModel.SortOptions.DEFAULT, defaults.getSearchSortOptions());
     }
@@ -308,8 +308,9 @@ class ClientSettingsTest {
         assertTrue(settings.isGeneralConfirmLogout());
         assertTrue(settings.isGeneralConfirmDeleteChat());
         assertTrue(settings.isGeneralConfirmRemoveContact());
-        assertEquals(20, settings.getSearchResultsPerPage());
+        assertEquals(100, settings.getSearchResultsPerPage());
         assertEquals(3, settings.getSearchMinimumQueryLength());
+        assertTrue(settings.isSearchPreserveLastQuery());
         assertFalse(settings.isPrivacyHidePresenceIndicators());
         assertFalse(settings.isPrivacyBlurOnStartupUntilUnlock());
         assertTrue(settings.isPrivacyConfirmExternalLinkOpen());

@@ -14,6 +14,8 @@ public class LoginRequest implements Serializable {
     private Boolean forceTakeover;
     private String takeoverPublicKeyPem;
     private String takeoverPublicKeyFingerprint;
+    private String takeoverSigningPublicKeyPem;
+    private String takeoverSigningPublicKeyFingerprint;
 
     /**
      * Creates an empty login request for JSON deserialization.
@@ -110,5 +112,41 @@ public class LoginRequest implements Serializable {
      */
     public void setTakeoverPublicKeyFingerprint(String takeoverPublicKeyFingerprint) {
         this.takeoverPublicKeyFingerprint = takeoverPublicKeyFingerprint;
+    }
+
+    /**
+     * Returns the PEM-encoded signing public key used for takeover rotation.
+     *
+     * @return takeover signing public key PEM
+     */
+    public String getTakeoverSigningPublicKeyPem() {
+        return takeoverSigningPublicKeyPem;
+    }
+
+    /**
+     * Sets the PEM-encoded signing public key used for takeover rotation.
+     *
+     * @param takeoverSigningPublicKeyPem takeover signing public key PEM
+     */
+    public void setTakeoverSigningPublicKeyPem(String takeoverSigningPublicKeyPem) {
+        this.takeoverSigningPublicKeyPem = takeoverSigningPublicKeyPem;
+    }
+
+    /**
+     * Returns fingerprint associated with takeover signing public key.
+     *
+     * @return takeover signing key fingerprint
+     */
+    public String getTakeoverSigningPublicKeyFingerprint() {
+        return takeoverSigningPublicKeyFingerprint;
+    }
+
+    /**
+     * Sets fingerprint associated with takeover signing public key.
+     *
+     * @param takeoverSigningPublicKeyFingerprint takeover signing key fingerprint
+     */
+    public void setTakeoverSigningPublicKeyFingerprint(String takeoverSigningPublicKeyFingerprint) {
+        this.takeoverSigningPublicKeyFingerprint = takeoverSigningPublicKeyFingerprint;
     }
 }

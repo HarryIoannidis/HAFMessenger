@@ -6,13 +6,14 @@ Describe the current end-to-end cryptography model and where each crypto respons
 
 ## Current Implementation
 
-- Envelope profile is fixed by `MessageHeader`: version `1`, algorithm `AES-256-GCM+X25519`.
+- Envelope profile is fixed by `MessageHeader`: version `1`, encryption algorithm `AES-256-GCM+X25519`, signature algorithm `Ed25519`.
 - `MessageEncryptor` performs per-message encryption:
   - Generates an ephemeral X25519 keypair.
   - Derives AES key material via `CryptoECC` (X25519 ECDH + SHA-256 KDF).
   - Encrypts payload with `CryptoService.encryptAesGcm(...)` using a 12-byte IV and detached 16-byte GCM tag.
   - Builds canonical AAD through `AadCodec.buildAAD(...)` from envelope metadata.
 - `MessageDecryptor.decryptMessage(...)` validates with `MessageValidator.validate(...)`, enforces TTL with `ClockProvider`, reconstructs sender ephemeral public key, then decrypts.
+- `MessageSignatureService` signs outbound envelopes and verifies inbound signatures over canonical envelope bytes.
 - Server ingress/router handles encrypted envelopes as opaque payloads and does not decrypt message bodies.
 - Private key material is managed through `UserKeystore` and sealed at rest by `KeystoreSealing`.
 
@@ -33,8 +34,9 @@ Describe the current end-to-end cryptography model and where each crypto respons
 1. Sender resolves recipient public key via `KeyProvider.getRecipientPublicKey(...)`.
 2. `MessageEncryptor.encrypt(...)` creates encrypted envelope fields (`ivB64`, `ephemeralPublicB64`, `ciphertextB64`, `tagB64`).
 3. Client sends the envelope through `MessageSender` over TLS ingress.
-4. Receiver validates and decrypts with `MessageDecryptor.decryptMessage(...)`.
-5. Receiver acknowledges delivered envelope IDs using `MessageReceiver.acknowledgeEnvelopes(...)`.
+4. Sender signs envelope with local Ed25519 signing private key and includes signing fingerprint.
+5. Receiver verifies signature/fingerprint binding, then decrypts with `MessageDecryptor.decryptMessage(...)`.
+6. Receiver acknowledges delivered envelope IDs using `MessageReceiver.acknowledgeEnvelopes(...)`.
 
 ## Error/Security Notes
 
@@ -42,6 +44,7 @@ Describe the current end-to-end cryptography model and where each crypto respons
 - AEAD tag failures are wrapped as `MessageTamperedException`.
 - Expired envelopes raise `MessageExpiredException`.
 - Recipient mismatch checks use `MessageValidator.validateRecipientOrThrow(...)` in receive paths.
+- Unsigned or invalidly signed envelopes are rejected before decrypt.
 - Private keys remain sealed on disk; keystore root fallback avoids startup failure on restricted system paths.
 
 ## Related Files

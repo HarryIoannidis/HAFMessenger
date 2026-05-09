@@ -17,6 +17,10 @@ public final class CryptoConstants {
     public static final String X25519_CURVE = "X25519";
     public static final String KEY_AGREEMENT_ALGO = "XDH";
 
+    // Ed25519 Signatures
+    public static final String ED25519_ALGORITHM = "Ed25519";
+    public static final String ED25519_SIGNATURE_ALGO = "Ed25519";
+
     // HKDF (Key Derivation)
     public static final String KDF_ALGORITHM = "HKDF";
     public static final String KDF_HASH_ALGO = "SHA-256";

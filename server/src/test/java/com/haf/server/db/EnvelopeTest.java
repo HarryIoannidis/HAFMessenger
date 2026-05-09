@@ -103,6 +103,9 @@ class EnvelopeTest {
         when(rs.getBytes("wrapped_key")).thenReturn("key".getBytes());
         when(rs.getBytes("iv")).thenReturn(new byte[12]);
         when(rs.getBytes("auth_tag")).thenReturn(new byte[16]);
+        when(rs.getBytes("signature")).thenReturn(new byte[64]);
+        when(rs.getString("signature_algorithm")).thenReturn("Ed25519");
+        when(rs.getString("sender_signing_key_fingerprint")).thenReturn("sign-fp");
         when(rs.getString("content_type")).thenReturn("text/plain");
         when(rs.getLong("content_length")).thenReturn(10L);
         when(rs.getLong("timestamp")).thenReturn(System.currentTimeMillis());
@@ -195,6 +198,9 @@ class EnvelopeTest {
         when(rs.getBytes("wrapped_key")).thenReturn("key1".getBytes(), "key2".getBytes());
         when(rs.getBytes("iv")).thenReturn(new byte[12], new byte[12]);
         when(rs.getBytes("auth_tag")).thenReturn(new byte[16], new byte[16]);
+        when(rs.getBytes("signature")).thenReturn(new byte[64], new byte[64]);
+        when(rs.getString("signature_algorithm")).thenReturn("Ed25519", "Ed25519");
+        when(rs.getString("sender_signing_key_fingerprint")).thenReturn("sign-fp-1", "sign-fp-2");
         when(rs.getString("content_type")).thenReturn("text/plain", "text/plain");
         when(rs.getLong("content_length")).thenReturn(8L, 8L);
         when(rs.getLong("timestamp")).thenReturn(System.currentTimeMillis(), System.currentTimeMillis());
@@ -250,6 +256,9 @@ class EnvelopeTest {
         when(rs.getBytes("wrapped_key")).thenReturn("key".getBytes());
         when(rs.getBytes("iv")).thenReturn(new byte[12]);
         when(rs.getBytes("auth_tag")).thenReturn(new byte[16]);
+        when(rs.getBytes("signature")).thenReturn(new byte[64]);
+        when(rs.getString("signature_algorithm")).thenReturn("Ed25519");
+        when(rs.getString("sender_signing_key_fingerprint")).thenReturn("sign-fp");
         when(rs.getString("content_type")).thenReturn("text/plain");
         when(rs.getLong("content_length")).thenReturn(7L);
         when(rs.getLong("timestamp")).thenReturn(System.currentTimeMillis());
@@ -290,6 +299,9 @@ class EnvelopeTest {
         message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
         message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
         message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
+        message.setSignatureB64(Base64.getEncoder().encodeToString(new byte[64]));
+        message.setSignatureAlgorithm("Ed25519");
+        message.setSenderSigningKeyFingerprint("sign-fp");
         message.setContentType("text/plain");
         message.setContentLength(4);
         message.setAadB64(Base64.getEncoder().encodeToString("aad".getBytes(StandardCharsets.UTF_8)));

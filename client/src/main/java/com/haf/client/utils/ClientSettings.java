@@ -41,8 +41,8 @@ public final class ClientSettings {
         SEARCH_REQUIRE_ENTER_TO_SEARCH("search.require_enter_to_search", true, ApplyMode.IMMEDIATE),
         SEARCH_MINIMUM_QUERY_LENGTH("search.minimum_query_length", 3, ApplyMode.IMMEDIATE),
         SEARCH_INFINITE_SCROLL("search.infinite_scroll", true, ApplyMode.IMMEDIATE),
-        SEARCH_RESULTS_PER_PAGE("search.results_per_page", 20, ApplyMode.IMMEDIATE),
-        SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", false, ApplyMode.IMMEDIATE),
+        SEARCH_RESULTS_PER_PAGE("search.results_per_page", 100, ApplyMode.IMMEDIATE),
+        SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", true, ApplyMode.IMMEDIATE),
         SEARCH_REMEMBER_SORT_OPTIONS("search.remember_sort_options", true, ApplyMode.IMMEDIATE),
 
         MEDIA_HOVER_ZOOM("media.hover_zoom", true, ApplyMode.IMMEDIATE),

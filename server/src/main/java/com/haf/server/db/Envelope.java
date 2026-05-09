@@ -39,13 +39,16 @@ public final class Envelope {
                 wrapped_key,
                 iv,
                 auth_tag,
+                signature,
                 aad_hash,
+                signature_algorithm,
+                sender_signing_key_fingerprint,
                 content_type,
                 content_length,
                 timestamp,
                 ttl,
                 expires_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     /**
@@ -59,6 +62,9 @@ public final class Envelope {
                    wrapped_key,
                    iv,
                    auth_tag,
+                   signature,
+                   signature_algorithm,
+                   sender_signing_key_fingerprint,
                    content_type,
                    content_length,
                    timestamp,
@@ -85,6 +91,9 @@ public final class Envelope {
                    wrapped_key,
                    iv,
                    auth_tag,
+                   signature,
+                   signature_algorithm,
+                   sender_signing_key_fingerprint,
                    content_type,
                    content_length,
                    timestamp,
@@ -147,12 +156,15 @@ public final class Envelope {
             ps.setBytes(5, decodeB64("wrappedKey", message.getEphemeralPublicB64()));
             ps.setBytes(6, decodeB64("iv", message.getIvB64()));
             ps.setBytes(7, decodeB64("tag", message.getTagB64()));
-            ps.setString(8, computeAadHash(message));
-            ps.setString(9, message.getContentType());
-            ps.setLong(10, message.getContentLength());
-            ps.setLong(11, message.getTimestampEpochMs());
-            ps.setLong(12, message.getTtlSeconds());
-            ps.setTimestamp(13, new Timestamp(expiresAtMillis));
+            ps.setBytes(8, decodeB64("signature", message.getSignatureB64()));
+            ps.setString(9, computeAadHash(message));
+            ps.setString(10, message.getSignatureAlgorithm());
+            ps.setString(11, message.getSenderSigningKeyFingerprint());
+            ps.setString(12, message.getContentType());
+            ps.setLong(13, message.getContentLength());
+            ps.setLong(14, message.getTimestampEpochMs());
+            ps.setLong(15, message.getTtlSeconds());
+            ps.setTimestamp(16, new Timestamp(expiresAtMillis));
 
             ps.executeUpdate();
 
@@ -347,6 +359,9 @@ public final class Envelope {
         message.setEphemeralPublicB64(encoder.encodeToString(rs.getBytes("wrapped_key")));
         message.setIvB64(encoder.encodeToString(rs.getBytes("iv")));
         message.setTagB64(encoder.encodeToString(rs.getBytes("auth_tag")));
+        message.setSignatureB64(encoder.encodeToString(rs.getBytes("signature")));
+        message.setSignatureAlgorithm(rs.getString("signature_algorithm"));
+        message.setSenderSigningKeyFingerprint(rs.getString("sender_signing_key_fingerprint"));
         message.setContentType(rs.getString("content_type"));
         message.setContentLength(rs.getLong("content_length"));
         message.setTimestampEpochMs(rs.getLong("timestamp"));

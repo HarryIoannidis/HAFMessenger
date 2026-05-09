@@ -19,6 +19,8 @@ public class RegisterRequest implements Serializable {
     private String password;
     private String publicKeyPem;
     private String publicKeyFingerprint;
+    private String signingPublicKeyPem;
+    private String signingPublicKeyFingerprint;
     private EncryptedFile idPhoto;
     private EncryptedFile selfiePhoto;
 
@@ -189,6 +191,42 @@ public class RegisterRequest implements Serializable {
      */
     public void setPublicKeyFingerprint(String publicKeyFingerprint) {
         this.publicKeyFingerprint = publicKeyFingerprint;
+    }
+
+    /**
+     * Returns caller signing public key in PEM format.
+     *
+     * @return signing public key PEM
+     */
+    public String getSigningPublicKeyPem() {
+        return signingPublicKeyPem;
+    }
+
+    /**
+     * Sets caller signing public key in PEM format.
+     *
+     * @param signingPublicKeyPem signing public key PEM
+     */
+    public void setSigningPublicKeyPem(String signingPublicKeyPem) {
+        this.signingPublicKeyPem = signingPublicKeyPem;
+    }
+
+    /**
+     * Returns fingerprint for caller signing public key.
+     *
+     * @return signing public key fingerprint
+     */
+    public String getSigningPublicKeyFingerprint() {
+        return signingPublicKeyFingerprint;
+    }
+
+    /**
+     * Sets fingerprint for caller signing public key.
+     *
+     * @param signingPublicKeyFingerprint signing public key fingerprint
+     */
+    public void setSigningPublicKeyFingerprint(String signingPublicKeyFingerprint) {
+        this.signingPublicKeyFingerprint = signingPublicKeyFingerprint;
     }
 
     /**

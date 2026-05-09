@@ -26,12 +26,15 @@ Document current DAO responsibilities and encrypted-data persistence behavior.
 
 1. Ingress/router layers call DAOs for inserts/queries/updates.
 2. Envelope and attachment rows are persisted with TTL metadata.
-3. ACK/cleanup operations update delivered/expired state.
-4. Attachment bind operations align attachment expiry to owning envelope expiry.
+3. Envelope rows persist Ed25519 signature bytes, signature algorithm, and sender signing fingerprint.
+4. User rows persist both encryption and signing public-key material for directory lookups/takeover rotation.
+5. ACK/cleanup operations update delivered/expired state.
+6. Attachment bind operations align attachment expiry to owning envelope expiry.
 
 ## Error/Security Notes
 
 - DAO layer stores encrypted bytes opaquely and does not decrypt payloads.
+- Signature bytes are stored and returned opaquely; verification occurs in ingress/client receive paths.
 - SQL errors are wrapped and surfaced via typed exceptions/logging.
 - Session activity checks and touches use database-side `CURRENT_TIMESTAMP` comparisons to avoid timezone skew between app and DB runtimes.
 - Refresh tokens are never stored in plaintext; only `SHA-256` hashes are persisted.

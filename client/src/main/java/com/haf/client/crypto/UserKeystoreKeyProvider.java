@@ -7,9 +7,12 @@ import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.utils.EccKeyIO;
+import com.haf.shared.utils.FingerprintUtil;
+import com.haf.shared.utils.SigningKeyIO;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -27,6 +30,7 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     private final String senderId;
     private final char[] passphrase;
     private UnaryOperator<String> directoryServiceFetcher;
+    private UnaryOperator<String> signingDirectoryServiceFetcher;
 
     /**
      * Creates a UserKeystoreKeyProvider with the specified keystore root and
@@ -98,6 +102,16 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     }
 
     /**
+     * Sets callback that resolves Ed25519 signing public keys from directory
+     * service.
+     *
+     * @param fetcher function mapping user id to signing public key PEM
+     */
+    public void setSigningDirectoryServiceFetcher(UnaryOperator<String> fetcher) {
+        this.signingDirectoryServiceFetcher = fetcher;
+    }
+
+    /**
      * Resolves a recipient public key from local keystore metadata, with optional
      * directory-service fallback.
      *
@@ -140,6 +154,37 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     }
 
     /**
+     * Resolves recipient signing key from local keystore or directory service.
+     *
+     * @param recipientId recipient identifier
+     * @return recipient Ed25519 signing public key
+     * @throws KeyNotFoundException when key cannot be resolved
+     */
+    @Override
+    public PublicKey getRecipientSigningPublicKey(String recipientId) throws KeyNotFoundException {
+        try {
+            List<KeyMetadata> metadataList = keyStore.listMetadata();
+            for (KeyMetadata meta : metadataList) {
+                if (recipientId.equals(meta.keyId())) {
+                    return loadRecipientSigningKey(recipientId);
+                }
+            }
+
+            if (signingDirectoryServiceFetcher != null) {
+                PublicKey key = fetchSigningPublicKeyFromDirectoryService(recipientId);
+                if (key != null) {
+                    return key;
+                }
+            }
+            throw new KeyNotFoundException("Recipient signing key not found for: " + recipientId);
+        } catch (KeyNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new KeyNotFoundException("Error looking up recipient signing key: " + recipientId, e);
+        }
+    }
+
+    /**
      * Loads a recipient public key by key id from the local keystore.
      *
      * @param recipientId key id to load
@@ -151,6 +196,14 @@ public class UserKeystoreKeyProvider implements KeyProvider {
             return keyStore.loadPublicKeyByKeyId(recipientId);
         } catch (Exception e) {
             throw new KeyNotFoundException("Failed to load public key for recipient: " + recipientId, e);
+        }
+    }
+
+    private PublicKey loadRecipientSigningKey(String recipientId) throws KeyNotFoundException {
+        try {
+            return keyStore.loadSigningPublicKeyByKeyId(recipientId);
+        } catch (Exception e) {
+            throw new KeyNotFoundException("Failed to load signing public key for recipient: " + recipientId, e);
         }
     }
 
@@ -176,6 +229,20 @@ public class UserKeystoreKeyProvider implements KeyProvider {
         }
     }
 
+    private PublicKey fetchSigningPublicKeyFromDirectoryService(String recipientId) throws KeyNotFoundException {
+        try {
+            String pem = signingDirectoryServiceFetcher.apply(recipientId);
+            if (pem != null) {
+                return SigningKeyIO.publicFromPem(pem);
+            }
+            return null;
+        } catch (Exception fetchEx) {
+            throw new KeyNotFoundException(
+                    "Failed to fetch signing public key from directory service for recipient: " + recipientId,
+                    fetchEx);
+        }
+    }
+
     /**
      * Returns the sender id associated with the currently loaded keystore.
      *
@@ -184,6 +251,37 @@ public class UserKeystoreKeyProvider implements KeyProvider {
     @Override
     public String getSenderId() {
         return senderId;
+    }
+
+    /**
+     * Returns sender Ed25519 signing private key from current local key material.
+     *
+     * @return sender signing private key
+     * @throws KeyNotFoundException when key cannot be loaded
+     */
+    @Override
+    public PrivateKey getSenderSigningPrivateKey() throws KeyNotFoundException {
+        try {
+            return keyStore.loadCurrentSigningPrivate(passphrase);
+        } catch (Exception e) {
+            throw new KeyNotFoundException("Failed to load sender signing private key for user: " + senderId, e);
+        }
+    }
+
+    /**
+     * Returns sender signing key fingerprint derived from current signing public key.
+     *
+     * @return sender signing key fingerprint
+     * @throws KeyNotFoundException when key cannot be loaded
+     */
+    @Override
+    public String getSenderSigningKeyFingerprint() throws KeyNotFoundException {
+        try {
+            PublicKey signingPublic = keyStore.loadCurrentSigningPublic();
+            return FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPublic));
+        } catch (Exception e) {
+            throw new KeyNotFoundException("Failed to resolve sender signing key fingerprint for user: " + senderId, e);
+        }
     }
 
     /**

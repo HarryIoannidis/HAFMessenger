@@ -31,10 +31,13 @@ Describe the implemented registration wizard and submission pipeline used by the
 1. User completes credentials step and passes `validateCredentials()`.
 2. User uploads ID photo and selfie, each validated by `validateFile(...)` and step-specific presence checks.
 3. Controller builds `RegistrationService.RegistrationCommand` from form fields and selected files.
-4. `DefaultRegistrationService` generates an X25519 registration keypair and constructs `RegisterRequest`.
+4. `DefaultRegistrationService` generates both keypairs:
+   - X25519 encryption keypair
+   - Ed25519 signing keypair
+   and constructs `RegisterRequest` with both public keys + fingerprints.
 5. Service tries to fetch admin key from `/api/v1/config/admin-key`; if available, photos are encrypted into `EncryptedFile` payloads.
 6. Service submits `POST /api/v1/register`.
-7. On success, service persists generated key material in local keystore and UI navigates back to login.
+7. On success, service persists both keypairs in local keystore and UI navigates back to login.
 
 ## Error/Security Notes
 
