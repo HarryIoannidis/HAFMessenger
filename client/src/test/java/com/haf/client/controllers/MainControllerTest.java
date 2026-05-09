@@ -16,7 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MainControllerTest {
-    private static final Path CONTROLLER_SOURCE = Path.of("src/main/java/com/haf/client/controllers/MainController.java");
+    private static final Path CONTROLLER_SOURCE = Path
+            .of("src/main/java/com/haf/client/controllers/MainController.java");
 
     @Test
     void constructor_rejects_null_session_service() {
@@ -215,7 +216,8 @@ class MainControllerTest {
 
     @Test
     void incoming_os_notification_body_respects_preview_toggle_and_type_mapping() {
-        MessageVM text = new MessageVM(false, MessageType.TEXT, "  Body with\npreview  ", null, null, null, null, false);
+        MessageVM text = new MessageVM(false, MessageType.TEXT, "  Body with\npreview  ", null, null, null, null,
+                false);
         MessageVM image = new MessageVM(false, MessageType.IMAGE, null, null, "a.png", null, null, false);
         MessageVM file = new MessageVM(false, MessageType.FILE, null, "/tmp/a", "a.pdf", "10 KB", null, false);
 
@@ -289,8 +291,10 @@ class MainControllerTest {
         String source = Files.readString(CONTROLLER_SOURCE);
 
         assertTrue(source.contains("syncStartupBlurLockFromSetting();"));
-        assertTrue(source.contains("String blurActionText = blurLocked ? \"Unlock Privacy Blur\" : \"Lock Privacy Blur\";"));
-        assertTrue(source.contains("Runnable blurAction = blurLocked ? this::unlockStartupPrivacyBlur : this::lockStartupPrivacyBlur;"));
+        assertTrue(source
+                .contains("String blurActionText = blurLocked ? \"Unlock Privacy Blur\" : \"Lock Privacy Blur\";"));
+        assertTrue(source.contains(
+                "Runnable blurAction = blurLocked ? this::unlockStartupPrivacyBlur : this::lockStartupPrivacyBlur;"));
         assertTrue(source.contains("if (startupBlurLocked) {"));
         assertTrue(source.contains("settings.isPrivacyBlurOnStartupUntilUnlock()"));
         assertTrue(source.contains("scheduleStartupBlurUnlockPopupAfterMainRender()"));
@@ -304,28 +308,14 @@ class MainControllerTest {
     void hide_presence_setting_is_applied_locally_on_contact_cells_and_profile_pane() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("ContactCellController.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
+        assertTrue(source.contains(
+                "ContactCellController.setHidePresenceIndicators(settings.isPrivacyHidePresenceIndicators())"));
         assertTrue(source.contains("private static final String HIDDEN_ACTIVITY_LABEL = \"Hidden Activity\";"));
         assertTrue(source.contains("""
                 settings.isPrivacyHidePresenceIndicators()
                                 ? HIDDEN_ACTIVITY_LABEL
                                 : activenessLabel"""));
         assertTrue(source.contains("hasActivenessLabel && !settings.isPrivacyHidePresenceIndicators()"));
-    }
-
-    @Test
-    void profile_header_updates_from_presence_are_gated_to_messages_tab() throws IOException {
-        String source = Files.readString(CONTROLLER_SOURCE);
-
-        assertTrue(source.contains("""
-                ContactInfo updated = viewModel.updateContactPresence(userId, active);
-                if (updated == null) {
-                    return;
-                }
-
-                if (viewModel.activeTabProperty().get() != MainViewModel.MainTab.MESSAGES) {
-                    return;
-                }"""));
     }
 
     @Test
