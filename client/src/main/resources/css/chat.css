@@ -221,3 +221,15 @@
     -fx-font-size: 12px;
     -fx-text-alignment: center;
 }
+
+.contact-cell-overlay-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
+    -fx-cursor: hand;
+    -jfx-rippler-fill: rgba(0, 0, 0, 0.14);
+}
+
+.contact-cell-overlay-button:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.06);
+}
