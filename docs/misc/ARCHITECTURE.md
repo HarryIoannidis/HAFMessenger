@@ -40,5 +40,5 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 - `client/src/main/java/com/haf/client/viewmodels/MessagesViewModel.java`
 - `server/src/main/java/com/haf/server/ingress/HttpIngressServer.java`
 - `server/src/main/java/com/haf/server/router/MailboxRouter.java`
-- `server/src/main/java/com/haf/server/db/EnvelopeDAO.java`
+- `server/src/main/java/com/haf/server/db/Envelope.java`
 - `shared/src/main/java/com/haf/shared/dto/EncryptedMessage.java`

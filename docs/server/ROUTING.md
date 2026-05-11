@@ -7,7 +7,7 @@ Describe mailbox routing behavior for inbound envelopes and acknowledgements.
 ## Current Implementation
 
 - `MailboxRouter` accepts validated envelopes from WSS ingress.
-- Persists envelopes via DAO and supports realtime subscriptions, reconnect backlog fetch, and receipt workflows.
+- Persists envelopes via `Envelope` entity/DAO and supports realtime subscriptions, reconnect backlog fetch, and receipt workflows.
 - Supports ownership-scoped delivery acknowledgement/read lookup and timed cleanup work.
 - TTL cleanup runs on a fixed 5-minute interval and decrements queue-depth metrics for deleted rows.
 
@@ -15,7 +15,7 @@ Describe mailbox routing behavior for inbound envelopes and acknowledgements.
 
 - `server.router.MailboxRouter`
 - `server.router.QueuedEnvelope`
-- `server.db.EnvelopeDAO`
+- `server.db.Envelope`
 
 ## Flow
 
@@ -35,4 +35,4 @@ Describe mailbox routing behavior for inbound envelopes and acknowledgements.
 
 - `server/src/main/java/com/haf/server/router/MailboxRouter.java`
 - `server/src/main/java/com/haf/server/router/QueuedEnvelope.java`
-- `server/src/main/java/com/haf/server/db/EnvelopeDAO.java`
+- `server/src/main/java/com/haf/server/db/Envelope.java`

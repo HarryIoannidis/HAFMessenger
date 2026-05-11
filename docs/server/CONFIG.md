@@ -56,7 +56,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 - TLS keystore path has compatibility fallback resolution logic.
 - JWT TTL values are validated (`access >= 60s`, `refresh >= access`, `absolute >= refresh`, `idle >= 60s`).
 - Attachment size/chunk/TTL values are validated to prevent invalid runtime limits.
-- `HAF_JWT_IDLE_TTL_SECONDS` is consumed by `SessionDAO` at bootstrap to enforce session-idle expiry behavior.
+- `HAF_JWT_IDLE_TTL_SECONDS` is consumed by `Session` entity/DAO at bootstrap to enforce session-idle expiry behavior.
 - Password getters return cloned char arrays to reduce accidental mutable sharing.
 - Packaging note: first-run local config bootstrap (no manual system-env setup) is tracked as a separate follow-up.
 

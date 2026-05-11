@@ -24,13 +24,13 @@ Document the current relational schema and DAO responsibilities used by the serv
 
 ## Key Types/Interfaces
 
-- DAOs:
-  - `UserDAO`
-  - `SessionDAO`
-  - `EnvelopeDAO`
-  - `FileUploadDAO`
-  - `AttachmentDAO`
-  - `ContactDAO`
+- Integrated Entity/DAOs:
+  - `User`
+  - `Session`
+  - `Envelope`
+  - `FileUpload`
+  - `Attachment`
+  - `Contact`
 - Exceptions/related:
   - `DatabaseOperationException`
   - `RateLimitException`
@@ -39,8 +39,8 @@ Document the current relational schema and DAO responsibilities used by the serv
 
 1. Startup runs Flyway migrations before ingress starts.
 2. Ingress and router paths call DAOs with prepared statements.
-3. `EnvelopeDAO` persists encrypted envelope metadata/payload and supports fetch/ack/expiry cleanup.
-4. `AttachmentDAO` handles init/chunk/complete/bind/download lifecycle for encrypted attachments.
+3. `Envelope` persists encrypted envelope metadata/payload and supports fetch/ack/expiry cleanup.
+4. `Attachment` handles init/chunk/complete/bind/download lifecycle for encrypted attachments.
 5. Scheduled cleanup removes expired uploads/envelopes according to TTL policy.
 6. Metrics/audit layers observe DAO-side outcomes (ingress rejects, cleanup counts, delivery latency).
 7. Session presence/duplicate-login logic uses `sessions.last_seen_at` and database-time comparisons.
@@ -59,9 +59,9 @@ Document the current relational schema and DAO responsibilities used by the serv
 ## Related Files
 
 - `server/src/main/java/com/haf/server/core/Main.java`
-- `server/src/main/java/com/haf/server/db/EnvelopeDAO.java`
-- `server/src/main/java/com/haf/server/db/AttachmentDAO.java`
-- `server/src/main/java/com/haf/server/db/UserDAO.java`
+- `server/src/main/java/com/haf/server/db/Envelope.java`
+- `server/src/main/java/com/haf/server/db/Attachment.java`
+- `server/src/main/java/com/haf/server/db/User.java`
 - `server/src/main/resources/db/migration/V1__create_users_table.sql`
 - `server/src/main/resources/db/migration/V11__create_message_attachments_tables.sql`
 - `server/src/main/resources/db/migration/V12__add_sessions_last_seen.sql`

@@ -7,7 +7,7 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 ## Current Implementation
 
 - Send path uses `MessageSender` + `MessageEncryptor` and submits encrypted envelopes over WSS.
-- Server path validates/rate-limits/routes via `RealtimeWebSocketServer`, `MessageIngressService`, and `MailboxRouter`, with persistence through DAOs.
+- Server path validates/rate-limits/routes via `RealtimeWebSocketServer`, `MessageIngressService`, and `MailboxRouter`, with persistence through integrated entity/DAO classes.
 - Receive path uses `MessageReceiver` + `MessageDecryptor`, updates UI state, and emits WSS delivery/read receipts.
 - Key provider path resolves sender id and recipient public keys through `KeyProvider` (`UserKeystoreKeyProvider` implementation).
 - Attachment flow extends message workflow with init/chunk/complete/bind/download endpoints while preserving encrypted payload handling.
@@ -15,7 +15,7 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 ## Key Types/Interfaces
 
 - Client: `DefaultMessageSender`, `DefaultMessageReceiver`, `AuthHttpClient`, `MessagesViewModel`.
-- Server: `RealtimeWebSocketServer`, `MessageIngressService`, `MailboxRouter`, `RateLimiterService`, `EnvelopeDAO`.
+- Server: `RealtimeWebSocketServer`, `MessageIngressService`, `MailboxRouter`, `RateLimiterService`, `Envelope`.
 - Shared: `EncryptedMessage`, `MessageValidator`, `MessageEncryptor`, `MessageDecryptor`, `KeyProvider`.
 
 ## Flow

@@ -1,5 +1,7 @@
 package com.haf.client.services;
 
+import com.haf.shared.utils.AuthErrorCode;
+
 /**
  * Refreshes access tokens using the server refresh-token endpoint.
  */
@@ -15,6 +17,7 @@ public interface TokenRefreshService {
      * @param refreshToken                 rotated refresh token when success
      * @param accessExpiresAtEpochSeconds  access-token expiry epoch seconds
      * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
+     * @param errorCode                    typed auth/api error code for failures
      * @param errorMessage                 failure message when refresh fails
      */
     record TokenRefreshResult(
@@ -24,6 +27,7 @@ public interface TokenRefreshService {
             String refreshToken,
             Long accessExpiresAtEpochSeconds,
             Long refreshExpiresAtEpochSeconds,
+            AuthErrorCode errorCode,
             String errorMessage) {
 
         /**
@@ -47,6 +51,7 @@ public interface TokenRefreshService {
                     refreshToken,
                     accessExpiresAtEpochSeconds,
                     refreshExpiresAtEpochSeconds,
+                    AuthErrorCode.UNKNOWN,
                     null);
         }
 
@@ -54,10 +59,11 @@ public interface TokenRefreshService {
          * Creates failed refresh result.
          *
          * @param invalidSession whether failure is an invalid/expired-session case
+         * @param errorCode      typed auth/api error code
          * @param errorMessage   failure message
          * @return failed refresh result
          */
-        public static TokenRefreshResult failure(boolean invalidSession, String errorMessage) {
+        public static TokenRefreshResult failure(boolean invalidSession, AuthErrorCode errorCode, String errorMessage) {
             return new TokenRefreshResult(
                     false,
                     invalidSession,
@@ -65,6 +71,7 @@ public interface TokenRefreshService {
                     null,
                     null,
                     null,
+                    errorCode == null ? AuthErrorCode.UNKNOWN : errorCode,
                     errorMessage);
         }
     }

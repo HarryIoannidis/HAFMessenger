@@ -58,7 +58,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Network: `DefaultMessageReceiver.java`, `DefaultMessageSender.java`, `MessageReceiver.java`, `MessageSender.java`, `AuthHttpClient.java`, `RealtimeClientTransport.java`, `RealtimeTransport.java`
   - Security: `LinuxSecretToolPasswordVault.java`, `MacOsKeychainPasswordVault.java`, `RememberedCredentialsStore.java`, `SecurePasswordVault.java`, `UnsupportedPasswordVault.java`, `WindowsPasswordManager.java`
   - Services: `AttachmentImageOptimizer.java`, `ChatAttachmentService.java`, `DefaultChatAttachmentService.java`, `DefaultLoginService.java`, `DefaultMainSessionService.java`, `DefaultRegistrationService.java`, `DefaultTokenRefreshService.java`, `DesktopNotificationService.java`, `LoginService.java`, `MainSessionService.java`, `RegistrationService.java`, `TokenRefreshService.java`
-  - Utils: `ClientRuntimeConfig.java`, `ClientSettings.java`, `ImageSaveSupport.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
+  - Utils: `AuthErrorClassifier.java`, `ClientRuntimeConfig.java`, `ClientSettings.java`, `ImageSaveSupport.java`, `PopupMessageSpec.java`, `RankIconResolver.java`, `RuntimeIssue.java`, `RuntimeIssuePopupGate.java`, `SslContextUtils.java`, `UiConstants.java`, `ViewRouter.java`, `WindowResizeHelper.java`
   - ViewModels: `ChatViewModel.java`, `LoginViewModel.java`, `MainViewModel.java`, `MessagesViewModel.java`, `RegisterViewModel.java`, `SearchSortViewModel.java`, `SearchViewModel.java`, `SplashViewModel.java`
 - Client files (`src/test/java`):
   - Controllers: `ChatControllerTest.java`, `ContactCellTest.java`, `LoginControllerTest.java`, `MainContentLoaderTest.java`, `MainControllerTest.java`, `PopupMessageControllerTest.java`, `PreviewControllerTest.java`, `RegisterControllerTest.java`, `SearchControllerTest.java`, `SearchFilterUiTest.java`, `SettingsControllerRememberCredentialsTest.java`, `SettingsControllerTest.java`, `SplashControllerTest.java`
@@ -66,9 +66,9 @@ Index the main source layout and notable classes without duplicating generated/b
   - Network: `AuthHttpClientTest.java`, `MessageReceiverTest.java`, `MessageSenderTest.java`
   - Security: `LinuxSecretToolPasswordVaultTest.java`, `MacOsKeychainPasswordVaultTest.java`, `RememberedCredentialsStoreTest.java`, `WindowsPasswordManagerTest.java`
   - Services: `DefaultChatAttachmentServiceTest.java`, `DefaultLoginServiceTest.java`, `DefaultMainSessionServiceTest.java`, `DefaultRegistrationServiceTest.java`
-  - Utils: `ClientRuntimeConfigTest.java`, `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `SettingsRowBuilderTest.java`
+  - Utils: `ClientRuntimeConfigTest.java`, `ClientSettingsTest.java`, `ImageSaveSupportTest.java`, `MessageBubbleFactoryTest.java`, `PopupMessageBuilderTest.java`, `RuntimeIssuePopupGateTest.java`, `RuntimeIssueTest.java`, `SettingsRowBuilderTest.java`
   - ViewModels: `ChatViewModelTest.java`, `LoginViewModelTest.java`, `MainViewModelTest.java`, `MessageViewModelAttachmentTest.java`, `MessageViewModelIncomingListenerTest.java`, `MessageViewModelPresenceTest.java`, `MessageViewModelRuntimeTest.java`, `RegisterViewModelTest.java`, `SearchViewModelTest.java`, `SplashViewModelTest.java`
-  - Integration tests: `AadConsistencyIT.java`, `MessageSendReceiveIT.java`, `MultiUserKeystoreCollisionIT.java`
+  - Integration tests: `AadConsistencyIT.java`, `MultiUserKeystoreCollisionIT.java`
 
 - Server files (`src/main/java`):
   - `module-info.java`
@@ -100,12 +100,13 @@ Index the main source layout and notable classes without duplicating generated/b
   - Exceptions: `CryptoOperationException.java`, `JsonCodecException.java`, `KeyNotFoundException.java`, `KeystoreOperationException.java`, `MessageDecryptionException.java`, `MessageExpiredException.java`, `MessageTamperedException.java`, `MessageValidationException.java`
   - Keystore: `KeyProvider.java`, `KeystoreBootstrap.java`, `KeystoreRoot.java`, `KeystoreSealing.java`, `UserKeystore.java`
   - Requests: `AddContactRequest.java`, `AttachmentBindRequest.java`, `AttachmentCompleteRequest.java`, `AttachmentInitRequest.java`, `LoginRequest.java`, `RefreshTokenRequest.java`, `RegisterRequest.java`
-  - Responses: `AttachmentBindResponse.java`, `AttachmentChunkResponse.java`, `AttachmentCompleteResponse.java`, `AttachmentInitResponse.java`, `ContactsResponse.java`, `LoginResponse.java`, `MessagingPolicyResponse.java`, `PublicKeyResponse.java`, `RefreshTokenResponse.java`, `RegisterResponse.java`, `UserSearchResponse.java`
-  - Utils: `AttachmentPayloadCodec.java`, `ClockProvider.java`, `EccKeyIO.java`, `FilePerms.java`, `FingerprintUtil.java`, `FixedClockProvider.java`, `JsonCodec.java`, `MessageValidator.java`, `PemCodec.java`, `SigningKeyIO.java`, `SystemClockProvider.java`
-  - Websocket: `RealtimeEvent.java`, `RealtimeEventType.java`
+  - Responses: `ApiErrorResponse.java`, `AttachmentBindResponse.java`, `AttachmentChunkResponse.java`, `AttachmentCompleteResponse.java`, `AttachmentInitResponse.java`, `ContactsResponse.java`, `LoginResponse.java`, `MessagingPolicyResponse.java`, `PublicKeyResponse.java`, `RefreshTokenResponse.java`, `RegisterResponse.java`, `UserSearchResponse.java`
+  - Utils: `AttachmentPayloadCodec.java`, `AuthErrorCode.java`, `ClockProvider.java`, `EccKeyIO.java`, `FilePerms.java`, `FingerprintUtil.java`, `FixedClockProvider.java`, `JsonCodec.java`, `MessageValidator.java`, `PemCodec.java`, `SigningKeyIO.java`, `SystemClockProvider.java`
+  - Websocket: `RealtimeErrorCode.java`, `RealtimeEvent.java`, `RealtimeEventType.java`
 
 - Shared files (`src/test/java`):
   - Integration tests: `KeystoreE2EIT.java`, `KeystorePermsE2EIT.java`, `KeystoreTamperIT.java`, `KeystoreWrongPassIT.java`
+  - Websocket: `RealtimeErrorCodeTest.java`
   - Constants: `AttachmentConstantsTest.java`, `CryptoConstantsTest.java`, `MessageHeaderTest.java`
   - Crypto: `AadBindingTest.java`, `AadCodecTest.java`, `CryptoECCTest.java`, `CryptoServiceTest.java`, `MessageDecryptorTest.java`, `MessageEncryptorTest.java`, `MessageFlowTest.java`
   - DTO: `EncryptedFileTest.java`, `EncryptedMessageTest.java`, `KeyMetadataTest.java`, `RegisterResponseTest.java`, `UserSearchResultTest.java`
@@ -113,7 +114,7 @@ Index the main source layout and notable classes without duplicating generated/b
   - Keystore: `KeyProviderTest.java`, `KeystoreBootstrapIdempotentTest.java`, `KeystoreBootstrapTest.java`, `KeystoreRootTest.java`, `KeystoreSealingTest.java`, `UserKeystoreTest.java`
   - Requests: `AddContactRequestTest.java`, `LoginRequestTest.java`
   - Responses: `PublicKeyResponseTest.java`
-  - Utils: `AttachmentPayloadCodecTest.java`, `ClockProviderTest.java`, `EccKeyIOTest.java`, `FilePermsTest.java`, `FingerprintUtilTest.java`, `JsonCodecTest.java`, `MessageValidatorTest.java`, `PemCodecTest.java`
+  - Utils: `AttachmentPayloadCodecTest.java`, `ClockProviderTest.java`, `EccKeyIOTest.java`, `FilePermsTest.java`, `FingerprintUtilTest.java`, `JsonCodecTest.java`, `MessageValidatorTest.java`, `PemCodecTest.java`, `SigningKeyIOTest.java`
 
 ## Related Files
 
@@ -122,7 +123,8 @@ Index the main source layout and notable classes without duplicating generated/b
 - `shared/src/main/java`
 - `docs/client/REMEMBERED_CREDENTIALS_SECURITY.md`
 - `docs/misc/STRUCTURE.md`
-- `docs/misc/scripts.md`
+- `docs/misc/SCRIPTS.md`
 - `scripts/package-linux-appimage.sh`
+- `scripts/package-linux-server-appimage.sh`
 - `scripts/package-mac-app.sh`
 - `scripts/package-windows-app.ps1`

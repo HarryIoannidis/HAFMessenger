@@ -104,6 +104,7 @@ HAFMessenger/
 
   scripts/
     package-linux-appimage.sh
+    package-linux-server-appimage.sh
     package-mac-app.sh
     package-windows-app.ps1
 
@@ -122,7 +123,7 @@ HAFMessenger/
 
 - Client packages: `builders`, `controllers`, `viewmodels`, `services`, `network`, `crypto`, `security`, `utils`, `models`, `core`, `exceptions`.
 - Server packages: `config`, `core`, `ingress`, `router`, `db`, `handlers`, `metrics`, `security`, `exceptions`.
-- Shared packages: `dto`, `requests`, `responses`, `constants`, `crypto`, `keystore`, `utils`, `exceptions`.
+- Shared packages: `dto`, `requests`, `responses`, `constants`, `crypto`, `keystore`, `utils`, `websocket`, `exceptions`.
 
 ## Flow
 
@@ -149,5 +150,5 @@ HAFMessenger/
 - `scripts/package-linux-appimage.sh`
 - `scripts/package-mac-app.sh`
 - `scripts/package-windows-app.ps1`
-- `docs/misc/scripts.md`
+- `docs/misc/SCRIPTS.md`
 - `.gitignore`
