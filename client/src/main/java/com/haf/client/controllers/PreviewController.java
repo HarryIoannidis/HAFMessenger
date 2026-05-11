@@ -19,6 +19,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.Window;
+import javafx.stage.WindowEvent;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +34,8 @@ import org.slf4j.LoggerFactory;
 public class PreviewController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PreviewController.class);
+    private static final double PREVIEW_MIN_WINDOW_WIDTH = 560.0;
+    private static final double PREVIEW_MIN_WINDOW_HEIGHT = 420.0;
     private static final double MAX_PREVIEW_WIDTH = 500.0;
     private static final double MAX_PREVIEW_HEIGHT = 500.0;
 
@@ -86,6 +90,7 @@ public class PreviewController {
         this.downloadAllowed = downloadAllowed;
 
         configureDownloadButton(downloadAllowed);
+        requestPreviewWindowStabilization();
         loadPreviewImage(imageUriOrPath);
     }
 
@@ -130,6 +135,7 @@ public class PreviewController {
         resetHoverZoom();
         if (source == null || source.isBlank()) {
             setSpinnerVisible(false);
+            requestPreviewWindowStabilization();
             return;
         }
 
@@ -144,7 +150,10 @@ public class PreviewController {
             });
             image.errorProperty().addListener((obs, wasError, isError) -> {
                 if (Boolean.TRUE.equals(isError) && isCurrentPreviewLoad(previewLoadId, image)) {
-                    runOnFxThread(() -> setSpinnerVisible(false));
+                    runOnFxThread(() -> {
+                        setSpinnerVisible(false);
+                        requestPreviewWindowStabilization();
+                    });
                 }
             });
 
@@ -153,11 +162,15 @@ public class PreviewController {
             if (image.getProgress() >= 1.0) {
                 runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
             } else if (image.isError()) {
-                runOnFxThread(() -> setSpinnerVisible(false));
+                runOnFxThread(() -> {
+                    setSpinnerVisible(false);
+                    requestPreviewWindowStabilization();
+                });
             }
         } catch (Exception ex) {
             LOGGER.warn("Failed to load preview image", ex);
             setSpinnerVisible(false);
+            requestPreviewWindowStabilization();
             showAttachmentError("Could not load image preview.");
         }
     }
@@ -175,6 +188,7 @@ public class PreviewController {
         }
         setSpinnerVisible(false);
         applyImageDimensions(image);
+        requestPreviewWindowStabilization();
     }
 
     /**
@@ -294,8 +308,8 @@ public class PreviewController {
             }
             stage.setResizable(true);
             WindowResizeHelper.enableResizing(stage);
-            stage.setMinWidth(280);
-            stage.setMinHeight(220);
+            stage.setMinWidth(PREVIEW_MIN_WINDOW_WIDTH);
+            stage.setMinHeight(PREVIEW_MIN_WINDOW_HEIGHT);
 
             if (closeButton != null) {
                 closeButton.setOnAction(e -> stage.hide());
@@ -310,6 +324,8 @@ public class PreviewController {
                     stage.setY(event.getScreenY() - yOffset);
                 });
             }
+
+            stage.addEventHandler(WindowEvent.WINDOW_SHOWN, event -> requestPreviewWindowStabilization());
         });
     }
 
@@ -343,10 +359,62 @@ public class PreviewController {
         double scale = Math.min(1.0, Math.min(MAX_PREVIEW_WIDTH / width, MAX_PREVIEW_HEIGHT / height));
         previewImageView.setFitWidth(width * scale);
         previewImageView.setFitHeight(height * scale);
+    }
+
+    /**
+     * Schedules two follow-up layout passes so preview geometry remains centered
+     * even when late image/layout updates occur after initial popup show.
+     */
+    private void requestPreviewWindowStabilization() {
+        runOnFxThread(() -> {
+            stabilizePreviewWindow();
+            Platform.runLater(() -> Platform.runLater(this::stabilizePreviewWindow));
+        });
+    }
+
+    /**
+     * Re-applies preferred scene size and re-centers preview window over its owner.
+     * This keeps the preview stable when image dimensions arrive asynchronously.
+     */
+    private void stabilizePreviewWindow() {
         Stage stage = resolveStage();
-        if (stage != null) {
-            stage.sizeToScene();
+        if (stage == null || stage.getScene() == null || stage.getScene().getRoot() == null) {
+            return;
         }
+
+        stage.setMinWidth(PREVIEW_MIN_WINDOW_WIDTH);
+        stage.setMinHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+        stage.getScene().getRoot().applyCss();
+        stage.getScene().getRoot().layout();
+        stage.sizeToScene();
+        centerStageOverOwner(stage);
+    }
+
+    /**
+     * Centers the preview stage over its owner window when available.
+     *
+     * @param stage preview stage to reposition
+     */
+    private static void centerStageOverOwner(Stage stage) {
+        if (stage == null) {
+            return;
+        }
+
+        Window owner = stage.getOwner();
+        if (owner == null || !owner.isShowing()) {
+            stage.centerOnScreen();
+            return;
+        }
+
+        double width = stage.getWidth();
+        double height = stage.getHeight();
+        if (width <= 0 || height <= 0) {
+            stage.centerOnScreen();
+            return;
+        }
+
+        stage.setX(owner.getX() + (owner.getWidth() - width) / 2.0);
+        stage.setY(owner.getY() + (owner.getHeight() - height) / 2.0);
     }
 
     /**
