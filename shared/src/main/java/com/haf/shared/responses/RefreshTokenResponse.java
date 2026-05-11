@@ -2,6 +2,8 @@ package com.haf.shared.responses;
 
 import java.io.Serializable;
 
+import com.haf.shared.utils.AuthErrorCode;
+
 /**
  * Refresh-token response DTO returned by the server.
  */
@@ -10,6 +12,7 @@ public class RefreshTokenResponse implements Serializable {
     private String refreshToken;
     private Long accessExpiresAtEpochSeconds;
     private Long refreshExpiresAtEpochSeconds;
+    private AuthErrorCode code;
     private String error;
 
     /**
@@ -92,6 +95,24 @@ public class RefreshTokenResponse implements Serializable {
     }
 
     /**
+     * Returns typed error code for failed refresh responses.
+     *
+     * @return typed error code (or {@link AuthErrorCode#UNKNOWN})
+     */
+    public AuthErrorCode getCode() {
+        return code == null ? AuthErrorCode.UNKNOWN : code;
+    }
+
+    /**
+     * Sets typed error code for failed refresh responses.
+     *
+     * @param code typed error code
+     */
+    public void setCode(AuthErrorCode code) {
+        this.code = code == null ? AuthErrorCode.UNKNOWN : code;
+    }
+
+    /**
      * Returns error text for failed refresh responses.
      *
      * @return error text
@@ -121,9 +142,9 @@ public class RefreshTokenResponse implements Serializable {
     /**
      * Creates success response.
      *
-     * @param accessToken access JWT
-     * @param refreshToken refresh token
-     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     * @param accessToken                  access JWT
+     * @param refreshToken                 refresh token
+     * @param accessExpiresAtEpochSeconds  access-token expiry epoch seconds
      * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
      * @return success response
      */
@@ -143,11 +164,13 @@ public class RefreshTokenResponse implements Serializable {
     /**
      * Creates failure response.
      *
+     * @param code  typed error code
      * @param error error message
      * @return failure response
      */
-    public static RefreshTokenResponse error(String error) {
+    public static RefreshTokenResponse error(AuthErrorCode code, String error) {
         RefreshTokenResponse response = new RefreshTokenResponse();
+        response.setCode(code);
         response.setError(error);
         return response;
     }

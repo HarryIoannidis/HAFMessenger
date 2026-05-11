@@ -12,13 +12,13 @@ Document how tests are currently organized and executed for shared, client, and 
   - `shared/src/test/java`
   - `client/src/test/java`
   - `server/src/test/java`
-- Representative existing tests include crypto, keystore, ingress, routing, DAOs, controllers, and ViewModels.
+- Representative existing tests include crypto, keystore, ingress, routing, entity/DAO classes, controllers, and ViewModels.
 - Typical commands: `./mvnw test` (unit) and `./mvnw verify` (unit + integration).
 
 ## Key Types/Interfaces
 
 - Client examples: `ChatControllerTest`, `SearchViewModelTest`, `AuthHttpClientTest`.
-- Server examples: `HttpIngressServerTest`, `MailboxRouterTest`, `RateLimiterServiceTest`, `MessageIngressServiceTest`, `RealtimeWebSocketServerTest`, DAO tests.
+- Server examples: `HttpIngressServerTest`, `MailboxRouterTest`, `RateLimiterServiceTest`, `MessageIngressServiceTest`, `RealtimeWebSocketServerTest`, entity/DAO tests.
 - Shared examples: `MessageValidatorTest`, `MessageEncryptorTest`, `UserKeystoreTest`, `AadCodecTest`.
 
 ## Flow

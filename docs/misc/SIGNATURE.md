@@ -26,7 +26,7 @@ Describe how message signatures are generated, transmitted, validated, and persi
 - `shared.dto.EncryptedMessage`
 - `shared.keystore.KeyProvider`
 - `client.crypto.UserKeystoreKeyProvider`
-- `server.db.UserDAO` (`PublicKeyRecord`)
+- `server.db.User` (`PublicKeyRecord`)
 - `shared.responses.PublicKeyResponse`
 
 ## Flow

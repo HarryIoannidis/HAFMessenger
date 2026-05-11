@@ -1,9 +1,11 @@
 package com.haf.client.services;
 
+import com.haf.client.utils.AuthErrorClassifier;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.requests.RefreshTokenRequest;
 import com.haf.shared.responses.RefreshTokenResponse;
+import com.haf.shared.utils.AuthErrorCode;
 import com.haf.shared.utils.JsonCodec;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,7 +34,7 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
     @Override
     public TokenRefreshResult refresh(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            return TokenRefreshResult.failure(false, "refresh token is missing");
+            return TokenRefreshResult.failure(false, AuthErrorCode.INVALID_REQUEST, "refresh token is missing");
         }
 
         try {
@@ -77,22 +79,29 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
             }
 
             String message = resolveRefreshFailureMessage(response, statusCode, responseBody);
-            boolean invalidSession = isInvalidSessionStatus(statusCode)
+            AuthErrorCode errorCode = resolveRefreshFailureCode(response, statusCode, responseBody);
+            boolean invalidSession = AuthErrorClassifier.isInvalidSessionCode(errorCode)
+                    || isInvalidSessionStatus(statusCode)
                     || isInvalidSessionMessage(message);
             LOGGER.warn(
-                    "Token refresh rejected (status={}, invalidSession={}, message={}, body={})",
+                    "Token refresh rejected (status={}, errorCode={}, invalidSession={}, message={}, body={})",
                     statusCode,
+                    errorCode,
                     invalidSession,
                     message,
                     abbreviateForLog(responseBody));
-            return TokenRefreshResult.failure(invalidSession, message);
+            return TokenRefreshResult.failure(invalidSession, errorCode, message);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            return TokenRefreshResult.failure(false, "token refresh was interrupted");
+            return TokenRefreshResult.failure(false, AuthErrorCode.UNKNOWN, "token refresh was interrupted");
         } catch (Exception ex) {
             String message = resolveExceptionFailureMessage(ex);
+            AuthErrorCode errorCode = AuthErrorClassifier.resolveCode(ex);
             LOGGER.warn("Token refresh request failed before response parsing: {}", message, ex);
-            return TokenRefreshResult.failure(isInvalidSessionMessage(message), message);
+            return TokenRefreshResult.failure(
+                    AuthErrorClassifier.isInvalidSessionCode(errorCode) || isInvalidSessionMessage(message),
+                    errorCode,
+                    message);
         }
     }
 
@@ -133,6 +142,34 @@ public class DefaultTokenRefreshService implements TokenRefreshService {
             return "token refresh failed (HTTP " + statusCode + ")";
         }
         return "token refresh failed";
+    }
+
+    /**
+     * Resolves typed error code from response payload/body and HTTP fallback
+     * status mappings.
+     *
+     * @param response   parsed response payload
+     * @param statusCode HTTP status code from refresh endpoint
+     * @param rawBody    raw response body
+     * @return resolved typed auth/api error code
+     */
+    static AuthErrorCode resolveRefreshFailureCode(RefreshTokenResponse response, int statusCode, String rawBody) {
+        if (response != null && response.getCode() != AuthErrorCode.UNKNOWN) {
+            return response.getCode();
+        }
+        AuthErrorCode parsed = AuthErrorClassifier.parseCode(rawBody);
+        if (parsed != AuthErrorCode.UNKNOWN) {
+            return parsed;
+        }
+        return switch (statusCode) {
+            case 400 -> AuthErrorCode.INVALID_REQUEST;
+            case 401 -> AuthErrorCode.INVALID_SESSION;
+            case 403 -> AuthErrorCode.FORBIDDEN;
+            case 405 -> AuthErrorCode.METHOD_NOT_ALLOWED;
+            case 409 -> AuthErrorCode.CONFLICT;
+            case 429 -> AuthErrorCode.RATE_LIMIT;
+            default -> statusCode >= 500 ? AuthErrorCode.INTERNAL_SERVER_ERROR : AuthErrorCode.UNKNOWN;
+        };
     }
 
     /**

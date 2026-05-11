@@ -32,6 +32,7 @@ import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.utils.JsonCodec;
+import com.haf.shared.utils.AuthErrorCode;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.SigningKeyIO;
@@ -649,7 +650,8 @@ public final class HttpIngressServer {
 
             try {
                 if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, JsonCodec.toJson(LoginResponse.error(METHOD_NOT_ALLOWED)));
+                    respond(exchange, requestId, 405, JsonCodec.toJson(
+                            LoginResponse.error(AuthErrorCode.METHOD_NOT_ALLOWED, METHOD_NOT_ALLOWED)));
                     return;
                 }
 
@@ -660,7 +662,9 @@ public final class HttpIngressServer {
                 // Validate required fields
                 if (isBlank(request.getEmail()) || isBlank(request.getPassword())) {
                     respond(exchange, requestId, 400,
-                            JsonCodec.toJson(LoginResponse.error("email and password are required")));
+                            JsonCodec.toJson(LoginResponse.error(
+                                    AuthErrorCode.INVALID_REQUEST,
+                                    "email and password are required")));
                     return;
                 }
 
@@ -670,7 +674,10 @@ public final class HttpIngressServer {
                         sourceIp);
                 if (!loginRateDecision.allowed()) {
                     respond(exchange, requestId, 429, JsonCodec.toJson(
-                            LoginResponse.error("Too many login attempts", loginRateDecision.retryAfterSeconds())));
+                            LoginResponse.error(
+                                    AuthErrorCode.RATE_LIMIT,
+                                    "Too many login attempts",
+                                    loginRateDecision.retryAfterSeconds())));
                     return;
                 }
 
@@ -682,7 +689,9 @@ public final class HttpIngressServer {
                         loginSentinelHash);
                 if (user == null || !passwordValid) {
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
+                            JsonCodec.toJson(LoginResponse.error(
+                                    AuthErrorCode.INVALID_CREDENTIALS,
+                                    "Invalid email or password")));
                     return;
                 }
 
@@ -690,6 +699,7 @@ public final class HttpIngressServer {
                 if (!"APPROVED".equals(user.status())) {
                     respond(exchange, requestId, 403,
                             JsonCodec.toJson(LoginResponse.error(
+                                    AuthErrorCode.ACCOUNT_NOT_APPROVED,
                                     "Account is " + user.status().toLowerCase()
                                             + ". Please contact an administrator.")));
                     return;
@@ -699,7 +709,9 @@ public final class HttpIngressServer {
 
                 if (!forceTakeover && isDuplicateLoginAttempt(user.userId())) {
                     respond(exchange, requestId, 409,
-                            JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
+                            JsonCodec.toJson(LoginResponse.error(
+                                    AuthErrorCode.DUPLICATE_SESSION,
+                                    "Account is already logged in.")));
                     return;
                 }
 
@@ -734,10 +746,14 @@ public final class HttpIngressServer {
                                 user.joinedDate(),
                                 user.status())));
             } catch (IllegalArgumentException ex) {
-                respond(exchange, requestId, 400, JsonCodec.toJson(LoginResponse.error(ex.getMessage())));
+                respond(exchange, requestId, 400, JsonCodec.toJson(LoginResponse.error(
+                        AuthErrorCode.INVALID_REQUEST,
+                        ex.getMessage())));
             } catch (Exception ex) {
                 auditLogger.logError("login_error", requestId, null, ex);
-                respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error(INTERNAL_SERVER_ERROR)));
+                respond(exchange, requestId, 500, JsonCodec.toJson(LoginResponse.error(
+                        AuthErrorCode.INTERNAL_SERVER_ERROR,
+                        INTERNAL_SERVER_ERROR)));
             } finally {
                 exchange.close();
             }
@@ -927,7 +943,8 @@ public final class HttpIngressServer {
 
             try {
                 if (!METHOD_POST.equalsIgnoreCase(exchange.getRequestMethod())) {
-                    respond(exchange, requestId, 405, JsonCodec.toJson(RefreshTokenResponse.error(METHOD_NOT_ALLOWED)));
+                    respond(exchange, requestId, 405, JsonCodec.toJson(
+                            RefreshTokenResponse.error(AuthErrorCode.METHOD_NOT_ALLOWED, METHOD_NOT_ALLOWED)));
                     return;
                 }
 
@@ -940,17 +957,23 @@ public final class HttpIngressServer {
                 RefreshTokenRequest request = JsonCodec.fromJson(body, RefreshTokenRequest.class);
                 if (request == null || isBlank(request.getRefreshToken())) {
                     respond(exchange, requestId, 400,
-                            JsonCodec.toJson(RefreshTokenResponse.error("refreshToken is required")));
+                            JsonCodec.toJson(RefreshTokenResponse.error(
+                                    AuthErrorCode.INVALID_REQUEST,
+                                    "refreshToken is required")));
                     return;
                 }
 
                 Session.SessionTokens rotated = sessionDAO.refreshSession(request.getRefreshToken());
                 if (rotated == null) {
-                    String reason = sessionDAO.isRefreshSessionRevoked(request.getRefreshToken())
+                    boolean revokedByTakeover = sessionDAO.isRefreshSessionRevoked(request.getRefreshToken());
+                    String reason = revokedByTakeover
                             ? "session revoked by takeover"
                             : "invalid session";
+                    AuthErrorCode code = revokedByTakeover
+                            ? AuthErrorCode.SESSION_REVOKED_BY_TAKEOVER
+                            : AuthErrorCode.INVALID_SESSION;
                     respond(exchange, requestId, 401,
-                            JsonCodec.toJson(RefreshTokenResponse.error(reason)));
+                            JsonCodec.toJson(RefreshTokenResponse.error(code, reason)));
                     return;
                 }
 
@@ -962,7 +985,9 @@ public final class HttpIngressServer {
                                 rotated.refreshExpiresAtEpochSeconds())));
             } catch (Exception ex) {
                 auditLogger.logError("token_refresh_error", requestId, null, ex);
-                respond(exchange, requestId, 500, JsonCodec.toJson(RefreshTokenResponse.error(INTERNAL_SERVER_ERROR)));
+                respond(exchange, requestId, 500, JsonCodec.toJson(RefreshTokenResponse.error(
+                        AuthErrorCode.INTERNAL_SERVER_ERROR,
+                        INTERNAL_SERVER_ERROR)));
             } finally {
                 exchange.close();
             }

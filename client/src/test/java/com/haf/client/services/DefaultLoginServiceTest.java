@@ -6,6 +6,7 @@ import com.haf.client.models.UserProfileInfo;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.shared.exceptions.CryptoOperationException;
 import com.haf.shared.responses.LoginResponse;
+import com.haf.shared.utils.AuthErrorCode;
 import com.haf.shared.utils.JsonCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -179,7 +180,9 @@ class DefaultLoginServiceTest {
         DefaultLoginService service = new DefaultLoginService(
                 (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
-                    return response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials")));
+                    return response(401, JsonCodec.toJson(LoginResponse.error(
+                            AuthErrorCode.INVALID_CREDENTIALS,
+                            "Invalid credentials")));
                 },
                 (userId, sessionId, passphrase) -> bootstrapCalls.incrementAndGet(),
                 millis -> {
@@ -201,7 +204,9 @@ class DefaultLoginServiceTest {
         DefaultLoginService service = new DefaultLoginService(
                 (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
-                    return response(409, JsonCodec.toJson(LoginResponse.error("Account is already logged in.")));
+                    return response(409, JsonCodec.toJson(LoginResponse.error(
+                            AuthErrorCode.DUPLICATE_SESSION,
+                            "Account is already logged in.")));
                 },
                 (userId, sessionId, passphrase) -> bootstrapCalls.incrementAndGet(),
                 millis -> {
@@ -222,7 +227,7 @@ class DefaultLoginServiceTest {
     void login_rate_limited_rejection_returns_minutes_message() {
         AtomicInteger attempts = new AtomicInteger();
 
-        LoginResponse rateLimited = LoginResponse.error("Too many login attempts", 125L);
+        LoginResponse rateLimited = LoginResponse.error(AuthErrorCode.RATE_LIMIT, "Too many login attempts", 125L);
         DefaultLoginService service = new DefaultLoginService(
                 (command, takeoverPayload) -> {
                     attempts.incrementAndGet();
@@ -257,7 +262,9 @@ class DefaultLoginServiceTest {
                             || takeoverPayload.signingPublicKeyPem().isBlank()
                             || takeoverPayload.signingPublicKeyFingerprint() == null
                             || takeoverPayload.signingPublicKeyFingerprint().isBlank()) {
-                        return response(400, JsonCodec.toJson(LoginResponse.error("missing takeover payload")));
+                        return response(400, JsonCodec.toJson(LoginResponse.error(
+                                AuthErrorCode.INVALID_REQUEST,
+                                "missing takeover payload")));
                     }
                     return response(200, JsonCodec.toJson(LoginResponse.success("u1", "s1", "User", "Rank", "ONLINE")));
                 },
@@ -308,7 +315,9 @@ class DefaultLoginServiceTest {
                 "old", "Old", "Rank", "REG", "2025-01-01", "old@haf.gr", "6999999999", true));
         AuthSessionState.set("old-session", "old-refresh", 1_700_000_000L, 1_700_100_000L);
         DefaultLoginService service = new DefaultLoginService(
-                (command, takeoverPayload) -> response(401, JsonCodec.toJson(LoginResponse.error("Invalid credentials"))),
+                (command, takeoverPayload) -> response(401, JsonCodec.toJson(LoginResponse.error(
+                        AuthErrorCode.INVALID_CREDENTIALS,
+                        "Invalid credentials"))),
                 (userId, sessionId, passphrase) -> {
                 },
                 millis -> {

@@ -2,6 +2,8 @@ package com.haf.shared.responses;
 
 import java.io.Serializable;
 
+import com.haf.shared.utils.AuthErrorCode;
+
 /**
  * Login response DTO returned by the server.
  *
@@ -22,6 +24,7 @@ public class LoginResponse implements Serializable {
     private Long accessExpiresAtEpochSeconds;
     private Long refreshExpiresAtEpochSeconds;
     private Long retryAfterSeconds;
+    private AuthErrorCode code;
     private String error;
 
     /**
@@ -194,6 +197,24 @@ public class LoginResponse implements Serializable {
     }
 
     /**
+     * Returns typed error code for failed login responses.
+     *
+     * @return typed error code (or {@link AuthErrorCode#UNKNOWN})
+     */
+    public AuthErrorCode getCode() {
+        return code == null ? AuthErrorCode.UNKNOWN : code;
+    }
+
+    /**
+     * Sets typed error code for failed login responses.
+     *
+     * @param code typed error code
+     */
+    public void setCode(AuthErrorCode code) {
+        this.code = code == null ? AuthErrorCode.UNKNOWN : code;
+    }
+
+    /**
      * Returns registration number.
      *
      * @return registration number
@@ -286,11 +307,11 @@ public class LoginResponse implements Serializable {
     /**
      * Creates a successful login response with core profile fields.
      *
-     * @param userId authenticated user id
+     * @param userId    authenticated user id
      * @param sessionId created session id
-     * @param fullName full name
-     * @param rank rank value
-     * @param status account status
+     * @param fullName  full name
+     * @param rank      rank value
+     * @param status    account status
      * @return populated success response
      */
     public static LoginResponse success(String userId, String sessionId,
@@ -301,18 +322,18 @@ public class LoginResponse implements Serializable {
     /**
      * Creates a successful login response with token payload and profile fields.
      *
-     * @param userId authenticated user id
-     * @param accessToken access JWT
-     * @param refreshToken refresh token
-     * @param accessExpiresAtEpochSeconds access-token expiry epoch seconds
+     * @param userId                       authenticated user id
+     * @param accessToken                  access JWT
+     * @param refreshToken                 refresh token
+     * @param accessExpiresAtEpochSeconds  access-token expiry epoch seconds
      * @param refreshExpiresAtEpochSeconds refresh-token expiry epoch seconds
-     * @param fullName full name
-     * @param rank rank value
-     * @param regNumber registration number
-     * @param email email
-     * @param telephone telephone
-     * @param joinedDate joined-date string
-     * @param status account status
+     * @param fullName                     full name
+     * @param rank                         rank value
+     * @param regNumber                    registration number
+     * @param email                        email
+     * @param telephone                    telephone
+     * @param joinedDate                   joined-date string
+     * @param status                       account status
      * @return populated success response
      */
     public static LoginResponse success(
@@ -338,15 +359,15 @@ public class LoginResponse implements Serializable {
     /**
      * Creates a successful login response with full profile payload.
      *
-     * @param userId authenticated user id
-     * @param sessionId created session id
-     * @param fullName full name
-     * @param rank rank value
-     * @param regNumber registration number
-     * @param email email
-     * @param telephone telephone
+     * @param userId     authenticated user id
+     * @param sessionId  created session id
+     * @param fullName   full name
+     * @param rank       rank value
+     * @param regNumber  registration number
+     * @param email      email
+     * @param telephone  telephone
      * @param joinedDate joined-date string
-     * @param status account status
+     * @param status     account status
      * @return populated success response
      */
     public static LoginResponse success(
@@ -375,11 +396,13 @@ public class LoginResponse implements Serializable {
     /**
      * Creates a failed login response.
      *
+     * @param code  typed error code
      * @param error error text
      * @return populated error response
      */
-    public static LoginResponse error(String error) {
+    public static LoginResponse error(AuthErrorCode code, String error) {
         LoginResponse r = new LoginResponse();
+        r.setCode(code);
         r.setError(error);
         return r;
     }
@@ -387,12 +410,13 @@ public class LoginResponse implements Serializable {
     /**
      * Creates a failed login response with retry-after metadata.
      *
-     * @param error error text
+     * @param code              typed error code
+     * @param error             error text
      * @param retryAfterSeconds retry-after seconds
      * @return populated error response
      */
-    public static LoginResponse error(String error, long retryAfterSeconds) {
-        LoginResponse r = error(error);
+    public static LoginResponse error(AuthErrorCode code, String error, long retryAfterSeconds) {
+        LoginResponse r = error(code, error);
         r.setRetryAfterSeconds(retryAfterSeconds);
         return r;
     }
