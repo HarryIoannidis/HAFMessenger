@@ -63,3 +63,9 @@
 .profile-popup-trigger:hover {
     -fx-background-color: rgba(0, 0, 0, 0.06);
 }
+
+.typing-indicator {
+    -fx-fill: #4f5963;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-size: 13px;
+}

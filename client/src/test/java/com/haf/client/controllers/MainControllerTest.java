@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MainControllerTest {
     private static final Path CONTROLLER_SOURCE = Path
             .of("src/main/java/com/haf/client/controllers/MainController.java");
+    private static final Path MAIN_FXML = Path.of("src/main/resources/fxml/main.fxml");
 
     @Test
     void constructor_rejects_null_session_service() {
@@ -148,8 +149,11 @@ class MainControllerTest {
         assertTrue(source.contains("handleConnectionLossRuntimeIssue(issue);"));
         assertTrue(source.contains(".popupKey(UiConstants.POPUP_CONNECTION_LOSS)"));
         assertTrue(source.contains(".actionText(\"Retry\")"));
-        assertTrue(source.contains(".cancelText(\"Dismiss\")"));
+        assertTrue(source.contains(".cancelText(\"Close and Exit\")"));
         assertTrue(source.contains(".movable(false)"));
+        assertTrue(source.contains(".onCancel(this::exitApplication)"));
+        assertTrue(source.contains("boolean messagingChannelIssue = isMessagingChannelIssue(issue);"));
+        assertTrue(source.contains(".cancelText(messagingChannelIssue ? \"Close and Exit\" : \"Dismiss\")"));
     }
 
     @Test
@@ -159,9 +163,21 @@ class MainControllerTest {
         assertTrue(source.contains("private static final long CONNECTION_RECOVERY_RETRY_SECONDS = 5L;"));
         assertTrue(source.contains("scheduleWithFixedDelay("));
         assertTrue(source.contains("CONNECTION_RECOVERY_RETRY_SECONDS"));
-        assertTrue(source.contains("connectionRecoveryDismissed.set(true);"));
+        assertFalse(source.contains("connectionRecoveryDismissed"));
         assertTrue(source.contains("triggerImmediateConnectionRecoveryAttempt();"));
         assertTrue(source.contains("runRuntimeIssueRetry(currentIssue.retryAction())"));
+    }
+
+    @Test
+    void typing_indicator_is_rendered_next_to_active_profile_name() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+        String fxml = Files.readString(MAIN_FXML);
+
+        assertTrue(source.contains("registerTypingListener();"));
+        assertTrue(source.contains("typingContactIds"));
+        assertTrue(source.contains("profileTypingText.setText(visible ? \"• Typing...\" : \"\");"));
+        assertTrue(fxml.contains("fx:id=\"profileTypingText\""));
+        assertTrue(fxml.contains("text=\"• Typing...\""));
     }
 
     @Test

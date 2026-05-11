@@ -4,6 +4,12 @@ import java.io.Serializable;
 
 /**
  * Reference payload sent inside an encrypted message for chunked attachments.
+ *
+ * Field meanings:
+ * - {@code attachmentId}: attachment id used by the attachment API.
+ * - {@code fileName}: attachment file name for UI display/save dialogs.
+ * - {@code mediaType}: attachment media type.
+ * - {@code sizeBytes}: plaintext attachment size in bytes.
  */
 public class AttachmentReferencePayload implements Serializable {
     private String attachmentId;

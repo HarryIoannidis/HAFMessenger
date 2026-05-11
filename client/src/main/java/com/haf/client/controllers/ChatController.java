@@ -18,10 +18,12 @@ import com.haf.client.viewmodels.MessagesViewModel;
 import com.jfoenix.controls.JFXButton;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.ListChangeListener;
 import javafx.collections.WeakListChangeListener;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -35,6 +37,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 import java.io.File;
 import java.nio.file.Files;
@@ -88,6 +91,31 @@ public class ChatController {
     private WeakListChangeListener<MessageVM> weakMessageListener;
     private javafx.collections.ObservableList<MessageVM> currentObservedList;
     private PauseTransition chatOpenScrollSettleTransition;
+    private boolean scrollToLatestQueued;
+    private boolean pendingReadAcknowledgement;
+    private Scene trackedScene;
+    private Window trackedWindow;
+    private final ChangeListener<Boolean> windowFocusListener = (obs, oldFocused, focused) -> {
+        if (Boolean.TRUE.equals(focused)) {
+            requestDeferredReadAcknowledgement();
+        }
+    };
+    private final ChangeListener<Boolean> windowIconifiedListener = (obs, oldIconified, iconified) -> {
+        if (Boolean.FALSE.equals(iconified)) {
+            requestDeferredReadAcknowledgement();
+        }
+    };
+    private final ChangeListener<Window> sceneWindowListener = (obs, oldWindow, newWindow) -> {
+        detachWindowVisibilityListeners();
+        if (newWindow != null) {
+            trackedWindow = newWindow;
+            trackedWindow.focusedProperty().addListener(windowFocusListener);
+            if (trackedWindow instanceof Stage stage) {
+                stage.iconifiedProperty().addListener(windowIconifiedListener);
+            }
+        }
+        requestDeferredReadAcknowledgement();
+    };
 
     /**
      * Creates the chat controller with the default attachment service.
@@ -157,6 +185,8 @@ public class ChatController {
         if (fileButton != null) {
             fileButton.setOnAction(e -> chooseFileAttachment());
         }
+        bindTypingActivity();
+        bindReadAcknowledgementVisibilitySignals();
     }
 
     /**
@@ -169,6 +199,32 @@ public class ChatController {
         if (sendButton != null) {
             sendButton.disableProperty().bind(viewModel.canSendProperty().not());
         }
+    }
+
+    /**
+     * Binds typing activity listeners to the message input field.
+     */
+    private void bindTypingActivity() {
+        if (messageField == null || viewModel == null || !viewModel.isReady()) {
+            return;
+        }
+        PauseTransition typingIdleTransition = new PauseTransition(Duration.seconds(2));
+        typingIdleTransition.setOnFinished(e -> viewModel.stopTyping());
+        messageField.textProperty().addListener((obs, oldValue, newValue) -> {
+            viewModel.notifyDraftActivity();
+            if (newValue == null || newValue.isBlank()) {
+                typingIdleTransition.stop();
+                viewModel.stopTyping();
+            } else {
+                typingIdleTransition.playFromStart();
+            }
+        });
+        messageField.focusedProperty().addListener((obs, oldFocused, focused) -> {
+            if (!focused) {
+                viewModel.stopTyping();
+                typingIdleTransition.stop();
+            }
+        });
     }
 
     /**
@@ -232,7 +288,8 @@ public class ChatController {
         chatBox.getChildren().clear();
         loadInitialMessages();
         setupMessageListener();
-        viewModel.acknowledgeActiveRecipient();
+        pendingReadAcknowledgement = true;
+        requestDeferredReadAcknowledgement();
         scrollToLatestOnChatOpen();
     }
 
@@ -292,8 +349,126 @@ public class ChatController {
             scrollToLatestIfEnabled();
         }
         if (state.hasIncomingMessages) {
-            viewModel.acknowledgeRecipient(activeRecipient);
+            if (shouldAcknowledgeIncomingAsRead(activeRecipient)) {
+                viewModel.acknowledgeRecipient(activeRecipient);
+                pendingReadAcknowledgement = false;
+            } else {
+                pendingReadAcknowledgement = true;
+                requestDeferredReadAcknowledgement();
+            }
         }
+    }
+
+    /**
+     * Hooks scene/window visibility signals to flush deferred read receipts only
+     * when the chat is actually foreground-visible.
+     */
+    private void bindReadAcknowledgementVisibilitySignals() {
+        if (chatScrollPane == null) {
+            return;
+        }
+        chatScrollPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            detachSceneWindowListener();
+            detachWindowVisibilityListeners();
+            if (newScene != null) {
+                attachWindowVisibilityListeners(newScene);
+            }
+            requestDeferredReadAcknowledgement();
+        });
+        Scene scene = chatScrollPane.getScene();
+        if (scene != null) {
+            attachWindowVisibilityListeners(scene);
+        }
+    }
+
+    /**
+     * Attaches focus/minimize listeners for the scene window.
+     *
+     * @param scene chat scene
+     */
+    private void attachWindowVisibilityListeners(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+        trackedScene = scene;
+        trackedScene.windowProperty().addListener(sceneWindowListener);
+        sceneWindowListener.changed(null, null, trackedScene.getWindow());
+    }
+
+    /**
+     * Removes focus/minimize listeners from the previously tracked window.
+     */
+    private void detachWindowVisibilityListeners() {
+        if (trackedWindow == null) {
+            return;
+        }
+        trackedWindow.focusedProperty().removeListener(windowFocusListener);
+        if (trackedWindow instanceof Stage stage) {
+            stage.iconifiedProperty().removeListener(windowIconifiedListener);
+        }
+        trackedWindow = null;
+    }
+
+    /**
+     * Removes window-property listener from the previously tracked scene.
+     */
+    private void detachSceneWindowListener() {
+        if (trackedScene == null) {
+            return;
+        }
+        trackedScene.windowProperty().removeListener(sceneWindowListener);
+        trackedScene = null;
+    }
+
+    /**
+     * Schedules a UI-thread attempt to flush deferred read acknowledgements.
+     */
+    private void requestDeferredReadAcknowledgement() {
+        if (!pendingReadAcknowledgement) {
+            return;
+        }
+        Platform.runLater(this::flushDeferredReadAcknowledgementIfVisible);
+    }
+
+    /**
+     * Flushes deferred read acknowledgements when the active chat is visible and
+     * focused.
+     */
+    private void flushDeferredReadAcknowledgementIfVisible() {
+        if (!pendingReadAcknowledgement || viewModel == null || !viewModel.isReady()) {
+            return;
+        }
+        String activeRecipient = viewModel.getRecipientId();
+        if (!shouldAcknowledgeIncomingAsRead(activeRecipient)) {
+            return;
+        }
+        viewModel.acknowledgeActiveRecipient();
+        pendingReadAcknowledgement = false;
+    }
+
+    /**
+     * Returns whether incoming messages should be acknowledged as read right now.
+     *
+     * @param activeRecipient active chat recipient id tied to current list listener
+     * @return {@code true} when chat is visible and window is focused
+     */
+    private boolean shouldAcknowledgeIncomingAsRead(String activeRecipient) {
+        if (viewModel == null || !viewModel.isReady()) {
+            return false;
+        }
+        String normalizedActiveRecipient = activeRecipient == null ? "" : activeRecipient.trim();
+        String currentRecipient = viewModel.getRecipientId();
+        if (currentRecipient == null || currentRecipient.isBlank() || !currentRecipient.equals(normalizedActiveRecipient)) {
+            return false;
+        }
+        if (chatScrollPane == null || !chatScrollPane.isVisible() || chatScrollPane.getScene() == null) {
+            return false;
+        }
+        Window window = chatScrollPane.getScene().getWindow();
+        if (window == null || !window.isShowing() || !window.isFocused()) {
+            return false;
+        }
+        return !(window instanceof Stage stage) || !stage.isIconified();
     }
 
     /**
@@ -335,7 +510,6 @@ public class ChatController {
             state.requiresFullRefresh = true;
             return;
         }
-        state.shouldScrollToLatest = true;
         state.hasIncomingMessages = state.hasIncomingMessages || containsIncoming(change.getAddedSubList());
     }
 
@@ -479,17 +653,13 @@ public class ChatController {
         if (chatScrollPane == null) {
             return;
         }
-        scrollToLatestNow();
-        Platform.runLater(() -> {
-            scrollToLatestNow();
-            Platform.runLater(this::scrollToLatestNow);
-        });
+        requestScrollToLatest();
 
         if (chatOpenScrollSettleTransition != null) {
             chatOpenScrollSettleTransition.stop();
         }
         chatOpenScrollSettleTransition = new PauseTransition(Duration.millis(OPEN_CHAT_SCROLL_SETTLE_MS));
-        chatOpenScrollSettleTransition.setOnFinished(event -> scrollToLatestNow());
+        chatOpenScrollSettleTransition.setOnFinished(event -> requestScrollToLatest());
         chatOpenScrollSettleTransition.playFromStart();
     }
 
@@ -502,12 +672,19 @@ public class ChatController {
             return;
         }
         if (settings.isChatAutoScrollToLatest()) {
-            scrollToLatestNow();
-            Platform.runLater(() -> {
-                scrollToLatestNow();
-                Platform.runLater(this::scrollToLatestNow);
-            });
+            requestScrollToLatest();
         }
+    }
+
+    private void requestScrollToLatest() {
+        if (chatScrollPane == null || scrollToLatestQueued) {
+            return;
+        }
+        scrollToLatestQueued = true;
+        Platform.runLater(() -> {
+            scrollToLatestQueued = false;
+            scrollToLatestNow();
+        });
     }
 
     /**
@@ -539,6 +716,7 @@ public class ChatController {
     private void sendMessage() {
         if (viewModel == null)
             return;
+        viewModel.stopTyping();
         viewModel.sendCurrentDraft();
     }
 

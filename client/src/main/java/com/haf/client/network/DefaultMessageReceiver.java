@@ -1,91 +1,73 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
-import com.haf.client.exceptions.HttpCommunicationException;
-import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.crypto.MessageDecryptor;
 import com.haf.shared.crypto.MessageSignatureService;
-import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.dto.EncryptedMessage;
-import com.haf.shared.dto.UserSearchResult;
+import com.haf.shared.dto.KeyMetadata;
 import com.haf.shared.exceptions.KeystoreOperationException;
 import com.haf.shared.exceptions.MessageExpiredException;
 import com.haf.shared.exceptions.MessageTamperedException;
 import com.haf.shared.exceptions.MessageValidationException;
-import com.haf.shared.responses.ContactsResponse;
+import com.haf.shared.exceptions.MessageDecryptionException;
+import com.haf.shared.keystore.KeyProvider;
 import com.haf.shared.utils.ClockProvider;
 import com.haf.shared.utils.FingerprintUtil;
-import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
 import com.haf.shared.utils.SigningKeyIO;
+import com.haf.shared.websocket.RealtimeEvent;
 import java.io.IOException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles inbound encrypted messages, decryption, and acknowledgement flow.
+ * Handles inbound WSS encrypted messages, decryption, and read/delivery
+ * receipt flow.
  */
 public class DefaultMessageReceiver implements MessageReceiver {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageReceiver.class);
-    private static final int HTTP_POLL_BATCH_LIMIT = 100;
-    private static final long HTTP_POLL_INTERVAL_MS = 2000L;
-    private static final int HTTP_POLL_ERROR_NOTIFY_THRESHOLD = 3;
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
-    private final AuthHttpClient authHttpClient;
+    private final RealtimeTransport realtimeTransport;
     private final String localRecipientId;
     private MessageListener messageListener;
 
-    // Tracks envelopeIds already processed to avoid duplicate delivery on
-    // reconnect.
     private final Set<String> seenEnvelopeIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-    // Pending ACKs: senderId → list of envelope IDs awaiting acknowledgement.
-    // Envelopes are only ACKed when the user opens the corresponding chat.
-    private final ConcurrentHashMap<String, List<String>> pendingAcks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Boolean> knownPresenceByUser = new ConcurrentHashMap<>();
-    private final Object pollingLock = new Object();
-    private ScheduledExecutorService pollingExecutor;
-    private volatile boolean httpPollingActive;
-    private final AtomicInteger pollFailureCount = new AtomicInteger();
+    private final ConcurrentHashMap<String, List<String>> pendingReadReceipts = new ConcurrentHashMap<>();
 
     /**
-     * Creates a DefaultMessageReceiver with the specified dependencies.
+     * Creates a WSS-only message receiver.
      *
-     * @param keyProvider      the key provider (must be UserKeystoreKeyProvider to
-     *                         access keystore)
-     * @param clockProvider    the clock provider for deterministic expiry checks
-     * @param authHttpClient   authenticated HTTP adapter
-     * @param localRecipientId the local recipient's ID (must match message
-     *                         recipientId)
+     * @param keyProvider       local key provider
+     * @param clockProvider     clock provider for expiry checks
+     * @param localRecipientId  local user id
+     * @param realtimeTransport authenticated WSS transport
      */
-    public DefaultMessageReceiver(KeyProvider keyProvider, ClockProvider clockProvider,
-            AuthHttpClient authHttpClient, String localRecipientId) {
-        this.keyProvider = keyProvider;
-        this.clockProvider = clockProvider;
-        this.authHttpClient = authHttpClient;
-        this.localRecipientId = localRecipientId;
+    public DefaultMessageReceiver(
+            KeyProvider keyProvider,
+            ClockProvider clockProvider,
+            String localRecipientId,
+            RealtimeTransport realtimeTransport) {
+        this.keyProvider = Objects.requireNonNull(keyProvider, "keyProvider");
+        this.clockProvider = Objects.requireNonNull(clockProvider, "clockProvider");
+        this.localRecipientId = Objects.requireNonNull(localRecipientId, "localRecipientId");
+        this.realtimeTransport = Objects.requireNonNull(realtimeTransport, "realtimeTransport");
     }
 
     /**
-     * Sets the message listener for incoming messages.
+     * Sets the listener for incoming messages and real-time events.
      *
-     * @param listener the message listener
+     * @param listener the listener to receive message callbacks
      */
     @Override
     public void setMessageListener(MessageListener listener) {
@@ -93,240 +75,126 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Starts the message receiver.
+     * Connects the underlying real-time transport and begins listening for events.
      *
-     * @throws IOException if the connection cannot be established
+     * @throws IOException           if a network error occurs during connection
+     * @throws IllegalStateException if no MessageListener has been set
      */
     @Override
     public void start() throws IOException {
         if (messageListener == null) {
             throw new IllegalStateException("MessageListener must be set before starting");
         }
-        stopHttpPolling();
-        startHttpPolling();
+        realtimeTransport.setEventListener(this::handleRealtimeEvent);
+        realtimeTransport.setErrorListener(this::notifyError);
+        realtimeTransport.start();
     }
 
     /**
-     * Stops the message receiver.
+     * Disconnects the real-time transport and stops receiving events.
      */
     @Override
     public void stop() {
-        stopHttpPolling();
-        authHttpClient.close();
+        realtimeTransport.close();
     }
 
     /**
-     * Starts background HTTP polling for inbound envelopes.
+     * Forces a reconnection of the underlying real-time transport.
+     *
+     * @throws IOException if the reconnection fails
      */
-    private void startHttpPolling() {
-        synchronized (pollingLock) {
-            if (httpPollingActive) {
-                return;
-            }
-            httpPollingActive = true;
-            pollFailureCount.set(0);
-            pollingExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread thread = new Thread(r, "message-http-poller");
-                thread.setDaemon(true);
-                return thread;
-            });
-            pollingExecutor.scheduleWithFixedDelay(
-                    this::pollMailboxSafely,
-                    0L,
-                    HTTP_POLL_INTERVAL_MS,
-                    TimeUnit.MILLISECONDS);
-        }
+    @Override
+    public void reconnect() throws IOException {
+        realtimeTransport.setEventListener(this::handleRealtimeEvent);
+        realtimeTransport.setErrorListener(this::notifyError);
+        realtimeTransport.reconnect();
     }
 
     /**
-     * Stops the HTTP polling worker, if active.
+     * Primary event handler for routing incoming WebSocket events to the listener.
+     *
+     * @param event the parsed real-time event
      */
-    private void stopHttpPolling() {
-        synchronized (pollingLock) {
-            httpPollingActive = false;
-            pollFailureCount.set(0);
-            if (pollingExecutor != null) {
-                pollingExecutor.shutdownNow();
-                pollingExecutor = null;
-            }
-        }
-    }
-
-    /**
-     * Executes one polling cycle with guarded error handling.
-     */
-    private void pollMailboxSafely() {
-        if (!httpPollingActive) {
+    private void handleRealtimeEvent(RealtimeEvent event) {
+        if (event == null || event.eventType() == null) {
             return;
         }
-        try {
-            pollCycleOnce();
-            pollFailureCount.set(0);
-        } catch (Exception pollError) {
-            if (isAuthenticationFailure(pollError)) {
-                LOGGER.info("Stopping HTTP mailbox polling after authentication failure: {}", pollError.getMessage());
-                stopHttpPolling();
-                notifyError(pollError);
-                return;
+        MessageListener listener = this.messageListener;
+        if (listener == null) {
+            switch (event.eventType()) {
+                case NEW_MESSAGE -> handleIncomingRealtimeMessage(event);
+                case ERROR ->
+                    notifyError(new IOException(event.getError() == null ? "Realtime error" : event.getError()));
+                default -> {
+                    // No client action is required for server acknowledgements here.
+                }
             }
-            int failures = pollFailureCount.incrementAndGet();
-            LOGGER.debug("HTTP mailbox poll failed: {}", pollError.getMessage());
-            if (failures == HTTP_POLL_ERROR_NOTIFY_THRESHOLD) {
-                notifyError(new IOException("HTTP mailbox polling failed. " + pollError.getMessage(), pollError));
-            }
-        }
-    }
-
-    /**
-     * Executes one full HTTPS polling cycle (messages + presence snapshot).
-     *
-     * @throws IOException when polling request fails
-     */
-    private void pollCycleOnce() throws IOException {
-        IOException failure = null;
-        try {
-            pollMailboxMessagesOnce();
-        } catch (IOException e) {
-            failure = e;
-        }
-
-        try {
-            pollContactsPresenceOnce();
-        } catch (IOException e) {
-            if (failure == null) {
-                failure = e;
-            } else {
-                failure.addSuppressed(e);
-            }
-        }
-
-        if (failure != null) {
-            throw failure;
-        }
-    }
-
-    /**
-     * Fetches pending mailbox envelopes over authenticated HTTP and processes them
-     * through the same envelope pipeline used by polling delivery.
-     *
-     * @throws IOException when polling request fails
-     */
-    private void pollMailboxMessagesOnce() throws IOException {
-        String responseJson = requestWithIoMapping(
-                authHttpClient.getAuthenticated("/api/v1/messages?limit=" + HTTP_POLL_BATCH_LIMIT),
-                "Failed to poll mailbox");
-        java.util.Map<?, ?> response = JsonCodec.fromJson(responseJson, java.util.Map.class);
-        Object messagesNode = response.get("messages");
-        if (!(messagesNode instanceof List<?> messages) || messages.isEmpty()) {
             return;
         }
-
-        for (Object messageNode : messages) {
-            if (messageNode == null) {
-                continue;
+        switch (event.eventType()) {
+            case NEW_MESSAGE -> handleIncomingRealtimeMessage(event);
+            case PRESENCE_UPDATE -> listener.onPresenceUpdate(event.getSenderId(), event.isActive());
+            case MESSAGE_DELIVERED -> listener.onMessageDelivered(event.getSenderId(), normalizeEnvelopeIds(event));
+            case MESSAGE_READ -> listener.onMessageRead(event.getSenderId(), normalizeEnvelopeIds(event));
+            case TYPING_START -> listener.onTyping(event.getSenderId(), true);
+            case TYPING_STOP -> listener.onTyping(event.getSenderId(), false);
+            case ERROR -> notifyError(new IOException(event.getError() == null ? "Realtime error" : event.getError()));
+            default -> {
+                // No client action is required for server acknowledgements here.
             }
-            handleIncomingMessage(JsonCodec.toJson(messageNode));
         }
     }
 
     /**
-     * Fetches contact snapshot over HTTPS and emits presence transitions only when
-     * state changed since the previous snapshot.
+     * Routes an incoming encrypted message envelope through parsing, decryption,
+     * and validation.
      *
-     * @throws IOException when polling request fails
+     * @param event the event containing the encrypted payload
      */
-    private void pollContactsPresenceOnce() throws IOException {
-        String responseJson = requestWithIoMapping(
-                authHttpClient.getAuthenticated("/api/v1/contacts"),
-                "Failed to poll contacts");
-        ContactsResponse response = JsonCodec.fromJson(responseJson, ContactsResponse.class);
-        if (response == null || response.getContacts() == null) {
-            return;
-        }
-
-        java.util.Set<String> seenUsers = new java.util.HashSet<>();
-        for (UserSearchResult contact : response.getContacts()) {
-            if (contact == null || contact.getUserId() == null || contact.getUserId().isBlank()) {
-                continue;
-            }
-            String userId = contact.getUserId().trim();
-            boolean active = contact.isActive();
-            seenUsers.add(userId);
-
-            Boolean previous = knownPresenceByUser.put(userId, active);
-            if ((previous == null || previous.booleanValue() != active) && messageListener != null) {
-                messageListener.onPresenceUpdate(userId, active);
-            }
-        }
-
-        knownPresenceByUser.keySet().removeIf(userId -> !seenUsers.contains(userId));
-    }
-
-    /**
-     * Handles incoming JSON envelope from polling response.
-     *
-     * @param json the JSON string containing envelope data
-     */
-    private void handleIncomingMessage(String json) {
+    private void handleIncomingRealtimeMessage(RealtimeEvent event) {
         try {
-            parseAndProcessEnvelope(json);
+            parseAndProcessRealtimeEnvelope(event);
         } catch (MessageTamperedException e) {
-            acknowledgeTamperedEnvelope(json);
-            LOGGER.warn("Undecryptable envelope; acknowledging to prevent endless retries.");
+            acknowledgeTamperedEnvelope(event.getEnvelopeId(), event.getSenderId());
+            LOGGER.warn("Undecryptable realtime envelope; acknowledging to prevent endless retries.");
             notifyError(e);
         } catch (KeystoreOperationException e) {
             LOGGER.warn("Keystore decryption failed: {}", e.getMessage());
             notifyError(new IOException("Keystore decryption failed. Incorrect passphrase or corrupted data.", e));
         } catch (MessageValidationException | MessageExpiredException e) {
-            LOGGER.debug("Rejected incoming envelope: {}", e.getMessage());
+            LOGGER.debug("Rejected realtime envelope: {}", e.getMessage());
             notifyError(e);
         } catch (Exception e) {
-            LOGGER.warn("Failed to process inbound message: {}", e.getMessage());
+            LOGGER.warn("Failed to process realtime message: {}", e.getMessage());
             notifyError(new IOException("Failed to process message: " + e.getMessage(), e));
         }
     }
 
     /**
-     * Parses the JSON envelope and dispatches the message for processing.
+     * Deduplicates, extracts, and initiates processing of an incoming message
+     * envelope.
      *
-     * @param json the raw JSON string envelope
-     * @return the envelope ID (may be {@code null})
-     * @throws Exception when parsing, validation, or decryption fails
+     * @param event the real-time event wrapper
+     * @return the deduplicated envelope ID, or null if unidentifiable
+     * @throws Exception if processing fails at any stage
      */
-    private String parseAndProcessEnvelope(String json) throws Exception {
-        java.util.Map<?, ?> envelope = JsonCodec.fromJson(json, java.util.Map.class);
-        Object type = envelope.get("type");
-        if ("presence".equals(type)) {
-            handlePresenceEvent(envelope);
-            return null;
-        }
-        if (!"message".equals(type)) {
-            return null;
-        }
-
-        // Deduplicate: skip messages we have already processed in this session.
-        Object envId = envelope.get("envelopeId");
-        String envelopeId = envId != null ? String.valueOf(envId) : null;
+    private String parseAndProcessRealtimeEnvelope(RealtimeEvent event) throws Exception {
+        String envelopeId = event.getEnvelopeId();
         if (envelopeId != null && !seenEnvelopeIds.add(envelopeId)) {
             return envelopeId;
         }
-
-        Object payloadObj = envelope.get("payload");
-        if (payloadObj == null) {
+        EncryptedMessage encryptedMessage = event.getEncryptedMessage();
+        if (encryptedMessage == null) {
             return envelopeId;
         }
-
-        EncryptedMessage encryptedMessage = JsonCodec.fromJson(JsonCodec.toJson(payloadObj),
-                EncryptedMessage.class);
-
         processEncryptedMessage(encryptedMessage, envelopeId);
         return envelopeId;
     }
 
     /**
-     * Forwards an error to the message listener if one is registered.
+     * Propagates a fatal or unhandled error to the registered message listener.
      *
-     * @param error the error to report
+     * @param error the throwable error
      */
     private void notifyError(Throwable error) {
         if (messageListener != null) {
@@ -335,68 +203,29 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Processes presence envelopes and forwards updates to the registered listener.
+     * Full decryption and verification pipeline for an incoming encrypted message.
      *
-     * @param envelope parsed envelope map containing presence fields
-     */
-    private void handlePresenceEvent(java.util.Map<?, ?> envelope) {
-        Object userIdRaw = envelope.get("userId");
-        Object activeRaw = envelope.get("active");
-        if (userIdRaw == null || activeRaw == null || messageListener == null) {
-            return;
-        }
-
-        String userId = String.valueOf(userIdRaw);
-        boolean active = toBoolean(activeRaw);
-        messageListener.onPresenceUpdate(userId, active);
-    }
-
-    /**
-     * Coerces arbitrary envelope values into boolean flags.
-     *
-     * @param value raw presence value from parsed JSON
-     * @return boolean interpretation of the given value
-     */
-    private boolean toBoolean(Object value) {
-        if (value instanceof Boolean bool) {
-            return bool;
-        }
-        return Boolean.parseBoolean(String.valueOf(value));
-    }
-
-    /**
-     * Validates, decrypts, and dispatches a received encrypted envelope.
-     *
-     * @param encryptedMessage incoming encrypted payload
-     * @param envelopeId       server envelope id used for deferred ACK handling
-     * @throws Exception when validation or decryption fails
+     * @param encryptedMessage the validated encrypted payload
+     * @param envelopeId       the tracking ID of the payload's envelope
+     * @throws Exception if validation, signature checks, or decryption fails
      */
     private void processEncryptedMessage(EncryptedMessage encryptedMessage, String envelopeId) throws Exception {
-        // Validate with MessageValidator
         List<MessageValidator.ErrorCode> errors = MessageValidator.validateOrCollectErrors(encryptedMessage);
         if (!errors.isEmpty()) {
             throw new MessageValidationException(errors);
         }
 
-        // Check recipient ID matches local recipient
         validateRecipient(encryptedMessage);
-
-        // Check expiry using ClockProvider (before decrypt)
         validateExpiry(encryptedMessage);
-
-        // Verify detached Ed25519 signature before attempting decrypt.
         verifySignature(encryptedMessage);
-
-        // Decrypt message (with fallback to older local keys when available)
         byte[] plaintext = decryptWithFallbackKeys(encryptedMessage, envelopeId);
 
-        // Store envelope ID for deferred ACK (keyed by sender)
         String senderId = encryptedMessage.getSenderId();
         if (envelopeId != null) {
-            pendingAcks.computeIfAbsent(senderId, k -> new ArrayList<>()).add(envelopeId);
+            pendingReadReceipts.computeIfAbsent(senderId, ignored -> new ArrayList<>()).add(envelopeId);
+            sendDeliveryReceipt(envelopeId, senderId);
         }
 
-        // Deliver to MessageListener
         if (messageListener != null) {
             messageListener.onMessage(plaintext,
                     senderId,
@@ -407,13 +236,13 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Attempts message decryption with current private key and falls back to older
-     * local keys when AEAD verification fails.
+     * Attempts decryption using the current private key, falling back to older keys
+     * if tampered.
      *
-     * @param encryptedMessage encrypted message to decrypt
-     * @param envelopeId       envelope id for diagnostic logging
-     * @return decrypted plaintext bytes
-     * @throws Exception when all decryption attempts fail
+     * @param encryptedMessage the target payload
+     * @param envelopeId       the tracking ID for logging
+     * @return the decrypted plaintext bytes
+     * @throws Exception if all decryption attempts fail
      */
     private byte[] decryptWithFallbackKeys(EncryptedMessage encryptedMessage, String envelopeId) throws Exception {
         PrivateKey privateKey = loadLocalPrivateKey();
@@ -442,7 +271,7 @@ public class DefaultMessageReceiver implements MessageReceiver {
                             new Object[] { envelopeId, metadata.keyId(), metadata.status() });
                     return plaintext;
                 } catch (MessageTamperedException ignored) {
-                    // Keep trying other local keys.
+                    // Try the next known local key.
                 } catch (Exception keyLoadOrDecryptError) {
                     LOGGER.debug(
                             "Skipping fallback key {} while decrypting envelope {}: {}",
@@ -465,17 +294,17 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Loads key metadata and sorts it so fallback attempts prefer current/recent
-     * keys first.
+     * Loads fallback key identities sorted by descending chronological creation
+     * order.
      *
-     * @param userKeyProvider key provider exposing keystore metadata
-     * @return sorted metadata list, or empty list when metadata cannot be loaded
+     * @param userKeyProvider the keystore provider
+     * @return an ordered list of fallback key metadata
      */
     private List<KeyMetadata> loadSortedKeyMetadata(UserKeystoreKeyProvider userKeyProvider) {
         try {
             List<KeyMetadata> metadataList = new ArrayList<>(userKeyProvider.getKeyStore().listMetadata());
             metadataList.sort(Comparator
-                    .comparing((KeyMetadata m) -> !"CURRENT".equalsIgnoreCase(m.status()))
+                    .comparing((KeyMetadata metadata) -> !"CURRENT".equalsIgnoreCase(metadata.status()))
                     .thenComparing(Comparator.comparingLong(KeyMetadata::createdAtEpochSec).reversed()));
             return metadataList;
         } catch (Exception e) {
@@ -485,30 +314,33 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Verifies that a message has not expired based on timestamp + TTL.
+     * Ensures the incoming message has not exceeded its designated time-to-live.
      *
-     * @param msg incoming encrypted message metadata
-     * @throws MessageExpiredException when message expiry time is in the past
+     * @param message the target encrypted message
+     * @throws MessageExpiredException if the TTL has passed
      */
-    private void validateExpiry(EncryptedMessage msg) throws MessageExpiredException {
+    private void validateExpiry(EncryptedMessage message) throws MessageExpiredException {
         long now = clockProvider.currentTimeMillis();
-        long expiryTime = msg.getTimestampEpochMs() + msg.getTtlSeconds() * 1000L;
+        long expiryTime = message.getTimestampEpochMs() + message.getTtlSeconds() * 1000L;
         if (now > expiryTime) {
             throw new MessageExpiredException("Message expired at " + now);
         }
     }
 
     /**
-     * Decrypts a detached encrypted message without requiring envelope
-     * context.
+     * Decrypts an isolated encrypted message that is not part of the active
+     * real-time stream.
      *
-     * @param encryptedMessage encrypted payload to decrypt
-     * @return decrypted plaintext bytes
-     * @throws Exception when validation/decryption fails
+     * @param encryptedMessage the standalone message payload
+     * @return the decrypted plaintext bytes
+     * @throws MessageDecryptionException if structural
+     *                                    validation,
+     *                                    signature, or
+     *                                    decryption fails
      */
     @Override
     public byte[] decryptDetachedMessage(EncryptedMessage encryptedMessage)
-            throws com.haf.shared.exceptions.MessageDecryptionException {
+            throws MessageDecryptionException {
         if (encryptedMessage == null) {
             throw new IllegalArgumentException("encryptedMessage is required");
         }
@@ -517,18 +349,19 @@ public class DefaultMessageReceiver implements MessageReceiver {
             validateExpiry(encryptedMessage);
             verifySignature(encryptedMessage);
             return decryptWithFallbackKeys(encryptedMessage, null);
-        } catch (com.haf.shared.exceptions.MessageDecryptionException e) {
+        } catch (MessageDecryptionException e) {
             throw e;
         } catch (Exception e) {
-            throw new com.haf.shared.exceptions.MessageDecryptionException("Failed to decrypt detached message", e);
+            throw new MessageDecryptionException("Failed to decrypt detached message", e);
         }
     }
 
     /**
-     * Verifies sender Ed25519 signature and fingerprint binding.
+     * Authenticates the sender by verifying the message's cryptographic signature.
      *
-     * @param encryptedMessage inbound envelope
-     * @throws Exception when sender key cannot be resolved or signature fails
+     * @param encryptedMessage the inbound payload
+     * @throws Exception if the signature is invalid or sender material is
+     *                   unidentifiable
      */
     private void verifySignature(EncryptedMessage encryptedMessage) throws Exception {
         String senderId = encryptedMessage.getSenderId();
@@ -550,36 +383,63 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * {@inheritDoc}
+     * Flushes pending read receipts back to a specific sender over the transport.
+     *
+     * @param senderId the target sender ID
      */
     @Override
     public void acknowledgeEnvelopes(String senderId) {
         if (senderId == null) {
             return;
         }
-        if (!httpPollingActive) {
-            LOGGER.debug("Deferring ACK for sender {} while receiver is not polling", senderId);
-            return;
-        }
-        List<String> ids = pendingAcks.remove(senderId);
+        List<String> ids = pendingReadReceipts.remove(senderId);
         if (ids == null || ids.isEmpty()) {
             return;
         }
         try {
-            sendAck(ids);
+            realtimeTransport.sendReadReceipt(ids, senderId);
         } catch (IOException e) {
-            LOGGER.warn("Failed to send ACK for sender {}", senderId, e);
-            // Put them back so we can try again later
-            pendingAcks.computeIfAbsent(senderId, k -> new ArrayList<>()).addAll(ids);
+            LOGGER.warn("Failed to send read receipt for sender {}", senderId, e);
+            pendingReadReceipts.computeIfAbsent(senderId, ignored -> new ArrayList<>()).addAll(ids);
         }
     }
 
     /**
-     * Validates that the message is addressed to the local recipient.
-     * Notifies the listener and returns early if the ID does not match.
+     * Emits a typing-start realtime event for a recipient via the realtime
+     * transport.
      *
-     * @param encryptedMessage the message to validate
-     * @throws MessageValidationException if the recipient ID does not match
+     * @param recipientId the ID of the recipient
+     */
+    @Override
+    public void sendTypingStart(String recipientId) {
+        try {
+            realtimeTransport.sendTypingStart(recipientId);
+        } catch (IOException e) {
+            LOGGER.debug("Failed to send typing-start event: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Emits a typing-stop realtime event for a recipient via the realtime
+     * transport.
+     *
+     * @param recipientId the ID of the recipient
+     */
+    @Override
+    public void sendTypingStop(String recipientId) {
+        try {
+            realtimeTransport.sendTypingStop(recipientId);
+        } catch (IOException e) {
+            LOGGER.debug("Failed to send typing-stop event: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Validates that the message is intended for the local user.
+     *
+     * @param encryptedMessage the incoming payload
+     * @throws MessageValidationException if the recipient ID does not match the
+     *                                    local ID
      */
     private void validateRecipient(EncryptedMessage encryptedMessage)
             throws MessageValidationException {
@@ -591,10 +451,11 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Loads the local private key from the keystore.
+     * Extracts the active private key from the local keystore for primary
+     * decryption.
      *
-     * @return the private key
-     * @throws Exception if the key cannot be loaded
+     * @return the current private key
+     * @throws Exception if the key cannot be extracted or unlocked
      */
     private PrivateKey loadLocalPrivateKey() throws Exception {
         if (keyProvider instanceof UserKeystoreKeyProvider userKeyProvider) {
@@ -605,109 +466,57 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
-     * Sends an acknowledgement for all provided envelope IDs.
+     * Sends a delivery receipt for a specific envelope.
      *
-     * @param envelopeIds envelope ids to acknowledge
-     * @throws IOException when HTTP ACK request fails
+     * @param envelopeId the envelope ID
+     * @param senderId   the sender ID
      */
-    private void sendAck(List<String> envelopeIds) throws IOException {
-        if (envelopeIds == null || envelopeIds.isEmpty()) {
-            return;
-        }
-        StringBuilder sb = new StringBuilder("{\"envelopeIds\":[");
-        for (int i = 0; i < envelopeIds.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('\"').append(envelopeIds.get(i)).append('\"');
-        }
-        sb.append("]}");
-        if (!httpPollingActive) {
-            throw new IOException("Receiver polling is not active");
-        }
-        requestWithIoMapping(
-                authHttpClient.postAuthenticated("/api/v1/messages/ack", sb.toString()),
-                "Failed to acknowledge mailbox envelopes");
-    }
-
-    /**
-     * Acknowledges tampered envelopes immediately so server-side retry queues do
-     * not
-     * replay them endlessly.
-     *
-     * @param rawEnvelopeJson raw envelope JSON
-     */
-    private void acknowledgeTamperedEnvelope(String rawEnvelopeJson) {
-        String envelopeId = extractEnvelopeId(rawEnvelopeJson);
+    private void sendDeliveryReceipt(String envelopeId, String senderId) {
         if (envelopeId == null || envelopeId.isBlank()) {
             return;
         }
         try {
-            sendAck(List.of(envelopeId));
-        } catch (IOException ackError) {
-            LOGGER.warn("Failed to acknowledge undecryptable envelope {}", envelopeId, ackError);
+            realtimeTransport.sendDeliveryReceipt(List.of(envelopeId), senderId);
+        } catch (IOException e) {
+            LOGGER.debug("Failed to send delivery receipt for envelope {}: {}", envelopeId, e.getMessage());
         }
     }
 
     /**
-     * Extracts the envelope id from raw envelope JSON.
+     * Acknowledges a tampered envelope by sending a delivery receipt to prevent
+     * endless replays.
      *
-     * @param rawEnvelopeJson envelope payload
-     * @return envelope id or {@code null} when not available
+     * @param envelopeId the envelope ID
+     * @param senderId   the sender ID
      */
-    private String extractEnvelopeId(String rawEnvelopeJson) {
-        if (rawEnvelopeJson == null || rawEnvelopeJson.isBlank()) {
-            return null;
+    private void acknowledgeTamperedEnvelope(String envelopeId, String senderId) {
+        if (envelopeId == null || envelopeId.isBlank()) {
+            return;
         }
-        try {
-            java.util.Map<?, ?> envelope = JsonCodec.fromJson(rawEnvelopeJson, java.util.Map.class);
-            Object envelopeId = envelope.get("envelopeId");
-            return envelopeId == null ? null : String.valueOf(envelopeId);
-        } catch (Exception ignored) {
-            return null;
-        }
+        sendDeliveryReceipt(envelopeId, senderId);
     }
 
     /**
-     * Resolves async HTTP helper futures while normalizing nested exceptions into
-     * IOExceptions.
+     * Normalizes envelope IDs from a realtime event.
      *
-     * @param future  asynchronous HTTP future
-     * @param message fallback error message
-     * @return completed future body
-     * @throws IOException when request fails
+     * @param event the realtime event
+     * @return a list of normalized envelope IDs
      */
-    private String requestWithIoMapping(CompletableFuture<String> future, String message) throws IOException {
-        try {
-            return future.join();
-        } catch (CompletionException completionException) {
-            Throwable cause = completionException.getCause();
-            if (cause instanceof IOException ioException) {
-                throw ioException;
-            }
-            throw new IOException(message, cause != null ? cause : completionException);
-        } catch (Exception exception) {
-            throw new IOException(message, exception);
+    private static List<String> normalizeEnvelopeIds(RealtimeEvent event) {
+        if (event == null) {
+            return List.of();
         }
-    }
-
-    /**
-     * Detects authentication failures produced by authenticated HTTP polling calls.
-     *
-     * @param error polling error candidate
-     * @return {@code true} when the cause chain indicates 401/403 auth failure
-     */
-    private static boolean isAuthenticationFailure(Throwable error) {
-        Throwable current = error;
-        while (current != null) {
-            if (current instanceof HttpCommunicationException communicationException) {
-                int statusCode = communicationException.getStatusCode();
-                if (statusCode == 401 || statusCode == 403) {
-                    return true;
+        List<String> ids = new ArrayList<>();
+        if (event.getEnvelopeId() != null && !event.getEnvelopeId().isBlank()) {
+            ids.add(event.getEnvelopeId().trim());
+        }
+        if (event.getEnvelopeIds() != null) {
+            for (String id : event.getEnvelopeIds()) {
+                if (id != null && !id.isBlank()) {
+                    ids.add(id.trim());
                 }
             }
-            current = current.getCause();
         }
-        return false;
+        return ids.stream().distinct().toList();
     }
 }

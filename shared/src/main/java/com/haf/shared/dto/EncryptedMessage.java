@@ -21,7 +21,8 @@ import java.io.Serializable;
  * @e2e whether the message is end-to-end encrypted.
  * @aadB64 the authenticated additional data of the message in base64.
  * @signatureAlgorithm the signature algorithm identifier.
- * @senderSigningKeyFingerprint the sender signing key fingerprint used for the signature.
+ * @senderSigningKeyFingerprint the sender signing key fingerprint used for the
+ *                              signature.
  * @signatureB64 the signature bytes in base64.
  */
 public class EncryptedMessage implements Serializable {

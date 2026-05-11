@@ -6,17 +6,11 @@ import com.haf.server.db.FileUpload;
 import com.haf.server.db.Attachment;
 import com.haf.server.db.Session;
 import com.haf.server.db.User;
-import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
-import com.haf.server.metrics.MetricsRegistry;
-import com.haf.server.router.MailboxRouter;
-import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.server.router.RateLimiterService.ApiRateLimitScope;
 import com.haf.server.router.RateLimiterService.RateLimitDecision;
 import com.haf.shared.dto.EncryptedFile;
-import com.haf.shared.dto.EncryptedMessage;
-import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.responses.AttachmentBindResponse;
 import com.haf.shared.responses.AttachmentChunkResponse;
@@ -37,7 +31,6 @@ import com.haf.shared.dto.UserSearchResult;
 import com.haf.shared.responses.ContactsResponse;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.constants.AttachmentConstants;
-import com.haf.shared.constants.MessageHeader;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
@@ -64,7 +57,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -82,29 +74,26 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Handles HTTPS API ingress for authentication, messaging, and attachments.
+ * Handles HTTPS API ingress for REST authentication, accounts, contacts,
+ * search, configuration, and attachments.
  */
-@SuppressWarnings("java:S1075")
 public final class HttpIngressServer {
 
     private HttpsServer server;
     private final ServerConfig config;
-    private final MailboxRouter mailboxRouter;
     private final RateLimiterService rateLimiterService;
     private final AuditLogger auditLogger;
-    private final MetricsRegistry metricsRegistry;
-    private final EncryptedMessageValidator validator;
     private final User userDAO;
     private final Session sessionDAO;
     private final FileUpload fileUploadDAO;
     private final Attachment attachmentDAO;
     private final Contact contactDAO;
+    private final String loginSentinelHash;
     private final ExecutorService executor;
     private final Object trustedProxyCacheLock = new Object();
     private final AtomicReference<TrustedProxyCache> trustedProxyCache = new AtomicReference<>(
             TrustedProxyCache.empty());
     private static final int MAX_BODY_BYTES = 10 * 1024 * 1024;
-    private static final String MESSAGES_PATH = apiPath("messages");
     private static final String STRICT_TRANSPORT_SECURITY = "Strict-Transport-Security";
     private static final String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
     private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
@@ -113,7 +102,6 @@ public final class HttpIngressServer {
     private static final String CONTENT_TYPE = "Content-Type";
     private static final String APPLICATION_JSON = "application/json";
     private static final String AUTHORIZATION = "Authorization";
-    private static final String RECIPIENT_KEY_FINGERPRINT_HEADER = "X-Recipient-Key-Fingerprint";
     private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
     private static final String REQUEST_BODY_EXCEEDS_LIMIT = "Request body exceeds limit";
@@ -124,9 +112,8 @@ public final class HttpIngressServer {
     private static final String METHOD_NOT_ALLOWED = "method not allowed";
     private static final String INTERNAL_SERVER_ERROR = "internal server error";
     private static final String INVALID_REQUEST_PATH = "invalid request path";
-    private static final String SENDER_MISMATCH = "senderId does not match authenticated user";
-    private static final String INVALID_SIGNATURE = "invalid message signature";
-    private static final long PROD_ACTIVE_WINDOW_SECONDS = 8L;
+
+    private static final long PROD_ACTIVE_WINDOW_SECONDS = 90L;
     private static final String JSON_ERROR_PREFIX = "{\"error\":\"";
     private static final String JSON_ERROR_SUFFIX = "\"}";
     private static final Argon2Function ARGON2 = Argon2Function.getInstance(
@@ -135,32 +122,44 @@ public final class HttpIngressServer {
             CryptoConstants.ARGON2_PARALLELISM,
             CryptoConstants.ARGON2_OUTPUT_LENGTH,
             com.password4j.types.Argon2.ID);
-    private static final String LOGIN_SENTINEL_HASH = Password.hash("haf-login-sentinel-password")
-            .addRandomSalt(CryptoConstants.SALT_LEN)
-            .with(ARGON2)
-            .getResult();
+
+    static String buildLoginSentinelHash(String sentinelPassword) {
+        return Password.hash(sentinelPassword)
+                .addRandomSalt(CryptoConstants.SALT_LEN)
+                .with(ARGON2)
+                .getResult();
+    }
+
+    static boolean verifyPasswordWithSentinel(String providedPassword, String storedHash, String loginSentinelHash) {
+        String hashToCheck = storedHash == null ? loginSentinelHash : storedHash;
+        boolean matches = Password.check(providedPassword, hashToCheck).with(ARGON2);
+        return storedHash != null && matches;
+    }
 
     /**
-     * Builds an API path under {@code /api/v1}.
+     * Builds an API path using the configured base path.
      *
      * @param segment first path segment
      * @return full API path
      */
-    private static String apiPath(String segment) {
-        return "/api/v1/" + segment;
+    private String apiPath(String segment) {
+        return config.getHttpsPath() + "/" + segment;
     }
 
     /**
-     * Builds a nested API path under {@code /api/v1}.
+     * Builds a nested API path using the configured base path.
      *
      * @param parent parent segment
      * @param child  child segment
      * @return full API path
      */
-    private static String apiPath(String parent, String child) {
-        return "/api/v1/" + parent + "/" + child;
+    private String apiPath(String parent, String child) {
+        return config.getHttpsPath() + "/" + parent + "/" + child;
     }
 
+    /**
+     * Represents the action to be performed on an attachment.
+     */
     private enum AttachmentAction {
         DOWNLOAD,
         CHUNK,
@@ -168,6 +167,9 @@ public final class HttpIngressServer {
         BIND
     }
 
+    /**
+     * Represents a parsed attachment-related HTTP route.
+     */
     private static final class AttachmentRoute {
         private final String attachmentId;
         private final AttachmentAction action;
@@ -243,39 +245,32 @@ public final class HttpIngressServer {
     }
 
     /**
-     * Creates an HttpIngressServer with a default MetricsRegistry.
+     * Creates an HttpIngressServer for REST-only HTTPS endpoints.
      *
      * @param config             the ServerConfig
      * @param sslContext         the SSLContext
-     * @param mailboxRouter      the MailboxRouter
      * @param rateLimiterService the RateLimiterService
      * @param auditLogger        the AuditLogger
-     * @param validator          the EncryptedMessageValidator
      * @throws IOException if an error occurs while creating the HttpsServer
      */
     public HttpIngressServer(ServerConfig config,
             SSLContext sslContext,
-            MailboxRouter mailboxRouter,
             RateLimiterService rateLimiterService,
             AuditLogger auditLogger,
-            MetricsRegistry metricsRegistry,
-            EncryptedMessageValidator validator,
             User userDAO,
             Session sessionDAO,
             FileUpload fileUploadDAO,
             Attachment attachmentDAO,
             Contact contactDAO) throws IOException {
         this.config = config;
-        this.mailboxRouter = mailboxRouter;
         this.rateLimiterService = rateLimiterService;
         this.auditLogger = auditLogger;
-        this.metricsRegistry = metricsRegistry;
-        this.validator = validator;
         this.userDAO = userDAO;
         this.sessionDAO = sessionDAO;
         this.fileUploadDAO = fileUploadDAO;
         this.attachmentDAO = attachmentDAO;
         this.contactDAO = contactDAO;
+        this.loginSentinelHash = buildLoginSentinelHash(config.getLoginSentinelPassword());
         refreshTrustedProxyRanges(config.getTrustedProxyCidrs());
         this.executor = createIngressExecutor(config);
         this.server = createServer(sslContext);
@@ -315,7 +310,7 @@ public final class HttpIngressServer {
      * @throws IOException if an error occurs while creating the HttpsServer
      */
     private HttpsServer createServer(SSLContext sslContext) throws IOException {
-        HttpsServer httpsServer = HttpsServer.create(new InetSocketAddress(config.getHttpPort()), 0);
+        HttpsServer httpsServer = HttpsServer.create(new InetSocketAddress(config.getHttpsPort()), 0);
         httpsServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
             /**
              * Applies strict TLS protocol/cipher restrictions on the HTTPS server endpoint.
@@ -335,7 +330,6 @@ public final class HttpIngressServer {
             }
         });
 
-        httpsServer.createContext(MESSAGES_PATH, new IngressHandler());
         httpsServer.createContext(apiPath("register"), new RegistrationHandler());
         httpsServer.createContext(apiPath("login"), new LoginHandler());
         httpsServer.createContext(apiPath("token", "refresh"), new TokenRefreshHandler());
@@ -370,432 +364,26 @@ public final class HttpIngressServer {
     }
 
     /**
-     * Handles HTTP requests.
+     * Creates an HttpHandler for testing purposes.
+     *
+     * @param handlerName the name of the handler
+     * @return the created HttpHandler
      */
-    private final class IngressHandler implements HttpHandler {
-        private static final int DEFAULT_FETCH_LIMIT = 100;
-        private static final int MAX_FETCH_LIMIT = 500;
-
-        /**
-         * Handles an HTTP request.
-         *
-         * @param exchange the HttpExchange
-         * @throws IOException if an error occurs while handling the request
-         */
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            long start = System.nanoTime();
-            String requestId = UUID.randomUUID().toString();
-            exchange.getResponseHeaders().add(X_REQUEST_ID, requestId);
-            applySecurityHeaders(exchange.getResponseHeaders());
-
-            AuthResult authResult = resolveAuthenticatedCaller(exchange);
-            if (!authResult.authenticated()) {
-                respond(exchange, requestId, 401, JSON_ERROR_PREFIX + authResult.error() + JSON_ERROR_SUFFIX);
-                return;
-            }
-            String userId = authResult.callerId();
-
-            try {
-                String method = exchange.getRequestMethod();
-                String path = normalizePath(exchange.getRequestURI().getPath());
-
-                if (METHOD_POST.equalsIgnoreCase(method) && MESSAGES_PATH.equals(path)) {
-                    handleIngress(exchange, requestId, userId, start);
-                    return;
-                }
-                if (METHOD_GET.equalsIgnoreCase(method) && MESSAGES_PATH.equals(path)) {
-                    handleFetchUndelivered(exchange, requestId, userId);
-                    return;
-                }
-                if (METHOD_POST.equalsIgnoreCase(method) && (MESSAGES_PATH + "/ack").equals(path)) {
-                    handleAcknowledge(exchange, requestId, userId);
-                    return;
-                }
-
-                if (!MESSAGES_PATH.equals(path) && !(MESSAGES_PATH + "/ack").equals(path)) {
-                    respond(exchange, requestId, 404, JSON_ERROR_PREFIX + INVALID_REQUEST_PATH + JSON_ERROR_SUFFIX);
-                    return;
-                }
-
-                respond(exchange, requestId, 405, JSON_ERROR_PREFIX + METHOD_NOT_ALLOWED + JSON_ERROR_SUFFIX);
-            } catch (IllegalArgumentException ex) {
-                respond(exchange, requestId, 400, JSON_ERROR_PREFIX + escapeJson(ex.getMessage()) + JSON_ERROR_SUFFIX);
-            } catch (Exception ex) {
-                auditLogger.logError("ingress_http_error", requestId, userId, ex);
-                metricsRegistry.incrementRejects();
-                respond(exchange, requestId, 500, "{\"error\":\"internal\"}");
-            } finally {
-                exchange.close();
-            }
-        }
-
-        /**
-         * Handles authenticated message ingress via HTTP POST.
-         *
-         * @param exchange  HTTP exchange
-         * @param requestId request identifier
-         * @param userId    authenticated caller id
-         * @param start     request start time in nanos
-         * @throws IOException when request handling fails
-         */
-        private void handleIngress(HttpExchange exchange, String requestId, String userId, long start)
-                throws IOException {
-            String body = readBody(exchange.getRequestBody());
-            EncryptedMessage message = JsonCodec.fromJson(body, EncryptedMessage.class);
-
-            EncryptedMessageValidator.ValidationResult validationResult = validator.validate(message);
-            if (!validationResult.valid()) {
-                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
-                        validationResult.reason());
-                respond(exchange, requestId, 400,
-                        JSON_ERROR_PREFIX + validationResult.reason() + JSON_ERROR_SUFFIX);
-                return;
-            }
-
-            if (!userId.equals(message.getSenderId())) {
-                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(),
-                        "SENDER_MISMATCH");
-                respond(exchange, requestId, 403, JSON_ERROR_PREFIX + SENDER_MISMATCH + JSON_ERROR_SUFFIX);
-                return;
-            }
-
-            if (!verifyIngressSignature(message, userId)) {
-                auditLogger.logValidationFailure(requestId, userId, message.getRecipientId(), "INVALID_SIGNATURE");
-                respond(exchange, requestId, 400, JSON_ERROR_PREFIX + INVALID_SIGNATURE + JSON_ERROR_SUFFIX);
-                return;
-            }
-
-            if (isRecipientKeyFingerprintStale(exchange, message)) {
-                respond(exchange, requestId, 409,
-                        "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}");
-                return;
-            }
-
-            RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
-            if (!rateDecision.allowed()) {
-                auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
-                respond(exchange, requestId, 429,
-                        "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds()
-                                + "}");
-                return;
-            }
-
-            QueuedEnvelope envelope = mailboxRouter.ingress(message);
-            auditLogger.logIngressAccepted(
-                    requestId,
-                    userId,
-                    message.getRecipientId(),
-                    202,
-                    Duration.ofNanos(System.nanoTime() - start).toMillis());
-
-            String response = JsonCodec
-                    .toJson(new IngressResponse(envelope.envelopeId(), validationResult.expiresAtMillis()));
-            respond(exchange, requestId, 202, response);
-        }
-
-        /**
-         * Verifies sender Ed25519 signature and fingerprint binding on ingress
-         * messages.
-         *
-         * @param message               message envelope
-         * @param authenticatedSenderId authenticated caller identity
-         * @return {@code true} when signature is valid
-         */
-        private boolean verifyIngressSignature(EncryptedMessage message, String authenticatedSenderId) {
-            if (message == null || authenticatedSenderId == null || authenticatedSenderId.isBlank()) {
-                return false;
-            }
-            if (!MessageHeader.ALGO_SIGNATURE.equals(message.getSignatureAlgorithm())) {
-                return false;
-            }
-            if (message.getSignatureB64() == null || message.getSignatureB64().isBlank()) {
-                return false;
-            }
-            if (message.getSenderSigningKeyFingerprint() == null
-                    || message.getSenderSigningKeyFingerprint().isBlank()) {
-                return false;
-            }
-
-            User.PublicKeyRecord senderKey = userDAO.getPublicKey(authenticatedSenderId);
-            if (senderKey == null
-                    || senderKey.signingPublicKeyPem() == null
-                    || senderKey.signingPublicKeyPem().isBlank()
-                    || senderKey.signingFingerprint() == null
-                    || senderKey.signingFingerprint().isBlank()) {
-                return false;
-            }
-
-            String providedFingerprint = message.getSenderSigningKeyFingerprint().trim();
-            if (!providedFingerprint.equalsIgnoreCase(senderKey.signingFingerprint().trim())) {
-                return false;
-            }
-            try {
-                PublicKey signingPublicKey = SigningKeyIO.publicFromPem(senderKey.signingPublicKeyPem());
-                String recomputedFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPublicKey));
-                if (!recomputedFingerprint.equalsIgnoreCase(senderKey.signingFingerprint().trim())) {
-                    return false;
-                }
-                return MessageSignatureService.verify(message, signingPublicKey);
-            } catch (Exception ignored) {
-                return false;
-            }
-        }
-
-        /**
-         * Compares caller-provided recipient fingerprint header against current
-         * recipient key fingerprint.
-         *
-         * Missing header is treated as backward-compatible no-op.
-         *
-         * @param exchange HTTP exchange carrying optional fingerprint header
-         * @param message  validated encrypted message payload
-         * @return {@code true} when caller used a stale recipient key fingerprint
-         */
-        private boolean isRecipientKeyFingerprintStale(HttpExchange exchange, EncryptedMessage message) {
-            String providedFingerprint = exchange.getRequestHeaders().getFirst(RECIPIENT_KEY_FINGERPRINT_HEADER);
-            if (providedFingerprint == null || providedFingerprint.isBlank() || message == null) {
-                return false;
-            }
-            String recipientId = message.getRecipientId();
-            if (recipientId == null || recipientId.isBlank()) {
-                return false;
-            }
-            User.PublicKeyRecord recipientKey = userDAO.getPublicKey(recipientId);
-            if (recipientKey == null || recipientKey.fingerprint() == null || recipientKey.fingerprint().isBlank()) {
-                return false;
-            }
-            return !recipientKey.fingerprint().trim().equalsIgnoreCase(providedFingerprint.trim());
-        }
-
-        /**
-         * Handles authenticated undelivered-envelope fetches for HTTP-polling
-         * fallback clients.
-         *
-         * @param exchange  HTTP exchange
-         * @param requestId request identifier
-         * @param userId    authenticated caller id
-         * @throws IOException when response write fails
-         */
-        private void handleFetchUndelivered(HttpExchange exchange, String requestId, String userId) throws IOException {
-            if (!allowRateLimitedRequest(exchange, requestId, userId)) {
-                return;
-            }
-            int limit = resolveFetchLimit(exchange.getRequestURI().getRawQuery());
-            List<QueuedEnvelope> pending = mailboxRouter.fetchUndelivered(userId, limit);
-            List<Map<String, Object>> envelopes = pending.stream()
-                    .map(this::toEnvelopeResponse)
-                    .toList();
-            respond(exchange, requestId, 200, JsonCodec.toJson(Map.of("messages", envelopes)));
-        }
-
-        /**
-         * Handles authenticated envelope acknowledgements for HTTP-polling fallback
-         * clients.
-         *
-         * @param exchange  HTTP exchange
-         * @param requestId request identifier
-         * @param userId    authenticated caller id
-         * @throws IOException when response write fails
-         */
-        private void handleAcknowledge(HttpExchange exchange, String requestId, String userId) throws IOException {
-            if (!allowRateLimitedRequest(exchange, requestId, userId)) {
-                return;
-            }
-            String body = readBody(exchange.getRequestBody());
-            Map<?, ?> ackMap = JsonCodec.fromJson(body, Map.class);
-            List<String> envelopeIds = extractEnvelopeIds(ackMap == null ? null : ackMap.get("envelopeIds"));
-            if (envelopeIds.isEmpty()) {
-                throw new IllegalArgumentException("envelopeIds is required");
-            }
-
-            boolean acknowledged = mailboxRouter.acknowledgeOwned(userId, envelopeIds);
-            respond(exchange, requestId, 200, "{\"acknowledged\":" + acknowledged + "}");
-        }
-
-        /**
-         * Applies per-user rate limiting using the same policy as message ingress.
-         *
-         * @param exchange  HTTP exchange
-         * @param requestId request id for audit logging
-         * @param userId    authenticated user id
-         * @return {@code true} when request is allowed
-         * @throws IOException when rate-limit response write fails
-         */
-        private boolean allowRateLimitedRequest(HttpExchange exchange, String requestId, String userId)
-                throws IOException {
-            RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, userId);
-            if (rateDecision.allowed()) {
-                return true;
-            }
-            auditLogger.logRateLimit(requestId, userId, rateDecision.retryAfterSeconds());
-            respond(exchange, requestId, 429,
-                    "{\"error\":\"rate limit\",\"retryAfterSeconds\":" + rateDecision.retryAfterSeconds() + "}");
-            return false;
-        }
-
-        /**
-         * Converts queued envelope to the polling API wire format.
-         *
-         * @param envelope queued envelope
-         * @return map payload serializable by JsonCodec
-         */
-        private Map<String, Object> toEnvelopeResponse(QueuedEnvelope envelope) {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("type", "message");
-            payload.put("envelopeId", envelope.envelopeId());
-            payload.put("payload", envelope.payload());
-            payload.put("expiresAt", envelope.expiresAtEpochMs());
-            return payload;
-        }
-
-        /**
-         * Resolves fetch limit from query-string parameters.
-         *
-         * @param rawQuery raw query string
-         * @return bounded limit value
-         */
-        private int resolveFetchLimit(String rawQuery) {
-            Map<String, String> params = parseQueryParams(rawQuery);
-            String rawLimit = params.get("limit");
-            if (rawLimit == null || rawLimit.isBlank()) {
-                return DEFAULT_FETCH_LIMIT;
-            }
-            try {
-                return Math.clamp(Integer.parseInt(rawLimit), 1, MAX_FETCH_LIMIT);
-            } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException("invalid limit", ex);
-            }
-        }
-
-        /**
-         * Parses first-value-wins query parameters from raw URI query text.
-         *
-         * @param rawQuery raw query string
-         * @return decoded key-value map
-         */
-        private Map<String, String> parseQueryParams(String rawQuery) {
-            Map<String, String> params = new HashMap<>();
-            if (rawQuery == null || rawQuery.isBlank()) {
-                return params;
-            }
-            String[] pairs = rawQuery.split("&");
-            for (String pair : pairs) {
-                if (pair == null || pair.isBlank()) {
-                    continue;
-                }
-                int equalsIndex = pair.indexOf('=');
-                String rawKey = equalsIndex >= 0 ? pair.substring(0, equalsIndex) : pair;
-                String rawValue = equalsIndex >= 0 ? pair.substring(equalsIndex + 1) : "";
-                String key = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
-                String value = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
-                params.putIfAbsent(key, value);
-            }
-            return params;
-        }
-
-        /**
-         * Extracts non-empty envelope id strings from parsed ack payload.
-         *
-         * @param idsRaw raw envelopeIds node
-         * @return normalized envelope id list
-         */
-        private List<String> extractEnvelopeIds(Object idsRaw) {
-            if (!(idsRaw instanceof List<?> ids) || ids.isEmpty()) {
-                return List.of();
-            }
-            return ids.stream()
-                    .filter(java.util.Objects::nonNull)
-                    .map(String::valueOf)
-                    .map(String::trim)
-                    .filter(id -> !id.isBlank())
-                    .toList();
-        }
-
-        /**
-         * Normalizes request paths by stripping a trailing slash.
-         *
-         * @param path raw request path
-         * @return normalized path
-         */
-        private String normalizePath(String path) {
-            if (path == null || path.isBlank()) {
-                return "";
-            }
-            if (path.length() > 1 && path.endsWith("/")) {
-                return path.substring(0, path.length() - 1);
-            }
-            return path;
-        }
-
-        /**
-         * Escapes text for safe inclusion in compact JSON string literals.
-         *
-         * @param value source text
-         * @return escaped text
-         */
-        private String escapeJson(String value) {
-            return HttpIngressServer.escapeJson(value == null ? INTERNAL_SERVER_ERROR : value);
-        }
-
-        /**
-         * Reads the body of an HTTP request.
-         *
-         * @param body the InputStream
-         * @return the body as a string
-         * @throws IOException if an error occurs while reading the body
-         */
-        private String readBody(InputStream body) throws IOException {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[4096];
-            int read;
-            int total = 0;
-            while ((read = body.read(chunk)) != -1) {
-                total += read;
-                if (total > MAX_BODY_BYTES) {
-                    throw new IOException(REQUEST_BODY_EXCEEDS_LIMIT);
-                }
-                buffer.write(chunk, 0, read);
-            }
-            return buffer.toString(StandardCharsets.UTF_8);
-        }
-
-        /**
-         * Applies security headers to the given Headers.
-         *
-         * @param headers the Headers
-         */
-        private void applySecurityHeaders(Headers headers) {
-            headers.add(STRICT_TRANSPORT_SECURITY, STRICT_TRANSPORT_SECURITY_VALUE);
-            headers.add(CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_VALUE);
-            headers.add(X_CONTENT_TYPE_OPTIONS, X_CONTENT_TYPE_OPTIONS_VALUE);
-            headers.add(X_FRAME_OPTIONS, X_FRAME_OPTIONS_VALUE);
-        }
-
-        /**
-         * Sends a response to the given HttpExchange.
-         *
-         * @param exchange  the HttpExchange
-         * @param requestId the request ID
-         * @param status    the response status code
-         * @param body      the response body
-         * @throws IOException if an error occurs while sending the response
-         */
-        private void respond(HttpExchange exchange, String requestId, int status, String body) throws IOException {
-            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            Headers responseHeaders = exchange.getResponseHeaders();
-            responseHeaders.add(CONTENT_TYPE, APPLICATION_JSON);
-
-            if (!responseHeaders.containsKey(X_REQUEST_ID)) {
-                responseHeaders.add(X_REQUEST_ID, requestId);
-            }
-
-            exchange.sendResponseHeaders(status, payload.length);
-
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(payload);
-            }
-        }
+    HttpHandler createHandlerForTesting(String handlerName) {
+        return switch (handlerName) {
+            case "RegistrationHandler" -> new RegistrationHandler();
+            case "LoginHandler" -> new LoginHandler();
+            case "TokenRefreshHandler" -> new TokenRefreshHandler();
+            case "LogoutHandler" -> new LogoutHandler();
+            case "AdminKeyHandler" -> new AdminKeyHandler();
+            case "UserKeyHandler" -> new UserKeyHandler();
+            case "SearchHandler" -> new SearchHandler();
+            case "HealthHandler" -> new HealthHandler();
+            case "ContactsHandler" -> new ContactsHandler();
+            case "MessagingConfigHandler" -> new MessagingConfigHandler();
+            case "AttachmentsHandler" -> new AttachmentsHandler();
+            default -> throw new IllegalArgumentException("Unknown handler: " + handlerName);
+        };
     }
 
     /**
@@ -1042,15 +630,6 @@ public final class HttpIngressServer {
     }
 
     /**
-     * Represents the response to an ingress request.
-     *
-     * @param envelopeId the envelope ID
-     * @param expiresAt  the expiration time of the envelope
-     */
-    public record IngressResponse(String envelopeId, long expiresAt) {
-    }
-
-    /**
      * Handles login requests.
      */
     private final class LoginHandler implements HttpHandler {
@@ -1099,7 +678,8 @@ public final class HttpIngressServer {
                 User.UserRecord user = userDAO.findByEmail(request.getEmail());
                 boolean passwordValid = verifyPasswordWithSentinel(
                         request.getPassword(),
-                        user == null ? null : user.passwordHash());
+                        user == null ? null : user.passwordHash(),
+                        loginSentinelHash);
                 if (user == null || !passwordValid) {
                     respond(exchange, requestId, 401,
                             JsonCodec.toJson(LoginResponse.error("Invalid email or password")));
@@ -1246,20 +826,6 @@ public final class HttpIngressServer {
             } catch (Exception ex) {
                 throw new IllegalArgumentException("invalid takeoverSigningPublicKeyPem", ex);
             }
-        }
-
-        /**
-         * Verifies password hash while consuming Argon2 work even when account is
-         * missing.
-         *
-         * @param providedPassword caller-provided password
-         * @param storedHash       account hash, or {@code null} when account is unknown
-         * @return {@code true} when stored hash is present and password matches
-         */
-        static boolean verifyPasswordWithSentinel(String providedPassword, String storedHash) {
-            String hashToCheck = storedHash == null ? LOGIN_SENTINEL_HASH : storedHash;
-            boolean matches = Password.check(providedPassword, hashToCheck).with(ARGON2);
-            return storedHash != null && matches;
         }
 
         /**
@@ -2304,7 +1870,6 @@ public final class HttpIngressServer {
                         config.getAttachmentMaxBytes(),
                         config.getAttachmentInlineMaxBytes(),
                         config.getAttachmentChunkBytes(),
-                        config.getAttachmentAllowedTypes(),
                         config.getAttachmentUnboundTtlSeconds());
                 sendJson(exchange, 200, JsonCodec.toJson(response));
             } catch (Exception ex) {

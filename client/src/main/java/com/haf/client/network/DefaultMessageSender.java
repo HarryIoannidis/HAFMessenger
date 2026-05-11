@@ -1,6 +1,5 @@
 package com.haf.client.network;
 
-import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.crypto.MessageSignatureService;
@@ -27,31 +26,34 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletionException;
 
 /**
  * Encrypts and submits outbound messages and attachment API calls.
  */
 public class DefaultMessageSender implements MessageSender {
-    private static final String RECIPIENT_KEY_FINGERPRINT_HEADER = "X-Recipient-Key-Fingerprint";
     private static final String STALE_RECIPIENT_KEY_CODE = "stale_recipient_key";
 
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
     private final AuthHttpClient authHttpClient;
+    private final RealtimeTransport realtimeTransport;
 
     /**
      * Creates a DefaultMessageSender with the specified dependencies.
      *
      * @param keyProvider      the key provider for retrieving recipient public keys
      * @param clockProvider    the clock provider for deterministic timestamps
-     * @param authHttpClient authenticated HTTP adapter for network communication
+     * @param authHttpClient    authenticated HTTP adapter for REST-only operations
+     * @param realtimeTransport WSS transport for live message sends
      */
     public DefaultMessageSender(KeyProvider keyProvider, ClockProvider clockProvider,
-            AuthHttpClient authHttpClient) {
+            AuthHttpClient authHttpClient, RealtimeTransport realtimeTransport) {
         this.keyProvider = keyProvider;
         this.clockProvider = clockProvider;
         this.authHttpClient = authHttpClient;
+        this.realtimeTransport = Objects.requireNonNull(realtimeTransport, "realtimeTransport");
     }
 
     /**
@@ -200,36 +202,7 @@ public class DefaultMessageSender implements MessageSender {
             throw new IllegalArgumentException("Encrypted message cannot be null");
         }
 
-        String json = JsonCodec.toJson(encryptedMessage);
-        String response;
-        try {
-            Map<String, String> headers = recipientKeyFingerprint == null || recipientKeyFingerprint.isBlank()
-                    ? Map.of()
-                    : Map.of(RECIPIENT_KEY_FINGERPRINT_HEADER, recipientKeyFingerprint);
-            response = authHttpClient.postAuthenticated("/api/v1/messages", json, headers).join();
-        } catch (CompletionException ex) {
-            Throwable cause = ex.getCause();
-            if (cause instanceof IOException ioException) {
-                throw ioException;
-            }
-            throw new IOException("Failed to send encrypted message", cause != null ? cause : ex);
-        }
-        Map<?, ?> map = JsonCodec.fromJson(response, Map.class);
-        String envelopeId = map.get("envelopeId") == null ? null : String.valueOf(map.get("envelopeId"));
-
-        long expiresAt = 0;
-        Object expiresAtObj = map.get("expiresAt");
-        if (expiresAtObj instanceof Number number) {
-            expiresAt = number.longValue();
-        } else if (expiresAtObj != null) {
-            try {
-                expiresAt = Long.parseLong(String.valueOf(expiresAtObj));
-            } catch (NumberFormatException ignored) {
-                expiresAt = 0;
-            }
-        }
-
-        return new SendResult(envelopeId, expiresAt);
+        return realtimeTransport.sendMessage(encryptedMessage, recipientKeyFingerprint);
     }
 
     /**
@@ -241,14 +214,9 @@ public class DefaultMessageSender implements MessageSender {
     private static boolean isStaleRecipientKeyFailure(Throwable error) {
         Throwable current = error;
         while (current != null) {
-            if (current instanceof HttpCommunicationException communicationException
-                    && communicationException.getStatusCode() == 409) {
-                String responseBody = communicationException.getResponseBody();
-                if (responseBody != null
-                        && (responseBody.contains(STALE_RECIPIENT_KEY_CODE)
-                                || responseBody.contains("recipient key is stale"))) {
-                    return true;
-                }
+            if (current instanceof RealtimeClientTransport.RealtimeException realtimeException
+                    && STALE_RECIPIENT_KEY_CODE.equals(realtimeException.code())) {
+                return true;
             }
             current = current.getCause();
         }

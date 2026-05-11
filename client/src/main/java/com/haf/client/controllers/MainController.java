@@ -58,6 +58,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -66,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,6 +146,8 @@ public class MainController implements SearchController.ContactActions {
     @FXML
     private Text profileNameText;
     @FXML
+    private Text profileTypingText;
+    @FXML
     private Text profileActivenessText;
     @FXML
     private Circle profileActivenessCircle;
@@ -166,6 +170,8 @@ public class MainController implements SearchController.ContactActions {
     private ContextMenu contactContextMenu;
     private ContextMenu dotsMenu;
     private EventHandler<MouseEvent> contactContextOutsideClickHandler;
+    private MessagesViewModel.TypingListener profileTypingListener;
+    private final Set<String> typingContactIds = ConcurrentHashMap.newKeySet();
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
     private final MainViewModel viewModel = MainViewModel.createDefault();
@@ -176,7 +182,6 @@ public class MainController implements SearchController.ContactActions {
     private final AtomicBoolean logoutInProgress = new AtomicBoolean(false);
     private final AtomicBoolean undecryptableMessagesPopupShown = new AtomicBoolean(false);
     private final AtomicBoolean connectionRecoveryActive = new AtomicBoolean(false);
-    private final AtomicBoolean connectionRecoveryDismissed = new AtomicBoolean(false);
     private final AtomicBoolean connectionRecoveryInFlight = new AtomicBoolean(false);
     private final MainSessionService mainSessionService;
     private final DesktopNotificationService desktopNotificationService;
@@ -330,6 +335,7 @@ public class MainController implements SearchController.ContactActions {
         registerRuntimeIssueListeners();
         registerPresenceListener();
         registerIncomingMessageListener();
+        registerTypingListener();
         startMessageReceiving();
 
         beginInitialMainLoadPipeline();
@@ -719,6 +725,7 @@ public class MainController implements SearchController.ContactActions {
      */
     private void showProfilePanel(ContactInfo contact) {
         profileNameText.setText(contact.name());
+        updateProfileTypingIndicatorForContact(contact.id());
         String activenessLabel = contact.activenessLabel() == null ? "" : contact.activenessLabel().trim();
         String resolvedActivenessLabel = settings.isPrivacyHidePresenceIndicators()
                 ? HIDDEN_ACTIVITY_LABEL
@@ -746,6 +753,7 @@ public class MainController implements SearchController.ContactActions {
      * Hides the profile panel from both visibility and layout participation.
      */
     private void hideProfilePanel() {
+        hideProfileTypingIndicator();
         profilePanel.setVisible(false);
         profilePanel.setManaged(false);
     }
@@ -2409,20 +2417,35 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Displays the generic retry/dismiss runtime popup.
+     * Displays the generic retry/runtime popup.
      *
      * @param issue runtime issue to render
      */
     private void showGenericRuntimeIssuePopup(RuntimeIssue issue) {
-        PopupMessageBuilder.create()
+        boolean messagingChannelIssue = isMessagingChannelIssue(issue);
+        PopupMessageBuilder builder = PopupMessageBuilder.create()
                 .popupKey(UiConstants.POPUP_RUNTIME_ISSUE)
                 .title(issue.title())
                 .message(issue.message())
                 .actionText("Retry")
-                .cancelText("Dismiss")
+                .cancelText(messagingChannelIssue ? "Close and Exit" : "Dismiss")
                 .showCancel(true)
-                .onAction(() -> runRuntimeIssueRetry(issue.retryAction()))
-                .show();
+                .onAction(() -> runRuntimeIssueRetry(issue.retryAction()));
+        if (messagingChannelIssue) {
+            builder.onCancel(this::exitApplication);
+        }
+        builder.show();
+    }
+
+    /**
+     * Returns whether the runtime issue came from the authenticated messaging
+     * channel.
+     *
+     * @param issue runtime issue candidate
+     * @return {@code true} when the popup should offer application exit
+     */
+    private static boolean isMessagingChannelIssue(RuntimeIssue issue) {
+        return issue != null && issue.dedupeKey().startsWith("messaging.");
     }
 
     /**
@@ -2441,13 +2464,12 @@ public class MainController implements SearchController.ContactActions {
         LOGGER.warn("Connection runtime issue: key={}, message={}", issue.dedupeKey(), issue.message());
         lastConnectionIssue = issue;
         startConnectionRecoveryLoop();
-        if (!connectionRecoveryDismissed.get()) {
-            showConnectionLossPopup(issue);
-        }
+        showConnectionLossPopup(issue);
     }
 
     /**
-     * Shows the dedicated connection-loss popup with Retry and Dismiss actions.
+     * Shows the dedicated connection-loss popup with Retry and Close and Exit
+     * actions.
      *
      * @param issue current connection issue snapshot
      */
@@ -2457,21 +2479,12 @@ public class MainController implements SearchController.ContactActions {
                 .title(issue.title())
                 .message(issue.message())
                 .actionText("Retry")
-                .cancelText("Dismiss")
+                .cancelText("Close and Exit")
                 .showCancel(true)
                 .movable(false)
                 .onAction(this::handleConnectionLossRetry)
-                .onCancel(this::handleConnectionLossDismiss)
+                .onCancel(this::exitApplication)
                 .show();
-    }
-
-    /**
-     * Handles user-initiated dismiss from the connection-loss popup while keeping
-     * background recovery active.
-     */
-    private void handleConnectionLossDismiss() {
-        connectionRecoveryDismissed.set(true);
-        ViewRouter.hidePopup(UiConstants.POPUP_CONNECTION_LOSS);
     }
 
     /**
@@ -2480,7 +2493,6 @@ public class MainController implements SearchController.ContactActions {
      * once (manual replay only).
      */
     private void handleConnectionLossRetry() {
-        connectionRecoveryDismissed.set(false);
         RuntimeIssue currentIssue = lastConnectionIssue;
         if (currentIssue != null) {
             CompletableFuture.runAsync(() -> runRuntimeIssueRetry(currentIssue.retryAction()));
@@ -2517,7 +2529,6 @@ public class MainController implements SearchController.ContactActions {
         connectionRecoveryActive.set(false);
         connectionRecoveryInFlight.set(false);
         lastConnectionIssue = null;
-        connectionRecoveryDismissed.set(false);
         synchronized (connectionRecoveryLock) {
             cancelScheduledConnectionRecoveryLocked();
         }
@@ -3168,6 +3179,19 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
+     * Registers typing updates so the active contact header can show lightweight
+     * typing state beside the display name.
+     */
+    private void registerTypingListener() {
+        MessagesViewModel chatViewModel = ChatSession.get();
+        if (chatViewModel == null) {
+            return;
+        }
+        profileTypingListener = this::applyTypingUpdate;
+        chatViewModel.addTypingListener(profileTypingListener);
+    }
+
+    /**
      * Starts chat message receiving if the chat session has been initialized.
      */
     private void startMessageReceiving() {
@@ -3188,6 +3212,56 @@ public class MainController implements SearchController.ContactActions {
      */
     private void applyPresenceUpdate(String userId, boolean active) {
         Platform.runLater(() -> updateContactPresence(userId, active));
+    }
+
+    /**
+     * Applies inbound typing state to the current profile strip.
+     *
+     * @param userId user whose typing state changed
+     * @param typing whether the user is currently typing
+     */
+    private void applyTypingUpdate(String userId, boolean typing) {
+        String normalized = normalizeUserId(userId);
+        if (normalized.isEmpty()) {
+            return;
+        }
+        if (typing) {
+            typingContactIds.add(normalized);
+        } else {
+            typingContactIds.remove(normalized);
+        }
+        Platform.runLater(() -> updateProfileTypingIndicatorForContact(resolveTrackedContactId()));
+    }
+
+    /**
+     * Shows or hides the header typing label for the active chat contact.
+     *
+     * @param contactId active contact id
+     */
+    private void updateProfileTypingIndicatorForContact(String contactId) {
+        if (profileTypingText == null) {
+            return;
+        }
+        boolean visible = typingContactIds.contains(normalizeUserId(contactId));
+        profileTypingText.setText(visible ? "• Typing..." : "");
+        profileTypingText.setVisible(visible);
+        profileTypingText.setManaged(visible);
+    }
+
+    /**
+     * Hides the header typing label while preserving remembered typing state.
+     */
+    private void hideProfileTypingIndicator() {
+        if (profileTypingText == null) {
+            return;
+        }
+        profileTypingText.setText("");
+        profileTypingText.setVisible(false);
+        profileTypingText.setManaged(false);
+    }
+
+    private static String normalizeUserId(String userId) {
+        return userId == null ? "" : userId.trim();
     }
 
     /**

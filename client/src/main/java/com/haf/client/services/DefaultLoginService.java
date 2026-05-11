@@ -9,6 +9,7 @@ import com.haf.client.models.UserProfileInfo;
 import com.haf.client.network.DefaultMessageReceiver;
 import com.haf.client.network.DefaultMessageSender;
 import com.haf.client.network.AuthHttpClient;
+import com.haf.client.network.RealtimeClientTransport;
 import com.haf.client.utils.ClientRuntimeConfig;
 import com.haf.client.utils.SslContextUtils;
 import com.haf.client.viewmodels.MessagesViewModel;
@@ -587,16 +588,23 @@ public class DefaultLoginService implements LoginService {
             AuthHttpClient authHttpClient = new AuthHttpClient(
                     resolveServerBaseUri(runtimeConfig),
                     sessionId);
+            RealtimeClientTransport realtimeTransport = new RealtimeClientTransport(
+                    runtimeConfig.realtimeWebSocketUri(),
+                    AuthSessionState::getAccessToken);
             keyProvider.setDirectoryServiceFetcher(recipientId -> fetchPublicKey(authHttpClient, recipientId));
             keyProvider.setSigningDirectoryServiceFetcher(recipientId -> fetchSigningPublicKey(authHttpClient, recipientId));
             verifyLocalIdentityFingerprint(userId, keyProvider, authHttpClient);
 
-            DefaultMessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);
-            DefaultMessageReceiver receiver = new DefaultMessageReceiver(
+            DefaultMessageSender sender = new DefaultMessageSender(
                     keyProvider,
                     clockProvider,
                     authHttpClient,
-                    keyProvider.getSenderId());
+                    realtimeTransport);
+            DefaultMessageReceiver receiver = new DefaultMessageReceiver(
+                    keyProvider,
+                    clockProvider,
+                    keyProvider.getSenderId(),
+                    realtimeTransport);
 
             NetworkSession.set(authHttpClient);
             ChatSession.set(new MessagesViewModel(sender, receiver));

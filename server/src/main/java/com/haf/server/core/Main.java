@@ -11,6 +11,7 @@ import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.ingress.HttpIngressServer;
 import com.haf.server.metrics.AuditLogger;
 import com.haf.server.metrics.MetricsRegistry;
+import com.haf.server.realtime.RealtimeWebSocketServer;
 import com.haf.server.router.MailboxRouter;
 import com.haf.server.router.RateLimiterService;
 import com.haf.server.security.JwtTokenService;
@@ -72,6 +73,7 @@ public final class Main {
         ScheduledFuture<?> attachmentCleanupFuture = null;
         Thread shutdownHook = null;
         HttpIngressServer httpServer = null;
+        RealtimeWebSocketServer realtimeServer = null;
         MailboxRouter mailboxRouter = null;
         try {
             SSLContext sslContext = buildSslContext(config);
@@ -99,8 +101,18 @@ public final class Main {
             RateLimiterService rateLimiter = new RateLimiterService(dataSource, auditLogger);
 
             httpServer = new HttpIngressServer(
-                    config, sslContext, mailboxRouter, rateLimiter, auditLogger, metricsRegistry, validator, userDAO,
+                    config, sslContext, rateLimiter, auditLogger, userDAO,
                     sessionDAO, fileUploadDAO, attachmentDAO, contactDAO);
+            realtimeServer = new RealtimeWebSocketServer(
+                    config,
+                    sslContext,
+                    mailboxRouter,
+                    rateLimiter,
+                    auditLogger,
+                    validator,
+                    userDAO,
+                    sessionDAO,
+                    contactDAO);
 
             metricsFuture = scheduler.scheduleAtFixedRate(
                     () -> auditLogger.logMetricsSnapshot(metricsRegistry.snapshot()),
@@ -120,6 +132,7 @@ public final class Main {
 
             final MailboxRouter finalMailboxRouter = mailboxRouter;
             final HttpIngressServer finalHttpServer = httpServer;
+            final RealtimeWebSocketServer finalRealtimeServer = realtimeServer;
             final ScheduledFuture<?> finalMetricsFuture = metricsFuture;
             final ScheduledFuture<?> finalAttachmentCleanupFuture = attachmentCleanupFuture;
             shutdownHook = new Thread(
@@ -128,6 +141,7 @@ public final class Main {
                             shutdownOnce,
                             shutdownLatch,
                             finalHttpServer,
+                            finalRealtimeServer,
                             finalMailboxRouter,
                             finalMetricsFuture,
                             finalAttachmentCleanupFuture,
@@ -138,7 +152,13 @@ public final class Main {
 
             mailboxRouter.start();
             httpServer.start();
-            LOGGER.info("Server started on HTTP {}", config.getHttpPort());
+            realtimeServer.start();
+            LOGGER.info(
+                    "Server started. REST scheme=https port={} path={} Realtime scheme=wss port={} path={}",
+                    config.getHttpsPort(),
+                    config.getHttpsPath(),
+                    config.getWsPort(),
+                    config.getWsPath());
 
             awaitShutdown(shutdownLatch);
         } catch (Exception e) {
@@ -152,6 +172,7 @@ public final class Main {
                     shutdownOnce,
                     shutdownLatch,
                     httpServer,
+                    realtimeServer,
                     mailboxRouter,
                     metricsFuture,
                     attachmentCleanupFuture,
@@ -271,6 +292,7 @@ public final class Main {
      * @param shutdownOnce              single-execution guard
      * @param shutdownLatch             latch used by the main thread
      * @param httpServer                HTTP ingress server instance
+     * @param realtimeServer            WebSocket realtime server instance
      * @param mailboxRouter             mailbox router instance
      * @param metricsFuture             periodic metrics task
      * @param attachmentCleanupFuture   periodic attachment cleanup task
@@ -282,6 +304,7 @@ public final class Main {
             AtomicBoolean shutdownOnce,
             CountDownLatch shutdownLatch,
             HttpIngressServer httpServer,
+            RealtimeWebSocketServer realtimeServer,
             MailboxRouter mailboxRouter,
             ScheduledFuture<?> metricsFuture,
             ScheduledFuture<?> attachmentCleanupFuture,
@@ -295,6 +318,9 @@ public final class Main {
         LOGGER.info(reason);
         if (httpServer != null) {
             httpServer.stop();
+        }
+        if (realtimeServer != null) {
+            realtimeServer.close();
         }
         if (mailboxRouter != null) {
             mailboxRouter.close();

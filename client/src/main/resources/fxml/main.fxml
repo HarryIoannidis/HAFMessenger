@@ -132,11 +132,20 @@
                                           <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
                                        </padding>
                                        <children>
-                                          <Text strokeType="OUTSIDE" strokeWidth="0.0" fx:id="profileNameText" styleClass="plain-text" text="" VBox.vgrow="ALWAYS">
-                                             <font>
-                                                <Font size="17.0" />
-                                             </font>
-                                          </Text>
+                                          <HBox alignment="BASELINE_LEFT" spacing="6.0" VBox.vgrow="ALWAYS">
+                                             <children>
+                                                <Text strokeType="OUTSIDE" strokeWidth="0.0" fx:id="profileNameText" styleClass="plain-text" text="">
+                                                   <font>
+                                                      <Font size="17.0" />
+                                                   </font>
+                                                </Text>
+                                                <Text fx:id="profileTypingText" managed="false" strokeType="OUTSIDE" strokeWidth="0.0" styleClass="typing-indicator" text="• Typing..." visible="false">
+                                                   <font>
+                                                      <Font size="13.0" />
+                                                   </font>
+                                                </Text>
+                                             </children>
+                                          </HBox>
                                           <HBox alignment="CENTER_LEFT" VBox.vgrow="ALWAYS">
                                              <children>
                                                 <Text opacity="0.9" strokeType="OUTSIDE" strokeWidth="0.0" fx:id="profileActivenessText" styleClass="plain-text-subtitle" text="">

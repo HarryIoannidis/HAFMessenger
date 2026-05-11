@@ -25,6 +25,12 @@
     -fx-border-color: #0078d7;
 }
 
+.typing-indicator {
+    -fx-fill: #4f5963;
+    -fx-font-family: 'Manrope', sans-serif;
+    -fx-font-size: 12px;
+}
+
 .chat-area {
     -fx-background-color: transparent;
     -fx-background: transparent;
@@ -155,6 +161,14 @@
 
 .bubble-time-out-pending {
     -fx-fill: rgba(255, 255, 255, 0.82);
+}
+
+.bubble-receipt-out {
+    -fx-icon-color: rgba(255, 255, 255, 0.88);
+}
+
+.bubble-receipt-group-out {
+    -fx-alignment: center-left;
 }
 
 .bubble-time-in {

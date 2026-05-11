@@ -52,6 +52,9 @@ class EnvelopeTest {
     @Mock
     private PreparedStatement fetchByIdsStatement;
 
+    @Mock
+    private PreparedStatement fetchReceiptsStatement;
+
     private Envelope dao;
 
     @BeforeEach
@@ -156,6 +159,42 @@ class EnvelopeTest {
         boolean result = dao.markDelivered(null);
 
         assertFalse(result);
+    }
+
+    @Test
+    void mark_read_updates_envelopes_and_implies_delivery() throws SQLException {
+        List<String> envelopeIds = List.of("id1", "id2");
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("read_at = COALESCE"))).thenReturn(markDeliveredStatement);
+        when(markDeliveredStatement.executeUpdate()).thenReturn(2);
+
+        boolean result = dao.markRead(envelopeIds);
+
+        assertTrue(result);
+        verify(markDeliveredStatement, times(2)).setString(anyInt(), anyString());
+        verify(markDeliveredStatement).executeUpdate();
+    }
+
+    @Test
+    void fetch_receipts_for_sender_returns_minimal_metadata() throws SQLException {
+        ResultSet rs = mock(ResultSet.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(contains("receipt_state"))).thenReturn(fetchReceiptsStatement);
+        when(fetchReceiptsStatement.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(true, true, false);
+        when(rs.getString("envelope_id")).thenReturn("env-delivered", "env-read");
+        when(rs.getString("recipient_id")).thenReturn("recipient-1", "recipient-2");
+        when(rs.getString("receipt_state")).thenReturn("DELIVERED", "READ");
+
+        List<Envelope.ReceiptRecord> result = dao.fetchReceiptsForSender("sender-1", 500);
+
+        assertEquals(2, result.size());
+        assertEquals("env-delivered", result.get(0).envelopeId());
+        assertEquals(Envelope.ReceiptState.DELIVERED, result.get(0).state());
+        assertEquals("recipient-2", result.get(1).recipientId());
+        assertEquals(Envelope.ReceiptState.READ, result.get(1).state());
+        verify(fetchReceiptsStatement).setString(1, "sender-1");
+        verify(fetchReceiptsStatement).setInt(2, 500);
     }
 
     @Test

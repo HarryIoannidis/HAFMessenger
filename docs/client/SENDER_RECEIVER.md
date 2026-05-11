@@ -11,12 +11,12 @@ Describe concrete messaging implementations used by the client runtime.
   - encrypts payloads with `MessageEncryptor`
   - signs envelopes with Ed25519 (`MessageSignatureService`)
   - validates envelopes with `MessageValidator`
-  - sends via authenticated HTTPS helper in `AuthHttpClient`
+  - sends live envelopes through `RealtimeClientTransport`
 - `DefaultMessageReceiver`:
-  - consumes HTTPS polling snapshots (`/api/v1/messages`, `/api/v1/contacts`)
+  - consumes WSS realtime events (`NEW_MESSAGE`, receipts, typing, presence)
   - validates, verifies Ed25519 signatures, and decrypts envelopes
-  - dispatches callbacks (`onMessage`, `onError`, `onPresenceUpdate`)
-  - performs envelope acknowledgement flow
+  - dispatches callbacks (`onMessage`, `onError`, `onPresenceUpdate`, typing and receipt callbacks)
+  - performs WSS delivery/read receipt flow
 
 ## Key Types/Interfaces
 
@@ -28,11 +28,11 @@ Describe concrete messaging implementations used by the client runtime.
 
 ## Flow
 
-1. Sender builds encrypted envelope and posts to `/api/v1/messages`.
-2. Server returns envelope metadata (`envelopeId`, `expiresAt`).
-3. Receiver gets inbound envelope events over HTTPS polling.
+1. Sender builds encrypted envelope and sends WSS `SEND_MESSAGE`.
+2. Server returns WSS `SEND_ACCEPTED` metadata (`envelopeId`, `expiresAt`).
+3. Receiver gets inbound envelope events over WSS `NEW_MESSAGE`.
 4. Receiver verifies sender signing key fingerprint/signature, decrypts, and notifies UI-facing listener.
-5. Receiver acknowledges delivered envelope ids via authenticated ACK path.
+5. Receiver emits WSS delivery/read receipts for delivered/viewed envelope ids.
 
 ## Error/Security Notes
 

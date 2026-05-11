@@ -6,32 +6,32 @@ Describe implemented end-to-end workflows for message send/receive, routing, and
 
 ## Current Implementation
 
-- Send path uses `MessageSender` + `MessageEncryptor` and submits encrypted envelopes to server ingress.
-- Server path validates/rate-limits/routes via `HttpIngressServer` and `MailboxRouter`, with persistence through DAOs.
-- Receive path uses `MessageReceiver` + `MessageDecryptor`, updates UI state, and acknowledges envelope IDs.
+- Send path uses `MessageSender` + `MessageEncryptor` and submits encrypted envelopes over WSS.
+- Server path validates/rate-limits/routes via `RealtimeWebSocketServer`, `MessageIngressService`, and `MailboxRouter`, with persistence through DAOs.
+- Receive path uses `MessageReceiver` + `MessageDecryptor`, updates UI state, and emits WSS delivery/read receipts.
 - Key provider path resolves sender id and recipient public keys through `KeyProvider` (`UserKeystoreKeyProvider` implementation).
 - Attachment flow extends message workflow with init/chunk/complete/bind/download endpoints while preserving encrypted payload handling.
 
 ## Key Types/Interfaces
 
 - Client: `DefaultMessageSender`, `DefaultMessageReceiver`, `AuthHttpClient`, `MessagesViewModel`.
-- Server: `HttpIngressServer`, `MailboxRouter`, `RateLimiterService`, `EnvelopeDAO`.
+- Server: `RealtimeWebSocketServer`, `MessageIngressService`, `MailboxRouter`, `RateLimiterService`, `EnvelopeDAO`.
 - Shared: `EncryptedMessage`, `MessageValidator`, `MessageEncryptor`, `MessageDecryptor`, `KeyProvider`.
 
 ## Flow
 
 1. Compose message in UI -> ViewModel -> `MessageSender`.
-2. Encrypt payload and send envelope to `/api/v1/messages`.
-3. Server validates and stores envelope, then serves polling updates for clients.
-4. Receiver validates/decrypts envelope and updates chat state from polling delivery.
-5. Client acknowledges delivered envelope IDs to avoid re-delivery.
+2. Encrypt payload and send envelope as a WSS `SEND_MESSAGE` event.
+3. Server validates and stores envelope, then pushes `NEW_MESSAGE` to the recipient socket or reconnect backlog.
+4. Receiver validates/decrypts envelope and updates chat state from WSS delivery.
+5. Client emits WSS delivery/read receipts to avoid duplicate processing and update read state.
 
 ## Error/Security Notes
 
 - Validation occurs on both client and server boundaries.
 - Decrypt failures are surfaced as errors without exposing sensitive internals.
 - Envelope metadata and TTL are enforced server-side and receiver-side.
-- ACK operations are ownership-scoped to prevent cross-user acknowledgement of foreign envelope IDs.
+- Receipt operations are ownership-scoped to prevent cross-user acknowledgement of foreign envelope IDs.
 
 ## Related Files
 

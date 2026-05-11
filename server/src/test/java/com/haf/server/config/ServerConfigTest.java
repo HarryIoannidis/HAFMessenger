@@ -50,16 +50,17 @@ class ServerConfigTest {
         assertTrue(config.getTrustedProxyCidrs().isEmpty());
         assertEquals(64, config.getIngressExecutorThreads());
         assertEquals(1024, config.getIngressExecutorQueueCapacity());
+        assertEquals(String.join("/", "", "ws", "v1", "realtime"), config.getWsPath());
         assertEquals("test-jwt-secret", config.getJwtSecret());
         assertEquals(900L, config.getJwtAccessTtlSeconds());
         assertEquals(2_592_000L, config.getJwtRefreshTtlSeconds());
         assertEquals(2_592_000L, config.getJwtAbsoluteTtlSeconds());
         assertEquals(900L, config.getJwtIdleTtlSeconds());
+        assertEquals("haf-login-sentinel-password", config.getLoginSentinelPassword());
         assertEquals(AttachmentConstants.DEFAULT_MAX_BYTES, config.getAttachmentMaxBytes());
         assertEquals(AttachmentConstants.DEFAULT_INLINE_MAX_BYTES, config.getAttachmentInlineMaxBytes());
         assertEquals(AttachmentConstants.DEFAULT_CHUNK_BYTES, config.getAttachmentChunkBytes());
         assertEquals(AttachmentConstants.DEFAULT_UNBOUND_TTL_SECONDS, config.getAttachmentUnboundTtlSeconds());
-        assertEquals(java.util.List.of(AttachmentConstants.MIME_TYPE_WILDCARD), config.getAttachmentAllowedTypes());
     }
 
     @Test
@@ -88,40 +89,28 @@ class ServerConfigTest {
         assertEquals(2048, config.getIngressExecutorQueueCapacity());
     }
 
-    @Test
-    void load_fails_when_trust_proxy_enabled_without_cidrs() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_TRUST_PROXY", "true");
-        env.remove("HAF_TRUSTED_PROXY_CIDRS");
 
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
 
     @Test
-    void load_fails_when_trusted_proxy_cidr_is_invalid() {
+    void load_uses_custom_https_port() {
         Map<String, String> env = createMinimalEnv();
-        env.put("HAF_TRUST_PROXY", "true");
-        env.put("HAF_TRUSTED_PROXY_CIDRS", "invalid-value");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_fails_when_ingress_executor_values_are_invalid() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_INGRESS_EXECUTOR_THREADS", "0");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_uses_custom_http_port() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_HTTP_PORT", "9000");
+        env.put("HAF_HTTPS_PORT", "9000");
 
         ServerConfig config = ServerConfig.fromEnv(env);
-        assertEquals(9000, config.getHttpPort());
+        assertEquals(9000, config.getHttpsPort());
     }
+
+    @Test
+    void load_uses_custom_ws_path() {
+        Map<String, String> env = createMinimalEnv();
+        env.put("HAF_WS_PATH", "/custom/realtime");
+
+        ServerConfig config = ServerConfig.fromEnv(env);
+
+        assertEquals("/custom/realtime", config.getWsPath());
+    }
+
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRequiredConfigurationMutations")
@@ -134,48 +123,7 @@ class ServerConfigTest {
         assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
     }
 
-    @Test
-    void load_fails_when_search_cursor_secret_missing() {
-        Map<String, String> env = createMinimalEnv();
-        env.remove("HAF_SEARCH_CURSOR_SECRET");
 
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_fails_when_jwt_secret_missing() {
-        Map<String, String> env = createMinimalEnv();
-        env.remove("HAF_JWT_SECRET");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_fails_when_search_page_size_exceeds_max() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_SEARCH_PAGE_SIZE", "60");
-        env.put("HAF_SEARCH_MAX_PAGE_SIZE", "50");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_fails_when_inline_attachment_limit_exceeds_max() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_ATTACHMENT_MAX_BYTES", "100");
-        env.put("HAF_ATTACHMENT_INLINE_MAX_BYTES", "101");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
-
-    @Test
-    void load_fails_when_jwt_absolute_ttl_is_less_than_refresh_ttl() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_JWT_REFRESH_TTL_SECONDS", "1200");
-        env.put("HAF_JWT_ABSOLUTE_TTL_SECONDS", "600");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
-    }
 
     @Test
     void load_uses_custom_jwt_idle_ttl_when_configured() {
@@ -188,21 +136,13 @@ class ServerConfigTest {
     }
 
     @Test
-    void load_accepts_attachment_policy_wildcards_and_deduplicates() {
+    void load_uses_custom_login_sentinel_password_when_configured() {
         Map<String, String> env = createMinimalEnv();
-        env.put("HAF_ATTACHMENT_ALLOWED_TYPES", "image/*, image/png, */*, image/*");
+        env.put("HAF_LOGIN_SENTINEL_PASSWORD", "custom-sentinel-password");
 
         ServerConfig config = ServerConfig.fromEnv(env);
 
-        assertEquals(java.util.List.of("image/*", "image/png", "*/*"), config.getAttachmentAllowedTypes());
-    }
-
-    @Test
-    void load_fails_when_jwt_idle_ttl_is_too_low() {
-        Map<String, String> env = createMinimalEnv();
-        env.put("HAF_JWT_IDLE_TTL_SECONDS", "30");
-
-        assertThrows(ConfigurationException.class, () -> ServerConfig.fromEnv(env));
+        assertEquals("custom-sentinel-password", config.getLoginSentinelPassword());
     }
 
     @Test
@@ -259,19 +199,21 @@ class ServerConfigTest {
         Path envFile = tempDir.resolve("values.env");
         Files.writeString(
                 envFile,
-                "# comment\n" +
-                        "HAF_DB_USER=repo-user\n" +
-                        "HAF_DB_PASS=repo-pass\n");
+                """
+                # comment
+                HAF_DB_USER=repo-user
+                HAF_DB_PASS=repo-pass
+                """);
 
         Map<String, String> env = new HashMap<>();
         env.put("HAF_DB_USER", "process-user");
-        env.put("HAF_HTTP_PORT", "8443");
+        env.put("HAF_HTTPS_PORT", "8443");
 
         ServerConfig.mergeEnvFile(env, envFile);
 
         assertEquals("repo-user", env.get("HAF_DB_USER"));
         assertEquals("repo-pass", env.get("HAF_DB_PASS"));
-        assertEquals("8443", env.get("HAF_HTTP_PORT"));
+        assertEquals("8443", env.get("HAF_HTTPS_PORT"));
     }
 
     private Map<String, String> createMinimalEnv() {
@@ -298,6 +240,36 @@ class ServerConfigTest {
                         (Consumer<Map<String, String>>) env -> env.put("HAF_DB_URL", "   ")),
                 Arguments.of(
                         "invalid_db_pool_size",
-                        (Consumer<Map<String, String>>) env -> env.put("HAF_DB_POOL_SIZE", "not-a-number")));
+                        (Consumer<Map<String, String>>) env -> env.put("HAF_DB_POOL_SIZE", "not-a-number")),
+                Arguments.of(
+                        "trust_proxy_enabled_without_cidrs",
+                        (Consumer<Map<String, String>>) env -> { env.put("HAF_TRUST_PROXY", "true"); env.remove("HAF_TRUSTED_PROXY_CIDRS"); }),
+                Arguments.of(
+                        "trusted_proxy_cidr_is_invalid",
+                        (Consumer<Map<String, String>>) env -> { env.put("HAF_TRUST_PROXY", "true"); env.put("HAF_TRUSTED_PROXY_CIDRS", "invalid-value"); }),
+                Arguments.of(
+                        "ingress_executor_values_are_invalid",
+                        (Consumer<Map<String, String>>) env -> env.put("HAF_INGRESS_EXECUTOR_THREADS", "0")),
+                Arguments.of(
+                        "ws_path_contains_query",
+                        (Consumer<Map<String, String>>) env -> env.put("HAF_WS_PATH", "/custom/realtime?token=bad")),
+                Arguments.of(
+                        "search_cursor_secret_missing",
+                        (Consumer<Map<String, String>>) env -> env.remove("HAF_SEARCH_CURSOR_SECRET")),
+                Arguments.of(
+                        "jwt_secret_missing",
+                        (Consumer<Map<String, String>>) env -> env.remove("HAF_JWT_SECRET")),
+                Arguments.of(
+                        "search_page_size_exceeds_max",
+                        (Consumer<Map<String, String>>) env -> { env.put("HAF_SEARCH_PAGE_SIZE", "60"); env.put("HAF_SEARCH_MAX_PAGE_SIZE", "50"); }),
+                Arguments.of(
+                        "inline_attachment_limit_exceeds_max",
+                        (Consumer<Map<String, String>>) env -> { env.put("HAF_ATTACHMENT_MAX_BYTES", "100"); env.put("HAF_ATTACHMENT_INLINE_MAX_BYTES", "101"); }),
+                Arguments.of(
+                        "jwt_absolute_ttl_is_less_than_refresh_ttl",
+                        (Consumer<Map<String, String>>) env -> { env.put("HAF_JWT_REFRESH_TTL_SECONDS", "1200"); env.put("HAF_JWT_ABSOLUTE_TTL_SECONDS", "600"); }),
+                Arguments.of(
+                        "jwt_idle_ttl_is_too_low",
+                        (Consumer<Map<String, String>>) env -> env.put("HAF_JWT_IDLE_TTL_SECONDS", "30")));
     }
 }

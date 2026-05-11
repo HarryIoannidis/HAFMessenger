@@ -25,7 +25,9 @@ public class ChatViewModel {
 
     private final StringProperty recipientId = new SimpleStringProperty("");
     private final StringProperty draftText = new SimpleStringProperty("");
+    private final StringProperty typingText = new SimpleStringProperty("");
     private final BooleanBinding canSend;
+    private boolean localTypingActive;
 
     /**
      * Creates a chat view-model wrapper around the shared message view-model.
@@ -40,6 +42,15 @@ public class ChatViewModel {
                         && !normalizeDraft(draftText.get()).isEmpty(),
                 recipientId,
                 draftText);
+        if (messageViewModel != null) {
+            messageViewModel.addTypingListener((userId, typing) -> {
+                String activeRecipient = normalize(recipientId.get());
+                if (!activeRecipient.equals(normalize(userId))) {
+                    return;
+                }
+                typingText.set(typing ? "Typing..." : "");
+            });
+        }
     }
 
     /**
@@ -71,6 +82,15 @@ public class ChatViewModel {
     }
 
     /**
+     * The typing status text property.
+     *
+     * @return typing status text property
+     */
+    public StringProperty typingTextProperty() {
+        return typingText;
+    }
+
+    /**
      * Returns the currently selected chat recipient id.
      *
      * @return active recipient id, or empty string when no contact is selected
@@ -86,6 +106,7 @@ public class ChatViewModel {
      */
     public void setRecipient(String newRecipientId) {
         String previousRecipient = normalize(recipientId.get());
+        stopTyping(previousRecipient);
         if (!previousRecipient.isEmpty()) {
             String currentDraft = draftText.get();
             if (currentDraft != null && !currentDraft.isEmpty()) {
@@ -100,6 +121,7 @@ public class ChatViewModel {
 
         String restoredDraft = draftsByRecipient.getOrDefault(normalized, "");
         draftText.set(restoredDraft);
+        typingText.set("");
 
         acknowledgeActiveRecipient();
     }
@@ -194,8 +216,51 @@ public class ChatViewModel {
         }
 
         messageViewModel.sendTextMessage(activeRecipient, message);
+        stopTyping(activeRecipient);
         draftText.set("");
         draftsByRecipient.remove(activeRecipient);
+    }
+
+    /**
+     * Notifies the system of draft activity, triggering a typing start event if necessary.
+     */
+    public void notifyDraftActivity() {
+        if (messageViewModel == null) {
+            return;
+        }
+        String activeRecipient = normalize(recipientId.get());
+        if (activeRecipient.isEmpty()) {
+            return;
+        }
+        if (normalizeDraft(draftText.get()).isEmpty()) {
+            stopTyping(activeRecipient);
+            return;
+        }
+        if (!localTypingActive) {
+            messageViewModel.sendTypingStart(activeRecipient);
+            localTypingActive = true;
+        }
+    }
+
+    /**
+     * Stops the local typing indicator for the active recipient.
+     */
+    public void stopTyping() {
+        stopTyping(normalize(recipientId.get()));
+    }
+
+    /**
+     * Stops the local typing indicator for a specific recipient.
+     *
+     * @param recipient the recipient to stop typing for
+     */
+    private void stopTyping(String recipient) {
+        if (messageViewModel == null || !localTypingActive || recipient == null || recipient.isBlank()) {
+            localTypingActive = false;
+            return;
+        }
+        messageViewModel.sendTypingStop(recipient);
+        localTypingActive = false;
     }
 
     /**

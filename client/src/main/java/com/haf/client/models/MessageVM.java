@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
  * @param fileSize  human-readable size string for FILE messages (e.g. "2.4 MB")
  * @param timestamp when the message was created / received
  * @param loading   true while an attachment bubble is still resolving content
+ * @param envelopeId server envelope id when known
+ * @param readState outgoing read state used by the receipt tick
  */
 public record MessageVM(
         boolean outgoing,
@@ -23,7 +25,36 @@ public record MessageVM(
         String fileName,
         String fileSize,
         LocalDateTime timestamp,
-        boolean loading) {
+        boolean loading,
+        String envelopeId,
+        ReadState readState) {
+
+    public enum ReadState {
+        UNREAD,
+        READ
+    }
+
+    public MessageVM(
+            boolean outgoing,
+            MessageType type,
+            String content,
+            String localPath,
+            String fileName,
+            String fileSize,
+            LocalDateTime timestamp,
+            boolean loading) {
+        this(
+                outgoing,
+                type,
+                content,
+                localPath,
+                fileName,
+                fileSize,
+                timestamp,
+                loading,
+                null,
+                outgoing ? ReadState.UNREAD : ReadState.READ);
+    }
 
     /**
      * Convenience factory for outgoing text messages.
@@ -158,5 +189,54 @@ public record MessageVM(
      */
     public boolean isLoading() {
         return loading;
+    }
+
+    /**
+     * Returns a copy of this message with the given envelope ID.
+     *
+     * @param envelopeId the new envelope ID
+     * @return a new message instance
+     */
+    public MessageVM withEnvelopeId(String envelopeId) {
+        return new MessageVM(
+                outgoing,
+                type,
+                content,
+                localPath,
+                fileName,
+                fileSize,
+                timestamp,
+                loading,
+                envelopeId,
+                readState);
+    }
+
+    /**
+     * Returns a copy of this message with the given read state.
+     *
+     * @param readState the new read state
+     * @return a new message instance
+     */
+    public MessageVM withReadState(ReadState readState) {
+        return new MessageVM(
+                outgoing,
+                type,
+                content,
+                localPath,
+                fileName,
+                fileSize,
+                timestamp,
+                loading,
+                envelopeId,
+                readState == null ? this.readState : readState);
+    }
+
+    /**
+     * Checks if this message is marked as read.
+     *
+     * @return true if read
+     */
+    public boolean isRead() {
+        return readState == ReadState.READ;
     }
 }

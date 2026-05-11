@@ -8,26 +8,27 @@ This repository contains a Java 25 secure messaging system for HAF workflows, sp
 
 - Architecture: JavaFX 25 desktop client + plain Java server + shared contract/crypto module.
 - Build: Maven multi-module (`shared`, `client`, `server`) targeting Java 25 (`maven.compiler.release=25`).
-- Transport: TLS 1.3 with authenticated HTTPS APIs and mailbox polling for receive/ACK flows.
+- Transport: TLS 1.3 with authenticated HTTPS REST APIs and authenticated WSS realtime messaging.
 - Messaging crypto: X25519 (XDH) key agreement + AES-256-GCM payload encryption + mandatory Ed25519 signatures on message envelopes.
-- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V17`).
-- Server ingress: `/api/v1/messages`, auth, search, contacts, attachment lifecycle, config endpoints.
+- Persistence: MySQL via HikariCP and Flyway migrations (`V1`-`V18`).
+- Server ingress: HTTPS REST auth/search/contacts/attachment/config endpoints plus WSS `/ws/v1/realtime` for live messaging.
 
 ## Key Types/Interfaces
 
-- `client.network.MessageSender`: send/encrypt message and attachment-related operations.
-- `client.network.MessageReceiver`: receive/decrypt flows and envelope acknowledgement.
+- `client.network.MessageSender`: encrypt message, send over WSS, and perform attachment-related REST operations.
+- `client.network.MessageReceiver`: receive/decrypt WSS events and emit read/delivery receipts.
 - `shared.keystore.KeyProvider`: sender identity + recipient public-key resolution.
 - `shared.utils.MessageValidator`: wire/policy validation for `EncryptedMessage`.
-- `server.ingress.HttpIngressServer`: HTTPS endpoint surface.
+- `server.ingress.HttpIngressServer`: HTTPS REST endpoint surface.
+- `server.realtime.RealtimeWebSocketServer`: authenticated WSS realtime gateway.
 - `server.router.MailboxRouter`: envelope routing and ACK handling.
 
 ## Flow
 
 1. Client authenticates via HTTPS and stores access/refresh session tokens.
-2. Client encrypts payload with `MessageEncryptor` and sends envelope through `MessageSender`.
-3. Server validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
-4. Receiver consumes envelopes via HTTPS polling, validates, decrypts with `MessageDecryptor`, and acknowledges envelope IDs.
+2. Client opens authenticated WSS after login and sends encrypted live envelopes through `MessageSender`.
+3. Server revalidates the session per event, validates envelope metadata, rate-limits, stores via DAO, and routes via `MailboxRouter`.
+4. Receiver consumes WSS events, validates, decrypts with `MessageDecryptor`, and emits read/delivery receipts.
 5. Attachments follow init/chunk/complete/bind/download endpoints, with binary chunk upload/download bodies and JSON lifecycle metadata.
 
 ## Error/Security Notes
@@ -123,8 +124,8 @@ This script:
 - Bundles a first-run server launcher that:
   - checks `devtunnel` availability and login status
   - creates/reuses a persistent tunnel ID
-  - configures public access on port `8443`
-  - starts tunnel host + server and prints the forwarding URL
+  - configures public access on REST port `8443` and WSS port `8444`
+  - starts tunnel host + server and prints both forwarding URLs
 
 Output path:
 
@@ -144,7 +145,7 @@ Optional environment overrides:
 Runtime notes:
 
 - The server launcher writes first-run config under `~/.config/hafmessenger-server/`.
-- Tunnel metadata is persisted at `~/.config/hafmessenger-server/runtime/devtunnel.env`.
+- Tunnel metadata is persisted at `~/.config/hafmessenger-server/runtime/devtunnel.env`, including the REST HTTPS and realtime WSS URLs.
 - The host must have `devtunnel` installed and authenticated once via `devtunnel user login`.
 
 ## Build Windows Installer (`.msi` / `.exe`)

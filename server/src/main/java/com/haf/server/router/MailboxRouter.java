@@ -70,6 +70,22 @@ public final class MailboxRouter implements AutoCloseable {
     }
 
     /**
+     * Handles message ingress with per-sender client idempotency.
+     *
+     * @param message         encrypted message
+     * @param clientMessageId client-provided idempotency key
+     * @return ingress result
+     */
+    public MailboxIngressResult ingressIdempotent(EncryptedMessage message, String clientMessageId) {
+        Envelope.InsertResult result = envelopeDAO.insertIdempotent(message, clientMessageId);
+        if (!result.duplicate()) {
+            metricsRegistry.increaseQueueDepth();
+            dispatch(message.getRecipientId(), result.envelope());
+        }
+        return new MailboxIngressResult(result.envelope(), result.duplicate());
+    }
+
+    /**
      * Fetches undelivered messages for a specific recipient.
      *
      * @param recipientId The ID of the recipient.
@@ -81,65 +97,125 @@ public final class MailboxRouter implements AutoCloseable {
     }
 
     /**
-     * Acknowledges the delivery of messages by their envelope IDs.
+     * Fetches envelopes that belong to a mailbox owner, regardless of delivery
+     * status.
      *
-     * @param envelopeIds a collection of envelope IDs to acknowledge.
-     * @return true if the acknowledgment was successful, false otherwise.
+     * @param userId      mailbox owner
+     * @param envelopeIds candidate envelope IDs
+     * @return owned non-expired envelopes
      */
-    public boolean acknowledge(Collection<String> envelopeIds) {
-        Map<String, QueuedEnvelope> envelopes = envelopeDAO.fetchByIds(envelopeIds);
-
-        boolean updated = envelopeDAO.markDelivered(List.copyOf(envelopeIds));
-
-        if (updated) {
-            long now = System.currentTimeMillis();
-            for (QueuedEnvelope envelope : envelopes.values()) {
-                long latency = now - envelope.createdAtEpochMs();
-                metricsRegistry.recordDeliveryLatency(latency);
-            }
-            metricsRegistry.decreaseQueueDepth(envelopeIds.size());
+    public List<QueuedEnvelope> fetchOwned(String userId, Collection<String> envelopeIds) {
+        if (userId == null || envelopeIds == null || envelopeIds.isEmpty()) {
+            return List.of();
         }
-        return updated;
+        return envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds).values().stream()
+                .filter(env -> userId.equals(env.payload().getRecipientId()))
+                .toList();
     }
 
     /**
-     * Acknowledges delivery for the specified user only.
-     * Filters out any envelope IDs that do not belong to the provided user to
-     * prevent cross-user acknowledgements.
+     * Acknowledges delivery for the specified user only and returns the owned
+     * envelopes that were acknowledged.
      *
-     * @param userId      the user who owns the mailbox
-     * @param envelopeIds the candidate envelope IDs to acknowledge
-     * @return true if at least one envelope was acknowledged, false otherwise
+     * @param userId      mailbox owner
+     * @param envelopeIds candidate envelope IDs
+     * @return owned envelopes that were marked delivered
      */
-    public boolean acknowledgeOwned(String userId, Collection<String> envelopeIds) {
+    public List<QueuedEnvelope> acknowledgeOwnedAndReturn(String userId, Collection<String> envelopeIds) {
         if (userId == null || envelopeIds == null || envelopeIds.isEmpty()) {
-            return false;
+            return List.of();
         }
 
-        Map<String, QueuedEnvelope> envelopes = envelopeDAO.fetchByIds(envelopeIds);
+        Map<String, QueuedEnvelope> envelopes = envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds);
 
-        // Filter to envelopes that belong to the user
-        List<String> owned = envelopes.values().stream()
-                .filter(env -> userId.equals(env.payload().getRecipientId()))
-                .map(QueuedEnvelope::envelopeId)
+        List<String> owned = envelopeIds.stream()
+                .filter(id -> {
+                    QueuedEnvelope envelope = envelopes.get(id);
+                    return envelope != null && userId.equals(envelope.payload().getRecipientId());
+                })
+                .distinct()
                 .toList();
 
         if (owned.isEmpty()) {
-            return false;
+            return List.of();
         }
 
+        Map<String, QueuedEnvelope> newlyDelivered = envelopeDAO.fetchByIds(owned);
         boolean updated = envelopeDAO.markDelivered(owned);
         if (updated) {
-            long now = System.currentTimeMillis();
-            for (QueuedEnvelope envelope : envelopes.values()) {
-                if (owned.contains(envelope.envelopeId())) {
-                    long latency = now - envelope.createdAtEpochMs();
-                    metricsRegistry.recordDeliveryLatency(latency);
-                }
-            }
-            metricsRegistry.decreaseQueueDepth(owned.size());
+            recordNewDeliveryMetrics(newlyDelivered.values());
         }
-        return updated;
+        if (!updated) {
+            return List.of();
+        }
+        return owned.stream()
+                .map(envelopes::get)
+                .toList();
+    }
+
+    /**
+     * Marks owned envelopes as read. Read receipts imply delivery, so undelivered
+     * owned envelopes are also removed from the mailbox queue.
+     *
+     * @param userId      mailbox owner emitting the read receipt
+     * @param envelopeIds candidate envelope IDs
+     * @return owned envelopes that were marked read
+     */
+    public List<QueuedEnvelope> markReadOwnedAndReturn(String userId, Collection<String> envelopeIds) {
+        if (userId == null || envelopeIds == null || envelopeIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, QueuedEnvelope> envelopes = envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds);
+        List<String> owned = envelopeIds.stream()
+                .filter(id -> {
+                    QueuedEnvelope envelope = envelopes.get(id);
+                    return envelope != null && userId.equals(envelope.payload().getRecipientId());
+                })
+                .distinct()
+                .toList();
+
+        if (owned.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, QueuedEnvelope> newlyDelivered = envelopeDAO.fetchByIds(owned);
+        boolean updated = envelopeDAO.markRead(owned);
+        if (updated) {
+            recordNewDeliveryMetrics(newlyDelivered.values());
+        }
+        if (!updated) {
+            return List.of();
+        }
+        return owned.stream()
+                .map(envelopes::get)
+                .toList();
+    }
+
+    /**
+     * Fetches minimal persisted receipt state for replay to a reconnecting sender.
+     *
+     * @param senderId sender whose outbound receipt state should be replayed
+     * @param limit    maximum receipt rows to fetch
+     * @return minimal receipt metadata
+     */
+    public List<ReceiptReplay> fetchReceiptReplayForSender(String senderId, int limit) {
+        return envelopeDAO.fetchReceiptsForSender(senderId, limit).stream()
+                .map(record -> new ReceiptReplay(record.envelopeId(), record.recipientId(),
+                        record.state() == Envelope.ReceiptState.READ))
+                .toList();
+    }
+
+    private void recordNewDeliveryMetrics(Collection<QueuedEnvelope> newlyDelivered) {
+        if (newlyDelivered == null || newlyDelivered.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (QueuedEnvelope envelope : newlyDelivered) {
+            long latency = now - envelope.createdAtEpochMs();
+            metricsRegistry.recordDeliveryLatency(latency);
+        }
+        metricsRegistry.decreaseQueueDepth(newlyDelivered.size());
     }
 
     /**
@@ -181,10 +257,6 @@ public final class MailboxRouter implements AutoCloseable {
     private void dispatch(String recipientId, QueuedEnvelope envelope) {
         Set<MailboxSubscriber> subs = subscribers.get(recipientId);
         if (subs != null) {
-            // Track delivery latency from ingress to dequeue.
-            // This is done here because the message is being pushed to the client.
-            long latency = System.currentTimeMillis() - envelope.createdAtEpochMs();
-            metricsRegistry.recordDeliveryLatency(latency);
             subs.forEach(sub -> sub.onEnvelope(envelope));
         }
     }
@@ -232,5 +304,24 @@ public final class MailboxRouter implements AutoCloseable {
      * @param subscriber  the subscriber associated with the subscription.
      */
     public record MailboxSubscription(String recipientId, MailboxSubscriber subscriber) {
+    }
+
+    /**
+     * Idempotent mailbox ingress outcome.
+     *
+     * @param envelope  stored envelope
+     * @param duplicate true when a previous client message id was reused
+     */
+    public record MailboxIngressResult(QueuedEnvelope envelope, boolean duplicate) {
+    }
+
+    /**
+     * Minimal receipt replay metadata for sender reconnects.
+     *
+     * @param envelopeId  envelope whose receipt state should be replayed
+     * @param recipientId original recipient who emitted the receipt
+     * @param read        true for read, false for delivered
+     */
+    public record ReceiptReplay(String envelopeId, String recipientId, boolean read) {
     }
 }

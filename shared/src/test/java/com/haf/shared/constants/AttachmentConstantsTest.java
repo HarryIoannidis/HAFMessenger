@@ -22,21 +22,14 @@ class AttachmentConstantsTest {
     }
 
     @Test
-    void is_allowed_attachment_type_accepts_any_valid_mime_type_by_default() {
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("image/png"));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("application/pdf; charset=binary"));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("text/plain"));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("application/x-msdownload"));
+    void is_valid_attachment_type_accepts_any_valid_mime_type_by_default() {
+        assertTrue(AttachmentConstants.isValidAttachmentType("image/png"));
+        assertTrue(AttachmentConstants.isValidAttachmentType("application/pdf; charset=binary"));
+        assertTrue(AttachmentConstants.isValidAttachmentType("text/plain"));
+        assertTrue(AttachmentConstants.isValidAttachmentType("application/x-msdownload"));
 
-        assertFalse(AttachmentConstants.isAllowedAttachmentType("not-a-mime"));
-        assertFalse(AttachmentConstants.isAllowedAttachmentType(null));
+        assertFalse(AttachmentConstants.isValidAttachmentType("not-a-mime"));
+        assertFalse(AttachmentConstants.isValidAttachmentType(null));
     }
 
-    @Test
-    void attachment_policy_supports_exact_subtype_and_global_wildcards() {
-        assertTrue(AttachmentConstants.isAttachmentTypeAllowedByPolicy("image/png", java.util.List.of("image/*")));
-        assertTrue(AttachmentConstants.isAttachmentTypeAllowedByPolicy("application/pdf", java.util.List.of("*/*")));
-        assertFalse(AttachmentConstants.isAttachmentTypeAllowedByPolicy("text/plain", java.util.List.of("image/*")));
-        assertFalse(AttachmentConstants.isAttachmentTypeAllowedByPolicy("not-a-mime", java.util.List.of("*/*")));
-    }
 }
