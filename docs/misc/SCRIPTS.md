@@ -27,7 +27,7 @@ Document repository automation scripts that package the desktop client for distr
   - Linux-only (`uname -s` must be `Linux`).
   - Builds `shared` + `server`, packages a server-focused `.AppImage`.
   - Installs an `AppRun` wrapper that starts `resources/server-launcher.sh`.
-  - Runtime launcher manages Dev Tunnel lifecycle for `8443` and writes metadata to user config.
+  - Runtime launcher manages Dev Tunnel lifecycle for REST `8443` and WSS `8444`, then writes metadata to user config.
 - `scripts/package-mac-app.sh`
   - macOS-only (`uname -s` must be `Darwin`).
   - Uses `jpackage` with classpath-staged jars.

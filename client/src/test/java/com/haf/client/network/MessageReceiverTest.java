@@ -1,7 +1,6 @@
 package com.haf.client.network;
 
 import com.haf.client.crypto.UserKeystoreKeyProvider;
-import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.EncryptedMessage;
@@ -11,65 +10,81 @@ import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FilePerms;
 import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.FingerprintUtil;
-import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.SigningKeyIO;
+import com.haf.shared.websocket.RealtimeEvent;
+import com.haf.shared.websocket.RealtimeEventType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
-import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 class MessageReceiverTest {
 
-    static class MockAuthHttpClient extends AuthHttpClient {
-        private final ArrayDeque<String> messageResponses = new ArrayDeque<>();
-        private final ArrayDeque<String> contactsResponses = new ArrayDeque<>();
-        private RuntimeException getFailure;
-        private final List<String> getPaths = new ArrayList<>();
-        private final List<String> postPaths = new ArrayList<>();
-        private final List<String> postBodies = new ArrayList<>();
+    static class RecordingRealtimeTransport implements RealtimeTransport {
+        private Consumer<RealtimeEvent> eventListener = event -> {
+        };
+        private Consumer<Throwable> errorListener = error -> {
+        };
+        private final List<List<String>> deliveryReceipts = new ArrayList<>();
+        private final List<List<String>> readReceipts = new ArrayList<>();
+        private final List<String> typingEvents = new ArrayList<>();
+        private int startCalls;
         private int closeCalls;
 
-        MockAuthHttpClient() {
-            super(java.net.URI.create("https://localhost:8443"), "test-session-id");
+        @Override
+        public void setEventListener(Consumer<RealtimeEvent> listener) {
+            eventListener = listener == null ? event -> {
+            } : listener;
         }
 
         @Override
-        public CompletableFuture<String> getAuthenticated(String path) {
-            getPaths.add(path);
-            if (getFailure != null) {
-                return CompletableFuture.failedFuture(getFailure);
-            }
-            if (path.startsWith("/api/v1/messages")) {
-                String next = messageResponses.isEmpty() ? "{\"messages\":[]}" : messageResponses.removeFirst();
-                return CompletableFuture.completedFuture(next);
-            }
-            if (path.startsWith("/api/v1/contacts")) {
-                String next = contactsResponses.isEmpty() ? "{\"contacts\":[]}" : contactsResponses.removeFirst();
-                return CompletableFuture.completedFuture(next);
-            }
-            return CompletableFuture.completedFuture("{}");
+        public void setErrorListener(Consumer<Throwable> listener) {
+            errorListener = listener == null ? error -> {
+            } : listener;
         }
 
         @Override
-        public CompletableFuture<String> postAuthenticated(String path, String body) {
-            postPaths.add(path);
-            postBodies.add(body);
-            return CompletableFuture.completedFuture("{\"acknowledged\":true}");
+        public void start() {
+            startCalls++;
+        }
+
+        @Override
+        public void reconnect() {
+            // Reconnect scheduling is outside these receiver unit tests.
+        }
+
+        @Override
+        public MessageSender.SendResult sendMessage(EncryptedMessage encryptedMessage, String recipientKeyFingerprint) {
+            return new MessageSender.SendResult("env-unused", 0L);
+        }
+
+        @Override
+        public void sendDeliveryReceipt(List<String> envelopeIds, String recipientId) {
+            deliveryReceipts.add(List.copyOf(envelopeIds));
+        }
+
+        @Override
+        public void sendReadReceipt(List<String> envelopeIds, String recipientId) {
+            readReceipts.add(List.copyOf(envelopeIds));
+        }
+
+        @Override
+        public void sendTypingStart(String recipientId) {
+            typingEvents.add("start:" + recipientId);
+        }
+
+        @Override
+        public void sendTypingStop(String recipientId) {
+            typingEvents.add("stop:" + recipientId);
         }
 
         @Override
@@ -77,16 +92,12 @@ class MessageReceiverTest {
             closeCalls++;
         }
 
-        void enqueueMessagePoll(String responseJson) {
-            messageResponses.addLast(responseJson);
+        void emit(RealtimeEvent event) {
+            eventListener.accept(event);
         }
 
-        void enqueueContactsPoll(String responseJson) {
-            contactsResponses.addLast(responseJson);
-        }
-
-        void failGetWith(RuntimeException error) {
-            getFailure = error;
+        void emitError(Throwable error) {
+            errorListener.accept(error);
         }
     }
 
@@ -99,11 +110,12 @@ class MessageReceiverTest {
     UserKeystore keyStore;
     UserKeystoreKeyProvider keyProvider;
     ClockProvider clockProvider;
-    MockAuthHttpClient authHttpClient;
+    RecordingRealtimeTransport realtimeTransport;
     MessageReceiver messageReceiver;
     List<byte[]> receivedMessages;
     List<Throwable> receivedErrors;
     List<String> presenceUpdates;
+    List<String> typingUpdates;
 
     @BeforeEach
     void setup() throws Exception {
@@ -120,12 +132,12 @@ class MessageReceiverTest {
 
         keyProvider = new UserKeystoreKeyProvider(tmpRoot, recipientKeyId, passphrase);
         clockProvider = new FixedClockProvider(1_000_000L);
-        authHttpClient = new MockAuthHttpClient();
-
-        messageReceiver = new DefaultMessageReceiver(keyProvider, clockProvider, authHttpClient, recipientKeyId);
+        realtimeTransport = new RecordingRealtimeTransport();
+        messageReceiver = new DefaultMessageReceiver(keyProvider, clockProvider, recipientKeyId, realtimeTransport);
         receivedMessages = new ArrayList<>();
         receivedErrors = new ArrayList<>();
         presenceUpdates = new ArrayList<>();
+        typingUpdates = new ArrayList<>();
 
         messageReceiver.setMessageListener(new MessageReceiver.MessageListener() {
             @Override
@@ -143,6 +155,11 @@ class MessageReceiverTest {
             public void onPresenceUpdate(String userId, boolean active) {
                 presenceUpdates.add(userId + ":" + active);
             }
+
+            @Override
+            public void onTyping(String userId, boolean typing) {
+                typingUpdates.add(userId + ":" + typing);
+            }
         });
     }
 
@@ -151,20 +168,83 @@ class MessageReceiverTest {
         if (tmpRoot == null) {
             return;
         }
-        try (var w = Files.walk(tmpRoot)) {
-            w.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
+        try (var paths = Files.walk(tmpRoot)) {
+            paths.sorted((a, b) -> b.getNameCount() - a.getNameCount()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException ignored) {
-                    // Ignore cleanup failures in tests.
+                    // Best-effort cleanup in tests.
                 }
             });
         }
     }
 
     @Test
-    void polling_ingests_mailbox_and_acknowledges_over_http() throws Exception {
-        byte[] payload = "hello polling".getBytes(StandardCharsets.UTF_8);
+    void wss_new_message_decrypts_deduplicates_and_emits_receipts() throws Exception {
+        byte[] payload = "hello wss".getBytes(StandardCharsets.UTF_8);
+        EncryptedMessage encrypted = encryptedMessage(payload);
+        RealtimeEvent event = RealtimeEvent.serverEvent(RealtimeEventType.NEW_MESSAGE);
+        event.setEnvelopeId("env-1");
+        event.setSenderId(senderKeyId);
+        event.setRecipientId(recipientKeyId);
+        event.setEncryptedMessage(encrypted);
+
+        messageReceiver.start();
+        realtimeTransport.emit(event);
+        realtimeTransport.emit(event);
+
+        assertEquals(1, realtimeTransport.startCalls);
+        assertEquals(1, receivedMessages.size());
+        assertArrayEquals(payload, receivedMessages.getFirst());
+        assertEquals(List.of(List.of("env-1")), realtimeTransport.deliveryReceipts);
+
+        messageReceiver.acknowledgeEnvelopes(senderKeyId);
+
+        assertEquals(List.of(List.of("env-1")), realtimeTransport.readReceipts);
+    }
+
+    @Test
+    void wss_presence_and_typing_events_are_forwarded() throws Exception {
+        messageReceiver.start();
+        RealtimeEvent presence = RealtimeEvent.serverEvent(RealtimeEventType.PRESENCE_UPDATE);
+        presence.setSenderId("contact-1");
+        presence.setActive(true);
+        realtimeTransport.emit(presence);
+
+        RealtimeEvent typing = RealtimeEvent.serverEvent(RealtimeEventType.TYPING_START);
+        typing.setSenderId("contact-1");
+        realtimeTransport.emit(typing);
+
+        assertEquals(List.of("contact-1:true"), presenceUpdates);
+        assertEquals(List.of("contact-1:true"), typingUpdates);
+    }
+
+    @Test
+    void typing_methods_send_wss_events() {
+        messageReceiver.sendTypingStart("recipient-1");
+        messageReceiver.sendTypingStop("recipient-1");
+
+        assertEquals(List.of("start:recipient-1", "stop:recipient-1"), realtimeTransport.typingEvents);
+    }
+
+    @Test
+    void transport_error_is_forwarded_to_listener() throws Exception {
+        IOException error = new IOException("connection closed");
+
+        messageReceiver.start();
+        realtimeTransport.emitError(error);
+
+        assertEquals(List.of(error), receivedErrors);
+    }
+
+    @Test
+    void stop_closes_realtime_transport() {
+        messageReceiver.stop();
+
+        assertEquals(1, realtimeTransport.closeCalls);
+    }
+
+    private EncryptedMessage encryptedMessage(byte[] payload) throws Exception {
         MessageEncryptor encryptor = new MessageEncryptor(
                 recipientKp.getPublic(),
                 senderKeyId,
@@ -177,74 +257,6 @@ class MessageReceiverTest {
                 encrypted,
                 keyStore.loadSigningPrivate(senderKeyId, passphrase),
                 senderSigningFingerprint);
-        String envelope = "{\"type\":\"message\",\"envelopeId\":\"env-1\",\"payload\":" + JsonCodec.toJson(encrypted) + "}";
-        authHttpClient.enqueueMessagePoll("{\"messages\":[" + envelope + "]}");
-
-        messageReceiver.start();
-        waitForCondition(() -> receivedMessages.size() == 1, 2500L);
-
-        assertArrayEquals(payload, receivedMessages.getFirst());
-        messageReceiver.acknowledgeEnvelopes(senderKeyId);
-
-        assertEquals(List.of("/api/v1/messages/ack"), authHttpClient.postPaths);
-        assertEquals(List.of("{\"envelopeIds\":[\"env-1\"]}"), authHttpClient.postBodies);
-    }
-
-    @Test
-    void polling_emits_presence_updates_only_on_state_change() throws Exception {
-        authHttpClient.enqueueContactsPoll("{\"contacts\":[{\"userId\":\"u-1\",\"fullName\":\"User\",\"active\":true}]}");
-        authHttpClient.enqueueContactsPoll("{\"contacts\":[{\"userId\":\"u-1\",\"fullName\":\"User\",\"active\":true}]}");
-        authHttpClient.enqueueContactsPoll("{\"contacts\":[{\"userId\":\"u-1\",\"fullName\":\"User\",\"active\":false}]}");
-
-        messageReceiver.start();
-        waitForCondition(() -> presenceUpdates.size() >= 2, 6500L);
-
-        assertEquals(List.of("u-1:true", "u-1:false"), presenceUpdates);
-    }
-
-    @Test
-    void polling_stops_and_surfaces_auth_failure_once() throws Exception {
-        authHttpClient.failGetWith(new HttpCommunicationException("Unauthorized", 401, "{\"error\":\"invalid session\"}"));
-
-        messageReceiver.start();
-        waitForCondition(() -> !receivedErrors.isEmpty(), 2500L);
-
-        assertEquals(1, receivedErrors.size());
-        assertTrue(isAuthenticationFailure(receivedErrors.getFirst()));
-        assertTrue(authHttpClient.getPaths.size() <= 2);
-    }
-
-    @Test
-    void stop_closes_adapter() throws Exception {
-        messageReceiver.start();
-        messageReceiver.stop();
-        assertEquals(1, authHttpClient.closeCalls);
-    }
-
-    private static boolean isAuthenticationFailure(Throwable error) {
-        Throwable current = error;
-        while (current != null) {
-            if (current instanceof HttpCommunicationException communicationException) {
-                int statusCode = communicationException.getStatusCode();
-                return statusCode == 401 || statusCode == 403;
-            }
-            current = current.getCause();
-        }
-        return false;
-    }
-
-    private static void waitForCondition(BooleanSupplier condition, long timeoutMs) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
-        long interval = TimeUnit.MILLISECONDS.toNanos(20L);
-        while (System.nanoTime() < deadline) {
-            if (condition.getAsBoolean()) {
-                return;
-            }
-            LockSupport.parkNanos(interval);
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("Interrupted while waiting for test condition");
-            }
-        }
-        fail("Condition not met within timeout");
+        return encrypted;
     }
 }

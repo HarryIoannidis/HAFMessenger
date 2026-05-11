@@ -18,6 +18,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import org.kordamp.ikonli.Ikon;
 import org.kordamp.ikonli.javafx.FontIcon;
+import org.kordamp.ikonli.materialdesign2.MaterialDesignC;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignF;
 import org.kordamp.ikonli.materialdesign2.MaterialDesignZ;
 import java.time.format.DateTimeFormatter;
@@ -497,10 +498,40 @@ public final class MessageBubbleFactory {
             ts.getStyleClass().add("bubble-time-out-pending");
         }
 
-        HBox row = new HBox(ts);
+        HBox row = new HBox(4, ts);
+        if (message.isOutgoing() && !message.isLoading()) {
+            row.getChildren().add(buildReceiptBadge(message));
+        }
         row.setAlignment(Pos.CENTER_RIGHT);
         VBox.setMargin(row, new Insets(2, 0, 0, 0));
         return row;
+    }
+
+    /**
+     * Builds the outgoing receipt glyph: one faded check while unread, two full
+     * checks once read.
+     *
+     * @param message outgoing message metadata
+     * @return fixed-width receipt badge node
+     */
+    private static HBox buildReceiptBadge(MessageVM message) {
+        boolean read = message != null && message.isRead();
+        HBox badge = new HBox(read ? -4 : 0);
+        badge.setAlignment(Pos.CENTER_LEFT);
+        badge.setMinWidth(18);
+        badge.setPrefWidth(18);
+        badge.setMaxWidth(18);
+        badge.getStyleClass().add("bubble-receipt-group-out");
+
+        int checkCount = read ? 2 : 1;
+        for (int i = 0; i < checkCount; i++) {
+            FontIcon receipt = new FontIcon(MaterialDesignC.CHECK);
+            receipt.setIconSize(13);
+            receipt.getStyleClass().add("bubble-receipt-out");
+            receipt.setOpacity(read ? 1.0 : 0.45);
+            badge.getChildren().add(receipt);
+        }
+        return badge;
     }
 
     /**

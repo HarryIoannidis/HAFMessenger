@@ -83,6 +83,11 @@ public class MessagesViewModel {
     }
 
     @FunctionalInterface
+    public interface TypingListener {
+        void onTyping(String userId, boolean typing);
+    }
+
+    @FunctionalInterface
     public interface ImagePreviewFallbackListener {
         /**
          * Receives an event when an image payload is intentionally rendered as a
@@ -116,6 +121,31 @@ public class MessagesViewModel {
     }
 
     private record PreparedAttachment(byte[] bytes, String mediaType, String fileName) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            PreparedAttachment that = (PreparedAttachment) o;
+            return java.util.Arrays.equals(bytes, that.bytes) &&
+                   java.util.Objects.equals(mediaType, that.mediaType) &&
+                   java.util.Objects.equals(fileName, that.fileName);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = java.util.Objects.hash(mediaType, fileName);
+            result = 31 * result + java.util.Arrays.hashCode(bytes);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "PreparedAttachment{" +
+                   "bytes=" + java.util.Arrays.toString(bytes) +
+                   ", mediaType='" + mediaType + '\'' +
+                   ", fileName='" + fileName + '\'' +
+                   '}';
+        }
     }
 
     private final MessageSender messageSender;
@@ -124,9 +154,12 @@ public class MessagesViewModel {
     private final StringProperty status = new SimpleStringProperty("Ready");
     private final List<PresenceListener> presenceListeners = new CopyOnWriteArrayList<>();
     private final List<IncomingMessageListener> incomingMessageListeners = new CopyOnWriteArrayList<>();
+    private final List<TypingListener> typingListeners = new CopyOnWriteArrayList<>();
     private final List<ImagePreviewFallbackListener> imagePreviewFallbackListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ConcurrentMap<String, MessageVM.ReadState>> pendingOutgoingReceiptStates =
+            new ConcurrentHashMap<>();
 
     private final Object policyLock = new Object();
     private volatile MessagingPolicyResponse cachedPolicy;
@@ -189,7 +222,7 @@ public class MessagesViewModel {
         @Override
         public void onMessage(byte[] plaintext, String senderId, String contentType, long timestampEpochMs,
                 String envelopeId) {
-            handleIncomingEnvelope(plaintext, senderId, contentType, timestampEpochMs);
+            handleIncomingEnvelope(plaintext, senderId, contentType, timestampEpochMs, envelopeId);
         }
 
         /**
@@ -215,6 +248,25 @@ public class MessagesViewModel {
             runOnUiThread(() -> notifyPresenceListeners(userId, active));
         }
 
+        @Override
+        public void onTyping(String userId, boolean typing) {
+            handleTypingUpdate(userId, typing);
+        }
+
+        @Override
+        public void onMessageDelivered(String userId, List<String> envelopeIds) {
+            // Delivery receipts keep server/mailbox state clean. The visible tick is
+            // intentionally read/unread only, so delivery does not change opacity.
+        }
+
+        @Override
+        public void onMessageRead(String userId, List<String> envelopeIds) {
+            runOnUiThread(() -> updateOutgoingReceiptState(
+                    normalizeContactId(userId),
+                    envelopeIds,
+                    MessageVM.ReadState.READ));
+        }
+
         /**
          * Handles a decrypted inbound envelope and converts it into a message item for
          * the sender timeline.
@@ -227,10 +279,11 @@ public class MessagesViewModel {
         private void handleIncomingEnvelope(byte[] plaintext,
                 String senderId,
                 String contentType,
-                long timestampEpochMs) {
+                long timestampEpochMs,
+                String envelopeId) {
             String contactId = normalizeContactId(senderId);
             try {
-                routeIncomingEnvelope(plaintext, contactId, contentType, timestampEpochMs);
+                routeIncomingEnvelope(plaintext, contactId, contentType, timestampEpochMs, envelopeId);
             } catch (Exception ex) {
                 handleIncomingRenderFailure(ex);
             }
@@ -249,7 +302,8 @@ public class MessagesViewModel {
         private void routeIncomingEnvelope(byte[] plaintext,
                 String contactId,
                 String contentType,
-                long timestampEpochMs) throws Exception {
+                long timestampEpochMs,
+                String envelopeId) throws Exception {
             if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
                 receiveReferencePayload(plaintext, contactId, timestampEpochMs);
                 return;
@@ -260,6 +314,7 @@ public class MessagesViewModel {
             }
 
             DecodedMessage decoded = decodeIncoming(plaintext, contactId, contentType, timestampEpochMs);
+            decoded = withEnvelopeId(decoded, envelopeId);
             appendDecodedIncomingMessage(contactId, decoded);
         }
 
@@ -403,6 +458,82 @@ public class MessagesViewModel {
         }
     }
 
+    private void handleTypingUpdate(String userId, boolean typing) {
+        String normalized = normalizeContactId(userId);
+        if (normalized.isBlank()) {
+            return;
+        }
+        runOnUiThread(() -> notifyTypingListeners(normalized, typing));
+        if (typing) {
+            CompletableFuture.delayedExecutor(4, java.util.concurrent.TimeUnit.SECONDS)
+                    .execute(() -> runOnUiThread(() -> notifyTypingListeners(normalized, false)));
+        }
+    }
+
+    private void updateOutgoingReceiptState(
+            String contactId,
+            List<String> envelopeIds,
+            MessageVM.ReadState readState) {
+        if (contactId == null || contactId.isBlank() || envelopeIds == null || envelopeIds.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> idSet = new java.util.HashSet<>(envelopeIds);
+        java.util.Set<String> unmatched = new java.util.HashSet<>(idSet);
+        ObservableList<MessageVM> messages = getMessages(contactId);
+        for (int i = 0; i < messages.size(); i++) {
+            MessageVM current = messages.get(i);
+            if (current != null
+                    && current.isOutgoing()
+                    && current.envelopeId() != null
+                    && idSet.contains(current.envelopeId())) {
+                messages.set(i, current.withReadState(readState));
+                unmatched.remove(current.envelopeId());
+            }
+        }
+        rememberPendingOutgoingReceiptStates(contactId, unmatched, readState);
+    }
+
+    private void rememberPendingOutgoingReceiptStates(
+            String contactId,
+            java.util.Set<String> envelopeIds,
+            MessageVM.ReadState readState) {
+        if (contactId == null || contactId.isBlank() || envelopeIds == null || envelopeIds.isEmpty()
+                || readState == null) {
+            return;
+        }
+        ConcurrentMap<String, MessageVM.ReadState> states = pendingOutgoingReceiptStates.computeIfAbsent(
+                contactId,
+                ignored -> new ConcurrentHashMap<>());
+        for (String envelopeId : envelopeIds) {
+            if (envelopeId != null && !envelopeId.isBlank()) {
+                states.put(envelopeId, readState);
+            }
+        }
+    }
+
+    private MessageVM applyPendingOutgoingReceiptState(String contactId, MessageVM message) {
+        if (contactId == null || contactId.isBlank() || message == null || !message.isOutgoing()
+                || message.envelopeId() == null || message.envelopeId().isBlank()) {
+            return message;
+        }
+        ConcurrentMap<String, MessageVM.ReadState> states = pendingOutgoingReceiptStates.get(contactId);
+        if (states == null) {
+            return message;
+        }
+        MessageVM.ReadState readState = states.remove(message.envelopeId());
+        if (states.isEmpty()) {
+            pendingOutgoingReceiptStates.remove(contactId, states);
+        }
+        return readState == null ? message : message.withReadState(readState);
+    }
+
+    private static DecodedMessage withEnvelopeId(DecodedMessage decoded, String envelopeId) {
+        if (decoded == null || decoded.message() == null || envelopeId == null || envelopeId.isBlank()) {
+            return decoded;
+        }
+        return new DecodedMessage(decoded.message().withEnvelopeId(envelopeId), decoded.fallbackNotice());
+    }
+
     /**
      * Sends a plain-text message asynchronously and adds it locally as outgoing
      * bubble.
@@ -430,9 +561,15 @@ public class MessagesViewModel {
     private void sendTextMessageInternal(String contactId, String text, MessageVM pendingVm) {
         try {
             byte[] payload = text.getBytes(StandardCharsets.UTF_8);
-            messageSender.sendMessage(payload, contactId, "text/plain", MessageHeader.MAX_TTL_SECONDS);
+            MessageSender.SendResult sendResult = messageSender.sendMessageWithResult(
+                    payload,
+                    contactId,
+                    "text/plain",
+                    MessageHeader.MAX_TTL_SECONDS);
 
-            MessageVM vm = MessageVM.outgoingText(text, pendingVm.timestamp());
+            MessageVM vm = MessageVM.outgoingText(text, pendingVm.timestamp())
+                    .withEnvelopeId(sendResult == null ? null : sendResult.envelopeId())
+                    .withReadState(MessageVM.ReadState.UNREAD);
             runOnUiThread(() -> replaceLoadingMessage(contactId, pendingVm, vm, "Message sent to " + contactId));
             clearFailedSendRetryAction();
         } catch (Exception e) {
@@ -631,22 +768,24 @@ public class MessagesViewModel {
             byte[] fileBytes,
             LocalDateTime timestamp,
             MessageVM loadingVm) throws Exception {
-        sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
+        MessageSender.SendResult sendResult = sendInlineAttachment(contactId, fileName, mediaType, fileBytes);
         DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
+        outgoing = withEnvelopeId(outgoing, sendResult == null ? null : sendResult.envelopeId());
         MessageVM pendingVm = loadingVm;
+        DecodedMessage resolvedOutgoing = outgoing;
         runOnUiThread(() -> {
             if (pendingVm == null) {
-                getMessages(contactId).add(outgoing.message());
+                getMessages(contactId).add(applyPendingOutgoingReceiptState(contactId, resolvedOutgoing.message()));
                 status.set(buildAttachmentDeliveredStatus(contactId, mediaType, true));
             } else {
                 replaceLoadingMessage(
                         contactId,
                         pendingVm,
-                        outgoing.message(),
+                        resolvedOutgoing.message(),
                         buildAttachmentDeliveredStatus(contactId, mediaType, true));
             }
-            if (outgoing.fallbackNotice() != null) {
-                notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+            if (resolvedOutgoing.fallbackNotice() != null) {
+                notifyImagePreviewFallbackListeners(resolvedOutgoing.fallbackNotice());
             }
         });
     }
@@ -695,18 +834,20 @@ public class MessagesViewModel {
             MessagingPolicyResponse policy,
             LocalDateTime timestamp,
             MessageVM loadingVm) throws Exception {
-        sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
+        MessageSender.SendResult sendResult = sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
 
         DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
+        outgoing = withEnvelopeId(outgoing, sendResult == null ? null : sendResult.envelopeId());
         MessageVM resolvedLoadingVm = loadingVm;
+        DecodedMessage resolvedOutgoing = outgoing;
         runOnUiThread(() -> {
             replaceLoadingMessage(
                     contactId,
                     resolvedLoadingVm,
-                    outgoing.message(),
+                    resolvedOutgoing.message(),
                     buildAttachmentDeliveredStatus(contactId, mediaType, true));
-            if (outgoing.fallbackNotice() != null) {
-                notifyImagePreviewFallbackListeners(outgoing.fallbackNotice());
+            if (resolvedOutgoing.fallbackNotice() != null) {
+                notifyImagePreviewFallbackListeners(resolvedOutgoing.fallbackNotice());
             }
         });
     }
@@ -851,6 +992,14 @@ public class MessagesViewModel {
         messageReceiver.acknowledgeEnvelopes(normalizeContactId(senderId));
     }
 
+    public void sendTypingStart(String recipientId) {
+        messageReceiver.sendTypingStart(normalizeContactId(recipientId));
+    }
+
+    public void sendTypingStop(String recipientId) {
+        messageReceiver.sendTypingStop(normalizeContactId(recipientId));
+    }
+
     /**
      * Observable list of chat messages for a specific contact.
      *
@@ -891,6 +1040,18 @@ public class MessagesViewModel {
     public void removePresenceListener(PresenceListener listener) {
         if (listener != null) {
             presenceListeners.remove(listener);
+        }
+    }
+
+    public void addTypingListener(TypingListener listener) {
+        if (listener != null) {
+            typingListeners.add(listener);
+        }
+    }
+
+    public void removeTypingListener(TypingListener listener) {
+        if (listener != null) {
+            typingListeners.remove(listener);
         }
     }
 
@@ -1034,6 +1195,22 @@ public class MessagesViewModel {
     }
 
     /**
+     * Notifies all typing listeners about a contact's typing status change.
+     *
+     * @param userId the user id
+     * @param typing true if the user is typing, false otherwise
+     */
+    private void notifyTypingListeners(String userId, boolean typing) {
+        for (TypingListener listener : typingListeners) {
+            try {
+                listener.onTyping(userId, typing);
+            } catch (Exception ignored) {
+                // A bad listener must not break dispatching for others.
+            }
+        }
+    }
+
+    /**
      * Notifies listeners when an image-like payload was rendered as a generic file
      * attachment.
      *
@@ -1120,9 +1297,7 @@ public class MessagesViewModel {
      * @throws Exception when stop/start operations fail
      */
     private void reconnectReceiver() throws Exception {
-        messageReceiver.stop();
-        receivingStarted = false;
-        messageReceiver.start();
+        messageReceiver.reconnect();
         receivingStarted = true;
     }
 
@@ -1430,11 +1605,12 @@ public class MessagesViewModel {
             MessageVM loadedVm,
             String resolvedStatus) {
         ObservableList<MessageVM> messages = getMessages(contactId);
+        MessageVM resolvedLoadedVm = applyPendingOutgoingReceiptState(contactId, loadedVm);
         int index = messages.indexOf(loadingVm);
         if (index >= 0) {
-            messages.set(index, loadedVm);
+            messages.set(index, resolvedLoadedVm);
         } else {
-            messages.add(loadedVm);
+            messages.add(resolvedLoadedVm);
         }
         status.set(resolvedStatus);
     }
@@ -1486,7 +1662,7 @@ public class MessagesViewModel {
      * @param fileBytes   attachment bytes to embed as Base64
      * @throws Exception when serialization or send operation fails
      */
-    private void sendInlineAttachment(String recipientId,
+    private MessageSender.SendResult sendInlineAttachment(String recipientId,
             String fileName,
             String mediaType,
             byte[] fileBytes) throws Exception {
@@ -1497,11 +1673,15 @@ public class MessagesViewModel {
         inlinePayload.setDataB64(Base64.getEncoder().encodeToString(fileBytes));
 
         String inlineJson = AttachmentPayloadCodec.toInlineJson(inlinePayload);
-        messageSender.sendMessage(
+        MessageSender.SendResult sendResult = messageSender.sendMessageWithResult(
                 inlineJson.getBytes(StandardCharsets.UTF_8),
                 recipientId,
                 AttachmentConstants.CONTENT_TYPE_INLINE,
                 MessageHeader.MAX_TTL_SECONDS);
+        if (sendResult == null || sendResult.envelopeId() == null || sendResult.envelopeId().isBlank()) {
+            throw new IOException("Inline attachment send did not return envelopeId");
+        }
+        return sendResult;
     }
 
     /**
@@ -1516,7 +1696,7 @@ public class MessagesViewModel {
      * @throws Exception when encryption, upload, completion, reference send, or
      *                   bind fails
      */
-    private void sendChunkedAttachment(String recipientId,
+    private MessageSender.SendResult sendChunkedAttachment(String recipientId,
             String fileName,
             String mediaType,
             byte[] fileBytes,
@@ -1587,6 +1767,7 @@ public class MessagesViewModel {
             bindRequest.setEnvelopeId(sendResult.envelopeId());
             var bindResponse = messageSender.bindAttachmentUpload(attachmentId, bindRequest);
             ensureNoError(bindResponse.getError());
+            return sendResult;
         } finally {
             if (tempEncryptedBlob != null) {
                 Files.deleteIfExists(tempEncryptedBlob);
@@ -1604,14 +1785,13 @@ public class MessagesViewModel {
             int encryptedSizeBytes,
             int chunkBytes,
             String recipientId,
-            String mediaType) throws Exception {
+            String mediaType) throws IOException {
         int expectedChunks = (int) Math.ceil(encryptedSizeBytes / (double) chunkBytes);
         int concurrency = resolveUploadConcurrency();
-        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
         List<CompletableFuture<Void>> futures = new ArrayList<>(expectedChunks);
         AtomicInteger uploadedBytes = new AtomicInteger(0);
 
-        try {
+        try (ExecutorService executor = Executors.newFixedThreadPool(concurrency)) {
             for (int chunkIndex = 0; chunkIndex < expectedChunks; chunkIndex++) {
                 final int currentIndex = chunkIndex;
                 futures.add(CompletableFuture.runAsync(() -> {
@@ -1635,12 +1815,13 @@ public class MessagesViewModel {
         } catch (CompletionException ex) {
             futures.forEach(future -> future.cancel(true));
             Throwable cause = ex.getCause();
-            if (cause instanceof Exception exception) {
-                throw exception;
+            if (cause instanceof RuntimeException runtimeEx) {
+                throw runtimeEx;
             }
-            throw ex;
-        } finally {
-            executor.shutdownNow();
+            if (cause instanceof IOException ioEx) {
+                throw ioEx;
+            }
+            throw new IOException("Failed to upload attachment chunks", cause != null ? cause : ex);
         }
     }
 
@@ -1798,25 +1979,21 @@ public class MessagesViewModel {
     }
 
     /**
-     * Validates attachment MIME type and size against the backend policy
-     * constraints.
+     * Validates attachment MIME type and size against backend policy constraints.
      *
      * @param mediaType normalized MIME/content type to validate
      * @param sizeBytes attachment size in bytes
-     * @param policy    policy snapshot with limits and allowlist
+     * @param policy    policy snapshot with size and transport limits
      * @throws IllegalArgumentException when size exceeds maximum or MIME type is
-     *                                  disallowed
+     *                                  invalid
      */
     private void validateAgainstPolicy(String mediaType, long sizeBytes, MessagingPolicyResponse policy) {
         if (sizeBytes > policy.getAttachmentMaxBytes()) {
             throw new IllegalArgumentException("Attachment exceeds maximum allowed size");
         }
 
-        if (policy.getAttachmentAllowedTypes() == null || policy.getAttachmentAllowedTypes().isEmpty()) {
-            throw new IllegalArgumentException("Attachment policy allowlist is empty");
-        }
-        if (!AttachmentConstants.isAttachmentTypeAllowedByPolicy(mediaType, policy.getAttachmentAllowedTypes())) {
-            throw new IllegalArgumentException("Attachment type is not allowed: " + mediaType);
+        if (!AttachmentConstants.isValidAttachmentType(mediaType)) {
+            throw new IllegalArgumentException("Attachment MIME type is invalid: " + mediaType);
         }
     }
 

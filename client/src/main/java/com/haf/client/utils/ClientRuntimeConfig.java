@@ -13,14 +13,21 @@ import java.util.Properties;
 public final class ClientRuntimeConfig {
 
     private static final String KEY_SERVER_URL_PROD = "server.url.prod";
+    private static final String KEY_SERVER_WS_URL_PROD = "server.ws.url.prod";
     private static final String KEY_HELP_CENTER_URL_PROD = "help.center.url.prod";
 
     private final URI serverBaseUri;
+    private final URI realtimeWebSocketUri;
     private final URI helpCenterBaseUri;
     private final URI healthCheckBaseUri;
 
-    private ClientRuntimeConfig(URI serverBaseUri, URI helpCenterBaseUri, URI healthCheckBaseUri) {
+    private ClientRuntimeConfig(
+            URI serverBaseUri,
+            URI realtimeWebSocketUri,
+            URI helpCenterBaseUri,
+            URI healthCheckBaseUri) {
         this.serverBaseUri = Objects.requireNonNull(serverBaseUri, "serverBaseUri");
+        this.realtimeWebSocketUri = Objects.requireNonNull(realtimeWebSocketUri, "realtimeWebSocketUri");
         this.helpCenterBaseUri = Objects.requireNonNull(helpCenterBaseUri, "helpCenterBaseUri");
         this.healthCheckBaseUri = Objects.requireNonNull(healthCheckBaseUri, "healthCheckBaseUri");
     }
@@ -57,12 +64,19 @@ public final class ClientRuntimeConfig {
         URI serverBaseUri = parseRequiredAbsoluteUri(properties, KEY_SERVER_URL_PROD);
         ensureScheme(serverBaseUri, KEY_SERVER_URL_PROD, "https");
 
+        URI realtimeWebSocketUri = parseRequiredAbsoluteUri(properties, KEY_SERVER_WS_URL_PROD);
+        ensureScheme(realtimeWebSocketUri, KEY_SERVER_WS_URL_PROD, "wss");
+        if (realtimeWebSocketUri.getQuery() != null) {
+            throw new ClientConfigurationException("'" + KEY_SERVER_WS_URL_PROD + "' must not include query parameters.");
+        }
+
         URI helpCenterBaseUri = parseOptionalAbsoluteUri(properties, KEY_HELP_CENTER_URL_PROD);
         URI resolvedHelpCenterBaseUri = helpCenterBaseUri == null ? serverBaseUri : helpCenterBaseUri;
         ensureScheme(resolvedHelpCenterBaseUri, KEY_HELP_CENTER_URL_PROD, "https");
 
         return new ClientRuntimeConfig(
                 serverBaseUri,
+                realtimeWebSocketUri,
                 resolvedHelpCenterBaseUri,
                 serverBaseUri);
     }
@@ -74,6 +88,15 @@ public final class ClientRuntimeConfig {
      */
     public URI serverBaseUri() {
         return serverBaseUri;
+    }
+
+    /**
+     * Returns the WSS realtime endpoint used by chat transport.
+     *
+     * @return WSS realtime URI
+     */
+    public URI realtimeWebSocketUri() {
+        return realtimeWebSocketUri;
     }
 
     /**
@@ -132,4 +155,5 @@ public final class ClientRuntimeConfig {
                             + uri.getScheme() + "'.");
         }
     }
+
 }

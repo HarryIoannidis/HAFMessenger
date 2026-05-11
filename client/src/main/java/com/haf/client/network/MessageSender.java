@@ -76,8 +76,8 @@ public interface MessageSender {
      */
     default SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType, long ttlSeconds)
             throws MessageValidationException, KeyNotFoundException, IOException {
-        EncryptedMessage encrypted = encryptMessage(payload, recipientId, contentType, ttlSeconds);
-        return sendEncryptedMessage(encrypted);
+        sendMessage(payload, recipientId, contentType, ttlSeconds);
+        return new SendResult(null, 0L);
     }
 
     /**

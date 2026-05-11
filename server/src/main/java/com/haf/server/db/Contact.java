@@ -52,6 +52,18 @@ public class Contact {
             """;
 
     /**
+     * SQL query to check if an accepted contact relationship exists.
+     */
+    private static final String SELECT_ACCEPTED_CONTACT_SQL = """
+                SELECT 1
+                FROM contacts
+                WHERE user_id = ?
+                  AND contact_id = ?
+                  AND status = 'ACCEPTED'
+                LIMIT 1
+            """;
+
+    /**
      * Creates a contact DAO backed by the provided pooled data source.
      *
      * @param dataSource JDBC connection pool
@@ -151,6 +163,29 @@ public class Contact {
             throw new DatabaseOperationException("Error fetching watchers for contact " + contactId, e);
         }
         return watcherUserIds;
+    }
+
+    /**
+     * Returns whether one user has an accepted contact relationship to another.
+     *
+     * @param userId    owner user id
+     * @param contactId candidate contact id
+     * @return true when the contact relationship is accepted
+     */
+    public boolean canReach(String userId, String contactId) {
+        if (userId == null || userId.isBlank() || contactId == null || contactId.isBlank()) {
+            return false;
+        }
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SELECT_ACCEPTED_CONTACT_SQL)) {
+            stmt.setString(1, userId);
+            stmt.setString(2, contactId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            throw new DatabaseOperationException("Error checking contact authorization", e);
+        }
     }
 
     /**

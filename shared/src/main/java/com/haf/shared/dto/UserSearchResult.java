@@ -4,6 +4,16 @@ import java.io.Serializable;
 
 /**
  * DTO representing a single user search result.
+ *
+ * Field meanings:
+ * - {@code userId}: user id
+ * - {@code fullName}: full name
+ * - {@code regNumber}: registration number
+ * - {@code email}: email address
+ * - {@code rank}: rank value
+ * - {@code telephone}: telephone number
+ * - {@code joinedDate}: joined-date text
+ * - {@code active}: active presence flag
  */
 public class UserSearchResult implements Serializable {
     private String userId;

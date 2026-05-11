@@ -5,7 +5,6 @@ import com.haf.shared.constants.AttachmentConstants;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +18,10 @@ public final class ServerConfig {
     private static final String ENV_FILE_OVERRIDE_PROPERTY = "haf.server.env.path";
     private static final String ENV_FILE_OVERRIDE_ENV = "HAF_SERVER_ENV_FILE";
     private static final int DEFAULT_DB_POOL_SIZE = 20;
-    private static final int DEFAULT_HTTP_PORT = 8443;
+    private static final int DEFAULT_HTTPS_PORT = 8443;
+    private static final String DEFAULT_HTTPS_PATH = String.join("/", "", "api", "v1");
+    private static final int DEFAULT_WS_PORT = 8444;
+    private static final String DEFAULT_WS_PATH = String.join("/", "", "ws", "v1", "realtime");
     private static final int DEFAULT_SEARCH_PAGE_SIZE = 20;
     private static final int DEFAULT_SEARCH_MAX_PAGE_SIZE = 50;
     private static final int DEFAULT_SEARCH_MIN_QUERY_LENGTH = 3;
@@ -31,6 +33,7 @@ public final class ServerConfig {
     private static final long DEFAULT_JWT_REFRESH_TTL_SECONDS = 2_592_000L;
     private static final long DEFAULT_JWT_ABSOLUTE_TTL_SECONDS = 2_592_000L;
     private static final long DEFAULT_JWT_IDLE_TTL_FLOOR_SECONDS = 600L;
+    private static final String DEFAULT_LOGIN_SENTINEL_PASSWORD = "haf-login-sentinel-password";
     private static final long DEFAULT_ATTACHMENT_MAX_BYTES = AttachmentConstants.DEFAULT_MAX_BYTES;
     private static final long DEFAULT_ATTACHMENT_INLINE_MAX_BYTES = AttachmentConstants.DEFAULT_INLINE_MAX_BYTES;
     private static final int DEFAULT_ATTACHMENT_CHUNK_BYTES = AttachmentConstants.DEFAULT_CHUNK_BYTES;
@@ -50,7 +53,10 @@ public final class ServerConfig {
     private final Path tlsKeystorePath;
     private final char[] tlsKeystorePassword;
 
-    private final int httpPort;
+    private final int httpsPort;
+    private final String httpsPath;
+    private final int wsPort;
+    private final String wsPath;
     private final String adminPublicKeyPem;
     private final int searchPageSize;
     private final int searchMaxPageSize;
@@ -66,10 +72,10 @@ public final class ServerConfig {
     private final long jwtRefreshTtlSeconds;
     private final long jwtAbsoluteTtlSeconds;
     private final long jwtIdleTtlSeconds;
+    private final String loginSentinelPassword;
     private final long attachmentMaxBytes;
     private final long attachmentInlineMaxBytes;
     private final int attachmentChunkBytes;
-    private final List<String> attachmentAllowedTypes;
     private final long attachmentUnboundTtlSeconds;
 
     /**
@@ -117,7 +123,10 @@ public final class ServerConfig {
         this.tlsKeystorePath = tls;
         this.tlsKeystorePassword = require(env, "HAF_TLS_KEYSTORE_PASS").toCharArray();
 
-        this.httpPort = parseInt(env.get("HAF_HTTP_PORT"), DEFAULT_HTTP_PORT);
+        this.httpsPort = parseInt(env.get("HAF_HTTPS_PORT"), DEFAULT_HTTPS_PORT);
+        this.httpsPath = normalizeHttpsPath(env.get("HAF_HTTPS_PATH"));
+        this.wsPort = parseInt(env.get("HAF_WS_PORT"), DEFAULT_WS_PORT);
+        this.wsPath = normalizeRealtimePath(env.get("HAF_WS_PATH"));
         this.adminPublicKeyPem = env.getOrDefault("HAF_ADMIN_PUBLIC_KEY", null);
 
         this.searchPageSize = parseInt(env.get("HAF_SEARCH_PAGE_SIZE"), DEFAULT_SEARCH_PAGE_SIZE);
@@ -142,11 +151,14 @@ public final class ServerConfig {
         this.jwtIdleTtlSeconds = parseLong(
                 env.get("HAF_JWT_IDLE_TTL_SECONDS"),
                 Math.max(DEFAULT_JWT_IDLE_TTL_FLOOR_SECONDS, this.jwtAccessTtlSeconds));
+        this.loginSentinelPassword = optionalWithDefault(
+                env,
+                "HAF_LOGIN_SENTINEL_PASSWORD",
+                DEFAULT_LOGIN_SENTINEL_PASSWORD);
         this.attachmentMaxBytes = parseLong(env.get("HAF_ATTACHMENT_MAX_BYTES"), DEFAULT_ATTACHMENT_MAX_BYTES);
         this.attachmentInlineMaxBytes = parseLong(env.get("HAF_ATTACHMENT_INLINE_MAX_BYTES"),
                 DEFAULT_ATTACHMENT_INLINE_MAX_BYTES);
         this.attachmentChunkBytes = parseInt(env.get("HAF_ATTACHMENT_CHUNK_BYTES"), DEFAULT_ATTACHMENT_CHUNK_BYTES);
-        this.attachmentAllowedTypes = parseAttachmentAllowedTypes(env.get("HAF_ATTACHMENT_ALLOWED_TYPES"));
         this.attachmentUnboundTtlSeconds = parseLong(env.get("HAF_ATTACHMENT_UNBOUND_TTL_SECONDS"),
                 DEFAULT_ATTACHMENT_UNBOUND_TTL_SECONDS);
 
@@ -156,6 +168,9 @@ public final class ServerConfig {
         validateIngressExecutorConfig();
         validateJwtConfig();
         validateAttachmentConfig();
+        validatePortConfig();
+        validateHttpsPathConfig();
+        validateRealtimePathConfig();
     }
 
     /**
@@ -218,11 +233,8 @@ public final class ServerConfig {
             String line;
             while ((line = reader.readLine()) != null) {
                 String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
                 int eqIndex = trimmed.indexOf('=');
-                if (eqIndex <= 0) {
+                if (trimmed.isEmpty() || trimmed.startsWith("#") || eqIndex <= 0) {
                     continue;
                 }
                 String key = trimmed.substring(0, eqIndex).trim();
@@ -312,10 +324,31 @@ public final class ServerConfig {
     }
 
     /**
-     * Returns the HTTP port.
+     * Returns the HTTPS port.
      */
-    public int getHttpPort() {
-        return httpPort;
+    public int getHttpsPort() {
+        return httpsPort;
+    }
+
+    /**
+     * Returns the HTTPS API base path.
+     */
+    public String getHttpsPath() {
+        return httpsPath;
+    }
+
+    /**
+     * Returns the WSS realtime port.
+     */
+    public int getWsPort() {
+        return wsPort;
+    }
+
+    /**
+     * Returns the WSS realtime resource path.
+     */
+    public String getWsPath() {
+        return wsPath;
     }
 
     /**
@@ -426,6 +459,13 @@ public final class ServerConfig {
     }
 
     /**
+     * Returns sentinel password used for constant-time login checks.
+     */
+    public String getLoginSentinelPassword() {
+        return loginSentinelPassword;
+    }
+
+    /**
      * Returns maximum attachment bytes accepted by the server.
      */
     public long getAttachmentMaxBytes() {
@@ -447,13 +487,6 @@ public final class ServerConfig {
     }
 
     /**
-     * Returns allowed attachment MIME types.
-     */
-    public List<String> getAttachmentAllowedTypes() {
-        return List.copyOf(attachmentAllowedTypes);
-    }
-
-    /**
      * Returns TTL in seconds for unbound attachment uploads.
      */
     public long getAttachmentUnboundTtlSeconds() {
@@ -467,6 +500,14 @@ public final class ServerConfig {
         String value = env.get(key);
         if (value == null || value.isBlank()) {
             throw new ConfigurationException("Missing required environment variable: " + key);
+        }
+        return value;
+    }
+
+    private static String optionalWithDefault(Map<String, String> env, String key, String defaultValue) {
+        String value = env.get(key);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
         }
         return value;
     }
@@ -635,37 +676,6 @@ public final class ServerConfig {
     }
 
     /**
-     * Parses and normalizes allowed attachment MIME types.
-     *
-     * Uses defaults when no value is provided, normalizes aliases, deduplicates
-     * entries, and validates that at
-     * least one type remains after normalization.
-     *
-     * @param candidate comma-separated MIME type string from configuration
-     * @return immutable list of normalized MIME types
-     * @throws ConfigurationException when no valid MIME types are configured
-     */
-    private static List<String> parseAttachmentAllowedTypes(String candidate) {
-        String source = candidate == null || candidate.isBlank()
-                ? String.join(",", AttachmentConstants.DEFAULT_ALLOWED_TYPES)
-                : candidate;
-        String[] parts = source.split(",");
-        List<String> allowed = new ArrayList<>();
-        for (String part : parts) {
-            String normalized = AttachmentConstants.normalizeMimeType(part);
-            if (normalized != null
-                    && AttachmentConstants.isValidAttachmentPolicyType(normalized)
-                    && !allowed.contains(normalized)) {
-                allowed.add(normalized);
-            }
-        }
-        if (allowed.isEmpty()) {
-            throw new ConfigurationException("HAF_ATTACHMENT_ALLOWED_TYPES must define at least one MIME type");
-        }
-        return List.copyOf(allowed);
-    }
-
-    /**
      * Validates search pagination/query configuration constraints.
      *
      * @throws ConfigurationException when configured search limits are inconsistent
@@ -782,6 +792,86 @@ public final class ServerConfig {
     }
 
     /**
+     * Validates listener ports.
+     */
+    private void validatePortConfig() {
+        validatePort(httpsPort, "HAF_HTTPS_PORT");
+        validatePort(wsPort, "HAF_WS_PORT");
+        if (httpsPort == wsPort) {
+            throw new ConfigurationException("HAF_WS_PORT must be different from HAF_HTTPS_PORT");
+        }
+    }
+
+    /**
+     * Validates the HTTPS API path.
+     */
+    private void validateHttpsPathConfig() {
+        if (httpsPath.isBlank() || !httpsPath.startsWith("/")) {
+            throw new ConfigurationException("HAF_HTTPS_PATH must start with /");
+        }
+        if (httpsPath.endsWith("/")) {
+            throw new ConfigurationException("HAF_HTTPS_PATH must not end with /");
+        }
+        if (httpsPath.contains("?") || httpsPath.contains("#") || httpsPath.chars().anyMatch(Character::isWhitespace)) {
+            throw new ConfigurationException("HAF_HTTPS_PATH must be a path without query, fragment, or whitespace");
+        }
+    }
+
+    /**
+     * Validates the realtime WebSocket path.
+     */
+    private void validateRealtimePathConfig() {
+        if (wsPath.isBlank() || !wsPath.startsWith("/")) {
+            throw new ConfigurationException("HAF_WS_PATH must start with /");
+        }
+        if (wsPath.contains("?") || wsPath.contains("#") || wsPath.chars().anyMatch(Character::isWhitespace)) {
+            throw new ConfigurationException("HAF_WS_PATH must be a path without query, fragment, or whitespace");
+        }
+    }
+
+    /**
+     * Validates a port value.
+     *
+     * @param port the port to validate
+     * @param key  the configuration key
+     */
+    private static void validatePort(int port, String key) {
+        if (port < 1 || port > 65_535) {
+            throw new ConfigurationException(key + " must be between 1 and 65535");
+        }
+    }
+
+    /**
+     * Normalizes the realtime WebSocket path.
+     *
+     * @param candidate the candidate path
+     * @return the normalized path
+     */
+    private static String normalizeRealtimePath(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return DEFAULT_WS_PATH;
+        }
+        return candidate.trim();
+    }
+
+    /**
+     * Normalizes the HTTPS API path.
+     *
+     * @param candidate the candidate path
+     * @return the normalized path
+     */
+    private static String normalizeHttpsPath(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return DEFAULT_HTTPS_PATH;
+        }
+        String path = candidate.trim();
+        if (path.length() > 1 && path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return path;
+    }
+
+    /**
      * Returns a string representation of this object.
      */
     @Override
@@ -792,7 +882,10 @@ public final class ServerConfig {
                 ", dbPoolSize=" + dbPoolSize +
                 ", dbTruststorePath=" + dbTruststorePath +
                 ", dbTruststoreType='" + dbTruststoreType + '\'' +
-                ", httpPort=" + httpPort +
+                ", httpsPort=" + httpsPort +
+                ", httpsPath='" + httpsPath + '\'' +
+                ", wsPort=" + wsPort +
+                ", wsPath='" + wsPath + '\'' +
                 ", keystoreRoot=" + keystoreRoot +
                 ", tlsKeystorePath=" + tlsKeystorePath +
                 ", searchPageSize=" + searchPageSize +
@@ -810,7 +903,6 @@ public final class ServerConfig {
                 ", attachmentMaxBytes=" + attachmentMaxBytes +
                 ", attachmentInlineMaxBytes=" + attachmentInlineMaxBytes +
                 ", attachmentChunkBytes=" + attachmentChunkBytes +
-                ", attachmentAllowedTypes=" + attachmentAllowedTypes +
                 ", attachmentUnboundTtlSeconds=" + attachmentUnboundTtlSeconds +
                 '}';
     }

@@ -27,8 +27,9 @@ Document authentication scene behavior and UI/validation flow.
 3. User enters/edits credentials and triggers sign-in.
 4. Controller asks ViewModel to validate local input.
 5. If valid, login service executes remote auth.
-6. Success routes to main view and persists remember state; failure updates error message and field styling.
-7. "Sign up" route opens registration view.
+6. If the server detects a duplicate session or key mismatch, a Takeover Confirmation popup is displayed, warning the user about logging off other devices and potential message loss. Confirming submits a forced takeover payload.
+7. Success routes to main view and persists remember state; failure updates error message and field styling.
+8. "Sign up" route opens registration view.
 
 ## Error/Security Notes
 

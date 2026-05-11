@@ -76,7 +76,7 @@ public final class MetricsRegistry {
      * @param latencyMs the latency in milliseconds.
      */
     public void recordDeliveryLatency(long latencyMs) {
-        totalDeliveryLatencyMs.addAndGet(latencyMs);
+        totalDeliveryLatencyMs.addAndGet(Math.max(0L, latencyMs));
         deliveredCount.incrementAndGet();
     }
 

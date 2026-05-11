@@ -35,8 +35,8 @@ Describe the implemented registration wizard and submission pipeline used by the
    - X25519 encryption keypair
    - Ed25519 signing keypair
    and constructs `RegisterRequest` with both public keys + fingerprints.
-5. Service tries to fetch admin key from `/api/v1/config/admin-key`; if available, photos are encrypted into `EncryptedFile` payloads.
-6. Service submits `POST /api/v1/register`.
+5. Service tries to fetch admin key from the configured REST path (default `/api/v1/config/admin-key`); if available, photos are encrypted into `EncryptedFile` payloads.
+6. Service submits `POST` to the registration endpoint (default `/api/v1/register`).
 7. On success, service persists both keypairs in local keystore and UI navigates back to login.
 
 ## Error/Security Notes

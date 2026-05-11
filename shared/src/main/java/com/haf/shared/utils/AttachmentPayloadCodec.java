@@ -103,7 +103,7 @@ public final class AttachmentPayloadCodec {
         }
 
         validateFileName(payload.getFileName());
-        String normalizedType = validateAllowedMimeType(payload.getMediaType());
+        String normalizedType = validateMimeType(payload.getMediaType());
         payload.setMediaType(normalizedType);
 
         if (payload.getSizeBytes() <= 0 || payload.getSizeBytes() > AttachmentConstants.DEFAULT_MAX_BYTES) {
@@ -133,7 +133,7 @@ public final class AttachmentPayloadCodec {
             throw new IllegalArgumentException("Attachment reference attachmentId is required");
         }
         validateFileName(payload.getFileName());
-        String normalizedType = validateAllowedMimeType(payload.getMediaType());
+        String normalizedType = validateMimeType(payload.getMediaType());
         payload.setMediaType(normalizedType);
         if (payload.getSizeBytes() <= 0 || payload.getSizeBytes() > AttachmentConstants.DEFAULT_MAX_BYTES) {
             throw new IllegalArgumentException("Attachment reference size is out of bounds");
@@ -141,16 +141,16 @@ public final class AttachmentPayloadCodec {
     }
 
     /**
-     * Validates and normalizes an attachment MIME type against the allow list.
+     * Validates and normalizes an attachment MIME type.
      *
      * @param mimeType MIME type to validate
      * @return normalized MIME type
-     * @throws IllegalArgumentException when the MIME type is missing or not allowed
+     * @throws IllegalArgumentException when the MIME type is missing or invalid
      */
-    public static String validateAllowedMimeType(String mimeType) {
+    public static String validateMimeType(String mimeType) {
         String normalized = AttachmentConstants.normalizeMimeType(mimeType);
-        if (!AttachmentConstants.isAllowedAttachmentType(normalized)) {
-            throw new IllegalArgumentException("Attachment MIME type is not allowed: " + mimeType);
+        if (!AttachmentConstants.isValidAttachmentType(normalized)) {
+            throw new IllegalArgumentException("Attachment MIME type is invalid: " + mimeType);
         }
         return normalized;
     }

@@ -8,7 +8,7 @@ When a chat tab opens, the `ChatController` mounts itself onto the active recipi
 
 - It fetches the active message list from `ChatViewModel`.
 - A `WeakListChangeListener` is bound directly to the observable feed. This specifically ensures memory isn't leaked when wildly jumping between thousands of different chat partners.
-- When the feed changes via HTTPS polling updates, it parses the `MessageVM` wrapper.
+- When the feed changes via WSS realtime updates, it parses the `MessageVM` wrapper.
 
 ## 2. Bubble Generation & Scroll Management
 

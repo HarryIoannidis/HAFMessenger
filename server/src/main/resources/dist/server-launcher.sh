@@ -13,15 +13,17 @@ BUNDLED_CONFIG_DIR="${APP_DIR}/resources/config"
 BUNDLED_ENV_TEMPLATE="${APP_DIR}/resources/server.env.template"
 
 SERVER_ENV_FILE="${CONFIG_DIR}/variables.env"
-DEVTUNNEL_PORT="${DEVTUNNEL_PORT:-8443}"
+HTTPS_DEVTUNNEL_PORT="${HAF_DEVTUNNEL_HTTPS_PORT:-${DEVTUNNEL_PORT:-8443}}"
+WS_DEVTUNNEL_PORT="${HAF_DEVTUNNEL_WS_PORT:-8444}"
+DEFAULT_WS_PATH="/ws/v1/realtime"
 DEVTUNNEL_PROTOCOL="${DEVTUNNEL_PROTOCOL:-https}"
-DEVTUNNEL_ID="${HAF_DEVTUNNEL_ID:-hafmessenger-8443}"
+DEVTUNNEL_ID="${HAF_DEVTUNNEL_ID:-hafmessenger-realtime}"
 TUNNEL_META_FILE="${RUNTIME_DIR}/devtunnel.env"
 TUNNEL_HOST_LOG="${RUNTIME_DIR}/devtunnel-host.log"
 LOCK_DIR="${RUNTIME_DIR}/server.lock"
 LOCK_PID_FILE="${LOCK_DIR}/pid"
 # Avoid killing the AppImage parent process directly; doing so can unmount /tmp/.mount_* mid-start.
-AUTO_KILL_PATTERN="${HAF_AUTO_KILL_PATTERN:-server-launcher.sh|devtunnel host hafmessenger-8443|/tmp/.mount_HAFMes.*/bin/HAFMessengerServer|com.haf.server.core.Main}"
+AUTO_KILL_PATTERN="${HAF_AUTO_KILL_PATTERN:-server-launcher.sh|devtunnel host hafmessenger-|/tmp/.mount_HAFMes.*/bin/HAFMessengerServer|com.haf.server.core.Main}"
 
 prepend_path_if_dir() {
   local dir="$1"
@@ -155,16 +157,36 @@ kill_stale_processes_on_start() {
   rm -rf "${LOCK_DIR}" >/dev/null 2>&1 || true
 }
 
-resolve_server_http_port() {
-  local default_port="${DEVTUNNEL_PORT}"
-
+resolve_server_env_value() {
+  local env_key="$1"
+  local default_value="$2"
   if [[ ! -f "${SERVER_ENV_FILE}" ]]; then
-    printf '%s\n' "${default_port}"
+    printf '%s\n' "${default_value}"
     return 0
   fi
 
+  local configured_value
+  configured_value="$(sed -n "s/^[[:space:]]*${env_key}[[:space:]]*=[[:space:]]*//p" "${SERVER_ENV_FILE}" | tail -n 1)"
+  configured_value="${configured_value%%#*}"
+  configured_value="${configured_value%\"}"
+  configured_value="${configured_value#\"}"
+  configured_value="${configured_value%\'}"
+  configured_value="${configured_value#\'}"
+  configured_value="$(printf '%s' "${configured_value}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+  if [[ -n "${configured_value}" ]]; then
+    printf '%s\n' "${configured_value}"
+    return 0
+  fi
+
+  printf '%s\n' "${default_value}"
+}
+
+resolve_server_env_port() {
+  local env_key="$1"
+  local default_port="$2"
   local configured_port
-  configured_port="$(sed -n 's/^[[:space:]]*HAF_HTTP_PORT[[:space:]]*=[[:space:]]*//p' "${SERVER_ENV_FILE}" | tail -n 1)"
+  configured_port="$(resolve_server_env_value "${env_key}" "${default_port}")"
   configured_port="${configured_port%%#*}"
   configured_port="${configured_port//\"/}"
   configured_port="${configured_port//\'/}"
@@ -365,45 +387,60 @@ ensure_tunnel_exists() {
 }
 
 ensure_tunnel_port() {
-  if devtunnel port show "${DEVTUNNEL_ID}" -p "${DEVTUNNEL_PORT}" >/dev/null 2>&1; then
+  local port="$1"
+  if devtunnel port show "${DEVTUNNEL_ID}" -p "${port}" >/dev/null 2>&1; then
     return 0
   fi
-  if devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1 && devtunnel port show -p "${DEVTUNNEL_PORT}" >/dev/null 2>&1; then
+  if devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1 && devtunnel port show -p "${port}" >/dev/null 2>&1; then
     return 0
   fi
 
-  echo "Creating tunnel port ${DEVTUNNEL_PORT}/${DEVTUNNEL_PROTOCOL}"
-  if devtunnel port create "${DEVTUNNEL_ID}" -p "${DEVTUNNEL_PORT}" --protocol "${DEVTUNNEL_PROTOCOL}" >/dev/null 2>&1; then
+  echo "Creating tunnel port ${port}/${DEVTUNNEL_PROTOCOL}"
+  if devtunnel port create "${DEVTUNNEL_ID}" -p "${port}" --protocol "${DEVTUNNEL_PROTOCOL}" >/dev/null 2>&1; then
     return 0
   fi
   devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1
-  devtunnel port create -p "${DEVTUNNEL_PORT}" --protocol "${DEVTUNNEL_PROTOCOL}" >/dev/null
+  devtunnel port create -p "${port}" --protocol "${DEVTUNNEL_PROTOCOL}" >/dev/null
 }
 
 enable_anonymous_port_access() {
-  if devtunnel access list "${DEVTUNNEL_ID}" --port-number "${DEVTUNNEL_PORT}" 2>/dev/null | grep -qi "anonymous"; then
+  local port="$1"
+  if devtunnel access list "${DEVTUNNEL_ID}" --port-number "${port}" 2>/dev/null | grep -qi "anonymous"; then
     return 0
   fi
-  if devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1 && devtunnel access list --port-number "${DEVTUNNEL_PORT}" 2>/dev/null | grep -qi "anonymous"; then
+  if devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1 && devtunnel access list --port-number "${port}" 2>/dev/null | grep -qi "anonymous"; then
     return 0
   fi
 
-  echo "Enabling anonymous tunnel access on port ${DEVTUNNEL_PORT}"
-  if devtunnel access create "${DEVTUNNEL_ID}" --port-number "${DEVTUNNEL_PORT}" --anonymous >/dev/null 2>&1; then
+  echo "Enabling anonymous tunnel access on port ${port}"
+  if devtunnel access create "${DEVTUNNEL_ID}" --port-number "${port}" --anonymous >/dev/null 2>&1; then
     return 0
   fi
   devtunnel set "${DEVTUNNEL_ID}" >/dev/null 2>&1
-  devtunnel access create --port-number "${DEVTUNNEL_PORT}" --anonymous >/dev/null
+  devtunnel access create --port-number "${port}" --anonymous >/dev/null
 }
 
-resolve_tunnel_url_from_show() {
+resolve_tunnel_url_for_port() {
+  local port="$1"
   local json
+  local found
+
   json="$(devtunnel show "${DEVTUNNEL_ID}" -j 2>/dev/null || true)"
+  if [[ -n "${json}" ]]; then
+    found="$(printf '%s' "${json}" | tr -d '\n' \
+      | sed -n "s/.*\"portNumber\"[[:space:]]*:[[:space:]]*${port}[^}]*\"portUri\"[[:space:]]*:[[:space:]]*\"\(https:\/\/[^\"]*devtunnels\.ms\/\{0,1\}\)\".*/\1/p")"
+    found="${found%/}"
+    if [[ -n "${found}" ]]; then
+      printf '%s\n' "${found}"
+      return 0
+    fi
+  fi
+
+  json="$(devtunnel port show "${DEVTUNNEL_ID}" -p "${port}" -j 2>/dev/null || true)"
   if [[ -z "${json}" ]]; then
     return 1
   fi
 
-  local found
   found="$(printf '%s' "${json}" | tr -d '\n' \
     | sed -n 's/.*"portUri"[[:space:]]*:[[:space:]]*"\(https:\/\/[^"]*devtunnels\.ms\/\{0,1\}\)".*/\1/p')"
   found="${found%/}"
@@ -412,6 +449,17 @@ resolve_tunnel_url_from_show() {
     return 0
   fi
   return 1
+}
+
+to_wss_url() {
+  local base_url="$1"
+  local ws_path="$2"
+  local trimmed="${base_url%/}"
+  if [[ "${ws_path}" != /* ]]; then
+    ws_path="/${ws_path}"
+  fi
+  trimmed="${trimmed/#https:/wss:}"
+  printf '%s%s\n' "${trimmed}" "${ws_path}"
 }
 
 HOST_PID=""
@@ -438,46 +486,62 @@ seed_runtime_config
 ensure_terminal_window "$@"
 kill_stale_processes_on_start
 acquire_single_instance_lock
-SERVER_HTTP_PORT="$(resolve_server_http_port)"
-ensure_server_port_available "${SERVER_HTTP_PORT}"
+SERVER_HTTPS_PORT="$(resolve_server_env_port HAF_HTTPS_PORT "${HTTPS_DEVTUNNEL_PORT}")"
+SERVER_HTTPS_PATH="$(resolve_server_env_value HAF_HTTPS_PATH "/api/v1")"
+SERVER_WS_PORT="$(resolve_server_env_port HAF_WS_PORT "${WS_DEVTUNNEL_PORT}")"
+SERVER_WS_PATH="$(resolve_server_env_value HAF_WS_PATH "${DEFAULT_WS_PATH}")"
+ensure_server_port_available "${SERVER_HTTPS_PORT}"
+ensure_server_port_available "${SERVER_WS_PORT}"
 require_devtunnel_cli
 ensure_devtunnel_login
 ensure_tunnel_exists
-ensure_tunnel_port
-enable_anonymous_port_access
+ensure_tunnel_port "${SERVER_HTTPS_PORT}"
+ensure_tunnel_port "${SERVER_WS_PORT}"
+enable_anonymous_port_access "${SERVER_HTTPS_PORT}"
+enable_anonymous_port_access "${SERVER_WS_PORT}"
 
 : > "${TUNNEL_HOST_LOG}"
 
-echo "Starting Dev Tunnel host for ${DEVTUNNEL_ID}:${DEVTUNNEL_PORT}"
+echo "Starting Dev Tunnel host for ${DEVTUNNEL_ID}:${SERVER_HTTPS_PORT},${SERVER_WS_PORT}"
 devtunnel host "${DEVTUNNEL_ID}" 2>&1 \
   | tee -a "${TUNNEL_HOST_LOG}" &
 HOST_PID=$!
 
-FORWARD_URL=""
+REST_FORWARD_URL=""
+WS_FORWARD_BASE_URL=""
 for _ in {1..60}; do
   if ! kill -0 "${HOST_PID}" >/dev/null 2>&1; then
     echo "Dev Tunnel host stopped unexpectedly. Check ${TUNNEL_HOST_LOG}." >&2
     exit 1
   fi
-  if FORWARD_URL="$(resolve_tunnel_url_from_show)"; then
+  REST_FORWARD_URL="$(resolve_tunnel_url_for_port "${SERVER_HTTPS_PORT}" || true)"
+  WS_FORWARD_BASE_URL="$(resolve_tunnel_url_for_port "${SERVER_WS_PORT}" || true)"
+  if [[ -n "${REST_FORWARD_URL}" && -n "${WS_FORWARD_BASE_URL}" ]]; then
     break
   fi
   sleep 1
 done
 
-if [[ -z "${FORWARD_URL}" ]]; then
-  echo "Unable to resolve tunnel forwarding URL. Check ${TUNNEL_HOST_LOG}." >&2
+if [[ -z "${REST_FORWARD_URL}" || -z "${WS_FORWARD_BASE_URL}" ]]; then
+  echo "Unable to resolve both tunnel forwarding URLs. Check ${TUNNEL_HOST_LOG}." >&2
   exit 1
 fi
 
+WSS_FORWARD_URL="$(to_wss_url "${WS_FORWARD_BASE_URL}" "${SERVER_WS_PATH}")"
+
 cat > "${TUNNEL_META_FILE}" <<META
 HAF_DEVTUNNEL_ID=${DEVTUNNEL_ID}
-HAF_DEVTUNNEL_URL=${FORWARD_URL}
-HAF_DEVTUNNEL_PORT=${DEVTUNNEL_PORT}
+HAF_DEVTUNNEL_REST_URL=${REST_FORWARD_URL}
+HAF_DEVTUNNEL_WSS_URL=${WSS_FORWARD_URL}
+HAF_DEVTUNNEL_HTTPS_PORT=${SERVER_HTTPS_PORT}
+HAF_DEVTUNNEL_HTTPS_PATH=${SERVER_HTTPS_PATH}
+HAF_DEVTUNNEL_WS_PORT=${SERVER_WS_PORT}
+HAF_DEVTUNNEL_WS_PATH=${SERVER_WS_PATH}
 HAF_DEVTUNNEL_PROTOCOL=${DEVTUNNEL_PROTOCOL}
 META
 
-echo "Tunnel URL: ${FORWARD_URL}"
+echo "REST HTTPS URL: ${REST_FORWARD_URL}"
+echo "Realtime WSS URL: ${WSS_FORWARD_URL}"
 echo "Saved tunnel metadata: ${TUNNEL_META_FILE}"
 
 echo "Starting HAF server with env file: ${SERVER_ENV_FILE}"

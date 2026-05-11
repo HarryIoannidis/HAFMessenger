@@ -111,6 +111,12 @@
             <version>1.21.4</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.78.1</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Environment Variables (.env) -->
         <dependency>
@@ -129,6 +135,13 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>2.0.17</version>
+        </dependency>
+
+        <!-- Secure WebSocket gateway -->
+        <dependency>
+            <groupId>org.java-websocket</groupId>
+            <artifactId>Java-WebSocket</artifactId>
+            <version>1.5.7</version>
         </dependency>
     </dependencies>
 

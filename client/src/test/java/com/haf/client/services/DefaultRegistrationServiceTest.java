@@ -32,6 +32,7 @@ class DefaultRegistrationServiceTest {
     void endpoint_resolution_uses_configured_server() {
         Properties properties = new Properties();
         properties.setProperty("server.url.prod", "https://localhost:8443");
+        properties.setProperty("server.ws.url.prod", "wss://localhost:8444/ws/v1/realtime");
         ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 
         assertEquals(
@@ -46,6 +47,7 @@ class DefaultRegistrationServiceTest {
     void endpoint_resolution_uses_prod_endpoints() {
         Properties properties = new Properties();
         properties.setProperty("server.url.prod", "https://prod.example.test");
+        properties.setProperty("server.ws.url.prod", "wss://realtime.example.test/ws/v1/realtime");
         ClientRuntimeConfig config = ClientRuntimeConfig.fromProperties(properties);
 
         assertEquals(

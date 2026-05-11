@@ -1,6 +1,5 @@
 package com.haf.client.network;
 
-import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.constants.AttachmentConstants;
@@ -30,10 +29,12 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -82,22 +83,6 @@ class MessageSenderTest {
         @Override
         public String getSenderSigningKeyFingerprint() {
             return senderSigningFingerprint;
-        }
-    }
-
-    static class RecordingAuthHttpClient extends AuthHttpClient {
-        private String lastPostPath;
-        private String lastPostBody;
-
-        RecordingAuthHttpClient() {
-            super(URI.create("https://localhost:8443"), "test-session-id");
-        }
-
-        @Override
-        public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
-            lastPostPath = path;
-            lastPostBody = jsonBody;
-            return CompletableFuture.completedFuture("{\"envelopeId\":\"env-record\",\"expiresAt\":1111}");
         }
     }
 
@@ -165,9 +150,59 @@ class MessageSenderTest {
         }
     }
 
+    static class RecordingRealtimeTransport implements RealtimeTransport {
+        private EncryptedMessage lastMessage;
+        private String lastRecipientFingerprint;
+
+        @Override
+        public void setEventListener(Consumer<com.haf.shared.websocket.RealtimeEvent> listener) {
+        }
+
+        @Override
+        public void setErrorListener(Consumer<Throwable> listener) {
+        }
+
+        @Override
+        public void start() {
+        }
+
+        @Override
+        public void reconnect() {
+        }
+
+        @Override
+        public MessageSender.SendResult sendMessage(EncryptedMessage encryptedMessage, String recipientKeyFingerprint)
+                throws IOException {
+            lastMessage = encryptedMessage;
+            lastRecipientFingerprint = recipientKeyFingerprint;
+            return new MessageSender.SendResult("env-record", 1111L);
+        }
+
+        @Override
+        public void sendDeliveryReceipt(List<String> envelopeIds, String recipientId) {
+        }
+
+        @Override
+        public void sendReadReceipt(List<String> envelopeIds, String recipientId) {
+        }
+
+        @Override
+        public void sendTypingStart(String recipientId) {
+        }
+
+        @Override
+        public void sendTypingStop(String recipientId) {
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
     private KeyProvider keyProvider;
     private ClockProvider clockProvider;
-    private RecordingAuthHttpClient authHttpClient;
+    private ApiStubAuthHttpClient authHttpClient;
+    private RecordingRealtimeTransport realtimeTransport;
     private MessageSender messageSender;
 
     @BeforeEach
@@ -181,18 +216,20 @@ class MessageSenderTest {
                 senderSigningKey.getPrivate(),
                 senderSigningFingerprint);
         clockProvider = new FixedClockProvider(1_000_000L);
-        authHttpClient = new RecordingAuthHttpClient();
-        messageSender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient);
+        authHttpClient = new ApiStubAuthHttpClient();
+        realtimeTransport = new RecordingRealtimeTransport();
+        messageSender = new DefaultMessageSender(keyProvider, clockProvider, authHttpClient, realtimeTransport);
     }
 
     @Test
-    void send_message_encrypts_and_posts_json() throws Exception {
+    void send_message_encrypts_and_uses_wss_transport() throws Exception {
         byte[] payload = "Hello, World!".getBytes(StandardCharsets.UTF_8);
         messageSender.sendMessage(payload, "recipient-123", "text/plain", 3600);
 
-        assertEquals("/api/v1/messages", authHttpClient.lastPostPath);
-        assertNotNull(authHttpClient.lastPostBody);
-        JsonCodec.fromJson(authHttpClient.lastPostBody, EncryptedMessage.class);
+        assertNotNull(realtimeTransport.lastMessage);
+        assertEquals("sender-123", realtimeTransport.lastMessage.getSenderId());
+        assertEquals("recipient-123", realtimeTransport.lastMessage.getRecipientId());
+        assertNotNull(realtimeTransport.lastRecipientFingerprint);
     }
 
     @Test
@@ -213,47 +250,35 @@ class MessageSenderTest {
     @Test
     void send_encrypted_message_parses_envelope_metadata() throws Exception {
         ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
-        apiAdapter.whenPost("/api/v1/messages", "{\"envelopeId\":\"env-1\",\"expiresAt\":123456}");
-        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
+        RecordingRealtimeTransport realtime = new RecordingRealtimeTransport();
+        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter, realtime);
 
         MessageSender.SendResult result = sender.sendEncryptedMessage(new EncryptedMessage());
 
-        assertEquals("env-1", result.envelopeId());
-        assertEquals(123456L, result.expiresAtEpochMs());
-    }
-
-    @Test
-    void send_encrypted_message_defaults_expires_at_when_not_numeric() throws Exception {
-        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
-        apiAdapter.whenPost("/api/v1/messages", "{\"envelopeId\":\"env-2\",\"expiresAt\":\"oops\"}");
-        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
-
-        MessageSender.SendResult result = sender.sendEncryptedMessage(new EncryptedMessage());
-
-        assertEquals("env-2", result.envelopeId());
-        assertEquals(0L, result.expiresAtEpochMs());
+        assertEquals("env-record", result.envelopeId());
+        assertEquals(1111L, result.expiresAtEpochMs());
     }
 
     @Test
     void send_message_retries_once_when_recipient_key_is_stale() throws Exception {
         AtomicInteger attempts = new AtomicInteger();
-        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient() {
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
+        RecordingRealtimeTransport realtime = new RecordingRealtimeTransport() {
             @Override
-            public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
-                if (!"/api/v1/messages".equals(path)) {
-                    return super.postAuthenticated(path, jsonBody, extraHeaders);
+            public MessageSender.SendResult sendMessage(
+                    EncryptedMessage encryptedMessage,
+                    String recipientKeyFingerprint) throws IOException {
+                attempts.incrementAndGet();
+                if (attempts.get() == 1) {
+                    throw new RealtimeClientTransport.RealtimeException(
+                            "stale_recipient_key",
+                            "recipient key is stale",
+                            0);
                 }
-                if (attempts.getAndIncrement() == 0) {
-                    return CompletableFuture.failedFuture(
-                            new HttpCommunicationException(
-                                    "stale key",
-                                    409,
-                                    "{\"error\":\"recipient key is stale\",\"code\":\"stale_recipient_key\"}"));
-                }
-                return CompletableFuture.completedFuture("{\"envelopeId\":\"env-retry\",\"expiresAt\":9999}");
+                return new MessageSender.SendResult("env-retry", 9999L);
             }
         };
-        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
+        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter, realtime);
 
         MessageSender.SendResult result = sender.sendMessageWithResult(
                 "hello".getBytes(StandardCharsets.UTF_8),
@@ -268,9 +293,13 @@ class MessageSenderTest {
     @Test
     void attachment_and_policy_apis_decode_payloads() throws Exception {
         ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
-        MessageSender sender = new DefaultMessageSender(keyProvider, clockProvider, apiAdapter);
+        MessageSender sender = new DefaultMessageSender(
+                keyProvider,
+                clockProvider,
+                apiAdapter,
+                new RecordingRealtimeTransport());
 
-        MessagingPolicyResponse policy = MessagingPolicyResponse.success(1000, 100, 32, java.util.List.of("application/pdf"), 60);
+        MessagingPolicyResponse policy = MessagingPolicyResponse.success(1000, 100, 32, 60);
         apiAdapter.whenGet("/api/v1/config/messaging", JsonCodec.toJson(policy));
 
         AttachmentInitResponse init = AttachmentInitResponse.success("att-1", 32, 1000);

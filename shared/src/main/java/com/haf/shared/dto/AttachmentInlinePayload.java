@@ -4,6 +4,12 @@ import java.io.Serializable;
 
 /**
  * Inline attachment payload sent inside an encrypted message.
+ *
+ * Field meanings:
+ * - {@code fileName}: attachment file name for UI display/save dialogs.
+ * - {@code mediaType}: attachment media type.
+ * - {@code sizeBytes}: plaintext attachment size in bytes.
+ * - {@code dataB64}: base64-encoded attachment bytes.
  */
 public class AttachmentInlinePayload implements Serializable {
     private String fileName;

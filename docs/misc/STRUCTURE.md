@@ -51,20 +51,24 @@ HAFMessenger/
         handlers/
         ingress/
         metrics/
+        realtime/
         router/
         security/
     src/main/resources/
       config/
       db/
       log4j2.xml
-    src/test/java/com/haf/server/
-      config/
-      core/
-      db/
-      handlers/
-      ingress/
-      metrics/
-      router/
+    src/test/java/com/haf/
+      integration_test/
+      server/
+        config/
+        core/
+        db/
+        handlers/
+        ingress/
+        metrics/
+        realtime/
+        router/
 
   shared/
     pom.xml
@@ -79,6 +83,7 @@ HAFMessenger/
         requests/
         responses/
         utils/
+        websocket/
     src/test/java/com/haf/shared/
       constants/
       crypto/

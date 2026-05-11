@@ -1,7 +1,6 @@
 package com.haf.shared.responses;
 
 import java.io.Serializable;
-import java.util.List;
 
 /**
  * Server-side messaging policy used by clients to decide attachment transport.
@@ -10,7 +9,6 @@ public class MessagingPolicyResponse implements Serializable {
     private long attachmentMaxBytes;
     private long attachmentInlineMaxBytes;
     private int attachmentChunkBytes;
-    private List<String> attachmentAllowedTypes;
     private long attachmentUnboundTtlSeconds;
     private String error;
 
@@ -76,24 +74,6 @@ public class MessagingPolicyResponse implements Serializable {
     }
 
     /**
-     * Returns allowed attachment MIME types.
-     *
-     * @return allowed attachment MIME types
-     */
-    public List<String> getAttachmentAllowedTypes() {
-        return attachmentAllowedTypes;
-    }
-
-    /**
-     * Sets allowed attachment MIME types.
-     *
-     * @param attachmentAllowedTypes allowed attachment MIME types
-     */
-    public void setAttachmentAllowedTypes(List<String> attachmentAllowedTypes) {
-        this.attachmentAllowedTypes = attachmentAllowedTypes;
-    }
-
-    /**
      * Returns TTL for unbound uploads, in seconds.
      *
      * @return unbound-upload TTL in seconds
@@ -135,20 +115,17 @@ public class MessagingPolicyResponse implements Serializable {
      * @param maxBytes maximum attachment bytes
      * @param inlineMaxBytes maximum inline-attachment bytes
      * @param chunkBytes chunk size in bytes
-     * @param allowedTypes allowed attachment MIME types
      * @param unboundTtlSeconds unbound-upload TTL in seconds
      * @return populated success response
      */
     public static MessagingPolicyResponse success(long maxBytes,
             long inlineMaxBytes,
             int chunkBytes,
-            List<String> allowedTypes,
             long unboundTtlSeconds) {
         MessagingPolicyResponse response = new MessagingPolicyResponse();
         response.setAttachmentMaxBytes(maxBytes);
         response.setAttachmentInlineMaxBytes(inlineMaxBytes);
         response.setAttachmentChunkBytes(chunkBytes);
-        response.setAttachmentAllowedTypes(allowedTypes);
         response.setAttachmentUnboundTtlSeconds(unboundTtlSeconds);
         return response;
     }

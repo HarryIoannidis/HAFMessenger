@@ -10,6 +10,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodySubscriber;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -18,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Flow;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
@@ -45,11 +49,11 @@ class AuthHttpClientTest {
     @Test
     void post_authenticated_sets_content_type_and_extra_headers() {
         FakeHttpClient fakeHttpClient = new FakeHttpClient();
-        fakeHttpClient.enqueueResponse(response(200, "{}", URI.create("https://api.test/api/v1/messages")));
+        fakeHttpClient.enqueueResponse(response(200, "{}", URI.create("https://api.test/api/v1/contacts")));
 
         AuthHttpClient client = new AuthHttpClient(URI.create("https://api.test"), "session-2", fakeHttpClient);
         client.postAuthenticated(
-                "/api/v1/messages",
+                "/api/v1/contacts",
                 "{\"x\":1}",
                 Map.of("X-Test", "abc"))
                 .join();
@@ -253,7 +257,12 @@ class AuthHttpClientTest {
         private final ArrayDeque<Object> queue = new ArrayDeque<>();
 
         void enqueueResponse(HttpResponse<?> response) {
-            queue.addLast(response);
+            queue.addLast(new QueuedResponse(
+                    response.statusCode(),
+                    responseBodyBytes(response.body()),
+                    response.uri(),
+                    response.headers(),
+                    response.version()));
         }
 
         void enqueueError(Throwable throwable) {
@@ -321,9 +330,14 @@ class AuthHttpClientTest {
             if (next instanceof Throwable throwable) {
                 return CompletableFuture.failedFuture(throwable);
             }
-            @SuppressWarnings("unchecked")
-            HttpResponse<T> response = (HttpResponse<T>) next;
-            return CompletableFuture.completedFuture(response);
+            if (!(next instanceof QueuedResponse response)) {
+                return CompletableFuture.failedFuture(new AssertionError("Unsupported queued fake response"));
+            }
+            try {
+                return decodeResponse(request, responseBodyHandler, response);
+            } catch (RuntimeException e) {
+                return CompletableFuture.failedFuture(e);
+            }
         }
 
         @Override
@@ -331,6 +345,115 @@ class AuthHttpClientTest {
                 HttpResponse.BodyHandler<T> responseBodyHandler,
                 HttpResponse.PushPromiseHandler<T> pushPromiseHandler) {
             return sendAsync(request, responseBodyHandler);
+        }
+
+        private static byte[] responseBodyBytes(Object body) {
+            if (body == null) {
+                return new byte[0];
+            }
+            if (body instanceof byte[] bytes) {
+                return bytes.clone();
+            }
+            if (body instanceof String text) {
+                return text.getBytes(StandardCharsets.UTF_8);
+            }
+            throw new IllegalArgumentException("Unsupported fake response body type: " + body.getClass().getName());
+        }
+
+        private static <T> CompletableFuture<HttpResponse<T>> decodeResponse(
+                HttpRequest request,
+                HttpResponse.BodyHandler<T> responseBodyHandler,
+                QueuedResponse response) {
+            BodySubscriber<T> subscriber = responseBodyHandler.apply(new FakeResponseInfo(response));
+            subscriber.onSubscribe(new NoopSubscription());
+            if (response.body().length > 0) {
+                subscriber.onNext(List.of(ByteBuffer.wrap(response.body())));
+            }
+            subscriber.onComplete();
+            return subscriber.getBody()
+                    .toCompletableFuture()
+                    .thenApply(body -> responseFor(request, response, body));
+        }
+
+        private static <T> HttpResponse<T> responseFor(HttpRequest request, QueuedResponse response, T body) {
+            return new HttpResponse<>() {
+                @Override
+                public int statusCode() {
+                    return response.statusCode();
+                }
+
+                @Override
+                public HttpRequest request() {
+                    return request;
+                }
+
+                @Override
+                public Optional<HttpResponse<T>> previousResponse() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public HttpHeaders headers() {
+                    return response.headers();
+                }
+
+                @Override
+                public T body() {
+                    return body;
+                }
+
+                @Override
+                public Optional<SSLSession> sslSession() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public URI uri() {
+                    return response.uri();
+                }
+
+                @Override
+                public Version version() {
+                    return response.version();
+                }
+            };
+        }
+    }
+
+    private record QueuedResponse(
+            int statusCode,
+            byte[] body,
+            URI uri,
+            HttpHeaders headers,
+            HttpClient.Version version) {
+    }
+
+    private record FakeResponseInfo(QueuedResponse response) implements HttpResponse.ResponseInfo {
+        @Override
+        public int statusCode() {
+            return response.statusCode();
+        }
+
+        @Override
+        public HttpHeaders headers() {
+            return response.headers();
+        }
+
+        @Override
+        public HttpClient.Version version() {
+            return response.version();
+        }
+    }
+
+    private static final class NoopSubscription implements Flow.Subscription {
+        @Override
+        public void request(long n) {
+            // BodySubscribers used here receive the complete in-memory fake body immediately.
+        }
+
+        @Override
+        public void cancel() {
+            // Nothing is allocated by this fake subscription, so cancellation has no work to do.
         }
     }
 }

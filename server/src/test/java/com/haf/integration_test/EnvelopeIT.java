@@ -30,15 +30,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class EnvelopeIT {
 
     @Container
-    @SuppressWarnings("resource")
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test");
+    static MySQLContainer<?> mysql = createMysqlContainer();
 
     private HikariDataSource dataSource;
     private Envelope dao;
     private AuditLogger auditLogger;
+
+    private static MySQLContainer<?> createMysqlContainer() {
+        MySQLContainer<?> container = new MySQLContainer<>("mysql:8.0");
+        container.withDatabaseName("testdb");
+        container.withUsername("test");
+        container.withPassword("test");
+        return container;
+    }
 
     @BeforeEach
     void setUp() {
@@ -97,6 +101,35 @@ class EnvelopeIT {
 
         List<QueuedEnvelope> after = dao.fetchForRecipient(message.getRecipientId(), 10);
         assertEquals(0, after.size());
+    }
+
+    @Test
+    void mark_read_implies_delivery_and_replays_read_state_to_sender() {
+        EncryptedMessage message = createValidMessage();
+        var inserted = dao.insert(message);
+
+        boolean marked = dao.markRead(List.of(inserted.envelopeId()));
+
+        assertTrue(marked);
+        assertEquals(0, dao.fetchForRecipient(message.getRecipientId(), 10).size());
+        List<Envelope.ReceiptRecord> receipts = dao.fetchReceiptsForSender(message.getSenderId(), 10);
+        assertEquals(1, receipts.size());
+        assertEquals(inserted.envelopeId(), receipts.get(0).envelopeId());
+        assertEquals(message.getRecipientId(), receipts.get(0).recipientId());
+        assertEquals(Envelope.ReceiptState.READ, receipts.get(0).state());
+    }
+
+    @Test
+    void mark_delivered_replays_delivered_state_to_sender() {
+        EncryptedMessage message = createValidMessage();
+        var inserted = dao.insert(message);
+
+        assertTrue(dao.markDelivered(List.of(inserted.envelopeId())));
+
+        List<Envelope.ReceiptRecord> receipts = dao.fetchReceiptsForSender(message.getSenderId(), 10);
+        assertEquals(1, receipts.size());
+        assertEquals(inserted.envelopeId(), receipts.get(0).envelopeId());
+        assertEquals(Envelope.ReceiptState.DELIVERED, receipts.get(0).state());
     }
 
     @Test

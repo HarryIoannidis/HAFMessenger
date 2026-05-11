@@ -29,6 +29,16 @@ public interface MessageReceiver {
     void stop();
 
     /**
+     * Reconnects the active transport after network loss or token refresh.
+     *
+     * @throws IOException when reconnection fails
+     */
+    default void reconnect() throws IOException {
+        stop();
+        start();
+    }
+
+    /**
      * Acknowledges all pending envelopes received from a specific sender.
      * This marks the messages as delivered on the server so they are not
      * re-sent on next login.
@@ -36,6 +46,24 @@ public interface MessageReceiver {
      * @param senderId the sender whose pending envelopes should be acknowledged
      */
     void acknowledgeEnvelopes(String senderId);
+
+    /**
+     * Emits a typing-start realtime event for a recipient.
+     *
+     * @param recipientId recipient/contact id
+     */
+    default void sendTypingStart(String recipientId) {
+        // Optional for transports without realtime typing support.
+    }
+
+    /**
+     * Emits a typing-stop realtime event for a recipient.
+     *
+     * @param recipientId recipient/contact id
+     */
+    default void sendTypingStop(String recipientId) {
+        // Optional for transports without realtime typing support.
+    }
 
     /**
      * Decrypts a detached encrypted message payload (not sourced from WS mailbox).
@@ -78,6 +106,36 @@ public interface MessageReceiver {
          * @param active true when active, false when inactive
          */
         default void onPresenceUpdate(String userId, boolean active) {
+            // Optional callback.
+        }
+
+        /**
+         * Called when another user starts or stops typing.
+         *
+         * @param userId sender/contact id
+         * @param typing true for typing start, false for typing stop
+         */
+        default void onTyping(String userId, boolean typing) {
+            // Optional callback.
+        }
+
+        /**
+         * Called when delivery receipts are received for outgoing envelope IDs.
+         *
+         * @param userId      sender of the receipt
+         * @param envelopeIds affected outgoing envelope IDs
+         */
+        default void onMessageDelivered(String userId, java.util.List<String> envelopeIds) {
+            // Optional callback.
+        }
+
+        /**
+         * Called when read receipts are received for outgoing envelope IDs.
+         *
+         * @param userId      sender of the receipt
+         * @param envelopeIds affected outgoing envelope IDs
+         */
+        default void onMessageRead(String userId, java.util.List<String> envelopeIds) {
             // Optional callback.
         }
     }

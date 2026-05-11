@@ -53,19 +53,21 @@ class MessageViewModelAttachmentTest {
         Files.write(file, pseudoPngBytes(256));
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1 && viewModel.getMessages("bob").size() == 1);
 
-        assertEquals(1, sender.sendCalls);
+        assertEquals(0, sender.sendCalls);
+        assertEquals(1, sender.sendWithResultCalls);
         assertEquals(0, sender.initCalls);
-        assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSentContentType);
-        assertEquals(MessageType.IMAGE, viewModel.getMessages("bob").getFirst().type());
+        assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSendWithResultContentType);
+        MessageVM first = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.IMAGE, first.type());
+        assertEquals("env-123", first.envelopeId());
     }
 
     @Test
-    void wildcard_policy_allows_arbitrary_file_attachment_types() throws Exception {
+    void arbitrary_valid_file_attachment_types_are_allowed() throws Exception {
         RecordingSender sender = new RecordingSender();
         sender.policy = policy(1_024, 512, 256);
-        sender.policy.setAttachmentAllowedTypes(List.of(AttachmentConstants.MIME_TYPE_WILDCARD));
         StubReceiver receiver = new StubReceiver();
         MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
 
@@ -73,10 +75,10 @@ class MessageViewModelAttachmentTest {
         Files.write(file, new byte[256]);
 
         viewModel.sendAttachment("bob", file, "application/vnd.microsoft.portable-executable");
-        awaitCondition(() -> sender.sendCalls == 1 && viewModel.getMessages("bob").size() == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1 && viewModel.getMessages("bob").size() == 1);
 
         MessageVM message = viewModel.getMessages("bob").getFirst();
-        assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSentContentType);
+        assertEquals(AttachmentConstants.CONTENT_TYPE_INLINE, sender.lastSendWithResultContentType);
         assertEquals(MessageType.FILE, message.type());
         assertEquals("installer.exe", message.fileName());
     }
@@ -102,7 +104,7 @@ class MessageViewModelAttachmentTest {
 
         awaitCondition(() -> {
             MessageVM message = viewModel.getMessages("bob").getFirst();
-            return sender.sendCalls == 1
+            return sender.sendWithResultCalls == 1
                     && message.type() == MessageType.IMAGE
                     && !message.isLoading()
                     && message.content() != null;
@@ -125,7 +127,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, original);
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1);
 
         AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
                 new String(sender.lastSentPayload, StandardCharsets.UTF_8));
@@ -150,7 +152,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, original);
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1);
 
         AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
                 new String(sender.lastSentPayload, StandardCharsets.UTF_8));
@@ -176,7 +178,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, original);
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1);
 
         AttachmentInlinePayload sent = AttachmentPayloadCodec.fromInlineJson(
                 new String(sender.lastSentPayload, StandardCharsets.UTF_8));
@@ -291,26 +293,6 @@ class MessageViewModelAttachmentTest {
         assertEquals(MessageType.IMAGE, resolved.type());
         assertNotNull(resolved.content());
         assertEquals("photo.png", resolved.fileName());
-    }
-
-    @Test
-    void disallowed_mime_is_blocked_before_send() throws Exception {
-        RecordingSender sender = new RecordingSender();
-        sender.policy = policy(2_048, 512, 256);
-        sender.policy.setAttachmentAllowedTypes(List.of("image/png"));
-
-        StubReceiver receiver = new StubReceiver();
-        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
-
-        Path file = tempDir.resolve("doc.pdf");
-        Files.write(file, new byte[200]);
-
-        viewModel.sendAttachment("bob", file, "application/pdf");
-        awaitCondition(() -> viewModel.statusProperty().get().contains("Failed to send attachment"));
-
-        assertEquals(0, sender.sendCalls);
-        assertEquals(0, sender.initCalls);
-        assertTrue(viewModel.statusProperty().get().contains("Failed to send attachment"));
     }
 
     @Test
@@ -439,7 +421,7 @@ class MessageViewModelAttachmentTest {
 
         viewModel.sendAttachment("bob", file, "image/png");
         awaitCondition(() -> {
-            if (sender.sendCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
+            if (sender.sendWithResultCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
                 return false;
             }
             MessageVM first = viewModel.getMessages("bob").getFirst();
@@ -465,7 +447,7 @@ class MessageViewModelAttachmentTest {
         Files.write(file, pseudoWebpBytes(128));
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendCalls == 1 && notices.size() == 1);
+        awaitCondition(() -> sender.sendWithResultCalls == 1 && notices.size() == 1);
 
         MessagesViewModel.ImagePreviewFallbackNotice notice = notices.getFirst();
         assertEquals("bob", notice.contactId());
@@ -489,7 +471,7 @@ class MessageViewModelAttachmentTest {
 
         viewModel.sendAttachment("bob", file, "image/png");
         awaitCondition(() -> {
-            if (sender.sendCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
+            if (sender.sendWithResultCalls != 1 || viewModel.getMessages("bob").isEmpty()) {
                 return false;
             }
             MessageVM first = viewModel.getMessages("bob").getFirst();
@@ -553,14 +535,6 @@ class MessageViewModelAttachmentTest {
                 max,
                 inlineMax,
                 chunk,
-                List.of(
-                        "image/png",
-                        "image/jpeg",
-                        "image/gif",
-                        "image/webp",
-                        "application/pdf",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
                 1800);
     }
 
@@ -662,7 +636,6 @@ class MessageViewModelAttachmentTest {
         private int completeCalls;
         private int bindCalls;
 
-        private String lastSentContentType;
         private String lastSendWithResultContentType;
         private byte[] lastSentPayload;
 
@@ -670,15 +643,16 @@ class MessageViewModelAttachmentTest {
         public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds) {
             sleepQuietly(sendDelayMs);
             sendCalls++;
-            lastSentContentType = contentType;
             lastSentPayload = payload;
         }
 
         @Override
         public SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType,
                 long ttlSeconds) {
+            sleepQuietly(sendDelayMs);
             sendWithResultCalls++;
             lastSendWithResultContentType = contentType;
+            lastSentPayload = payload;
             return new SendResult("env-123", System.currentTimeMillis() + 60_000);
         }
 

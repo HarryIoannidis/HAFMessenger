@@ -111,6 +111,22 @@ class MessageViewModelRuntimeTest {
     }
 
     @Test
+    void read_receipt_before_outgoing_envelope_is_rendered_is_applied_later() throws Exception {
+        ListenerCapturingReceiver receiver = new ListenerCapturingReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new EnvelopeSender("env-1"), receiver);
+
+        receiver.listener().onMessageRead("bob", List.of("env-1"));
+        viewModel.sendTextMessage("bob", "hello");
+
+        awaitCondition(() -> viewModel.getMessages("bob").size() == 1
+                && !viewModel.getMessages("bob").getFirst().isLoading());
+
+        MessageVM rendered = viewModel.getMessages("bob").getFirst();
+        assertEquals("env-1", rendered.envelopeId());
+        assertTrue(rendered.isRead());
+    }
+
+    @Test
     void receiver_takeover_error_emits_takeover_runtime_issue() throws Exception {
         ListenerCapturingReceiver receiver = new ListenerCapturingReceiver();
         MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
@@ -160,6 +176,26 @@ class MessageViewModelRuntimeTest {
         public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds)
                 throws MessageValidationException, KeyNotFoundException, IOException {
             // no-op
+        }
+    }
+
+    private static final class EnvelopeSender implements MessageSender {
+        private final String envelopeId;
+
+        private EnvelopeSender(String envelopeId) {
+            this.envelopeId = envelopeId;
+        }
+
+        @Override
+        public void sendMessage(byte[] payload, String recipientId, String contentType, long ttlSeconds)
+                throws MessageValidationException, KeyNotFoundException, IOException {
+            // no-op
+        }
+
+        @Override
+        public SendResult sendMessageWithResult(byte[] payload, String recipientId, String contentType, long ttlSeconds)
+                throws MessageValidationException, KeyNotFoundException, IOException {
+            return new SendResult(envelopeId, System.currentTimeMillis() + 60_000L);
         }
     }
 

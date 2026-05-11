@@ -5,6 +5,7 @@ target/
 .kotlin
 .logs/
 /logs/
+/server/logs/
 
 ### IntelliJ IDEA ###
 .idea/

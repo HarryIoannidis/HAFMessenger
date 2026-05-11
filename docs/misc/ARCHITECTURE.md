@@ -10,7 +10,7 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 - Server: layered plain Java service (`ingress`, `router`, `db`, `metrics`, `config`, `handlers`).
 - Shared: DTOs, requests/responses, constants, crypto, keystore, validation, and utility contracts.
 - Dependency direction: `client -> shared`, `server -> shared`; no direct `client -> server` compile dependency.
-- Runtime transport: HTTPS ingress for API operations, with HTTPS polling for mailbox receive and ACK paths.
+- Runtime transport: HTTPS REST for non-realtime API operations and WSS for live messaging, typing, receipts, presence, and server push.
 
 ## Key Types/Interfaces
 
@@ -21,9 +21,9 @@ Describe the implemented system architecture, boundaries, and responsibilities a
 ## Flow
 
 1. UI interaction enters controller layer and delegates to ViewModels/services.
-2. Client network layer sends authenticated HTTPS calls and polls mailbox updates.
-3. Server ingress validates/authenticates requests and passes envelopes to router/services.
-4. Router supports mailbox polling fetch/ack paths for recipients.
+2. Client network layer sends authenticated HTTPS REST calls for normal API work and authenticated WSS events for live chat.
+3. Server REST ingress validates/authenticates non-realtime requests; WSS gateway validates/revalidates live events and passes encrypted envelopes to router/services.
+4. Router supports realtime mailbox subscription, backlog push, and ownership-scoped receipt workflows.
 5. DAOs persist and retrieve encrypted metadata/payload blobs.
 6. Shared contracts/crypto guarantee wire compatibility and deterministic validation in both modules.
 

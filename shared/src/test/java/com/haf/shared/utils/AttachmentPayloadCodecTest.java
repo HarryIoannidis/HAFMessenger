@@ -39,7 +39,7 @@ class AttachmentPayloadCodecTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> AttachmentPayloadCodec.toInlineJson(payload));
-        assertTrue(ex.getMessage().contains("not allowed"));
+        assertTrue(ex.getMessage().contains("invalid"));
     }
 
     @Test
@@ -86,10 +86,9 @@ class AttachmentPayloadCodecTest {
     }
 
     @Test
-    void allowlist_contains_expected_defaults() {
-        assertTrue(AttachmentConstants.DEFAULT_ALLOWED_TYPES_SET.contains(AttachmentConstants.MIME_TYPE_WILDCARD));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("image/webp"));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("text/plain"));
-        assertTrue(AttachmentConstants.isAllowedAttachmentType("application/vnd.android.package-archive"));
+    void accepts_valid_mime_types() {
+        assertTrue(AttachmentConstants.isValidAttachmentType("image/webp"));
+        assertTrue(AttachmentConstants.isValidAttachmentType("text/plain"));
+        assertTrue(AttachmentConstants.isValidAttachmentType("application/vnd.android.package-archive"));
     }
 }

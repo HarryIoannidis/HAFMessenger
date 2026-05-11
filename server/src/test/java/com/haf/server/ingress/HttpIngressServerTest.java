@@ -6,17 +6,10 @@ import com.haf.server.db.Contact;
 import com.haf.server.db.FileUpload;
 import com.haf.server.db.Session;
 import com.haf.server.db.User;
-import com.haf.server.handlers.EncryptedMessageValidator;
 import com.haf.server.metrics.AuditLogger;
-import com.haf.server.metrics.MetricsRegistry;
-import com.haf.server.router.MailboxRouter;
-import com.haf.server.router.QueuedEnvelope;
 import com.haf.server.router.RateLimiterService;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.CryptoConstants;
-import com.haf.shared.constants.MessageHeader;
-import com.haf.shared.crypto.MessageSignatureService;
-import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.requests.AddContactRequest;
 import com.haf.shared.requests.AttachmentBindRequest;
 import com.haf.shared.requests.AttachmentCompleteRequest;
@@ -44,14 +37,12 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyStore;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -89,9 +80,6 @@ class HttpIngressServerTest {
     private ServerConfig config;
 
     @Mock
-    private MailboxRouter mailboxRouter;
-
-    @Mock
     private RateLimiterService rateLimiterService;
 
     @Mock
@@ -114,11 +102,10 @@ class HttpIngressServerTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        MetricsRegistry metricsRegistry = new MetricsRegistry();
-        EncryptedMessageValidator validator = new EncryptedMessageValidator();
         SSLContext sslContext = createTestSSLContext();
 
-        when(config.getHttpPort()).thenReturn(0);
+        when(config.getHttpsPort()).thenReturn(0);
+        lenient().when(config.getHttpsPath()).thenReturn("/api/v1");
         lenient().when(config.getAdminPublicKeyPem())
                 .thenReturn("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----");
 
@@ -131,11 +118,11 @@ class HttpIngressServerTest {
         lenient().when(config.getIngressExecutorThreads()).thenReturn(4);
         lenient().when(config.getIngressExecutorQueueCapacity()).thenReturn(64);
         lenient().when(config.getSearchCursorSecret()).thenReturn("test-search-secret");
+        lenient().when(config.getLoginSentinelPassword()).thenReturn("test-login-sentinel-password");
 
         lenient().when(config.getAttachmentMaxBytes()).thenReturn(10L * 1024L * 1024L);
         lenient().when(config.getAttachmentInlineMaxBytes()).thenReturn(1024L);
         lenient().when(config.getAttachmentChunkBytes()).thenReturn(512);
-        lenient().when(config.getAttachmentAllowedTypes()).thenReturn(List.of("application/pdf"));
         lenient().when(config.getAttachmentUnboundTtlSeconds()).thenReturn(1800L);
         lenient().when(rateLimiterService.checkAndConsumeLoginAttempt(anyString(), anyString(), anyString()))
                 .thenReturn(RateLimiterService.RateLimitDecision.allow());
@@ -146,11 +133,8 @@ class HttpIngressServerTest {
             server = new HttpIngressServer(
                     config,
                     sslContext,
-                    mailboxRouter,
                     rateLimiterService,
                     auditLogger,
-                    metricsRegistry,
-                    validator,
                     userDAO,
                     sessionDAO,
                     fileUploadDAO,
@@ -171,151 +155,6 @@ class HttpIngressServerTest {
     void stop_shuts_down_gracefully() {
         server.start();
         assertDoesNotThrow(() -> server.stop());
-    }
-
-    @Test
-    void ingress_rejects_missing_auth() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(validMessage("s", "r")));
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(401, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("missing or invalid auth"));
-    }
-
-    @Test
-    void ingress_accepts_valid_payload() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        EncryptedMessage message = validMessage("sender-1", "recipient-1");
-
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
-        authenticate(exchange, "session-ok", "sender-1");
-
-        when(rateLimiterService.checkAndConsume(anyString(), eq("sender-1")))
-                .thenReturn(RateLimiterService.RateLimitDecision.allow());
-        when(mailboxRouter.ingress(any(EncryptedMessage.class))).thenReturn(
-                new QueuedEnvelope("env-1", message, System.currentTimeMillis(), System.currentTimeMillis() + 60_000));
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(202, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"envelopeId\":\"env-1\""));
-        assertFalse(exchange.responseHeaders().containsKey("X-User-Id"));
-        verify(mailboxRouter, times(1)).ingress(any(EncryptedMessage.class));
-    }
-
-    @Test
-    void ingress_rejects_sender_mismatch_with_authenticated_user() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        EncryptedMessage message = validMessage("sender-2", "recipient-1");
-
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
-        authenticate(exchange, "session-ok", "sender-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(403, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("senderId does not match authenticated user"));
-        verify(rateLimiterService, never()).checkAndConsume(anyString(), anyString());
-        verify(mailboxRouter, never()).ingress(any(EncryptedMessage.class));
-    }
-
-    @Test
-    void ingress_rejects_stale_recipient_key_fingerprint_header() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        EncryptedMessage message = validMessage("sender-1", "recipient-1");
-        when(userDAO.getPublicKey("recipient-1")).thenReturn(
-                new User.PublicKeyRecord("pem", "fp-current", "sign-pem", "sign-fp-current"));
-
-        ExchangeHarness exchange = newExchange("POST", "/api/v1/messages", JsonCodec.toJson(message));
-        exchange.requestHeaders().add("X-Recipient-Key-Fingerprint", "fp-stale");
-        authenticate(exchange, "session-ok", "sender-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(409, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("stale_recipient_key"));
-        verify(mailboxRouter, never()).ingress(any(EncryptedMessage.class));
-    }
-
-    @Test
-    void ingress_fetches_pending_messages_for_authenticated_user() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        EncryptedMessage message = validMessage("sender-1", "recipient-1");
-        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
-                .thenReturn(RateLimiterService.RateLimitDecision.allow());
-        when(mailboxRouter.fetchUndelivered("recipient-1", 2)).thenReturn(
-                List.of(new QueuedEnvelope("env-fetch-1", message, 10L, 20L)));
-
-        ExchangeHarness exchange = newExchange("GET", "/api/v1/messages?limit=2", "");
-        authenticate(exchange, "session-fetch", "recipient-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(200, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"messages\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"envelopeId\":\"env-fetch-1\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"type\":\"message\""));
-        verify(mailboxRouter, times(1)).fetchUndelivered("recipient-1", 2);
-    }
-
-    @Test
-    void ingress_acknowledges_messages_for_authenticated_user() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
-                .thenReturn(RateLimiterService.RateLimitDecision.allow());
-        when(mailboxRouter.acknowledgeOwned("recipient-1", List.of("env-a", "env-b")))
-                .thenReturn(true);
-
-        ExchangeHarness exchange = newExchange(
-                "POST",
-                "/api/v1/messages/ack",
-                "{\"envelopeIds\":[\"env-a\",\"env-b\"]}");
-        authenticate(exchange, "session-ack", "recipient-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(200, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"acknowledged\":true"));
-        verify(mailboxRouter, times(1)).acknowledgeOwned("recipient-1", List.of("env-a", "env-b"));
-    }
-
-    @Test
-    void ingress_fetch_pending_messages_is_rate_limited() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
-                .thenReturn(RateLimiterService.RateLimitDecision.block(15));
-
-        ExchangeHarness exchange = newExchange("GET", "/api/v1/messages?limit=2", "");
-        authenticate(exchange, "session-fetch-limit", "recipient-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(429, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":15"));
-        verify(mailboxRouter, never()).fetchUndelivered(anyString(), anyInt());
-    }
-
-    @Test
-    void ingress_acknowledge_messages_is_rate_limited() throws Exception {
-        HttpHandler handler = createHandler("IngressHandler");
-        when(rateLimiterService.checkAndConsume(anyString(), eq("recipient-1")))
-                .thenReturn(RateLimiterService.RateLimitDecision.block(12));
-
-        ExchangeHarness exchange = newExchange(
-                "POST",
-                "/api/v1/messages/ack",
-                "{\"envelopeIds\":[\"env-a\"]}");
-        authenticate(exchange, "session-ack-limit", "recipient-1");
-
-        handler.handle(exchange.exchange());
-
-        assertEquals(429, exchange.statusCode().get());
-        assertTrue(exchange.responseBodyAsString().contains("\"error\":\"rate limit\""));
-        assertTrue(exchange.responseBodyAsString().contains("\"retryAfterSeconds\":12"));
-        verify(mailboxRouter, never()).acknowledgeOwned(anyString(), any());
     }
 
     @Test
@@ -482,22 +321,24 @@ class HttpIngressServerTest {
     }
 
     @Test
-    @SuppressWarnings("java:S3011") // Reflective access is required to test private inner-class method
     void login_password_helper_uses_sentinel_when_hash_missing() throws Exception {
-        Class<?> loginHandler = Class.forName(HttpIngressServer.class.getName() + "$LoginHandler");
-        java.lang.reflect.Method verifyMethod = loginHandler.getDeclaredMethod(
-                "verifyPasswordWithSentinel",
-                String.class,
-                String.class);
-        verifyMethod.setAccessible(true);
-
         String hash = Password.hash("correct horse battery staple")
                 .addRandomSalt()
                 .with(ARGON2)
                 .getResult();
-        boolean valid = (boolean) verifyMethod.invoke(null, "correct horse battery staple", hash);
-        boolean invalid = (boolean) verifyMethod.invoke(null, "wrong", hash);
-        boolean missing = (boolean) verifyMethod.invoke(null, "anything", null);
+        String sentinelHash = HttpIngressServer.buildLoginSentinelHash("test-login-sentinel-password");
+        boolean valid = HttpIngressServer.verifyPasswordWithSentinel(
+                "correct horse battery staple",
+                hash,
+                sentinelHash);
+        boolean invalid = HttpIngressServer.verifyPasswordWithSentinel(
+                "wrong",
+                hash,
+                sentinelHash);
+        boolean missing = HttpIngressServer.verifyPasswordWithSentinel(
+                "anything",
+                null,
+                sentinelHash);
 
         assertTrue(valid);
         assertFalse(invalid);
@@ -1120,7 +961,7 @@ class HttpIngressServerTest {
 
         assertEquals(200, exchange.statusCode().get());
         assertTrue(exchange.responseBodyAsString().contains("attachmentChunkBytes"));
-        assertTrue(exchange.responseBodyAsString().contains("attachmentAllowedTypes"));
+        assertFalse(exchange.responseBodyAsString().contains("attachmentAllowedTypes"));
     }
 
     @Test
@@ -1322,12 +1163,8 @@ class HttpIngressServerTest {
         assertTrue(exchange.responseBodyAsString().contains("invalid request path"));
     }
 
-    @SuppressWarnings("java:S3011") // Reflective access is required to instantiate private inner-class handlers
-    private HttpHandler createHandler(String nestedClassSimpleName) throws ReflectiveOperationException {
-        Class<?> handlerClass = Class.forName(HttpIngressServer.class.getName() + "$" + nestedClassSimpleName);
-        Constructor<?> constructor = handlerClass.getDeclaredConstructor(HttpIngressServer.class);
-        constructor.setAccessible(true);
-        return (HttpHandler) constructor.newInstance(server);
+    private HttpHandler createHandler(String nestedClassSimpleName) {
+        return server.createHandlerForTesting(nestedClassSimpleName);
     }
 
     private void authenticate(ExchangeHarness exchange, String sessionId, String userId) {
@@ -1344,32 +1181,6 @@ class HttpIngressServerTest {
         request.setSigningPublicKeyPem(SigningKeyIO.publicPem(signingPair.getPublic()));
         request.setSigningPublicKeyFingerprint(
                 FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPair.getPublic())));
-    }
-
-    private EncryptedMessage validMessage(String senderId, String recipientId) throws Exception {
-        EncryptedMessage message = new EncryptedMessage();
-        message.setVersion(MessageHeader.VERSION);
-        message.setAlgorithm(MessageHeader.ALGO_AEAD);
-        message.setSenderId(senderId);
-        message.setRecipientId(recipientId);
-        message.setTimestampEpochMs(System.currentTimeMillis());
-        message.setTtlSeconds((int) java.time.Duration.ofDays(1).toSeconds());
-        message.setIvB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.IV_BYTES]));
-        message.setEphemeralPublicB64(Base64.getEncoder().encodeToString(new byte[256]));
-        message.setCiphertextB64(Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)));
-        message.setTagB64(Base64.getEncoder().encodeToString(new byte[MessageHeader.GCM_TAG_BYTES]));
-        message.setContentType("text/plain");
-        message.setContentLength(4);
-        message.setE2e(true);
-
-        KeyPair signingPair = SigningKeyIO.generate();
-        String signingPem = SigningKeyIO.publicPem(signingPair.getPublic());
-        String signingFingerprint = FingerprintUtil.sha256Hex(SigningKeyIO.publicDer(signingPair.getPublic()));
-        MessageSignatureService.sign(message, signingPair.getPrivate(), signingFingerprint);
-        lenient().when(userDAO.getPublicKey(senderId)).thenReturn(
-                new User.PublicKeyRecord("enc-pem", "enc-fp", signingPem, signingFingerprint));
-
-        return message;
     }
 
     private static User.UserRecord approvedUser(String userId, String password) {

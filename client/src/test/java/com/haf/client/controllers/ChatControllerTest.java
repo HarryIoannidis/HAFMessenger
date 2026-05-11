@@ -281,7 +281,11 @@ class ChatControllerTest {
             "if (!settings.isMediaOpenPreviewOnImageClick()) {",
             "if (!settings.isPrivacyConfirmAttachmentOpen()) {",
             ".movable(spec.movable())",
-            "settings.setMediaShowImageFallbackPopup(false)"
+            "settings.setMediaShowImageFallbackPopup(false)",
+            "shouldAcknowledgeIncomingAsRead",
+            "pendingReadAcknowledgement = true;",
+            "window.isFocused()",
+            "!stage.isIconified()"
     })
     void controller_source_contains_expected_logic_and_behavior_wiring(String requiredCodeSnippet) throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);

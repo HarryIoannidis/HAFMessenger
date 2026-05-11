@@ -10,7 +10,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 - Env-file lookup can be overridden via JVM property `haf.server.env.path` or environment variable `HAF_SERVER_ENV_FILE`.
 - Required vars include DB credentials, TLS keystore, key passphrase, search cursor secret, and JWT signing secret.
 - `HAF_KEY_PASS` is consumed by server runtime only and is not used by client keystore bootstrap.
-- Optional vars control pool sizing, ports, search limits, and attachment policy.
+- Optional vars control pool sizing, ports, search limits, and attachment upload limits.
 - Optional DB TLS truststore vars:
   - `HAF_DB_TRUSTSTORE_PATH`
   - `HAF_DB_TRUSTSTORE_PASS`
@@ -26,14 +26,15 @@ Document server runtime configuration loaded by `ServerConfig`.
   - `HAF_JWT_SECRET`
 - Key defaults:
   - DB pool size: `20`
-  - HTTP port: `8443`
+  - HTTPS REST API port: `8443` (path: `/api/v1`, configurable via `HAF_HTTPS_PATH`)
+  - WSS realtime port: `8444` (path: `/ws/v1/realtime`, configurable via `HAF_WS_PATH`)
   - Search page size: `20` (max `50`)
   - Search min/max query length: `3` / `128`
   - JWT access TTL: `900` seconds
   - JWT refresh TTL: `2592000` seconds
   - JWT absolute session TTL: `2592000` seconds
   - JWT idle session TTL: `max(600, HAF_JWT_ACCESS_TTL_SECONDS)` seconds when `HAF_JWT_IDLE_TTL_SECONDS` is unset
-  - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL), and `HAF_ATTACHMENT_ALLOWED_TYPES` defaults to `*/*`
+  - Attachment limits default to `AttachmentConstants` values (`max`, `inline max`, `chunk bytes`, unbound TTL)
 
 ## Key Types/Interfaces
 
@@ -54,7 +55,7 @@ Document server runtime configuration loaded by `ServerConfig`.
 - Missing required values fail fast with `ConfigurationException`.
 - TLS keystore path has compatibility fallback resolution logic.
 - JWT TTL values are validated (`access >= 60s`, `refresh >= access`, `absolute >= refresh`, `idle >= 60s`).
-- Attachment policy values are validated to prevent invalid runtime limits.
+- Attachment size/chunk/TTL values are validated to prevent invalid runtime limits.
 - `HAF_JWT_IDLE_TTL_SECONDS` is consumed by `SessionDAO` at bootstrap to enforce session-idle expiry behavior.
 - Password getters return cloned char arrays to reduce accidental mutable sharing.
 - Packaging note: first-run local config bootstrap (no manual system-env setup) is tracked as a separate follow-up.

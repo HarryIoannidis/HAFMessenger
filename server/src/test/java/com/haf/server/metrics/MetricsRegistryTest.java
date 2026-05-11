@@ -154,6 +154,14 @@ class MetricsRegistryTest {
     }
 
     @Test
+    void record_delivery_latency_clamps_negative_clock_skew_to_zero() {
+        registry.recordDeliveryLatency(-500);
+
+        assertEquals(0.0, registry.snapshot().avgDeliveryLatencyMs());
+        assertEquals(1, registry.snapshot().deliveredCount());
+    }
+
+    @Test
     void get_average_delivery_latencyMs_returns_zero_when_no_deliveries() {
         assertEquals(0.0, registry.getAverageDeliveryLatencyMs());
     }
@@ -166,4 +174,3 @@ class MetricsRegistryTest {
     }
 
 }
-

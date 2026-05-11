@@ -40,7 +40,7 @@ The background task executes 4 sequential gating steps. If any step fails, the b
 - In dev mode, health URL resolution supports `server.url` in properties, then `-Dhaf.server.url`, then `HAF_SERVER_URL` (fallback `https://localhost:8443`).
 - In prod mode, health URL resolution uses `server.url.prod` with strict HTTPS validation.
 - It constructs a `java.net.http.HttpClient` with mode-aware SSL context (`SslContextUtils.getSslContextForMode(...)`) and tight boundaries: 2 seconds connection timeout, 3 seconds response timeout.
-- Instead of a full `GET`, it fires a lightweight HTTP `HEAD` request to `[SERVER]/api/v1/health`.
+- Instead of a full `GET`, it fires a lightweight HTTP `HEAD` request to `[SERVER]/api/v1/health` (or the configured REST path).
 - **Retries:** It allows exactly `3` attempts with a 500-millisecond backoff. If it receives a 400+ status code or timeout, it fails completely.
 
 ## 3. Transition or Fault Recovery (80% → 100%)

@@ -73,6 +73,41 @@ class MailboxRouterTest {
     }
 
     @Test
+    void ingress_push_does_not_count_delivery_before_receipt_ack() {
+        EncryptedMessage message = createValidMessage();
+        QueuedEnvelope envelope = new QueuedEnvelope(
+                "envelope-1", message, System.currentTimeMillis(), System.currentTimeMillis() + 3600000);
+
+        when(envelopeDAO.insert(message)).thenReturn(envelope);
+
+        MailboxRouter.MailboxSubscriber subscriber = mock(MailboxRouter.MailboxSubscriber.class);
+        router.subscribe(message.getRecipientId(), subscriber);
+
+        router.ingress(message);
+
+        verify(subscriber, times(1)).onEnvelope(envelope);
+        assertEquals(0, metricsRegistry.snapshot().deliveredCount());
+    }
+
+    @Test
+    void ingressIdempotent_does_not_redispatch_duplicate_client_message_id() {
+        EncryptedMessage message = createValidMessage();
+        QueuedEnvelope envelope = new QueuedEnvelope(
+                "envelope-1", message, System.currentTimeMillis(), System.currentTimeMillis() + 3600000);
+        when(envelopeDAO.insertIdempotent(message, "client-msg-1"))
+                .thenReturn(new Envelope.InsertResult(envelope, true));
+        MailboxRouter.MailboxSubscriber subscriber = mock(MailboxRouter.MailboxSubscriber.class);
+        router.subscribe(message.getRecipientId(), subscriber);
+
+        MailboxRouter.MailboxIngressResult result = router.ingressIdempotent(message, "client-msg-1");
+
+        assertTrue(result.duplicate());
+        assertEquals(envelope, result.envelope());
+        verify(subscriber, never()).onEnvelope(any());
+        assertEquals(0, metricsRegistry.snapshot().queueDepth());
+    }
+
+    @Test
     void fetchUndelivered_delegates_to_dao() {
         String recipientId = "recipient-123";
         List<QueuedEnvelope> envelopes = List.of(
@@ -88,7 +123,7 @@ class MailboxRouterTest {
     }
 
     @Test
-    void acknowledge_marks_delivered_and_decreases_queue_depth() {
+    void acknowledgeOwnedAndReturn_marks_delivered_and_decreases_queue_depth() {
         List<String> envelopeIds = List.of("id1", "id2", "id3");
 
         // Mock fetchByIds to return envelopes with timestamps
@@ -97,52 +132,62 @@ class MailboxRouterTest {
         QueuedEnvelope env2 = new QueuedEnvelope("id2", createValidMessage(), now - 200, now + 3600000);
         QueuedEnvelope env3 = new QueuedEnvelope("id3", createValidMessage(), now - 150, now + 3600000);
 
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds))
+                .thenReturn(Map.of("id1", env1, "id2", env2, "id3", env3));
         when(envelopeDAO.fetchByIds(envelopeIds))
                 .thenReturn(Map.of("id1", env1, "id2", env2, "id3", env3));
-        when(envelopeDAO.markDelivered(envelopeIds)).thenReturn(true);
+        when(envelopeDAO.markDelivered(any())).thenReturn(true);
 
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
 
-        boolean result = router.acknowledge(envelopeIds);
+        List<QueuedEnvelope> result = router.acknowledgeOwnedAndReturn("recipient-456", envelopeIds);
 
-        assertTrue(result);
+        assertEquals(3, result.size());
+        verify(envelopeDAO, times(1)).fetchByIdsIncludingDelivered(envelopeIds);
         verify(envelopeDAO, times(1)).fetchByIds(envelopeIds);
-        verify(envelopeDAO, times(1)).markDelivered(envelopeIds);
+        verify(envelopeDAO, times(1)).markDelivered(argThat(ids ->
+                ids.size() == envelopeIds.size() && ids.containsAll(envelopeIds)));
         assertEquals(0, metricsRegistry.snapshot().queueDepth());
         assertEquals(3, metricsRegistry.snapshot().deliveredCount());
         assertTrue(metricsRegistry.snapshot().avgDeliveryLatencyMs() > 0);
     }
 
     @Test
-    void acknowledge_does_not_decrease_when_dao_fails() {
+    void acknowledgeOwnedAndReturn_does_not_decrease_when_dao_fails() {
         List<String> envelopeIds = List.of("id1");
+        QueuedEnvelope env1 = new QueuedEnvelope("id1", createValidMessage(), System.currentTimeMillis(),
+                System.currentTimeMillis() + 3600000);
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds)).thenReturn(Map.of("id1", env1));
+        when(envelopeDAO.fetchByIds(envelopeIds)).thenReturn(Map.of("id1", env1));
         when(envelopeDAO.markDelivered(envelopeIds)).thenReturn(false);
         metricsRegistry.increaseQueueDepth();
 
-        boolean result = router.acknowledge(envelopeIds);
+        List<QueuedEnvelope> result = router.acknowledgeOwnedAndReturn("recipient-456", envelopeIds);
 
-        assertFalse(result);
+        assertTrue(result.isEmpty());
         assertEquals(1, metricsRegistry.snapshot().queueDepth());
     }
 
     @Test
-    void acknowledge_records_delivery_latency() {
+    void acknowledgeOwnedAndReturn_records_delivery_latency() {
         List<String> envelopeIds = List.of("id1", "id2");
 
         long now = System.currentTimeMillis();
         QueuedEnvelope env1 = new QueuedEnvelope("id1", createValidMessage(), now - 100, now + 3600000);
         QueuedEnvelope env2 = new QueuedEnvelope("id2", createValidMessage(), now - 200, now + 3600000);
 
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds))
+                .thenReturn(Map.of("id1", env1, "id2", env2));
         when(envelopeDAO.fetchByIds(envelopeIds))
                 .thenReturn(Map.of("id1", env1, "id2", env2));
-        when(envelopeDAO.markDelivered(envelopeIds)).thenReturn(true);
+        when(envelopeDAO.markDelivered(any())).thenReturn(true);
 
         metricsRegistry.increaseQueueDepth();
         metricsRegistry.increaseQueueDepth();
 
-        router.acknowledge(envelopeIds);
+        router.acknowledgeOwnedAndReturn("recipient-456", envelopeIds);
 
         assertEquals(2, metricsRegistry.snapshot().deliveredCount());
         assertTrue(metricsRegistry.snapshot().avgDeliveryLatencyMs() >= 100);
@@ -150,19 +195,69 @@ class MailboxRouterTest {
     }
 
     @Test
-    void acknowledge_handles_empty_fetchByIds_result() {
+    void acknowledgeOwnedAndReturn_handles_empty_fetchByIds_result() {
         List<String> envelopeIds = List.of("id1");
 
-        when(envelopeDAO.fetchByIds(envelopeIds)).thenReturn(Map.of());
-        when(envelopeDAO.markDelivered(envelopeIds)).thenReturn(true);
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds)).thenReturn(Map.of());
 
         metricsRegistry.increaseQueueDepth();
 
-        boolean result = router.acknowledge(envelopeIds);
+        List<QueuedEnvelope> result = router.acknowledgeOwnedAndReturn("recipient-456", envelopeIds);
 
-        assertTrue(result);
+        assertTrue(result.isEmpty());
+        assertEquals(1, metricsRegistry.snapshot().queueDepth());
+        assertEquals(0, metricsRegistry.snapshot().deliveredCount());
+    }
+
+    @Test
+    void markReadOwnedAndReturn_marks_read_and_delivery_for_undelivered_messages() {
+        List<String> envelopeIds = List.of("id1", "id2");
+        long now = System.currentTimeMillis();
+        QueuedEnvelope env1 = new QueuedEnvelope("id1", createValidMessage(), now - 100, now + 3600000);
+        QueuedEnvelope env2 = new QueuedEnvelope("id2", createValidMessage(), now - 200, now + 3600000);
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds))
+                .thenReturn(Map.of("id1", env1, "id2", env2));
+        when(envelopeDAO.fetchByIds(envelopeIds))
+                .thenReturn(Map.of("id1", env1));
+        when(envelopeDAO.markRead(any())).thenReturn(true);
+        metricsRegistry.increaseQueueDepth();
+
+        List<QueuedEnvelope> result = router.markReadOwnedAndReturn("recipient-456", envelopeIds);
+
+        assertEquals(2, result.size());
+        verify(envelopeDAO).markRead(argThat(ids -> ids.containsAll(envelopeIds)));
         assertEquals(0, metricsRegistry.snapshot().queueDepth());
-        assertEquals(0, metricsRegistry.snapshot().deliveredCount()); // No latency recorded
+        assertEquals(1, metricsRegistry.snapshot().deliveredCount());
+    }
+
+    @Test
+    void markReadOwnedAndReturn_rejects_unowned_envelopes() {
+        List<String> envelopeIds = List.of("id1");
+        EncryptedMessage message = createValidMessage();
+        message.setRecipientId("someone-else");
+        QueuedEnvelope env = new QueuedEnvelope("id1", message, System.currentTimeMillis(),
+                System.currentTimeMillis() + 3600000);
+        when(envelopeDAO.fetchByIdsIncludingDelivered(envelopeIds)).thenReturn(Map.of("id1", env));
+
+        List<QueuedEnvelope> result = router.markReadOwnedAndReturn("recipient-456", envelopeIds);
+
+        assertTrue(result.isEmpty());
+        verify(envelopeDAO, never()).markRead(any());
+    }
+
+    @Test
+    void fetchReceiptReplayForSender_maps_minimal_dao_records() {
+        when(envelopeDAO.fetchReceiptsForSender("sender-123", 500)).thenReturn(List.of(
+                new Envelope.ReceiptRecord("env-1", "recipient-1", Envelope.ReceiptState.DELIVERED),
+                new Envelope.ReceiptRecord("env-2", "recipient-2", Envelope.ReceiptState.READ)));
+
+        List<MailboxRouter.ReceiptReplay> result = router.fetchReceiptReplayForSender("sender-123", 500);
+
+        assertEquals(2, result.size());
+        assertEquals("env-1", result.get(0).envelopeId());
+        assertFalse(result.get(0).read());
+        assertEquals("env-2", result.get(1).envelopeId());
+        assertTrue(result.get(1).read());
     }
 
     @Test

@@ -8,7 +8,7 @@ Define current client messaging interfaces used by ViewModels/controllers.
 
 - `MessageSender` supports plaintext send, encrypt-only, send-encrypted, and attachment-related REST operations.
 - Attachment chunks are uploaded as raw encrypted bytes; attachment downloads return raw encrypted blob bytes plus metadata headers through `MessageSender.AttachmentDownload`.
-- `MessageReceiver` supports polling receive lifecycle, envelope acknowledgement, and detached decrypt helper.
+- `MessageReceiver` supports WSS receive lifecycle, read receipts, typing events, and detached decrypt helper.
 - Implementations are `DefaultMessageSender` and `DefaultMessageReceiver`.
 
 ## Key Types/Interfaces
@@ -23,14 +23,15 @@ Define current client messaging interfaces used by ViewModels/controllers.
   - `setMessageListener(...)`
   - `start()` / `stop()`
   - `acknowledgeEnvelopes(senderId)`
+  - `sendTypingStart(recipientId)` / `sendTypingStop(recipientId)`
   - `decryptDetachedMessage(...)`
 
 ## Flow
 
 1. Outbound UI actions call `MessageSender` APIs.
-2. Sender builds/validates encrypted envelopes and submits authenticated HTTPS calls.
-3. Receiver consumes HTTPS polling snapshots, decrypts valid envelopes, and emits listener callbacks.
-4. Receiver acks envelope ids to mark delivery on server side through HTTPS ACK endpoints.
+2. Sender builds/validates encrypted envelopes and submits authenticated WSS events.
+3. Receiver consumes WSS events, decrypts valid envelopes, and emits listener callbacks.
+4. Receiver emits WSS read receipts when a chat is viewed.
 
 ## Error/Security Notes
 

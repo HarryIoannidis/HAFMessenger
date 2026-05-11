@@ -47,6 +47,16 @@ class MessageBubbleFactoryTest {
     }
 
     @Test
+    void outgoing_receipt_badge_uses_single_faded_or_double_full_checks() throws IOException {
+        String source = Files.readString(FACTORY_SOURCE);
+
+        assertTrue(source.contains("buildReceiptBadge(message)"));
+        assertTrue(source.contains("int checkCount = read ? 2 : 1;"));
+        assertTrue(source.contains("receipt.setOpacity(read ? 1.0 : 0.45);"));
+        assertTrue(source.contains("badge.setPrefWidth(18);"));
+    }
+
+    @Test
     void overlay_hover_and_pressed_states_are_forwarded_to_bubble() throws IOException {
         String source = Files.readString(FACTORY_SOURCE);
 

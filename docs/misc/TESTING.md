@@ -18,7 +18,7 @@ Document how tests are currently organized and executed for shared, client, and 
 ## Key Types/Interfaces
 
 - Client examples: `ChatControllerTest`, `SearchViewModelTest`, `AuthHttpClientTest`.
-- Server examples: `HttpIngressServerTest`, `MailboxRouterTest`, `RateLimiterServiceTest`, DAO tests.
+- Server examples: `HttpIngressServerTest`, `MailboxRouterTest`, `RateLimiterServiceTest`, `MessageIngressServiceTest`, `RealtimeWebSocketServerTest`, DAO tests.
 - Shared examples: `MessageValidatorTest`, `MessageEncryptorTest`, `UserKeystoreTest`, `AadCodecTest`.
 
 ## Flow
