@@ -12,6 +12,7 @@ import com.haf.server.router.RateLimiterService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.websocket.RealtimeEvent;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import com.haf.shared.websocket.RealtimeEventType;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -185,7 +186,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
         if (rawMessage == null
                 || rawMessage.length() > MAX_EVENT_BYTES
                 || rawMessage.getBytes(StandardCharsets.UTF_8).length > MAX_EVENT_BYTES) {
-            sendError(session, requestId, null, "invalid_payload", "invalid payload", 0);
+            sendError(session, requestId, null, RealtimeErrorCode.INVALID_PAYLOAD, "invalid payload", 0);
             return;
         }
 
@@ -193,7 +194,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
             RealtimeEvent event = JsonCodec.fromJson(rawMessage, RealtimeEvent.class);
             RealtimeEventType type = event == null ? null : event.eventType();
             if (type == null) {
-                sendError(session, requestId, null, "invalid_type", "invalid event type", 0);
+                sendError(session, requestId, null, RealtimeErrorCode.INVALID_TYPE, "invalid event type", 0);
                 return;
             }
             requestId = safeRequestId(event.getEventId(), requestId);
@@ -205,7 +206,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                 return;
             }
             if (!consumeRealtimeLimit(session, type)) {
-                sendError(session, requestId, event.getEventId(), "rate_limit", "rate limit", 30);
+                sendError(session, requestId, event.getEventId(), RealtimeErrorCode.RATE_LIMIT, "rate limit", 30);
                 return;
             }
 
@@ -216,11 +217,12 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                 case TYPING_START, TYPING_STOP -> handleTyping(session, event, type);
                 case HEARTBEAT -> handleHeartbeat(session, event);
                 default ->
-                    sendError(session, requestId, event.getEventId(), "unsupported_event", "unsupported event", 0);
+                    sendError(session, requestId, event.getEventId(), RealtimeErrorCode.UNSUPPORTED_EVENT,
+                            "unsupported event", 0);
             }
         } catch (Exception ex) {
             auditLogger.logError("wss_event_error", requestId, session.userId, ex, Map.of("event", "unknown"));
-            sendError(session, requestId, null, "invalid_payload", "invalid payload", 0);
+            sendError(session, requestId, null, RealtimeErrorCode.INVALID_PAYLOAD, "invalid payload", 0);
         }
     }
 
@@ -234,7 +236,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
     public void onMessage(WebSocket conn, ByteBuffer message) {
         SocketSession session = sessionsBySocket.get(conn);
         if (session != null) {
-            sendError(session, UUID.randomUUID().toString(), null, "unsupported_frame",
+            sendError(session, UUID.randomUUID().toString(), null, RealtimeErrorCode.UNSUPPORTED_FRAME,
                     "binary frames are not supported", 0);
         }
         conn.close(POLICY_CLOSE, "binary frames unsupported");
@@ -314,7 +316,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
     private void handleSendMessage(SocketSession session, RealtimeEvent event, String requestId, long startNanos) {
         if (event.getClientMessageId() == null || event.getClientMessageId().isBlank()
                 || event.getClientMessageId().length() > 128) {
-            sendError(session, requestId, event.getEventId(), "invalid_client_message_id",
+            sendError(session, requestId, event.getEventId(), RealtimeErrorCode.INVALID_CLIENT_MESSAGE_ID,
                     "invalid client message id", 0);
             return;
         }
@@ -340,7 +342,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                     session,
                     requestId,
                     event.getEventId(),
-                    rejected.code(),
+                    rejected.codeEnum(),
                     rejected.getMessage(),
                     rejected.retryAfterSeconds());
         }
@@ -359,7 +361,8 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
     private void handleReceipt(SocketSession session, RealtimeEvent event, RealtimeEventType receiptType) {
         List<String> envelopeIds = normalizeEnvelopeIds(event);
         if (envelopeIds.isEmpty()) {
-            sendError(session, event.getEventId(), event.getEventId(), "invalid_receipt", "envelopeIds required", 0);
+            sendError(session, event.getEventId(), event.getEventId(), RealtimeErrorCode.INVALID_RECEIPT,
+                    "envelopeIds required", 0);
             return;
         }
 
@@ -367,7 +370,8 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                 ? mailboxRouter.acknowledgeOwnedAndReturn(session.userId, envelopeIds)
                 : mailboxRouter.markReadOwnedAndReturn(session.userId, envelopeIds);
         if (owned.isEmpty()) {
-            sendError(session, event.getEventId(), event.getEventId(), "unauthorized", "unauthorized receipt", 0);
+            sendError(session, event.getEventId(), event.getEventId(), RealtimeErrorCode.UNAUTHORIZED,
+                    "unauthorized receipt", 0);
             return;
         }
 
@@ -402,7 +406,8 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
         String recipientId = normalizeId(event.getRecipientId());
         if (recipientId == null || recipientId.equals(session.userId)
                 || !isContactAuthorized(session.userId, recipientId)) {
-            sendError(session, event.getEventId(), event.getEventId(), "unauthorized", "unauthorized typing target", 0);
+            sendError(session, event.getEventId(), event.getEventId(), RealtimeErrorCode.UNAUTHORIZED,
+                    "unauthorized typing target", 0);
             return;
         }
 
@@ -475,7 +480,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
     }
 
     private void notifySessionReplaced(SocketSession session) {
-        RealtimeEvent event = RealtimeEvent.error("session_replaced", "session revoked by takeover");
+        RealtimeEvent event = RealtimeEvent.error(RealtimeErrorCode.SESSION_REPLACED, "session revoked by takeover");
         sendSafe(session, event);
     }
 
@@ -538,7 +543,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
      * @param session           target socket session
      * @param requestId         request identifier for audit tracing
      * @param correlationId     the client event ID to correlate the error with
-     * @param code              short error code string
+     * @param code              short typed realtime error code
      * @param message           human-readable error message
      * @param retryAfterSeconds suggested retry delay (0 if not applicable)
      */
@@ -546,7 +551,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
             SocketSession session,
             String requestId,
             String correlationId,
-            String code,
+            RealtimeErrorCode code,
             String message,
             long retryAfterSeconds) {
         RealtimeEvent error = RealtimeEvent.error(code, message);
@@ -557,7 +562,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                 "Realtime WSS rejected requestId={} userId={} code={}",
                 requestId,
                 session == null ? null : session.userId,
-                code);
+                code == null ? RealtimeErrorCode.UNKNOWN.wireValue() : code.wireValue());
     }
 
     /**
@@ -605,7 +610,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
         if (event.getEventId() == null || event.getEventId().isBlank()
                 || event.getNonce() == null || event.getNonce().isBlank()
                 || event.getTimestampEpochMs() <= 0) {
-            sendError(session, requestId, event.getEventId(), "invalid_event_metadata",
+            sendError(session, requestId, event.getEventId(), RealtimeErrorCode.INVALID_EVENT_METADATA,
                     "invalid event metadata", 0);
             return false;
         }
@@ -613,13 +618,13 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
         long now = System.currentTimeMillis();
         pruneReplayGuards(now);
         if (Math.abs(now - event.getTimestampEpochMs()) > REPLAY_WINDOW_MS) {
-            sendError(session, requestId, event.getEventId(), "stale_event", "stale event", 0);
+            sendError(session, requestId, event.getEventId(), RealtimeErrorCode.STALE_EVENT, "stale event", 0);
             return false;
         }
 
         String replayKey = event.getEventId().trim() + ":" + event.getNonce().trim();
         if (!session.replayGuard.accept(replayKey, now)) {
-            sendError(session, requestId, event.getEventId(), "replay_rejected", "replay rejected", 0);
+            sendError(session, requestId, event.getEventId(), RealtimeErrorCode.REPLAY_REJECTED, "replay rejected", 0);
             return false;
         }
         return true;

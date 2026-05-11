@@ -11,6 +11,7 @@ import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.SigningKeyIO;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import java.security.PublicKey;
 import java.time.Duration;
 import java.util.Objects;
@@ -82,23 +83,23 @@ public final class MessageIngressService {
                     authenticatedUserId,
                     safeLogValue(message == null ? null : message.getRecipientId()),
                     validationResult.reason());
-            throw new IngressRejectedException(400, "invalid_payload", validationResult.reason(), 0);
+            throw new IngressRejectedException(400, RealtimeErrorCode.INVALID_PAYLOAD, validationResult.reason(), 0);
         }
 
         if (!authenticatedUserId.equals(message.getSenderId())) {
             auditLogger.logValidationFailure(requestId, authenticatedUserId, message.getRecipientId(),
                     "SENDER_MISMATCH");
-            throw new IngressRejectedException(403, "sender_mismatch", SENDER_MISMATCH, 0);
+            throw new IngressRejectedException(403, RealtimeErrorCode.SENDER_MISMATCH, SENDER_MISMATCH, 0);
         }
 
         if (!verifyIngressSignature(message, authenticatedUserId)) {
             auditLogger.logValidationFailure(requestId, authenticatedUserId, message.getRecipientId(),
                     "INVALID_SIGNATURE");
-            throw new IngressRejectedException(400, "invalid_signature", INVALID_SIGNATURE, 0);
+            throw new IngressRejectedException(400, RealtimeErrorCode.INVALID_SIGNATURE, INVALID_SIGNATURE, 0);
         }
 
         if (isRecipientKeyFingerprintStale(recipientKeyFingerprint, message)) {
-            throw new IngressRejectedException(409, "stale_recipient_key", "recipient key is stale", 0);
+            throw new IngressRejectedException(409, RealtimeErrorCode.STALE_RECIPIENT_KEY, "recipient key is stale", 0);
         }
 
         RateLimitDecision rateDecision = rateLimiterService.checkAndConsume(requestId, authenticatedUserId);
@@ -106,7 +107,7 @@ public final class MessageIngressService {
             auditLogger.logRateLimit(requestId, authenticatedUserId, rateDecision.retryAfterSeconds());
             throw new IngressRejectedException(
                     429,
-                    "rate_limit",
+                    RealtimeErrorCode.RATE_LIMIT,
                     "rate limit",
                     rateDecision.retryAfterSeconds());
         }
@@ -232,22 +233,26 @@ public final class MessageIngressService {
      */
     public static final class IngressRejectedException extends RuntimeException {
         private final int statusCode;
-        private final String code;
+        private final RealtimeErrorCode code;
         private final long retryAfterSeconds;
 
         /**
          * Creates a new IngressRejectedException.
          * 
          * @param statusCode        HTTP status code to return to client
-         * @param code              short error code string
+         * @param code              short typed realtime error code
          * @param message           human-readable error message
          * @param retryAfterSeconds how long client should wait before retrying (in
          *                          seconds)
          */
-        public IngressRejectedException(int statusCode, String code, String message, long retryAfterSeconds) {
+        public IngressRejectedException(
+                int statusCode,
+                RealtimeErrorCode code,
+                String message,
+                long retryAfterSeconds) {
             super(message);
             this.statusCode = statusCode;
-            this.code = code;
+            this.code = code == null ? RealtimeErrorCode.UNKNOWN : code;
             this.retryAfterSeconds = retryAfterSeconds;
         }
 
@@ -255,7 +260,7 @@ public final class MessageIngressService {
             return statusCode;
         }
 
-        public String code() {
+        public RealtimeErrorCode codeEnum() {
             return code;
         }
 

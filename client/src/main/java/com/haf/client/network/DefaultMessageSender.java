@@ -20,6 +20,7 @@ import com.haf.shared.utils.EccKeyIO;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.MessageValidator;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.security.PrivateKey;
@@ -33,8 +34,6 @@ import java.util.concurrent.CompletionException;
  * Encrypts and submits outbound messages and attachment API calls.
  */
 public class DefaultMessageSender implements MessageSender {
-    private static final String STALE_RECIPIENT_KEY_CODE = "stale_recipient_key";
-
     private final KeyProvider keyProvider;
     private final ClockProvider clockProvider;
     private final AuthHttpClient authHttpClient;
@@ -215,7 +214,7 @@ public class DefaultMessageSender implements MessageSender {
         Throwable current = error;
         while (current != null) {
             if (current instanceof RealtimeClientTransport.RealtimeException realtimeException
-                    && STALE_RECIPIENT_KEY_CODE.equals(realtimeException.code())) {
+                    && realtimeException.codeEnum() == RealtimeErrorCode.STALE_RECIPIENT_KEY) {
                 return true;
             }
             current = current.getCause();

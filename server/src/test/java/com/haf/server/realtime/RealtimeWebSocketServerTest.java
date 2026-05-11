@@ -12,6 +12,7 @@ import com.haf.server.router.RateLimiterService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.websocket.RealtimeEvent;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import com.haf.shared.websocket.RealtimeEventType;
 import java.nio.ByteBuffer;
 import javax.net.ssl.SSLContext;
@@ -118,7 +119,7 @@ class RealtimeWebSocketServerTest {
         verify(socket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("unauthorized", error.getCode());
+        assertEquals(RealtimeErrorCode.UNAUTHORIZED, error.getCode());
         assertTrue(error.getError().contains("typing"));
     }
 
@@ -159,7 +160,7 @@ class RealtimeWebSocketServerTest {
         verify(socket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("invalid_type", error.getCode());
+        assertEquals(RealtimeErrorCode.INVALID_TYPE, error.getCode());
     }
 
     @Test
@@ -176,7 +177,7 @@ class RealtimeWebSocketServerTest {
         verify(socket, times(2)).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getAllValues().get(1), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("replay_rejected", error.getCode());
+        assertEquals(RealtimeErrorCode.REPLAY_REJECTED, error.getCode());
     }
 
     @Test
@@ -195,7 +196,7 @@ class RealtimeWebSocketServerTest {
         verify(socket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("rate_limit", error.getCode());
+        assertEquals(RealtimeErrorCode.RATE_LIMIT, error.getCode());
     }
 
     @Test
@@ -213,7 +214,7 @@ class RealtimeWebSocketServerTest {
         verify(socket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("unauthorized", error.getCode());
+        assertEquals(RealtimeErrorCode.UNAUTHORIZED, error.getCode());
     }
 
     @Test
@@ -348,7 +349,7 @@ class RealtimeWebSocketServerTest {
         verify(secondSocket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("replay_rejected", error.getCode());
+        assertEquals(RealtimeErrorCode.REPLAY_REJECTED, error.getCode());
     }
 
     @Test
@@ -373,7 +374,7 @@ class RealtimeWebSocketServerTest {
         verify(secondSocket).send(payload.capture());
         RealtimeEvent error = JsonCodec.fromJson(payload.getValue(), RealtimeEvent.class);
         assertEquals(RealtimeEventType.ERROR, error.eventType());
-        assertEquals("rate_limit", error.getCode());
+        assertEquals(RealtimeErrorCode.RATE_LIMIT, error.getCode());
     }
 
     @Test
