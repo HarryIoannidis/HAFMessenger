@@ -23,7 +23,7 @@ public class RealtimeEvent {
     private List<String> envelopeIds;
     private boolean active;
     private boolean duplicate;
-    private String code;
+    private RealtimeErrorCode code;
     private String error;
     private long retryAfterSeconds;
 
@@ -49,7 +49,7 @@ public class RealtimeEvent {
         return event;
     }
 
-    public static RealtimeEvent error(String code, String message) {
+    public static RealtimeEvent error(RealtimeErrorCode code, String message) {
         RealtimeEvent event = serverEvent(RealtimeEventType.ERROR);
         event.setCode(code);
         event.setError(message);
@@ -187,12 +187,12 @@ public class RealtimeEvent {
         this.duplicate = duplicate;
     }
 
-    public String getCode() {
-        return code;
+    public RealtimeErrorCode getCode() {
+        return code == null ? RealtimeErrorCode.UNKNOWN : code;
     }
 
-    public void setCode(String code) {
-        this.code = code;
+    public void setCode(RealtimeErrorCode code) {
+        this.code = code == null ? RealtimeErrorCode.UNKNOWN : code;
     }
 
     public String getError() {

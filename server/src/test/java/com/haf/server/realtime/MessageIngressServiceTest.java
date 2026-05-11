@@ -11,6 +11,7 @@ import com.haf.shared.crypto.MessageSignatureService;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.SigningKeyIO;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Base64;
@@ -94,7 +95,7 @@ class MessageIngressServiceTest {
                 () -> service.accept("request-1", "sender-1", message, null, "client-1", System.nanoTime()));
 
         assertEquals(403, rejected.statusCode());
-        assertEquals("sender_mismatch", rejected.code());
+        assertEquals(RealtimeErrorCode.SENDER_MISMATCH, rejected.codeEnum());
         verify(rateLimiterService, never()).checkAndConsume(anyString(), anyString());
         verify(mailboxRouter, never()).ingressIdempotent(any(), anyString());
     }
@@ -112,7 +113,7 @@ class MessageIngressServiceTest {
                 () -> service.accept("request-1", "sender-1", message, null, "client-1", System.nanoTime()));
 
         assertEquals(400, rejected.statusCode());
-        assertEquals("invalid_signature", rejected.code());
+        assertEquals(RealtimeErrorCode.INVALID_SIGNATURE, rejected.codeEnum());
         verify(mailboxRouter, never()).ingressIdempotent(any(), anyString());
     }
 
@@ -131,7 +132,7 @@ class MessageIngressServiceTest {
                         System.nanoTime()));
 
         assertEquals(409, rejected.statusCode());
-        assertEquals("stale_recipient_key", rejected.code());
+        assertEquals(RealtimeErrorCode.STALE_RECIPIENT_KEY, rejected.codeEnum());
         verify(rateLimiterService, never()).checkAndConsume(anyString(), anyString());
         verify(mailboxRouter, never()).ingressIdempotent(any(), anyString());
     }
@@ -150,7 +151,7 @@ class MessageIngressServiceTest {
                 () -> service.accept("request-1", "sender-1", message, null, "client-1", System.nanoTime()));
 
         assertEquals(429, rejected.statusCode());
-        assertEquals("rate_limit", rejected.code());
+        assertEquals(RealtimeErrorCode.RATE_LIMIT, rejected.codeEnum());
         assertEquals(15, rejected.retryAfterSeconds());
         verify(mailboxRouter, never()).ingressIdempotent(any(), anyString());
     }

@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -47,7 +48,7 @@ class RealtimeClientTransportTest {
         RealtimeClientTransport.RealtimeException realtimeError = assertInstanceOf(
                 RealtimeClientTransport.RealtimeException.class,
                 error);
-        assertEquals("session_replaced", realtimeError.code());
+        assertEquals(RealtimeErrorCode.SESSION_REPLACED, realtimeError.codeEnum());
         assertTrue(realtimeError.getMessage().contains("session revoked by takeover"));
         IOException sendError = assertThrows(
                 IOException.class,
@@ -76,7 +77,7 @@ class RealtimeClientTransportTest {
         RealtimeClientTransport.RealtimeException realtimeError = assertInstanceOf(
                 RealtimeClientTransport.RealtimeException.class,
                 error);
-        assertEquals("invalid_session", realtimeError.code());
+        assertEquals(RealtimeErrorCode.INVALID_SESSION, realtimeError.codeEnum());
 
         transport.close();
     }

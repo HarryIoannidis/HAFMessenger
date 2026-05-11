@@ -5,6 +5,7 @@ import com.haf.client.utils.SslContextUtils;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.websocket.RealtimeEvent;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import com.haf.shared.websocket.RealtimeEventType;
 import java.io.IOException;
 import java.net.URI;
@@ -459,10 +460,10 @@ public final class RealtimeClientTransport implements RealtimeTransport {
     private static IOException terminalCloseFailure(int statusCode, String reason) {
         String normalizedReason = reason == null ? "" : reason.trim().toLowerCase();
         if (statusCode == 1008 && normalizedReason.contains("session replaced")) {
-            return new RealtimeException("session_replaced", "session revoked by takeover", 0);
+            return new RealtimeException(RealtimeErrorCode.SESSION_REPLACED, "session revoked by takeover", 0);
         }
         if (statusCode == 1008 && normalizedReason.contains("invalid session")) {
-            return new RealtimeException("invalid_session", "invalid session", 0);
+            return new RealtimeException(RealtimeErrorCode.INVALID_SESSION, "invalid session", 0);
         }
         return null;
     }
@@ -540,28 +541,28 @@ public final class RealtimeClientTransport implements RealtimeTransport {
      * and optional retry-after hint.
      */
     public static final class RealtimeException extends IOException {
-        private final String code;
+        private final RealtimeErrorCode code;
         private final long retryAfterSeconds;
 
         /**
          * Create a new RealtimeException.
          *
-         * @param code              short error code string
+         * @param code              short typed realtime error code
          * @param message           human-readable error message
          * @param retryAfterSeconds suggested retry delay in seconds
          */
-        RealtimeException(String code, String message, long retryAfterSeconds) {
+        RealtimeException(RealtimeErrorCode code, String message, long retryAfterSeconds) {
             super(message == null || message.isBlank() ? "Realtime error" : message);
-            this.code = code;
+            this.code = code == null ? RealtimeErrorCode.UNKNOWN : code;
             this.retryAfterSeconds = retryAfterSeconds;
         }
 
         /**
-         * Returns the server error code.
+         * Returns the typed realtime error code.
          *
-         * @return the error code string
+         * @return parsed code enum (or {@link RealtimeErrorCode#UNKNOWN})
          */
-        public String code() {
+        public RealtimeErrorCode codeEnum() {
             return code;
         }
 

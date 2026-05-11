@@ -18,6 +18,7 @@ import com.haf.shared.utils.FixedClockProvider;
 import com.haf.shared.utils.FingerprintUtil;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.shared.utils.SigningKeyIO;
+import com.haf.shared.websocket.RealtimeErrorCode;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -271,7 +272,7 @@ class MessageSenderTest {
                 attempts.incrementAndGet();
                 if (attempts.get() == 1) {
                     throw new RealtimeClientTransport.RealtimeException(
-                            "stale_recipient_key",
+                            RealtimeErrorCode.STALE_RECIPIENT_KEY,
                             "recipient key is stale",
                             0);
                 }
