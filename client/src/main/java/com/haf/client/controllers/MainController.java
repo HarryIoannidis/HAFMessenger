@@ -1651,7 +1651,6 @@ public class MainController implements SearchController.ContactActions {
      * @param result successful refresh result
      */
     private void applySuccessfulTokenRefresh(TokenRefreshService.TokenRefreshResult result) {
-        boolean recoveredExpiredSession = sessionExpired.get();
         AuthSessionState.set(
                 result.accessToken(),
                 result.refreshToken(),
@@ -1663,9 +1662,7 @@ public class MainController implements SearchController.ContactActions {
         if (adapter != null) {
             adapter.updateAccessToken(result.accessToken());
         }
-        if (recoveredExpiredSession) {
-            restoreMessagingTransportAfterSessionRefresh();
-        }
+        restoreMessagingTransportAfterSessionRefresh();
 
         Platform.runLater(this::updateSessionExpiryIndicator);
         if (autoRefreshTokenEnabled.get()) {

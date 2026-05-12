@@ -355,11 +355,13 @@ class MainControllerTest {
     }
 
     @Test
-    void successful_refresh_after_expired_session_restores_messaging_transport() throws IOException {
+    void successful_refresh_always_restores_messaging_transport() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 
-        assertTrue(source.contains("boolean recoveredExpiredSession = sessionExpired.get();"));
-        assertTrue(source.contains("if (recoveredExpiredSession) {"));
+        assertFalse(source.contains("boolean recoveredExpiredSession = sessionExpired.get();"),
+                "Conditional expired-session guard should be removed; transport must reconnect on every refresh");
+        assertFalse(source.contains("if (recoveredExpiredSession) {"),
+                "Transport restore must not be gated by expired-session flag");
         assertTrue(source.contains("restoreMessagingTransportAfterSessionRefresh();"));
         assertTrue(source.contains("chatViewModel.restoreReceiverTransportAfterSessionRefresh();"));
     }

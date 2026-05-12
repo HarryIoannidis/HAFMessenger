@@ -25,10 +25,10 @@ class AadConsistencyIT {
 
         EncryptedMessage original = encryptor.encrypt(payload, "text/plain", ttl);
 
-        // Mimic EnvelopeDAO hydration
+        // Mimic Envelope hydration
         EncryptedMessage hydrated = new EncryptedMessage();
-        hydrated.setVersion(MessageHeader.VERSION); // Hardcoded in EnvelopeDAO
-        hydrated.setAlgorithm(MessageHeader.ALGO_AEAD); // Hardcoded in EnvelopeDAO
+        hydrated.setVersion(MessageHeader.VERSION); // Hardcoded in Envelope
+        hydrated.setAlgorithm(MessageHeader.ALGO_AEAD); // Hardcoded in Envelope
         hydrated.setSenderId(original.getSenderId());
         hydrated.setRecipientId(original.getRecipientId());
         hydrated.setCiphertextB64(original.getCiphertextB64());
@@ -85,8 +85,7 @@ class AadConsistencyIT {
         mutator.accept(copy);
 
         MessageDecryptor decryptor = new MessageDecryptor(key, clock);
-        assertThrows(Exception.class, () -> {
-            decryptor.decryptMessage(copy);
-        }, "Modification of AAD field should be detected (either by validator or by tag check)");
+        assertThrows(Exception.class, () -> decryptor.decryptMessage(copy),
+                "Modification of AAD field should be detected (either by validator or by tag check)");
     }
 }

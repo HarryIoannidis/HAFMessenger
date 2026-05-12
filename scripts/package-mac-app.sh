@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ============================================================================
+# package-mac-app.sh
+#
+# Packages the HAFMessenger client as a native macOS bundle (.app, .dmg, or .pkg).
+#
+# What this script produces:
+#   1. A compiled fat JAR for the client module
+#   2. A macOS-compliant App Bundle structure
+#   3. Optional DMG or PKG installer containing the bundled application
+#
+# Usage:
+#   ./scripts/package-mac-app.sh
+# ============================================================================
+
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
 
