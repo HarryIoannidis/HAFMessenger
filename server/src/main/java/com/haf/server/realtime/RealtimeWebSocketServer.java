@@ -104,6 +104,7 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
                 "TLS_CHACHA20_POLY1305_SHA256"
         });
         setWebSocketFactory(new SSLParametersWebSocketServerFactory(sslContext, sslParameters));
+        setConnectionLostTimeout(120);
     }
 
     /**

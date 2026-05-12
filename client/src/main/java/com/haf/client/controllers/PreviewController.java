@@ -5,7 +5,6 @@ import com.haf.client.utils.ClientSettings;
 import com.haf.client.utils.ImageSaveSupport;
 import com.haf.client.utils.PopupMessageSpec;
 import com.haf.client.utils.UiConstants;
-import com.haf.client.utils.WindowResizeHelper;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -306,10 +305,11 @@ public class PreviewController {
             if (stage == null) {
                 return;
             }
-            stage.setResizable(true);
-            WindowResizeHelper.enableResizing(stage);
+            stage.setResizable(false);
             stage.setMinWidth(PREVIEW_MIN_WINDOW_WIDTH);
             stage.setMinHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+            stage.setWidth(PREVIEW_MIN_WINDOW_WIDTH);
+            stage.setHeight(PREVIEW_MIN_WINDOW_HEIGHT);
 
             if (closeButton != null) {
                 closeButton.setOnAction(e -> stage.hide());

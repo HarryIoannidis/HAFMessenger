@@ -27,7 +27,7 @@ public final class Session {
     private static final long DEFAULT_ACCESS_TTL_SECONDS = 900L;
     private static final long DEFAULT_REFRESH_TTL_SECONDS = 2_592_000L;
     private static final long DEFAULT_ABSOLUTE_SESSION_TTL_SECONDS = 2_592_000L;
-    private static final long DEFAULT_IDLE_SESSION_TTL_SECONDS = 600L;
+    private static final long DEFAULT_IDLE_SESSION_TTL_SECONDS = 1_800L;
 
     private static final String INSERT_SQL = """
             INSERT INTO sessions (

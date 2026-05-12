@@ -170,7 +170,6 @@ public class MainController implements SearchController.ContactActions {
     private ContextMenu contactContextMenu;
     private ContextMenu dotsMenu;
     private EventHandler<MouseEvent> contactContextOutsideClickHandler;
-    private MessagesViewModel.TypingListener profileTypingListener;
     private final Set<String> typingContactIds = ConcurrentHashMap.newKeySet();
 
     /** Tracks whether results are currently displayed (for clear/search toggle). */
@@ -3184,8 +3183,8 @@ public class MainController implements SearchController.ContactActions {
         if (chatViewModel == null) {
             return;
         }
-        profileTypingListener = this::applyTypingUpdate;
-        chatViewModel.addTypingListener(profileTypingListener);
+        MessagesViewModel.TypingListener typingListener = this::applyTypingUpdate;
+        chatViewModel.addTypingListener(typingListener);
     }
 
     /**
