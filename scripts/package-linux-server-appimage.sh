@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ============================================================================
+# package-linux-server-appimage.sh
+#
+# Packages the HAFMessenger server as a standalone Linux AppImage.
+#
+# What this script produces:
+#   1. A compiled fat JAR for the server module
+#   2. A self-contained AppDir structure including configuration templates
+#   3. A portable .AppImage bundle with an embedded launcher script
+#
+# Usage:
+#   ./scripts/package-linux-server-appimage.sh
+# ============================================================================
+
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
 

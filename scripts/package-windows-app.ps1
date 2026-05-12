@@ -1,3 +1,17 @@
+# ============================================================================
+# package-windows-app.ps1
+#
+# Packages the HAFMessenger client as a native Windows installer (.msi or .exe).
+#
+# What this script produces:
+#   1. A compiled fat JAR for the client module
+#   2. A self-contained Windows application directory
+#   3. A native installer containing the application and private JRE
+#
+# Usage:
+#   .\scripts\package-windows-app.ps1
+# ============================================================================
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
