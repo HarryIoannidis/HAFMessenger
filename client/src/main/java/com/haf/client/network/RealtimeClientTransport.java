@@ -132,14 +132,10 @@ public final class RealtimeClientTransport implements RealtimeTransport {
      */
     @Override
     public void reconnect() throws IOException {
-        IOException terminal = terminalFailure.get();
-        if (terminal != null) {
-            throw terminal;
-        }
+        terminalFailure.set(null);
+        running.set(true);
         closeSocketOnly(1000, "reconnect");
-        if (running.get()) {
-            connectNow();
-        }
+        connectNow();
     }
 
     /**
