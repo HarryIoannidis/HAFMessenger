@@ -283,11 +283,13 @@ class UserTest {
         assertEquals("6900000002", results.get(1).telephone());
         assertEquals("2026-01-02", results.get(1).joinedDate());
         verify(existsStatement).setString(1, "caller-id");
-        verify(existsStatement).setString(2, "a%");
-        verify(existsStatement).setString(3, "a%");
-        verify(existsStatement).setString(4, "a%");
-        verify(existsStatement).setInt(5, 0);
-        verify(existsStatement).setInt(9, 21);
+        verify(existsStatement).setString(2, "%a%");
+        verify(existsStatement).setString(3, "%a%");
+        verify(existsStatement).setString(4, "%a%");
+        verify(existsStatement).setString(5, "%a%");
+        verify(existsStatement).setString(6, "%a%");
+        verify(existsStatement).setInt(7, 0);
+        verify(existsStatement).setInt(11, 21);
     }
 
     @Test
@@ -322,9 +324,11 @@ class UserTest {
 
         dao.searchUsersPage("ab%_\\\\", "caller-id", 20, null, null);
 
-        verify(existsStatement).setString(2, "ab\\%\\_\\\\\\\\%");
-        verify(existsStatement).setString(3, "ab\\%\\_\\\\\\\\%");
-        verify(existsStatement).setString(4, "ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(2, "%ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(3, "%ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(4, "%ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(5, "%ab\\%\\_\\\\\\\\%");
+        verify(existsStatement).setString(6, "%ab\\%\\_\\\\\\\\%");
     }
 
     @Test
@@ -346,7 +350,7 @@ class UserTest {
         assertTrue(page.hasMore());
         assertEquals("Bob", page.lastFullName());
         assertEquals("uid-2", page.lastUserId());
-        verify(existsStatement).setInt(9, 3);
+        verify(existsStatement).setInt(11, 3);
     }
 
     private RegisterRequest createValidRequest() {

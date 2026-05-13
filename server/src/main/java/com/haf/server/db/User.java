@@ -317,15 +317,17 @@ public final class User {
               AND user_id != ?
               AND (full_name LIKE ? ESCAPE '\\\\'
                    OR reg_number LIKE ? ESCAPE '\\\\'
-                   OR `rank` LIKE ? ESCAPE '\\\\')
+                   OR `rank` LIKE ? ESCAPE '\\\\'
+                   OR username LIKE ? ESCAPE '\\\\'
+                   OR email LIKE ? ESCAPE '\\\\')
               AND (? = 0 OR full_name > ? OR (full_name = ? AND user_id > ?))
             ORDER BY full_name ASC, user_id ASC
             LIMIT ?
             """;
 
     /**
-     * Searches for approved users whose name, registration number, or rank matches
-     * using prefix matching and keyset pagination.
+     * Searches for approved users whose profile fields match using SQL contains
+     * matching and keyset pagination.
      *
      * @param query          the search term
      * @param excludeUserId  user ID to exclude from results
@@ -337,7 +339,7 @@ public final class User {
     public SearchPage searchUsersPage(String query, String excludeUserId, int limit, String cursorFullName,
             String cursorUserId) {
         String normalizedQuery = query == null ? "" : query;
-        String pattern = toPrefixPattern(normalizedQuery);
+        String pattern = toContainsPattern(normalizedQuery);
         boolean hasCursor = cursorFullName != null && !cursorFullName.isBlank()
                 && cursorUserId != null && !cursorUserId.isBlank();
 
@@ -348,11 +350,13 @@ public final class User {
             ps.setString(2, pattern);
             ps.setString(3, pattern);
             ps.setString(4, pattern);
-            ps.setInt(5, hasCursor ? 1 : 0);
-            ps.setString(6, hasCursor ? cursorFullName : null);
-            ps.setString(7, hasCursor ? cursorFullName : null);
-            ps.setString(8, hasCursor ? cursorUserId : null);
-            ps.setInt(9, limit + 1);
+            ps.setString(5, pattern);
+            ps.setString(6, pattern);
+            ps.setInt(7, hasCursor ? 1 : 0);
+            ps.setString(8, hasCursor ? cursorFullName : null);
+            ps.setString(9, hasCursor ? cursorFullName : null);
+            ps.setString(10, hasCursor ? cursorUserId : null);
+            ps.setInt(11, limit + 1);
 
             List<SearchRecord> rows = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
@@ -393,7 +397,7 @@ public final class User {
     /**
      * Legacy non-paginated search helper retained for backwards compatibility in
      * tests and callers that only need the first page.
-     * Searches for approved users whose name or registration number matches,
+     * Searches for approved users whose profile fields match,
      * excluding the user performing the search.
      *
      * @param query         the search term
@@ -407,13 +411,13 @@ public final class User {
     }
 
     /**
-     * Converts raw query text into a SQL LIKE prefix pattern with escaping.
+     * Converts raw query text into a SQL LIKE contains pattern with escaping.
      *
      * @param input raw user query text
-     * @return escaped pattern ending with {@code %}
+     * @return escaped pattern wrapped with {@code %...%}
      */
-    private static String toPrefixPattern(String input) {
-        return escapeLikeLiteral(input) + "%";
+    private static String toContainsPattern(String input) {
+        return "%" + escapeLikeLiteral(input) + "%";
     }
 
     /**

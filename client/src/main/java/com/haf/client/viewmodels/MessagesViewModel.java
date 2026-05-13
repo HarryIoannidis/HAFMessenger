@@ -34,6 +34,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -41,6 +44,7 @@ import java.util.Base64;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
@@ -124,12 +128,14 @@ public class MessagesViewModel {
     private record PreparedAttachment(byte[] bytes, String mediaType, String fileName) {
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
             PreparedAttachment that = (PreparedAttachment) o;
             return java.util.Arrays.equals(bytes, that.bytes) &&
-                   java.util.Objects.equals(mediaType, that.mediaType) &&
-                   java.util.Objects.equals(fileName, that.fileName);
+                    java.util.Objects.equals(mediaType, that.mediaType) &&
+                    java.util.Objects.equals(fileName, that.fileName);
         }
 
         @Override
@@ -142,10 +148,10 @@ public class MessagesViewModel {
         @Override
         public String toString() {
             return "PreparedAttachment{" +
-                   "bytes=" + java.util.Arrays.toString(bytes) +
-                   ", mediaType='" + mediaType + '\'' +
-                   ", fileName='" + fileName + '\'' +
-                   '}';
+                    "bytes=" + java.util.Arrays.toString(bytes) +
+                    ", mediaType='" + mediaType + '\'' +
+                    ", fileName='" + fileName + '\'' +
+                    '}';
         }
     }
 
@@ -164,8 +170,7 @@ public class MessagesViewModel {
     private final List<ImagePreviewFallbackListener> imagePreviewFallbackListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, ConcurrentMap<String, MessageVM.ReadState>> pendingOutgoingReceiptStates =
-            new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ConcurrentMap<String, MessageVM.ReadState>> pendingOutgoingReceiptStates = new ConcurrentHashMap<>();
 
     private final Object policyLock = new Object();
     private volatile MessagingPolicyResponse cachedPolicy;
@@ -190,8 +195,7 @@ public class MessagesViewModel {
     });
     private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
     private static final String SESSION_TAKEOVER_TITLE = "Logged out";
-    private static final String SESSION_TAKEOVER_MESSAGE =
-            "You were logged out because this account was signed in on another device.";
+    private static final String SESSION_TAKEOVER_MESSAGE = "You were logged out because this account was signed in on another device.";
 
     private volatile ClientSettings settings = ClientSettings.defaults();
 
@@ -1767,7 +1771,7 @@ public class MessagesViewModel {
             }
 
             if (encryptedBlob.length > TEMP_ENCRYPTED_BLOB_THRESHOLD_BYTES) {
-                tempEncryptedBlob = Files.createTempFile("haf-attachment-", ".encmsg");
+                tempEncryptedBlob = createSecureTempFile("haf-attachment-", ".encmsg");
                 Files.write(tempEncryptedBlob, encryptedBlob);
             }
             uploadAttachmentChunks(
@@ -1875,7 +1879,8 @@ public class MessagesViewModel {
             return;
         }
         int percent = Math.clamp((int) Math.round((uploaded * 100.0) / total), 0, 100);
-        runOnUiThread(() -> status.set(buildAttachmentLoadingStatus(recipientId, mediaType, true) + " " + percent + "%"));
+        runOnUiThread(
+                () -> status.set(buildAttachmentLoadingStatus(recipientId, mediaType, true) + " " + percent + "%"));
     }
 
     private static byte[] readChunk(byte[] source, int offset, int length) {
@@ -2582,13 +2587,88 @@ public class MessagesViewModel {
      */
     private static String writeTempFile(byte[] data, String prefix, String suffix) {
         try {
-            Path tmp = Files.createTempFile(prefix, suffix);
+            Path tmp = createSecureTempFile(prefix, suffix);
             Files.write(tmp, data);
             tmp.toFile().deleteOnExit();
             return tmp.toUri().toString();
         } catch (IOException e) {
             return null;
         }
+    }
+
+    /**
+     * Creates a temporary file under an application-private directory and applies
+     * owner-only permissions where supported.
+     *
+     * @param prefix temp-file prefix
+     * @param suffix temp-file suffix
+     * @return created temporary-file path
+     * @throws IOException when directory/file creation fails
+     */
+    private static Path createSecureTempFile(String prefix, String suffix) throws IOException {
+        Path tempDirectory = resolveSecureTempDirectory();
+        if (supportsPosixPermissions(tempDirectory)) {
+            FileAttribute<Set<PosixFilePermission>> filePermissions = PosixFilePermissions
+                    .asFileAttribute(PosixFilePermissions.fromString("rw-------"));
+            return Files.createTempFile(tempDirectory, prefix, suffix, filePermissions);
+        }
+        Path tempFile = Files.createTempFile(tempDirectory, prefix, suffix);
+        boolean readableSet = tempFile.toFile().setReadable(true, true);
+        boolean writableSet = tempFile.toFile().setWritable(true, true);
+        boolean executableSet = tempFile.toFile().setExecutable(false, false);
+        if (!readableSet || !writableSet || !executableSet) {
+            Files.deleteIfExists(tempFile);
+            throw new IOException("Failed to apply secure temporary-file permissions");
+        }
+        return tempFile;
+    }
+
+    /**
+     * Resolves or creates the secure temp directory used for temporary attachment
+     * artifacts.
+     *
+     * @return existing or newly created secure temp directory
+     * @throws IOException when directory creation fails
+     */
+    private static Path resolveSecureTempDirectory() throws IOException {
+        String configuredTempDir = System.getProperty("haf.client.tempDir");
+        Path tempDirectory;
+        if (configuredTempDir != null && !configuredTempDir.isBlank()) {
+            tempDirectory = Path.of(configuredTempDir.trim());
+        } else {
+            String home = System.getProperty("user.home");
+            Path baseDirectory = (home == null || home.isBlank())
+                    ? Path.of(System.getProperty("user.dir", "."))
+                    : Path.of(home);
+            tempDirectory = baseDirectory.resolve(".hafmessenger").resolve("tmp");
+        }
+
+        if (supportsPosixPermissions(tempDirectory)) {
+            Set<PosixFilePermission> directoryPermissions = PosixFilePermissions.fromString("rwx------");
+            FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(directoryPermissions);
+            if (Files.notExists(tempDirectory)) {
+                Files.createDirectories(tempDirectory, attrs);
+            } else {
+                try {
+                    Files.setPosixFilePermissions(tempDirectory, directoryPermissions);
+                } catch (IOException ignored) {
+                    // Keep existing permissions when permission change is not allowed.
+                }
+            }
+        } else {
+            Files.createDirectories(tempDirectory);
+        }
+        return tempDirectory;
+    }
+
+    /**
+     * Returns whether the filesystem supports POSIX permissions.
+     *
+     * @param path path whose filesystem is checked
+     * @return {@code true} when POSIX permission APIs are available
+     */
+    private static boolean supportsPosixPermissions(Path path) {
+        return path != null && path.getFileSystem().supportedFileAttributeViews().contains("posix");
     }
 
     /**
@@ -2626,4 +2706,5 @@ public class MessagesViewModel {
             return String.format("%.1f KB", bytes / 1024.0);
         return String.format("%.1f MB", bytes / (1024.0 * 1024));
     }
+
 }
