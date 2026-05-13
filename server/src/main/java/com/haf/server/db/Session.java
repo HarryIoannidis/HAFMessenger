@@ -164,6 +164,9 @@ public final class Session {
      * Creates DAO with test defaults for JWT settings.
      * Production bootstrap should use
      * {@link #Session(DataSource, AuditLogger, JwtTokenService, long, long, long)}.
+     *
+     * @param dataSource  the data source
+     * @param auditLogger audit logger
      */
     public Session(DataSource dataSource, AuditLogger auditLogger) {
         this(dataSource,
