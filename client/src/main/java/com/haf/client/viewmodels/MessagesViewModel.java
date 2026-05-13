@@ -17,6 +17,7 @@ import com.haf.shared.dto.AttachmentInlinePayload;
 import com.haf.shared.dto.AttachmentReferencePayload;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.MessageTamperedException;
+import com.haf.shared.responses.ApiErrorResponse;
 import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
@@ -148,6 +149,11 @@ public class MessagesViewModel {
         }
     }
 
+    @FunctionalInterface
+    private interface IoSupplier<T> {
+        T get() throws IOException;
+    }
+
     private final MessageSender messageSender;
     private final MessageReceiver messageReceiver;
 
@@ -174,6 +180,14 @@ public class MessagesViewModel {
     private static final int DEFAULT_UPLOAD_CONCURRENCY = 4;
     private static final int MIN_UPLOAD_CONCURRENCY = 1;
     private static final int MAX_UPLOAD_CONCURRENCY = 6;
+    private static final int ATTACHMENT_API_RETRY_ATTEMPTS = 4;
+    private static final long ATTACHMENT_API_RETRY_BACKOFF_MS = 750L;
+    private static final long ATTACHMENT_API_RETRY_MAX_DELAY_MS = 8_000L;
+    private static final ExecutorService ATTACHMENT_SEND_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "attachment-send-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
     private static final String SESSION_TAKEOVER_ISSUE_KEY = "messaging.session.takeover";
     private static final String SESSION_TAKEOVER_TITLE = "Logged out";
     private static final String SESSION_TAKEOVER_MESSAGE =
@@ -612,7 +626,9 @@ public class MessagesViewModel {
      */
     public void sendAttachment(String recipientId, Path filePath, String mediaTypeHint) {
         String contactId = normalizeContactId(recipientId);
-        CompletableFuture.runAsync(() -> sendAttachmentInternal(contactId, filePath, mediaTypeHint));
+        CompletableFuture.runAsync(
+                () -> sendAttachmentInternal(contactId, filePath, mediaTypeHint),
+                ATTACHMENT_SEND_EXECUTOR);
     }
 
     /**
@@ -1133,7 +1149,7 @@ public class MessagesViewModel {
     public void retryLastFailedOperation() {
         CompletableFuture.runAsync(() -> {
             try {
-                reconnectReceiverTransport();
+                reconnectReceiverTransportIfNeeded();
                 Runnable retryAction = lastFailedSendRetryAction.get();
                 if (retryAction != null) {
                     retryAction.run();
@@ -1161,7 +1177,7 @@ public class MessagesViewModel {
     public void restoreReceiverTransportAfterSessionRefresh() {
         CompletableFuture.runAsync(() -> {
             try {
-                reconnectReceiverTransport();
+                reconnectReceiverTransportIfNeeded();
                 runOnUiThread(() -> status.set("Messaging connection restored"));
             } catch (Exception ex) {
                 runOnUiThread(() -> status.set(
@@ -1299,6 +1315,27 @@ public class MessagesViewModel {
     private void reconnectReceiver() throws Exception {
         messageReceiver.reconnect();
         receivingStarted = true;
+    }
+
+    /**
+     * Returns whether the receiver transport is currently active and healthy.
+     *
+     * @return {@code true} when receiving is started and transport is connected
+     */
+    public boolean isReceiverTransportHealthy() {
+        return receivingStarted && messageReceiver.isConnected();
+    }
+
+    /**
+     * Reconnects receiver transport only when it is not currently healthy.
+     *
+     * @throws Exception when reconnect operations fail
+     */
+    public void reconnectReceiverTransportIfNeeded() throws Exception {
+        if (isReceiverTransportHealthy()) {
+            return;
+        }
+        reconnectReceiver();
     }
 
     /**
@@ -1720,7 +1757,9 @@ public class MessagesViewModel {
             initRequest.setPlaintextSizeBytes(fileBytes.length);
             initRequest.setEncryptedSizeBytes(encryptedBlob.length);
             initRequest.setExpectedChunks(expectedChunks);
-            var initResponse = messageSender.initAttachmentUpload(initRequest);
+            var initResponse = callAttachmentApiWithRetry(
+                    "init attachment upload",
+                    () -> messageSender.initAttachmentUpload(initRequest));
             ensureNoError(initResponse.getError());
             String attachmentId = initResponse.getAttachmentId();
             if (attachmentId == null || attachmentId.isBlank()) {
@@ -1743,7 +1782,9 @@ public class MessagesViewModel {
             AttachmentCompleteRequest completeRequest = new AttachmentCompleteRequest();
             completeRequest.setExpectedChunks(expectedChunks);
             completeRequest.setEncryptedSizeBytes(encryptedBlob.length);
-            var completeResponse = messageSender.completeAttachmentUpload(attachmentId, completeRequest);
+            var completeResponse = callAttachmentApiWithRetry(
+                    "complete attachment upload",
+                    () -> messageSender.completeAttachmentUpload(attachmentId, completeRequest));
             ensureNoError(completeResponse.getError());
 
             AttachmentReferencePayload referencePayload = new AttachmentReferencePayload();
@@ -1765,7 +1806,9 @@ public class MessagesViewModel {
 
             AttachmentBindRequest bindRequest = new AttachmentBindRequest();
             bindRequest.setEnvelopeId(sendResult.envelopeId());
-            var bindResponse = messageSender.bindAttachmentUpload(attachmentId, bindRequest);
+            var bindResponse = callAttachmentApiWithRetry(
+                    "bind attachment upload",
+                    () -> messageSender.bindAttachmentUpload(attachmentId, bindRequest));
             ensureNoError(bindResponse.getError());
             return sendResult;
         } finally {
@@ -1801,7 +1844,9 @@ public class MessagesViewModel {
                         byte[] chunk = encryptedBlobPath == null
                                 ? readChunk(encryptedBlob, from, length)
                                 : readChunk(encryptedBlobPath, from, length);
-                        var chunkResponse = messageSender.uploadAttachmentChunk(attachmentId, currentIndex, chunk);
+                        var chunkResponse = callAttachmentApiWithRetry(
+                                "upload attachment chunk",
+                                () -> messageSender.uploadAttachmentChunk(attachmentId, currentIndex, chunk));
                         ensureNoError(chunkResponse.getError());
                         int uploaded = uploadedBytes.addAndGet(chunk.length);
                         updateAttachmentUploadProgress(recipientId, mediaType, uploaded, encryptedSizeBytes);
@@ -2075,6 +2120,124 @@ public class MessagesViewModel {
     private static void ensureNoError(String error) throws IOException {
         if (error != null && !error.isBlank()) {
             throw new IOException(error);
+        }
+    }
+
+    /**
+     * Executes one attachment API step with bounded retries for HTTP rate-limit
+     * responses.
+     *
+     * @param operation operation label used for diagnostics
+     * @param supplier  attachment API call to execute
+     * @param <T>       response type
+     * @return API response
+     * @throws IOException when the operation ultimately fails
+     */
+    private <T> T callAttachmentApiWithRetry(String operation, IoSupplier<T> supplier) throws IOException {
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= ATTACHMENT_API_RETRY_ATTEMPTS; attempt++) {
+            try {
+                return supplier.get();
+            } catch (IOException ex) {
+                long delayMs = resolveAttachmentRetryDelayMillis(ex, attempt);
+                if (delayMs < 0L || attempt >= ATTACHMENT_API_RETRY_ATTEMPTS) {
+                    throw ex;
+                }
+                lastFailure = ex;
+                int attemptNumber = attempt;
+                runOnUiThread(() -> status.set(
+                        "Attachment service is busy. Retrying "
+                                + operation
+                                + " ("
+                                + attemptNumber
+                                + "/"
+                                + ATTACHMENT_API_RETRY_ATTEMPTS
+                                + ")…"));
+                sleepForAttachmentRetry(delayMs);
+            }
+        }
+        throw lastFailure == null ? new IOException("Failed to " + operation) : lastFailure;
+    }
+
+    /**
+     * Resolves retry delay for rate-limited attachment API failures.
+     *
+     * @param error   API failure candidate
+     * @param attempt current attempt number
+     * @return retry delay in milliseconds, or {@code -1} when failure is not
+     *         retryable
+     */
+    private static long resolveAttachmentRetryDelayMillis(IOException error, int attempt) {
+        HttpCommunicationException communicationException = findHttpCommunicationException(error);
+        if (communicationException != null && communicationException.getStatusCode() == 429) {
+            long retryAfterMs = parseRetryAfterMillis(communicationException.getResponseBody());
+            if (retryAfterMs > 0L) {
+                return Math.min(ATTACHMENT_API_RETRY_MAX_DELAY_MS, retryAfterMs);
+            }
+            return Math.min(
+                    ATTACHMENT_API_RETRY_MAX_DELAY_MS,
+                    ATTACHMENT_API_RETRY_BACKOFF_MS * Math.max(1, attempt));
+        }
+        String message = resolveErrorMessage(error, "").toLowerCase(Locale.ROOT);
+        if (message.contains("http 429") || message.contains("rate limit")) {
+            return Math.min(
+                    ATTACHMENT_API_RETRY_MAX_DELAY_MS,
+                    ATTACHMENT_API_RETRY_BACKOFF_MS * Math.max(1, attempt));
+        }
+        return -1L;
+    }
+
+    /**
+     * Finds an HTTP communication exception in an error chain.
+     *
+     * @param error throwable chain to inspect
+     * @return matching HTTP exception, or {@code null}
+     */
+    private static HttpCommunicationException findHttpCommunicationException(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpCommunicationException communicationException) {
+                return communicationException;
+            }
+            current = current.getCause();
+        }
+        return null;
+    }
+
+    /**
+     * Parses retry-after delay from API error payload.
+     *
+     * @param responseBody raw JSON response body
+     * @return delay in milliseconds, or {@code -1} when unavailable
+     */
+    private static long parseRetryAfterMillis(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return -1L;
+        }
+        try {
+            ApiErrorResponse errorPayload = JsonCodec.fromJson(responseBody, ApiErrorResponse.class);
+            if (errorPayload == null || errorPayload.getRetryAfterSeconds() == null) {
+                return -1L;
+            }
+            long retryAfterSeconds = errorPayload.getRetryAfterSeconds();
+            return retryAfterSeconds > 0L ? retryAfterSeconds * 1000L : -1L;
+        } catch (Exception ignored) {
+            return -1L;
+        }
+    }
+
+    /**
+     * Sleeps between attachment API retries while preserving thread interruption.
+     *
+     * @param delayMs sleep duration in milliseconds
+     * @throws IOException when interrupted while waiting
+     */
+    private static void sleepForAttachmentRetry(long delayMs) throws IOException {
+        try {
+            Thread.sleep(Math.max(1L, delayMs));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting to retry attachment upload", ex);
         }
     }
 

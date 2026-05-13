@@ -19,6 +19,15 @@ public interface RealtimeTransport extends AutoCloseable {
 
     void reconnect() throws IOException;
 
+    /**
+     * Returns whether the realtime socket is currently active and usable.
+     *
+     * @return {@code true} when the transport is connected
+     */
+    default boolean isConnected() {
+        return false;
+    }
+
     MessageSender.SendResult sendMessage(EncryptedMessage encryptedMessage, String recipientKeyFingerprint)
             throws IOException;
 

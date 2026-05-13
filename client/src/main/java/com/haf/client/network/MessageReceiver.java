@@ -39,6 +39,15 @@ public interface MessageReceiver {
     }
 
     /**
+     * Returns whether the underlying receiver transport is currently connected.
+     *
+     * @return {@code true} when the receiver has an active connection
+     */
+    default boolean isConnected() {
+        return false;
+    }
+
+    /**
      * Acknowledges all pending envelopes received from a specific sender.
      * This marks the messages as delivered on the server so they are not
      * re-sent on next login.

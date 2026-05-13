@@ -22,12 +22,34 @@ import javax.net.ssl.SSLParameters;
 import com.haf.shared.websocket.RealtimeErrorCode;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealtimeClientTransportTest {
+
+    @Test
+    void is_connected_reflects_socket_lifecycle() throws Exception {
+        FakeHttpClient httpClient = new FakeHttpClient();
+        RealtimeClientTransport transport = new RealtimeClientTransport(
+                URI.create("wss://example.test/ws/v1/realtime"),
+                () -> "token-1",
+                httpClient);
+
+        assertFalse(transport.isConnected());
+
+        transport.start();
+        assertTrue(transport.isConnected());
+
+        ConnectionHandle active = httpClient.connectionAt(0);
+        active.listener().onClose(active.webSocket(), 1001, "going away").toCompletableFuture().join();
+        assertFalse(transport.isConnected());
+
+        transport.close();
+        assertFalse(transport.isConnected());
+    }
 
     @Test
     void session_replaced_close_is_terminal_and_does_not_reconnect() throws Exception {

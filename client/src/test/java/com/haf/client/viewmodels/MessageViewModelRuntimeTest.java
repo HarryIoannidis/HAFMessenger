@@ -56,6 +56,30 @@ class MessageViewModelRuntimeTest {
     }
 
     @Test
+    void send_retry_skips_reconnect_when_receiver_is_already_healthy() throws Exception {
+        FailOnceSender sender = new FailOnceSender();
+        HealthyReceiver receiver = new HealthyReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+        List<RuntimeIssue> issues = new CopyOnWriteArrayList<>();
+        viewModel.addRuntimeIssueListener(issues::add);
+        viewModel.startReceiving();
+
+        viewModel.sendTextMessage("bob", "hello");
+
+        awaitCondition(() -> sender.sendCalls.get() == 1 && !issues.isEmpty());
+        RuntimeIssue issue = issues.getFirst();
+        issue.retryAction().run();
+
+        awaitCondition(() -> sender.sendCalls.get() == 2
+                && receiver.startCalls.get() == 1
+                && receiver.stopCalls.get() == 0
+                && viewModel.getMessages("bob").size() == 1
+                && !viewModel.getMessages("bob").getFirst().isLoading());
+
+        assertTrue(receiver.isConnectedCalls.get() > 0);
+    }
+
+    @Test
     void start_receiving_failure_emits_runtime_issue() {
         FailStartReceiver receiver = new FailStartReceiver();
         MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
@@ -95,6 +119,20 @@ class MessageViewModelRuntimeTest {
         awaitCondition(() -> receiver.startCalls.get() == 1 && receiver.stopCalls.get() == 1);
         assertEquals(1, receiver.startCalls.get());
         assertEquals(1, receiver.stopCalls.get());
+    }
+
+    @Test
+    void session_refresh_transport_restore_skips_reconnect_when_receiver_is_already_healthy() throws Exception {
+        HealthyReceiver receiver = new HealthyReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(new NoopSender(), receiver);
+        viewModel.startReceiving();
+
+        awaitCondition(() -> receiver.startCalls.get() == 1);
+        viewModel.restoreReceiverTransportAfterSessionRefresh();
+
+        awaitCondition(() -> receiver.isConnectedCalls.get() > 0);
+        assertEquals(1, receiver.startCalls.get());
+        assertEquals(0, receiver.stopCalls.get());
     }
 
     @Test
@@ -245,6 +283,16 @@ class MessageViewModelRuntimeTest {
                 throw new IllegalStateException("listener");
             }
             return listener;
+        }
+    }
+
+    private static final class HealthyReceiver extends CountingReceiver {
+        private final AtomicInteger isConnectedCalls = new AtomicInteger();
+
+        @Override
+        public boolean isConnected() {
+            isConnectedCalls.incrementAndGet();
+            return true;
         }
     }
 }
