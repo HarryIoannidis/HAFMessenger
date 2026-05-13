@@ -2084,9 +2084,6 @@ public final class HttpIngressServer {
             if (recipientId.isBlank()) {
                 throw new IllegalArgumentException("recipientId is required");
             }
-            if (request.getPlaintextSizeBytes() <= config.getAttachmentInlineMaxBytes()) {
-                throw new IllegalArgumentException("chunked upload requires size above inline limit");
-            }
             if (request.getPlaintextSizeBytes() > config.getAttachmentMaxBytes()) {
                 throw new IllegalArgumentException("attachment exceeds maximum size");
             }

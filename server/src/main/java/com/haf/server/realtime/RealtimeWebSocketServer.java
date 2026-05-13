@@ -259,7 +259,12 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
             return;
         }
         cleanupSession(session);
-        LOGGER.info("Realtime WSS disconnected userId={} code={}", session.userId, code);
+        LOGGER.info(
+                "Realtime WSS disconnected userId={} code={} remote={} reason={}",
+                session.userId,
+                code,
+                remote,
+                normalizeCloseReason(reason));
     }
 
     /**
@@ -803,6 +808,13 @@ public final class RealtimeWebSocketServer extends WebSocketServer implements Au
      */
     private static String safeRequestId(String eventId, String fallback) {
         return eventId == null || eventId.isBlank() ? fallback : eventId.trim();
+    }
+
+    private static String normalizeCloseReason(String reason) {
+        if (reason == null) {
+            return "";
+        }
+        return reason.trim();
     }
 
     /**

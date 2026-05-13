@@ -2577,8 +2577,8 @@ public class MainController implements SearchController.ContactActions {
 
     /**
      * Executes one recovery cycle:
-     * validates session snapshot, refreshes token when needed, reconnects message
-     * transport, then probes authenticated connectivity.
+     * validates session snapshot, refreshes token when needed, probes authenticated
+     * connectivity, then reconnects message transport only if it is unhealthy.
      *
      * @return recovery result state for loop control
      */
@@ -2605,18 +2605,19 @@ public class MainController implements SearchController.ContactActions {
             }
         }
 
+        ProbeResult probeResult = probeAuthenticatedConnectivity();
+        if (probeResult.invalidSessionIssue() != null) {
+            return ConnectionRecoveryResult.invalidSessionResult(probeResult.invalidSessionIssue());
+        }
+        if (!probeResult.success()) {
+            return ConnectionRecoveryResult.keepRetryingResult();
+        }
+
         if (!restoreMessagingReceiverTransportForRecovery()) {
             return ConnectionRecoveryResult.keepRetryingResult();
         }
 
-        ProbeResult probeResult = probeAuthenticatedConnectivity();
-        if (probeResult.success()) {
-            return ConnectionRecoveryResult.recoveredResult();
-        }
-        if (probeResult.invalidSessionIssue() != null) {
-            return ConnectionRecoveryResult.invalidSessionResult(probeResult.invalidSessionIssue());
-        }
-        return ConnectionRecoveryResult.keepRetryingResult();
+        return ConnectionRecoveryResult.recoveredResult();
     }
 
     /**
@@ -2669,9 +2670,12 @@ public class MainController implements SearchController.ContactActions {
         if (chatViewModel == null) {
             return true;
         }
-        try {
-            chatViewModel.reconnectReceiverTransport();
+        if (chatViewModel.isReceiverTransportHealthy()) {
             return true;
+        }
+        try {
+            chatViewModel.reconnectReceiverTransportIfNeeded();
+            return chatViewModel.isReceiverTransportHealthy();
         } catch (Exception ex) {
             LOGGER.debug("Connection recovery transport reconnect failed: {}", ex.getMessage());
             return false;

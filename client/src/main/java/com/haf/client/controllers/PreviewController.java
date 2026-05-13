@@ -8,6 +8,7 @@ import com.haf.client.utils.UiConstants;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -16,6 +17,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.Screen;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -35,8 +37,12 @@ public class PreviewController {
     private static final Logger LOGGER = LoggerFactory.getLogger(PreviewController.class);
     private static final double PREVIEW_MIN_WINDOW_WIDTH = 560.0;
     private static final double PREVIEW_MIN_WINDOW_HEIGHT = 420.0;
-    private static final double MAX_PREVIEW_WIDTH = 500.0;
-    private static final double MAX_PREVIEW_HEIGHT = 500.0;
+    private static final double PREVIEW_MAX_WINDOW_WIDTH_RATIO = 0.90;
+    private static final double PREVIEW_MAX_WINDOW_HEIGHT_RATIO = 0.88;
+    private static final double PREVIEW_CHROME_WIDTH = 64.0;
+    private static final double PREVIEW_CHROME_HEIGHT = 170.0;
+    private static final double PREVIEW_FALLBACK_IMAGE_WIDTH = 700.0;
+    private static final double PREVIEW_FALLBACK_IMAGE_HEIGHT = 520.0;
 
     // Popup window controls
     @FXML
@@ -310,6 +316,7 @@ public class PreviewController {
             stage.setMinHeight(PREVIEW_MIN_WINDOW_HEIGHT);
             stage.setWidth(PREVIEW_MIN_WINDOW_WIDTH);
             stage.setHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+            applyStageMaxBounds(stage);
 
             if (closeButton != null) {
                 closeButton.setOnAction(e -> stage.hide());
@@ -356,9 +363,13 @@ public class PreviewController {
         if (width <= 0 || height <= 0) {
             return;
         }
-        double scale = Math.min(1.0, Math.min(MAX_PREVIEW_WIDTH / width, MAX_PREVIEW_HEIGHT / height));
-        previewImageView.setFitWidth(width * scale);
-        previewImageView.setFitHeight(height * scale);
+        PreviewBounds bounds = resolvePreviewBounds();
+        double scale = Math.min(1.0, Math.min(bounds.maxImageWidth() / width, bounds.maxImageHeight() / height));
+        double fittedWidth = width * scale;
+        double fittedHeight = height * scale;
+        previewImageView.setFitWidth(fittedWidth);
+        previewImageView.setFitHeight(fittedHeight);
+        applyPreviewLayout(fittedWidth, fittedHeight);
     }
 
     /**
@@ -368,7 +379,7 @@ public class PreviewController {
     private void requestPreviewWindowStabilization() {
         runOnFxThread(() -> {
             stabilizePreviewWindow();
-            Platform.runLater(() -> Platform.runLater(this::stabilizePreviewWindow));
+            Platform.runLater(this::stabilizePreviewWindow);
         });
     }
 
@@ -384,10 +395,110 @@ public class PreviewController {
 
         stage.setMinWidth(PREVIEW_MIN_WINDOW_WIDTH);
         stage.setMinHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+        applyStageMaxBounds(stage);
         stage.getScene().getRoot().applyCss();
         stage.getScene().getRoot().layout();
         stage.sizeToScene();
+        clampStageToBounds(stage, resolvePreviewBounds());
         centerStageOverOwner(stage);
+    }
+
+    private void applyPreviewLayout(double imageWidth, double imageHeight) {
+        double safeImageWidth = Math.max(1.0, imageWidth);
+        double safeImageHeight = Math.max(1.0, imageHeight);
+        PreviewBounds bounds = resolvePreviewBounds();
+
+        if (previewImageContainer != null) {
+            previewImageContainer.setMinWidth(safeImageWidth);
+            previewImageContainer.setMinHeight(safeImageHeight);
+            previewImageContainer.setPrefWidth(safeImageWidth);
+            previewImageContainer.setPrefHeight(safeImageHeight);
+            previewImageContainer.setMaxWidth(safeImageWidth);
+            previewImageContainer.setMaxHeight(safeImageHeight);
+        }
+
+        if (rootContainer != null) {
+            double targetWindowWidth = clampToRange(
+                    safeImageWidth + PREVIEW_CHROME_WIDTH,
+                    PREVIEW_MIN_WINDOW_WIDTH,
+                    bounds.maxWindowWidth());
+            double targetWindowHeight = clampToRange(
+                    safeImageHeight + PREVIEW_CHROME_HEIGHT,
+                    PREVIEW_MIN_WINDOW_HEIGHT,
+                    bounds.maxWindowHeight());
+            rootContainer.setPrefWidth(targetWindowWidth);
+            rootContainer.setPrefHeight(targetWindowHeight);
+            rootContainer.setMaxWidth(bounds.maxWindowWidth());
+            rootContainer.setMaxHeight(bounds.maxWindowHeight());
+        }
+    }
+
+    private void applyStageMaxBounds(Stage stage) {
+        if (stage == null) {
+            return;
+        }
+        PreviewBounds bounds = resolvePreviewBounds();
+        stage.setMaxWidth(bounds.maxWindowWidth());
+        stage.setMaxHeight(bounds.maxWindowHeight());
+    }
+
+    private static void clampStageToBounds(Stage stage, PreviewBounds bounds) {
+        if (stage == null || bounds == null) {
+            return;
+        }
+        if (stage.getWidth() > bounds.maxWindowWidth()) {
+            stage.setWidth(bounds.maxWindowWidth());
+        }
+        if (stage.getHeight() > bounds.maxWindowHeight()) {
+            stage.setHeight(bounds.maxWindowHeight());
+        }
+    }
+
+    private PreviewBounds resolvePreviewBounds() {
+        Rectangle2D visualBounds = resolveVisualBounds();
+        double maxWindowWidth = Math.max(PREVIEW_MIN_WINDOW_WIDTH,
+                visualBounds.getWidth() * PREVIEW_MAX_WINDOW_WIDTH_RATIO);
+        double maxWindowHeight = Math.max(PREVIEW_MIN_WINDOW_HEIGHT,
+                visualBounds.getHeight() * PREVIEW_MAX_WINDOW_HEIGHT_RATIO);
+        double maxImageWidth = Math.max(PREVIEW_FALLBACK_IMAGE_WIDTH, maxWindowWidth - PREVIEW_CHROME_WIDTH);
+        double maxImageHeight = Math.max(PREVIEW_FALLBACK_IMAGE_HEIGHT, maxWindowHeight - PREVIEW_CHROME_HEIGHT);
+        return new PreviewBounds(maxImageWidth, maxImageHeight, maxWindowWidth, maxWindowHeight);
+    }
+
+    private Rectangle2D resolveVisualBounds() {
+        Stage stage = resolveStage();
+        if (stage == null) {
+            return Screen.getPrimary().getVisualBounds();
+        }
+
+        Screen ownerScreen = screenForWindow(stage.getOwner());
+        if (ownerScreen == null) {
+            ownerScreen = screenForWindow(stage);
+        }
+        if (ownerScreen == null) {
+            ownerScreen = Screen.getPrimary();
+        }
+        return ownerScreen.getVisualBounds();
+    }
+
+    private static Screen screenForWindow(Window window) {
+        if (window == null) {
+            return null;
+        }
+        double width = Math.max(1.0, window.getWidth());
+        double height = Math.max(1.0, window.getHeight());
+        var screens = Screen.getScreensForRectangle(window.getX(), window.getY(), width, height);
+        if (screens == null || screens.isEmpty()) {
+            return null;
+        }
+        return screens.getFirst();
+    }
+
+    private record PreviewBounds(
+            double maxImageWidth,
+            double maxImageHeight,
+            double maxWindowWidth,
+            double maxWindowHeight) {
     }
 
     /**
@@ -478,6 +589,10 @@ public class PreviewController {
             return 1.0;
         }
         return value;
+    }
+
+    private static double clampToRange(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     /**

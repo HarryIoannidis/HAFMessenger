@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,6 +40,7 @@ public final class RealtimeClientTransport implements RealtimeTransport {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(8);
     private static final Duration SEND_ACK_TIMEOUT = Duration.ofSeconds(10);
     private static final long HEARTBEAT_SECONDS = 25L;
+    private static final int MAX_SEND_ATTEMPTS = 2;
 
     private final URI realtimeUri;
     private final Supplier<String> accessTokenSupplier;
@@ -134,8 +136,24 @@ public final class RealtimeClientTransport implements RealtimeTransport {
     public void reconnect() throws IOException {
         terminalFailure.set(null);
         running.set(true);
+        LOGGER.info("Realtime transport reconnect requested");
         closeSocketOnly(1000, "reconnect");
         connectNow();
+    }
+
+    /**
+     * Returns whether the transport is running with a currently open socket and
+     * without terminal failure state.
+     *
+     * @return {@code true} when the realtime connection is active
+     */
+    @Override
+    public boolean isConnected() {
+        if (!running.get() || terminalFailure.get() != null) {
+            return false;
+        }
+        WebSocket current = webSocket.get();
+        return current != null && !current.isInputClosed() && !current.isOutputClosed();
     }
 
     /**
@@ -264,17 +282,50 @@ public final class RealtimeClientTransport implements RealtimeTransport {
      * @throws IOException if the send fails or the response times out
      */
     private RealtimeEvent sendAndAwait(RealtimeEvent event) throws IOException {
-        ensureConnected();
-        CompletableFuture<RealtimeEvent> future = new CompletableFuture<>();
-        pendingEvents.put(event.getEventId(), future);
-        sendRaw(event);
-        try {
-            return future.orTimeout(SEND_ACK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
-        } catch (CompletionException ex) {
-            throw normalizeIOException(ex.getCause() == null ? ex : ex.getCause(), "Realtime send failed");
-        } finally {
-            pendingEvents.remove(event.getEventId());
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
+            if (attempt > 1) {
+                refreshEventMetadataForRetry(event);
+            }
+            String requestEventId = event.getEventId();
+            CompletableFuture<RealtimeEvent> future = new CompletableFuture<>();
+            pendingEvents.put(requestEventId, future);
+            try {
+                ensureConnected();
+                sendRaw(event);
+                return future.orTimeout(SEND_ACK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).join();
+            } catch (CompletionException ex) {
+                lastFailure = handleSendAttemptFailure(
+                        normalizeIOException(ex.getCause() == null ? ex : ex.getCause(), "Realtime send failed"),
+                        attempt);
+            } catch (IOException ex) {
+                lastFailure = handleSendAttemptFailure(ex, attempt);
+            } finally {
+                pendingEvents.remove(requestEventId, future);
+            }
         }
+        throw lastFailure == null ? new IOException("Realtime send failed") : lastFailure;
+    }
+
+    /**
+     * Evaluates a single send-attempt failure and either prepares for retry
+     * (by recovering the connection) or rethrows immediately.
+     *
+     * @param failure the IOException from the failed attempt
+     * @param attempt the 1-based attempt number that just failed
+     * @return the failure, only when a retry will follow
+     * @throws IOException when the failure is not retryable
+     */
+    private IOException handleSendAttemptFailure(IOException failure, int attempt) throws IOException {
+        if (attempt < MAX_SEND_ATTEMPTS && isRetryableSendFailure(failure)) {
+            LOGGER.warn(
+                    "Realtime send attempt {} failed ({}). Recovering connection and retrying once.",
+                    attempt,
+                    failure.getMessage());
+            recoverConnectionForRetry();
+            return failure;
+        }
+        throw failure;
     }
 
     /**
@@ -334,6 +385,7 @@ public final class RealtimeClientTransport implements RealtimeTransport {
                     .join());
             reconnectAttempt.set(0);
             reconnectScheduled.set(false);
+            LOGGER.info("Realtime transport connected uri={}", realtimeUri);
         } catch (CompletionException ex) {
             throw normalizeIOException(ex.getCause() == null ? ex : ex.getCause(),
                     "Failed to connect realtime transport");
@@ -357,6 +409,8 @@ public final class RealtimeClientTransport implements RealtimeTransport {
             }
         } catch (CompletionException ex) {
             throw normalizeIOException(ex.getCause() == null ? ex : ex.getCause(), "Realtime send failed");
+        } catch (RuntimeException ex) {
+            throw normalizeIOException(ex, "Realtime send failed");
         }
     }
 
@@ -421,6 +475,10 @@ public final class RealtimeClientTransport implements RealtimeTransport {
         }
         int attempt = reconnectAttempt.incrementAndGet();
         long delaySeconds = Math.min(15L, 1L << Math.min(attempt, 4));
+        LOGGER.warn(
+                "Realtime transport scheduling reconnect attempt={} delaySeconds={}",
+                attempt,
+                delaySeconds);
         scheduler.schedule(() -> {
             reconnectScheduled.set(false);
             if (!running.get()) {
@@ -445,6 +503,10 @@ public final class RealtimeClientTransport implements RealtimeTransport {
     private void closeSocketOnly(int statusCode, String reason) {
         WebSocket current = webSocket.getAndSet(null);
         if (current != null) {
+            LOGGER.info(
+                    "Realtime transport closing socket statusCode={} reason={}",
+                    statusCode,
+                    normalizeCloseReason(reason));
             try {
                 current.sendClose(statusCode, reason).join();
             } catch (Exception ignored) {
@@ -491,7 +553,115 @@ public final class RealtimeClientTransport implements RealtimeTransport {
         if (error instanceof IOException ioException) {
             return ioException;
         }
-        return new IOException(fallback, error);
+        String message = safeMessage(error);
+        if (message == null || message.isBlank()) {
+            return new IOException(fallback, error);
+        }
+        return new IOException(fallback + ": " + message, error);
+    }
+
+    /**
+     * Normalizes a close reason for log output and comparisons.
+     *
+     * @param reason raw close reason
+     * @return trimmed reason, or empty string when {@code null}
+     */
+    private static String normalizeCloseReason(String reason) {
+        if (reason == null) {
+            return "";
+        }
+        return reason.trim();
+    }
+
+    /**
+     * Determines whether a send failure is safe to retry once after connection
+     * recovery.
+     *
+     * @param error send failure candidate
+     * @return {@code true} when retrying is likely to succeed
+     */
+    private static boolean isRetryableSendFailure(IOException error) {
+        if (error == null) {
+            return false;
+        }
+        if (error instanceof RealtimeException) {
+            return false;
+        }
+        if (hasCause(error, TimeoutException.class)) {
+            return true;
+        }
+        String normalized = safeMessage(error).toLowerCase();
+        return normalized.contains("realtime connection closed")
+                || normalized.contains("connection is not available")
+                || normalized.contains("broken pipe")
+                || normalized.contains("connection reset")
+                || normalized.contains("closed channel")
+                || normalized.contains("timed out")
+                || normalized.contains("send failed");
+    }
+
+    /**
+     * Walks a throwable chain to detect whether a specific cause type is present.
+     *
+     * @param error throwable to inspect
+     * @param type  cause type to match
+     * @return {@code true} when a matching cause is found
+     */
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Resolves a non-empty diagnostic message for a throwable.
+     *
+     * @param throwable throwable to describe
+     * @return trimmed message or throwable simple class name
+     */
+    private static String safeMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "";
+        }
+        String message = throwable.getMessage();
+        if (message != null && !message.isBlank()) {
+            return message.trim();
+        }
+        return throwable.getClass().getSimpleName();
+    }
+
+    /**
+     * Closes the current socket and reconnects immediately for one send retry.
+     *
+     * @throws IOException when reconnection cannot be established
+     */
+    private void recoverConnectionForRetry() throws IOException {
+        if (!running.get()) {
+            throw new IOException("Realtime transport is not running");
+        }
+        synchronized (sendLock) {
+            closeSocketOnly(1001, "recover send failure");
+        }
+        connectNow();
+    }
+
+    /**
+     * Refreshes id/timestamp/nonce metadata before replaying an outbound event.
+     *
+     * @param event outbound event to update
+     */
+    private static void refreshEventMetadataForRetry(RealtimeEvent event) {
+        if (event == null) {
+            return;
+        }
+        event.setEventId(UUID.randomUUID().toString());
+        event.setTimestampEpochMs(System.currentTimeMillis());
+        event.setNonce(UUID.randomUUID().toString());
     }
 
     /**
@@ -629,10 +799,23 @@ public final class RealtimeClientTransport implements RealtimeTransport {
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             if (!clearActiveSocketIfCurrent(webSocket)) {
+                LOGGER.debug(
+                        "Ignoring stale realtime close callback statusCode={} reason={}",
+                        statusCode,
+                        normalizeCloseReason(reason));
                 return CompletableFuture.completedFuture(null);
             }
+            LOGGER.info(
+                    "Realtime transport closed statusCode={} reason={} running={}",
+                    statusCode,
+                    normalizeCloseReason(reason),
+                    running.get());
             IOException terminal = terminalCloseFailure(statusCode, reason);
             if (terminal != null) {
+                LOGGER.warn(
+                        "Realtime transport terminal close statusCode={} reason={}",
+                        statusCode,
+                        normalizeCloseReason(reason));
                 terminalFailure.compareAndSet(null, terminal);
                 running.set(false);
                 reconnectScheduled.set(false);
@@ -658,8 +841,10 @@ public final class RealtimeClientTransport implements RealtimeTransport {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             if (!clearActiveSocketIfCurrent(webSocket)) {
+                LOGGER.debug("Ignoring stale realtime error callback");
                 return;
             }
+            LOGGER.warn("Realtime transport error", error);
             failPending(error);
             errorListener.get().accept(error);
             scheduleReconnect();

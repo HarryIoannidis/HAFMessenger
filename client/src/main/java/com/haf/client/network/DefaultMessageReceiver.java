@@ -111,6 +111,17 @@ public class DefaultMessageReceiver implements MessageReceiver {
     }
 
     /**
+     * Returns whether the underlying realtime transport currently has an active
+     * socket connection.
+     *
+     * @return {@code true} when realtime transport is connected
+     */
+    @Override
+    public boolean isConnected() {
+        return realtimeTransport.isConnected();
+    }
+
+    /**
      * Primary event handler for routing incoming WebSocket events to the listener.
      *
      * @param event the parsed real-time event

@@ -1,5 +1,6 @@
 package com.haf.client.network;
 
+import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.shared.dto.EncryptedMessage;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.constants.AttachmentConstants;
@@ -90,6 +91,8 @@ class MessageSenderTest {
     static class ApiStubAuthHttpClient extends AuthHttpClient {
         private final Map<String, String> postResponses = new HashMap<>();
         private final Map<String, String> getResponses = new HashMap<>();
+        private final Map<String, Throwable> postFailures = new HashMap<>();
+        private final Map<String, Throwable> getFailures = new HashMap<>();
         private final Map<String, HttpResponse<byte[]>> getByteResponses = new HashMap<>();
         private String lastPostBytesPath;
         private byte[] lastPostBytesBody;
@@ -107,12 +110,23 @@ class MessageSenderTest {
             getResponses.put(path, responseBody);
         }
 
+        void whenPostFailure(String path, Throwable failure) {
+            postFailures.put(path, failure);
+        }
+
+        void whenGetFailure(String path, Throwable failure) {
+            getFailures.put(path, failure);
+        }
+
         void whenGetBytes(String path, HttpResponse<byte[]> response) {
             getByteResponses.put(path, response);
         }
 
         @Override
         public CompletableFuture<String> postAuthenticated(String path, String jsonBody, Map<String, String> extraHeaders) {
+            if (postFailures.containsKey(path)) {
+                return CompletableFuture.failedFuture(postFailures.get(path));
+            }
             if (postResponses.containsKey(path)) {
                 return CompletableFuture.completedFuture(postResponses.get(path));
             }
@@ -128,6 +142,9 @@ class MessageSenderTest {
             lastPostBytesPath = path;
             lastPostBytesBody = body;
             lastPostBytesHeaders = extraHeaders;
+            if (postFailures.containsKey(path)) {
+                return CompletableFuture.failedFuture(postFailures.get(path));
+            }
             if (postResponses.containsKey(path)) {
                 return CompletableFuture.completedFuture(postResponses.get(path));
             }
@@ -136,6 +153,9 @@ class MessageSenderTest {
 
         @Override
         public CompletableFuture<String> getAuthenticated(String path) {
+            if (getFailures.containsKey(path)) {
+                return CompletableFuture.failedFuture(getFailures.get(path));
+            }
             if (getResponses.containsKey(path)) {
                 return CompletableFuture.completedFuture(getResponses.get(path));
             }
@@ -354,6 +374,49 @@ class MessageSenderTest {
         MessageSender.AttachmentDownload downloaded = sender.downloadAttachment("att-1");
         assertEquals("att-1", downloaded.attachmentId());
         assertEquals(3, downloaded.encryptedBlob().length);
+    }
+
+    @Test
+    void attachment_http_failures_surface_server_error_message() {
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
+        MessageSender sender = new DefaultMessageSender(
+                keyProvider,
+                clockProvider,
+                apiAdapter,
+                new RecordingRealtimeTransport());
+
+        apiAdapter.whenPostFailure(
+                "/api/v1/attachments/init",
+                new HttpCommunicationException(
+                        "HTTP POST failed with status 409",
+                        409,
+                        "{\"error\":\"attachment exceeds maximum size\"}"));
+
+        AttachmentInitRequest initReq = new AttachmentInitRequest();
+        initReq.setRecipientId("recipient-123");
+        initReq.setContentType("application/vnd.haf.encrypted-message+json");
+        initReq.setPlaintextSizeBytes(2000);
+        initReq.setEncryptedSizeBytes(3000);
+        initReq.setExpectedChunks(2);
+
+        IOException ex = assertThrows(IOException.class, () -> sender.initAttachmentUpload(initReq));
+        assertTrue(ex.getMessage().contains("HTTP 409 from server"));
+        assertTrue(ex.getMessage().contains("attachment exceeds maximum size"));
+    }
+
+    @Test
+    void attachment_decode_failure_reports_invalid_payload() {
+        ApiStubAuthHttpClient apiAdapter = new ApiStubAuthHttpClient();
+        MessageSender sender = new DefaultMessageSender(
+                keyProvider,
+                clockProvider,
+                apiAdapter,
+                new RecordingRealtimeTransport());
+
+        apiAdapter.whenGet("/api/v1/config/messaging", "not-json");
+
+        IOException ex = assertThrows(IOException.class, sender::fetchMessagingPolicy);
+        assertTrue(ex.getMessage().contains("Failed to decode server response"));
     }
 
     private static HttpResponse<byte[]> byteResponse(int status, byte[] body, Map<String, java.util.List<String>> headers) {

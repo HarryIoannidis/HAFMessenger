@@ -1,5 +1,7 @@
 package com.haf.client.network;
 
+import com.haf.client.exceptions.HttpCommunicationException;
+import com.haf.client.utils.AuthErrorClassifier;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.crypto.MessageEncryptor;
 import com.haf.shared.crypto.MessageSignatureService;
@@ -11,6 +13,7 @@ import com.haf.shared.responses.AttachmentCompleteResponse;
 import com.haf.shared.requests.AttachmentInitRequest;
 import com.haf.shared.responses.AttachmentInitResponse;
 import com.haf.shared.dto.EncryptedMessage;
+import com.haf.shared.responses.ApiErrorResponse;
 import com.haf.shared.responses.MessagingPolicyResponse;
 import com.haf.shared.exceptions.KeyNotFoundException;
 import com.haf.shared.exceptions.MessageValidationException;
@@ -356,16 +359,81 @@ public class DefaultMessageSender implements MessageSender {
             throws IOException {
         try {
             String response = future.join();
+            if (response == null || response.isBlank()) {
+                throw new IOException("Server returned an empty response");
+            }
             return JsonCodec.fromJson(response, type);
+        } catch (HttpCommunicationException ex) {
+            throw toIoException(ex);
         } catch (CompletionException ex) {
             Throwable cause = ex.getCause();
             if (cause instanceof IOException ioException) {
                 throw ioException;
             }
-            throw new IOException("Failed to decode server response", cause != null ? cause : ex);
+            if (cause instanceof HttpCommunicationException communicationException) {
+                throw toIoException(communicationException);
+            }
+            throw new IOException("Failed to decode server response: " + abbreviateBody(causeMessage(cause)),
+                    cause != null ? cause : ex);
         } catch (Exception ex) {
-            throw new IOException("Failed to decode server response", ex);
+            throw new IOException("Failed to decode server response: " + abbreviateBody(causeMessage(ex)), ex);
         }
+    }
+
+    private static IOException toIoException(HttpCommunicationException communicationException) {
+        int status = communicationException.getStatusCode();
+        String parsedError = AuthErrorClassifier.parseMessage(communicationException.getResponseBody());
+        String message = parsedError == null || parsedError.isBlank()
+                ? abbreviateBody(causeMessage(communicationException))
+                : abbreviateBody(parsedError);
+        Long retryAfterSeconds = parseRetryAfterSeconds(communicationException.getResponseBody());
+        if (retryAfterSeconds != null && retryAfterSeconds > 0L) {
+            message = (message == null || message.isBlank() ? "rate limit" : message)
+                    + " (retry after " + retryAfterSeconds + "s)";
+        }
+        if (message == null || message.isBlank()) {
+            message = "HTTP request failed";
+        }
+        return new IOException("HTTP " + status + " from server: " + message, communicationException);
+    }
+
+    private static Long parseRetryAfterSeconds(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            ApiErrorResponse payload = JsonCodec.fromJson(responseBody, ApiErrorResponse.class);
+            if (payload == null || payload.getRetryAfterSeconds() == null) {
+                return null;
+            }
+            long retryAfter = payload.getRetryAfterSeconds();
+            return retryAfter > 0L ? retryAfter : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String causeMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error";
+        }
+        String message = throwable.getMessage();
+        if (message == null || message.isBlank()) {
+            return throwable.getClass().getSimpleName();
+        }
+        return message;
+    }
+
+    private static String abbreviateBody(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String singleLine = text.replace("\r", " ").replace("\n", " ").trim();
+        int maxLen = 180;
+        if (singleLine.length() <= maxLen) {
+            return singleLine;
+        }
+        return singleLine.substring(0, maxLen - 3) + "...";
     }
 
     private static String header(HttpResponse<?> response, String name, String fallback) {
