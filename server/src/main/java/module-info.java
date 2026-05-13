@@ -13,7 +13,6 @@ module server {
     requires org.java_websocket;
     requires transitive shared;
 
-    opens db.migration;
     opens com.haf.server.ingress to com.fasterxml.jackson.databind;
     opens com.haf.server.realtime to com.fasterxml.jackson.databind;
 }
