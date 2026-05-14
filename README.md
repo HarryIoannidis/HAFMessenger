@@ -162,6 +162,7 @@ This script:
 - Stages runtime dependencies on the classpath
 - Produces a native Windows installer with `jpackage`
 - Creates Start Menu and Desktop shortcuts on install
+- Validates that `client.properties` contains valid HTTPS (`server.url.prod`) and WSS (`server.ws.url.prod`) endpoints
 
 Output path:
 
@@ -178,5 +179,6 @@ Optional environment overrides:
 - `APP_VERSION` (default: `1.0`)
 - `OUTPUT_DIR` (default: `client/target/native`)
 - `PACKAGE_WORK_DIR` (default: `client/target/windows-package`)
+- `CLIENT_CONFIG_PATH` (default: `client/src/main/resources/config/client.properties`)
 - `MVNW` (default: `mvnw.cmd`)
 - `SKIP_TESTS` (default: `true`)
