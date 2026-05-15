@@ -399,7 +399,7 @@ public class SettingsController {
                             "Hover Zoom Scale",
                             "Control how strong the preview zoom effect should be.",
                             1.05,
-                            1.50,
+                            5.00,
                             settings.getMediaHoverZoomScale(),
                             0.05,
                             true,
