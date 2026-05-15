@@ -4,6 +4,7 @@ import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
 import com.haf.client.network.MessageReceiver;
 import com.haf.client.network.MessageSender;
+import com.haf.client.utils.ImageSaveSupport;
 import com.haf.client.utils.ClientSettings;
 import com.haf.shared.constants.AttachmentConstants;
 import com.haf.shared.constants.MessageHeader;
@@ -113,6 +114,27 @@ class MessageViewModelAttachmentTest {
         MessageVM resolved = viewModel.getMessages("bob").getFirst();
         assertFalse(resolved.isLoading());
         assertEquals("small-photo.png", resolved.fileName());
+    }
+
+    @Test
+    void resolved_outgoing_inline_image_content_points_to_existing_local_file() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        sender.policy = policy(1_024, 512, 256);
+        StubReceiver receiver = new StubReceiver();
+        MessagesViewModel viewModel = new MessagesViewModel(sender, receiver);
+
+        Path file = tempDir.resolve("small-photo.png");
+        Files.write(file, pseudoPngBytes(256));
+
+        viewModel.sendAttachment("bob", file, "image/png");
+        awaitCondition(() -> sender.sendWithResultCalls == 1 && !viewModel.getMessages("bob").isEmpty());
+
+        MessageVM resolved = viewModel.getMessages("bob").getFirst();
+        assertEquals(MessageType.IMAGE, resolved.type());
+        assertNotNull(resolved.content());
+        Path localImagePath = ImageSaveSupport.resolveLocalSourcePath(resolved.content());
+        assertNotNull(localImagePath);
+        assertTrue(Files.exists(localImagePath));
     }
 
     @Test
