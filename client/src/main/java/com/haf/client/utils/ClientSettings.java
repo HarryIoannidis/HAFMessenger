@@ -505,7 +505,7 @@ public final class ClientSettings {
      * Updates media hover zoom scale.
      */
     public void setMediaHoverZoomScale(double value) {
-        setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 1.50, 0.05));
+        setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 5.00, 0.05));
     }
 
     /**

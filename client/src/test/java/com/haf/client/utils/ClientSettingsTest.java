@@ -143,8 +143,8 @@ class ClientSettingsTest {
 
         settings.setMediaHoverZoomScale(1.12);
         assertEquals(1.10, settings.getMediaHoverZoomScale(), 0.0001);
-        settings.setMediaHoverZoomScale(2.0);
-        assertEquals(1.50, settings.getMediaHoverZoomScale(), 0.0001);
+        settings.setMediaHoverZoomScale(6.0);
+        assertEquals(5.00, settings.getMediaHoverZoomScale(), 0.0001);
 
         settings.setMediaImageSendQuality(59);
         assertEquals(60, settings.getMediaImageSendQuality());
@@ -186,7 +186,7 @@ class ClientSettingsTest {
         settings.setSearchResultsPerPage(46);
         settings.setSearchMinimumQueryLength(5.9);
         settings.setNotificationsBadgeCap(95);
-        settings.setMediaHoverZoomScale(2.0);
+        settings.setMediaHoverZoomScale(6.0);
         settings.setMediaImageSendQuality(63);
         settings.setPrivacyBlurStrength(8.6);
 
@@ -207,7 +207,7 @@ class ClientSettingsTest {
         assertEquals(50, reloaded.getSearchResultsPerPage());
         assertEquals(5, reloaded.getSearchMinimumQueryLength());
         assertEquals(100, reloaded.getNotificationsBadgeCap());
-        assertEquals(1.50, reloaded.getMediaHoverZoomScale(), 0.0001);
+        assertEquals(5.00, reloaded.getMediaHoverZoomScale(), 0.0001);
         assertEquals(65, reloaded.getMediaImageSendQuality());
         assertEquals(9.0, reloaded.getPrivacyBlurStrength(), 0.0001);
         assertTrue(reloaded.isPrivacyBlurOnStartupUntilUnlock());
