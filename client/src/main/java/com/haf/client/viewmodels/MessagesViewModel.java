@@ -2615,6 +2615,7 @@ public class MessagesViewModel {
         Path tempFile = Files.createTempFile(tempDirectory, prefix, suffix);
         boolean readableSet = tempFile.toFile().setReadable(true, true);
         boolean writableSet = tempFile.toFile().setWritable(true, true);
+
         // Best effort: Windows often reports false here even when the file is
         // already non-executable, so do not fail temp-file creation on that.
         boolean success = tempFile.toFile().setExecutable(false, false);
