@@ -2617,8 +2617,8 @@ public class MessagesViewModel {
         boolean writableSet = tempFile.toFile().setWritable(true, true);
         // Best effort: Windows often reports false here even when the file is
         // already non-executable, so do not fail temp-file creation on that.
-        tempFile.toFile().setExecutable(false, false);
-        if (!readableSet || !writableSet) {
+        boolean success = tempFile.toFile().setExecutable(false, false);
+        if (!success || !readableSet || !writableSet) {
             Files.deleteIfExists(tempFile);
             throw new IOException("Failed to apply secure temporary-file permissions");
         }
