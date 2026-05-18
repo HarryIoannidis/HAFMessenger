@@ -447,6 +447,7 @@ class SettingsControllerTest {
         int imageQualityRowIndex = source.indexOf("\"mediaImageSendQualityRow\"");
         int previewSectionIndex = source.indexOf("\"mediaPreviewSection\"");
         int previewClickRowIndex = source.indexOf("\"mediaOpenPreviewOnImageClickRow\"");
+        int clickZoomRowIndex = source.indexOf("\"mediaClickZoomRow\"");
 
         assertTrue(source.contains("\"Upload\""));
         assertTrue(source.contains("\"Preview\""));
@@ -455,6 +456,7 @@ class SettingsControllerTest {
         assertTrue(imageQualityRowIndex > maxQualityRowIndex);
         assertTrue(previewSectionIndex > imageQualityRowIndex);
         assertTrue(previewClickRowIndex > previewSectionIndex);
+        assertTrue(clickZoomRowIndex > previewClickRowIndex);
     }
 
     @Test
@@ -468,6 +470,7 @@ class SettingsControllerTest {
         assertTrue(source.contains("\"generalConfirmLogoutToggle\""));
         assertTrue(source.contains("\"Confirm Before Logout\""));
         assertTrue(source.contains("wireSwitch(\"generalConfirmLogoutRow\", \"generalConfirmLogoutToggle\","));
+        assertTrue(source.contains("wireSwitch(\"mediaClickZoomRow\", \"mediaClickZoomToggle\","));
         assertTrue(source.contains("if (syncing.get() || !Boolean.TRUE.equals(newValue)) {"));
         assertTrue(source.contains("applyDependentRowState(dependentRow, toggle.isSelected());"));
         assertTrue(source.contains("row.setDisable(!enabled);"));

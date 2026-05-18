@@ -10,12 +10,19 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.Cursor;
+import javafx.scene.ImageCursor;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Screen;
 import javafx.stage.FileChooser;
@@ -43,6 +50,10 @@ public class PreviewController {
     private static final double PREVIEW_CHROME_HEIGHT = 170.0;
     private static final double PREVIEW_FALLBACK_IMAGE_WIDTH = 700.0;
     private static final double PREVIEW_FALLBACK_IMAGE_HEIGHT = 520.0;
+    private static final double DEFAULT_CLICK_ZOOM_SCALE = 2.0;
+    private static final int MAX_TEMPORARY_ZOOM_STEP = 2;
+    private static final double UNZOOMED_SCALE = 1.0;
+    private static final double ZOOM_EPSILON = 0.0001;
 
     // Popup window controls
     @FXML
@@ -69,6 +80,10 @@ public class PreviewController {
     private boolean downloadAllowed;
     private long activePreviewLoadId;
     private ClientSettings settings = ClientSettings.defaults();
+    private int previewZoomStep;
+    private boolean hoverActive;
+    private Cursor zoomInCursor = Cursor.HAND;
+    private Cursor zoomOutCursor = Cursor.OPEN_HAND;
 
     /**
      * Initializes window controls and download button wiring.
@@ -76,7 +91,7 @@ public class PreviewController {
     @FXML
     public void initialize() {
         setupWindowControls();
-        setupPreviewHoverZoom();
+        setupPreviewClickZoom();
         if (downloadButton != null) {
             downloadButton.setOnAction(e -> handleDownloadClick());
         }
@@ -95,6 +110,8 @@ public class PreviewController {
         this.downloadAllowed = downloadAllowed;
 
         configureDownloadButton(downloadAllowed);
+        resetPreviewZoomForCurrentWindow();
+        resetPreviewLayout();
         requestPreviewWindowStabilization();
         loadPreviewImage(imageUriOrPath);
     }
@@ -106,6 +123,8 @@ public class PreviewController {
      */
     public void setSettings(ClientSettings settings) {
         this.settings = settings == null ? ClientSettings.defaults() : settings;
+        resetPreviewZoomForCurrentWindow();
+        configureDownloadButton(downloadAllowed);
     }
 
     /**
@@ -137,7 +156,8 @@ public class PreviewController {
         previewImageView.setImage(null);
         previewImageView.setFitWidth(0);
         previewImageView.setFitHeight(0);
-        resetHoverZoom();
+        applyCurrentPreviewZoomScale();
+        refreshPreviewZoomCursor();
         if (source == null || source.isBlank()) {
             setSpinnerVisible(false);
             requestPreviewWindowStabilization();
@@ -193,6 +213,8 @@ public class PreviewController {
         }
         setSpinnerVisible(false);
         applyImageDimensions(image);
+        applyCurrentPreviewZoomScale();
+        refreshPreviewZoomCursor();
         requestPreviewWindowStabilization();
     }
 
@@ -226,9 +248,9 @@ public class PreviewController {
     }
 
     /**
-     * Configures subtle hover zoom behavior with cursor-follow panning.
+     * Configures click-driven preview zoom behavior with cursor-follow panning.
      */
-    private void setupPreviewHoverZoom() {
+    private void setupPreviewClickZoom() {
         if (previewImageView == null) {
             return;
         }
@@ -239,11 +261,13 @@ public class PreviewController {
             clip.heightProperty().bind(previewImageContainer.heightProperty());
             previewImageContainer.setClip(clip);
         }
-
-        previewImageView.setOnMouseEntered(this::updateHoverZoom);
-        previewImageView.setOnMouseMoved(this::updateHoverZoom);
-        previewImageView.setOnMouseDragged(this::updateHoverZoom);
-        previewImageView.setOnMouseExited(event -> resetHoverZoom());
+        initializeZoomCursors();
+        previewImageView.setOnMouseEntered(this::handlePreviewMouseEntered);
+        previewImageView.setOnMouseMoved(this::updateZoomPanFromPointer);
+        previewImageView.setOnMouseDragged(this::updateZoomPanFromPointer);
+        previewImageView.setOnMouseClicked(this::togglePreviewZoom);
+        previewImageView.setOnMouseExited(this::handlePreviewMouseExited);
+        resetPreviewZoomForCurrentWindow();
     }
 
     /**
@@ -381,6 +405,32 @@ public class PreviewController {
             stabilizePreviewWindow();
             Platform.runLater(this::stabilizePreviewWindow);
         });
+    }
+
+    /**
+     * Resets preview layout constraints to minimum dimensions, clearing any
+     * stale sizing from a previously displayed image. This prevents the reused
+     * popup window from retaining old container bounds that can cause side
+     * clipping when the next image has different dimensions.
+     */
+    private void resetPreviewLayout() {
+        if (previewImageContainer != null) {
+            previewImageContainer.setMinWidth(PREVIEW_FALLBACK_IMAGE_WIDTH);
+            previewImageContainer.setMinHeight(PREVIEW_FALLBACK_IMAGE_HEIGHT);
+            previewImageContainer.setPrefWidth(PREVIEW_FALLBACK_IMAGE_WIDTH);
+            previewImageContainer.setPrefHeight(PREVIEW_FALLBACK_IMAGE_HEIGHT);
+            previewImageContainer.setMaxWidth(PREVIEW_FALLBACK_IMAGE_WIDTH);
+            previewImageContainer.setMaxHeight(PREVIEW_FALLBACK_IMAGE_HEIGHT);
+        }
+        if (rootContainer != null) {
+            rootContainer.setPrefWidth(PREVIEW_MIN_WINDOW_WIDTH);
+            rootContainer.setPrefHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+        }
+        Stage stage = resolveStage();
+        if (stage != null) {
+            stage.setWidth(PREVIEW_MIN_WINDOW_WIDTH);
+            stage.setHeight(PREVIEW_MIN_WINDOW_HEIGHT);
+        }
     }
 
     /**
@@ -529,16 +579,80 @@ public class PreviewController {
     }
 
     /**
+     * Resets zoom state for the currently opened preview window.
+     * The image always opens at normal (1x) scale. Hover zoom only activates
+     * when the mouse actually enters the image area.
+     */
+    private void resetPreviewZoomForCurrentWindow() {
+        previewZoomStep = 0;
+        hoverActive = false;
+        applyCurrentPreviewZoomScale();
+        refreshPreviewZoomCursor();
+    }
+
+    /**
+     * Handles mouse entering the preview image area.
+     * Activates hover-driven zoom when hover zoom is enabled and not
+     * click-toggled off for this window.
+     *
+     * @param event mouse entered event
+     */
+    private void handlePreviewMouseEntered(MouseEvent event) {
+        hoverActive = true;
+        updateZoomPanFromPointer(event);
+    }
+
+    /**
+     * Handles mouse leaving the preview image area.
+     * Deactivates hover zoom and resets transform back to normal scale.
+     *
+     * @param event mouse exited event
+     */
+    private void handlePreviewMouseExited(MouseEvent event) {
+        hoverActive = false;
+        applyCurrentPreviewZoomScale();
+        refreshPreviewZoomCursor();
+    }
+
+    /**
+     * Toggles zoom level on preview-image click.
+     * With hover zoom enabled, click toggles between configured zoom and normal
+     * size.
+     * Without hover zoom, click cycles through 1x -> 2x -> 4x -> 1x.
+     */
+    private void togglePreviewZoom(MouseEvent event) {
+        if (event == null || previewImageView == null || previewImageView.getImage() == null) {
+            return;
+        }
+        if (!settings.isMediaClickZoom()) {
+            return;
+        }
+        if (settings.isMediaHoverZoom()) {
+            // Toggle hover zoom off/on for this window only.
+            // Step 0 = hover zoom active (default), step 1 = hover zoom disabled for this
+            // window.
+            previewZoomStep = previewZoomStep > 0 ? 0 : 1;
+        } else {
+            previewZoomStep = previewZoomStep >= MAX_TEMPORARY_ZOOM_STEP ? 0 : previewZoomStep + 1;
+        }
+        applyCurrentPreviewZoomScale();
+        updateZoomPanFromPointer(event);
+        refreshPreviewZoomCursor();
+    }
+
+    /**
      * Applies zoom/pan transform so the zoomed region follows cursor position.
      *
      * @param event pointer event within the image view
      */
-    private void updateHoverZoom(MouseEvent event) {
+    private void updateZoomPanFromPointer(MouseEvent event) {
         if (event == null || previewImageView == null || previewImageView.getImage() == null) {
             return;
         }
-        if (!settings.isMediaHoverZoom()) {
-            resetHoverZoom();
+        refreshPreviewZoomCursor();
+        double zoomScale = resolveActivePreviewZoomScale();
+        if (zoomScale <= UNZOOMED_SCALE + ZOOM_EPSILON) {
+            resetPreviewTransformOnly();
             return;
         }
 
@@ -548,31 +662,132 @@ public class PreviewController {
             return;
         }
 
-        double hoverZoomScale = settings.getMediaHoverZoomScale();
-        previewImageView.setScaleX(hoverZoomScale);
-        previewImageView.setScaleY(hoverZoomScale);
+        previewImageView.setScaleX(zoomScale);
+        previewImageView.setScaleY(zoomScale);
 
         double xRatio = clamp(event.getX() / width);
         double yRatio = clamp(event.getY() / height);
 
-        double maxTranslateX = (width * hoverZoomScale - width) / 2.0;
-        double maxTranslateY = (height * hoverZoomScale - height) / 2.0;
+        double maxTranslateX = (width * zoomScale - width) / 2.0;
+        double maxTranslateY = (height * zoomScale - height) / 2.0;
 
         previewImageView.setTranslateX((0.5 - xRatio) * maxTranslateX * 2.0);
         previewImageView.setTranslateY((0.5 - yRatio) * maxTranslateY * 2.0);
     }
 
     /**
-     * Resets preview transforms to the default non-zoomed state.
+     * Resolves the active zoom scale from settings and the current zoom step.
+     *
+     * @return current scale applied to the preview image
      */
-    private void resetHoverZoom() {
+    private double resolveActivePreviewZoomScale() {
+        if (settings.isMediaHoverZoom()) {
+            // Hover zoom: active when mouse is over image AND not click-toggled off.
+            // previewZoomStep == 0 means hover zoom is active (default).
+            // previewZoomStep == 1 means user clicked to disable hover zoom for this
+            // window.
+            boolean hoverZoomDisabledByClick = previewZoomStep > 0;
+            if (hoverActive && !hoverZoomDisabledByClick) {
+                return settings.getMediaHoverZoomScale();
+            }
+            return UNZOOMED_SCALE;
+        }
+        return Math.pow(DEFAULT_CLICK_ZOOM_SCALE, Math.max(0, previewZoomStep));
+    }
+
+    /**
+     * Applies the current zoom scale to the preview image view and recenters
+     * translation when zoom returns to normal size.
+     */
+    private void applyCurrentPreviewZoomScale() {
         if (previewImageView == null) {
             return;
         }
-        previewImageView.setScaleX(1.0);
-        previewImageView.setScaleY(1.0);
+        double zoomScale = resolveActivePreviewZoomScale();
+        previewImageView.setScaleX(zoomScale);
+        previewImageView.setScaleY(zoomScale);
+        if (zoomScale <= UNZOOMED_SCALE + ZOOM_EPSILON) {
+            previewImageView.setTranslateX(0.0);
+            previewImageView.setTranslateY(0.0);
+        }
+    }
+
+    /**
+     * Updates preview image cursor to reflect whether the next click action
+     * zooms in or zooms out.
+     */
+    private void refreshPreviewZoomCursor() {
+        if (previewImageView == null) {
+            return;
+        }
+        if (previewImageView.getImage() == null) {
+            previewImageView.setCursor(Cursor.DEFAULT);
+            return;
+        }
+        if (settings.isMediaHoverZoom()) {
+            // previewZoomStep == 0 means hover zoom active: show zoom-out cursor
+            // (hovering zooms in, click will zoom out / disable)
+            // previewZoomStep == 1 means hover zoom disabled by click: show zoom-in cursor
+            // (click will re-enable hover zoom)
+            previewImageView.setCursor(previewZoomStep == 0 ? zoomOutCursor : zoomInCursor);
+            return;
+        }
+        if (!settings.isMediaClickZoom()) {
+            previewImageView.setCursor(Cursor.DEFAULT);
+            return;
+        }
+        previewImageView.setCursor(previewZoomStep >= MAX_TEMPORARY_ZOOM_STEP ? zoomOutCursor : zoomInCursor);
+    }
+
+    /**
+     * Resets only transform state (scale/translation) without changing the
+     * click-zoom step machine.
+     */
+    private void resetPreviewTransformOnly() {
+        if (previewImageView == null) {
+            return;
+        }
+        previewImageView.setScaleX(UNZOOMED_SCALE);
+        previewImageView.setScaleY(UNZOOMED_SCALE);
         previewImageView.setTranslateX(0.0);
         previewImageView.setTranslateY(0.0);
+    }
+
+    /**
+     * Initializes zoom-in/zoom-out cursors used by preview image interactions.
+     */
+    private void initializeZoomCursors() {
+        zoomInCursor = createZoomCursor(true);
+        zoomOutCursor = createZoomCursor(false);
+    }
+
+    /**
+     * Builds a simple magnifier cursor for zoom-in/zoom-out affordance.
+     *
+     * @param zoomIn {@code true} to draw plus sign, {@code false} for minus
+     * @return custom image cursor, or fallback system cursor when generation fails
+     */
+    private Cursor createZoomCursor(boolean zoomIn) {
+        try {
+            Canvas canvas = new Canvas(24, 24);
+            GraphicsContext graphics = canvas.getGraphicsContext2D();
+            graphics.setStroke(Color.rgb(21, 21, 21, 0.95));
+            graphics.setLineWidth(2.1);
+            graphics.strokeOval(2.5, 2.5, 12.5, 12.5);
+            graphics.strokeLine(13.2, 13.2, 20.5, 20.5);
+            graphics.setLineWidth(1.9);
+            graphics.strokeLine(5.8, 8.8, 11.8, 8.8);
+            if (zoomIn) {
+                graphics.strokeLine(8.8, 5.8, 8.8, 11.8);
+            }
+            SnapshotParameters snapshotParameters = new SnapshotParameters();
+            snapshotParameters.setFill(Color.TRANSPARENT);
+            WritableImage image = canvas.snapshot(snapshotParameters, new WritableImage(24, 24));
+            return new ImageCursor(image, 3.0, 3.0);
+        } catch (Exception ex) {
+            LOGGER.debug("Could not build custom preview zoom cursor, falling back to defaults", ex);
+            return zoomIn ? Cursor.HAND : Cursor.OPEN_HAND;
+        }
     }
 
     /**
@@ -582,17 +797,19 @@ public class PreviewController {
      * @return clamped ratio
      */
     private static double clamp(double value) {
-        if (value < 0.0) {
-            return 0.0;
-        }
-        if (value > 1.0) {
-            return 1.0;
-        }
-        return value;
+        return Math.clamp(value, 0.0, 1.0);
     }
 
+    /**
+     * Clamps a numeric value within an inclusive range.
+     *
+     * @param value value to clamp
+     * @param min   lower bound
+     * @param max   upper bound
+     * @return clamped value
+     */
     private static double clampToRange(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
+        return Math.clamp(value, min, max);
     }
 
     /**

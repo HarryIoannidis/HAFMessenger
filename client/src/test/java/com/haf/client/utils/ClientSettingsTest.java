@@ -54,8 +54,9 @@ class ClientSettingsTest {
     void defaults_match_expected_values_media() {
         ClientSettings defaults = ClientSettings.defaults();
 
+        assertTrue(defaults.isMediaClickZoom());
         assertTrue(defaults.isMediaHoverZoom());
-        assertEquals(1.15, defaults.getMediaHoverZoomScale(), 0.0001);
+        assertEquals(4.00, defaults.getMediaHoverZoomScale(), 0.0001);
         assertEquals(100, defaults.getMediaImageSendQuality());
         assertTrue(defaults.isMediaSendInMaxQuality());
         assertTrue(defaults.isMediaShowDownloadButton());
@@ -142,7 +143,7 @@ class ClientSettingsTest {
         assertEquals(100, settings.getNotificationsBadgeCap());
 
         settings.setMediaHoverZoomScale(1.12);
-        assertEquals(1.10, settings.getMediaHoverZoomScale(), 0.0001);
+        assertEquals(1.00, settings.getMediaHoverZoomScale(), 0.0001);
         settings.setMediaHoverZoomScale(6.0);
         assertEquals(5.00, settings.getMediaHoverZoomScale(), 0.0001);
 

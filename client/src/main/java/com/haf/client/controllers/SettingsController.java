@@ -388,20 +388,26 @@ public class SettingsController {
                             "Open the image preview popup when clicking image messages.",
                             settings.isMediaOpenPreviewOnImageClick()),
                     SettingsRowBuilder.buildSwitchRow(
+                            "mediaClickZoomRow",
+                            "mediaClickZoomToggle",
+                            "Enable Click Zoom",
+                            "Allow click-to-toggle zoom levels inside image preview.",
+                            settings.isMediaClickZoom()),
+                    SettingsRowBuilder.buildSwitchRow(
                             "mediaHoverZoomRow",
                             "mediaHoverZoomToggle",
                             "Enable Hover Zoom",
-                            "Apply subtle zoom and cursor-based panning inside image preview.",
+                            "Enable pointer-follow zoom behavior while hovering in image preview.",
                             settings.isMediaHoverZoom()),
                     SettingsRowBuilder.buildSliderRow(
                             "mediaHoverZoomScaleRow",
                             "mediaHoverZoomScaleSlider",
-                            "Hover Zoom Scale",
+                            "Preview Zoom Scale",
                             "Control how strong the preview zoom effect should be.",
-                            1.05,
+                            1.00,
                             5.00,
                             settings.getMediaHoverZoomScale(),
-                            0.05,
+                            0.50,
                             true,
                             true),
                     SettingsRowBuilder.buildSwitchRow(
@@ -575,6 +581,7 @@ public class SettingsController {
                 settings::setSearchRememberSortOptions);
 
         wireSwitch("mediaSendInMaxQualityRow", "mediaSendInMaxQualityToggle", settings::setMediaSendInMaxQuality);
+        wireSwitch("mediaClickZoomRow", "mediaClickZoomToggle", settings::setMediaClickZoom);
         wireSwitch("mediaHoverZoomRow", "mediaHoverZoomToggle", settings::setMediaHoverZoom);
         wireSlider("mediaHoverZoomScaleSlider", settings::setMediaHoverZoomScale);
         wireSlider("mediaImageSendQualitySlider", settings::setMediaImageSendQuality);

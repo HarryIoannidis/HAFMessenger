@@ -45,8 +45,9 @@ public final class ClientSettings {
         SEARCH_PRESERVE_LAST_QUERY("search.preserve_last_query", true, ApplyMode.IMMEDIATE),
         SEARCH_REMEMBER_SORT_OPTIONS("search.remember_sort_options", true, ApplyMode.IMMEDIATE),
 
+        MEDIA_CLICK_ZOOM("media.click_zoom", true, ApplyMode.IMMEDIATE),
         MEDIA_HOVER_ZOOM("media.hover_zoom", true, ApplyMode.IMMEDIATE),
-        MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 1.15, ApplyMode.IMMEDIATE),
+        MEDIA_HOVER_ZOOM_SCALE("media.hover_zoom_scale", 4.00, ApplyMode.IMMEDIATE),
         MEDIA_IMAGE_SEND_QUALITY("media.image_send_quality", 100, ApplyMode.IMMEDIATE),
         MEDIA_SEND_IN_MAX_QUALITY("media.send_in_max_quality", true, ApplyMode.IMMEDIATE),
         MEDIA_SHOW_DOWNLOAD_BUTTON("media.show_download_button", true, ApplyMode.IMMEDIATE),
@@ -481,6 +482,20 @@ public final class ClientSettings {
     }
 
     /**
+     * Returns whether media click zoom.
+     */
+    public boolean isMediaClickZoom() {
+        return getBoolean(Key.MEDIA_CLICK_ZOOM);
+    }
+
+    /**
+     * Updates media click zoom.
+     */
+    public void setMediaClickZoom(boolean enabled) {
+        setBoolean(Key.MEDIA_CLICK_ZOOM, enabled);
+    }
+
+    /**
      * Returns whether media hover zoom.
      */
     public boolean isMediaHoverZoom() {
@@ -505,7 +520,7 @@ public final class ClientSettings {
      * Updates media hover zoom scale.
      */
     public void setMediaHoverZoomScale(double value) {
-        setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.05, 5.00, 0.05));
+        setDouble(Key.MEDIA_HOVER_ZOOM_SCALE, clampDecimal(value, 1.00, 5.00, 1));
     }
 
     /**
