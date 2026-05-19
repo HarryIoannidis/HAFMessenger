@@ -20,6 +20,7 @@ public final class UiConstants {
     public static final String FXML_SETTINGS = "/fxml/settings.fxml";
     public static final String FXML_SETTINGS_ITEM_CELL = "/fxml/settings_item_cell.fxml";
     public static final String FXML_POPUP_MESSAGE = "/fxml/popup_message.fxml";
+    public static final String FXML_LOADING_POPUP = "/fxml/loading_popup.fxml";
 
     // Config resources
     public static final String CONFIG_CLIENT_PROPERTIES = "/config/client.properties";

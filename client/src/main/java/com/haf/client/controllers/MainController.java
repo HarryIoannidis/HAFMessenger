@@ -2060,11 +2060,29 @@ public class MainController implements SearchController.ContactActions {
         logoutInProgress.set(true);
         shutdownTokenRefreshFlow();
         persistWindowState(ViewRouter.getMainStage());
+
+        ViewRouter.showPopup(
+                "popup-loading",
+                UiConstants.FXML_LOADING_POPUP,
+                PopupMessageController.class,
+                controller -> {
+                    com.haf.client.utils.PopupMessageSpec spec = PopupMessageBuilder.create()
+                            .popupKey("popup-loading")
+                            .title("Logging Out")
+                            .message("Please wait while we log you out...")
+                            .singleAction(true)
+                            .build();
+                    controller.showMessage(spec);
+                });
+
         mainSessionService.logout().whenComplete((unused, throwable) -> {
             if (throwable != null) {
                 LOGGER.warn("Logout completed with errors", throwable);
             }
-            Platform.runLater(() -> ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN));
+            Platform.runLater(() -> {
+                ViewRouter.hidePopup("popup-loading");
+                ViewRouter.switchToTransparent(UiConstants.FXML_LOGIN);
+            });
         });
     }
 
@@ -2245,6 +2263,20 @@ public class MainController implements SearchController.ContactActions {
         shutdownTokenRefreshFlow();
         persistWindowState(ViewRouter.getMainStage());
 
+        ViewRouter.showPopup(
+                "popup-loading",
+                UiConstants.FXML_LOADING_POPUP,
+                PopupMessageController.class,
+                controller -> {
+                    com.haf.client.utils.PopupMessageSpec spec = PopupMessageBuilder.create()
+                            .popupKey("popup-loading")
+                            .title("Logging Out")
+                            .message("Please wait while we log you out...")
+                            .singleAction(true)
+                            .build();
+                    controller.showMessage(spec);
+                });
+
         CompletableFuture<Void> logoutFuture;
         try {
             logoutFuture = mainSessionService.logout()
@@ -2259,6 +2291,7 @@ public class MainController implements SearchController.ContactActions {
                 LOGGER.warn("Logout on app exit completed with errors.", throwable);
             }
             Platform.runLater(() -> {
+                ViewRouter.hidePopup("popup-loading");
                 Platform.exit();
                 System.exit(0);
             });
@@ -2590,7 +2623,8 @@ public class MainController implements SearchController.ContactActions {
 
         if (shouldRefreshTokenForConnectionRecovery(snapshot)) {
             if (snapshot.refreshToken() == null || snapshot.refreshToken().isBlank()) {
-                return ConnectionRecoveryResult.invalidSessionResult(resolveInvalidSessionRuntimeIssue("invalid session"));
+                return ConnectionRecoveryResult
+                        .invalidSessionResult(resolveInvalidSessionRuntimeIssue("invalid session"));
             }
             TokenRefreshService.TokenRefreshResult refreshResult = tokenRefreshService.refresh(snapshot.refreshToken());
             if (refreshResult.success()) {
@@ -2751,7 +2785,8 @@ public class MainController implements SearchController.ContactActions {
     }
 
     /**
-     * Extracts best-effort session failure reason text for takeover/revoked mapping.
+     * Extracts best-effort session failure reason text for takeover/revoked
+     * mapping.
      *
      * @param error error candidate
      * @return normalized message string, or "invalid session" fallback
