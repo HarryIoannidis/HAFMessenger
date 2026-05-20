@@ -46,7 +46,7 @@
             <StackPane fx:id="previewImageContainer">
                <children>
                   <ImageView fx:id="previewImageView" pickOnBounds="true" preserveRatio="true" />
-                  <ProgressIndicator fx:id="loadingSpinner" managed="false" maxHeight="46.0" maxWidth="46.0" prefHeight="46.0" prefWidth="46.0" visible="false" />
+                  <ProgressIndicator fx:id="loadingSpinner" styleClass="preview-progress" managed="false" maxHeight="80.0" maxWidth="80.0" prefHeight="80.0" prefWidth="80.0" visible="false" />
                </children>
             </StackPane>
             <JFXButton fx:id="downloadButton" contentDisplay="RIGHT" focusTraversable="false" graphicTextGap="5.0" prefHeight="40.0" prefWidth="150.0" styleClass="button-download" text="Download">

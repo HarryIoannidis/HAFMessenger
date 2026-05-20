@@ -158,6 +158,10 @@ public class PreviewController {
         previewImageView.setFitHeight(0);
         applyCurrentPreviewZoomScale();
         refreshPreviewZoomCursor();
+        if (loadingSpinner != null) {
+            loadingSpinner.progressProperty().unbind();
+            loadingSpinner.setProgress(-1);
+        }
         if (source == null || source.isBlank()) {
             setSpinnerVisible(false);
             requestPreviewWindowStabilization();
@@ -167,6 +171,9 @@ public class PreviewController {
         try {
             Image image = new Image(source, true);
             previewImageView.setImage(image);
+            if (loadingSpinner != null) {
+                loadingSpinner.progressProperty().bind(image.progressProperty());
+            }
             setSpinnerVisible(true);
             image.progressProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null && newVal.doubleValue() >= 1.0) {
@@ -176,6 +183,9 @@ public class PreviewController {
             image.errorProperty().addListener((obs, wasError, isError) -> {
                 if (Boolean.TRUE.equals(isError) && isCurrentPreviewLoad(previewLoadId, image)) {
                     runOnFxThread(() -> {
+                        if (loadingSpinner != null) {
+                            loadingSpinner.progressProperty().unbind();
+                        }
                         setSpinnerVisible(false);
                         requestPreviewWindowStabilization();
                     });
@@ -188,12 +198,18 @@ public class PreviewController {
                 runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
             } else if (image.isError()) {
                 runOnFxThread(() -> {
+                    if (loadingSpinner != null) {
+                        loadingSpinner.progressProperty().unbind();
+                    }
                     setSpinnerVisible(false);
                     requestPreviewWindowStabilization();
                 });
             }
         } catch (Exception ex) {
             LOGGER.warn("Failed to load preview image", ex);
+            if (loadingSpinner != null) {
+                loadingSpinner.progressProperty().unbind();
+            }
             setSpinnerVisible(false);
             requestPreviewWindowStabilization();
             showAttachmentError("Could not load image preview.");
@@ -210,6 +226,9 @@ public class PreviewController {
     private void completePreviewLoadIfCurrent(long previewLoadId, Image image) {
         if (!isCurrentPreviewLoad(previewLoadId, image)) {
             return;
+        }
+        if (loadingSpinner != null) {
+            loadingSpinner.progressProperty().unbind();
         }
         setSpinnerVisible(false);
         applyImageDimensions(image);

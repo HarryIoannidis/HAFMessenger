@@ -24,3 +24,27 @@
     -fx-font-size: 15px;
     -fx-background-color: rgba(0, 0, 0, 0.1);
 }
+
+/* Progress indicator custom styling */
+.preview-progress {
+    -fx-progress-color: #007acc;
+}
+
+.preview-progress .percentage {
+    -fx-fill: transparent;
+}
+
+.preview-progress:determinate .indicator {
+    -fx-background-color: transparent;
+    -fx-border-color: #e6e6e6;
+    -fx-border-width: 6px;
+    -fx-border-radius: 40px;
+    -fx-padding: 0;
+}
+
+.preview-progress:determinate .progress {
+    -fx-background-color: #007acc;
+    -fx-background-insets: 0;
+    -fx-background-radius: 40px;
+    -fx-padding: 6px;
+}
