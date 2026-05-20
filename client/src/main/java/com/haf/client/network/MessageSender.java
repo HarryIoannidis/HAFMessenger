@@ -146,6 +146,21 @@ public interface MessageSender {
     }
 
     /**
+     * Downloads encrypted attachment blob by reference ID while reporting
+     * download progress to the caller.
+     *
+     * @param attachmentId     the attachment identifier
+     * @param progressCallback receives progress as a ratio from 0.0 to 1.0;
+     *                         may be {@code null}
+     * @throws IOException if network communication fails
+     */
+    default AttachmentDownload downloadAttachmentWithProgress(
+            String attachmentId,
+            java.util.function.DoubleConsumer progressCallback) throws IOException {
+        return downloadAttachment(attachmentId);
+    }
+
+    /**
      * Result returned by message ingress endpoint.
      * 
      * @param envelopeId       the envelope identifier

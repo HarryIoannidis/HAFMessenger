@@ -9,6 +9,7 @@ import javafx.scene.Cursor;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.beans.property.DoubleProperty;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -147,6 +148,25 @@ public final class MessageBubbleFactory {
      * @return rendered row node
      */
     public static Node create(MessageVM message, boolean showTimestamp, boolean use24HourTime) {
+        return create(message, showTimestamp, use24HourTime, null);
+    }
+
+    /**
+     * Creates a full-width row bubble with optional timestamp row and progress
+     * binding.
+     *
+     * 
+     * @param message            message to render
+     * @param showTimestamp      whether to render timestamp metadata
+     * @param use24HourTime      whether to format timestamp as 24-hour clock
+     * @param attachmentProgress optional progress property (0.0–1.0) for
+     *                           determinate spinners; {@code null} for
+     *                           indeterminate
+     * @return rendered row node
+     * 
+     */
+    public static Node create(MessageVM message, boolean showTimestamp, boolean use24HourTime,
+            DoubleProperty attachmentProgress) {
         // Outer row
         HBox row = new HBox();
         row.setMaxWidth(Double.MAX_VALUE);
@@ -170,7 +190,7 @@ public final class MessageBubbleFactory {
         bubble.setCursor(Cursor.HAND);
 
         // Message content
-        Node content = buildContent(message, bubble);
+        Node content = buildContent(message, bubble, attachmentProgress);
         bubble.getChildren().add(content);
 
         // Timestamp
@@ -230,11 +250,11 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the message content node
      */
-    private static Node buildContent(MessageVM message, VBox bubble) {
+    private static Node buildContent(MessageVM message, VBox bubble, DoubleProperty attachmentProgress) {
         return switch (message.type()) {
             case TEXT -> buildText(message, bubble);
-            case IMAGE -> buildImage(message, bubble);
-            case FILE -> buildFile(message);
+            case IMAGE -> buildImage(message, bubble, attachmentProgress);
+            case FILE -> buildFile(message, attachmentProgress);
         };
     }
 
@@ -289,7 +309,7 @@ public final class MessageBubbleFactory {
      * @param message the message to render
      * @return the image content node
      */
-    private static Node buildImage(MessageVM message, VBox bubble) {
+    private static Node buildImage(MessageVM message, VBox bubble, DoubleProperty attachmentProgress) {
         var imageWidthBinding = Bindings.createDoubleBinding(
                 () -> Math.max(140.0,
                         Math.min(IMAGE_BUBBLE_MAX_WIDTH, bubble.getMaxWidth() - BUBBLE_HORIZONTAL_PADDING)),
@@ -308,8 +328,9 @@ public final class MessageBubbleFactory {
         imageView.setCursor(Cursor.HAND);
 
         ProgressIndicator spinner = new ProgressIndicator();
-        spinner.setPrefSize(28, 28);
-        spinner.setMaxSize(28, 28);
+        spinner.setMinSize(80, 80);
+        spinner.setPrefSize(80, 80);
+        spinner.setMaxSize(80, 80);
         spinner.getStyleClass().add("bubble-image-spinner");
         spinner.setMouseTransparent(true);
 
@@ -320,6 +341,7 @@ public final class MessageBubbleFactory {
         if (loadingPlaceholder) {
             imageContainer.setMinHeight(160);
             setSpinnerVisible(spinner, true);
+            bindAttachmentProgress(spinner, attachmentProgress);
         } else {
             setSpinnerVisible(spinner, false);
         }
@@ -333,13 +355,14 @@ public final class MessageBubbleFactory {
      * the spinner visibility during loading, completion, and error states.
      *
      * @param message   the message containing the image URL
-     * @param imageView the view to display the image in
-     * @param spinner   the loading spinner overlay
+     * @param imageVi   the view to display the image in
+     * @param spinnerCo tainer the loading spinner overlay
      */
     private static void loadImageContent(MessageVM message,
             ImageView imageView,
             ProgressIndicator spinner) {
         if (message.content() == null || message.content().isBlank()) {
+            imageView.setImage(null);
             return;
         }
         try {
@@ -354,8 +377,8 @@ public final class MessageBubbleFactory {
                     setSpinnerVisible(spinner, false);
                 }
             });
-            image.errorProperty().addListener((obs, wasError, isError) -> {
-                if (Boolean.TRUE.equals(isError)) {
+            image.exceptionProperty().addListener((obs, oldEx, newEx) -> {
+                if (newEx != null) {
                     setSpinnerVisible(spinner, false);
                 }
             });
@@ -377,12 +400,38 @@ public final class MessageBubbleFactory {
     }
 
     /**
+     * Binds a {@link JFXSpinner} to an external attachment progress
+     * property so it transitions from indeterminate to determinate as upload
+     * or download progress is reported.
+     *
+     * @param spinner            progress indicator rendered inside the bubble
+     * @param attachmentProgress optional progress property (0.0–1.0); ignored
+     *                           when {@code null}
+     */
+    private static void bindAttachmentProgress(ProgressIndicator spinner,
+            DoubleProperty attachmentProgress) {
+        if (attachmentProgress == null) {
+            return;
+        }
+        // Apply current value immediately.
+        double current = attachmentProgress.get();
+        spinner.setProgress(current);
+
+        // Listen for future changes from the ViewModel.
+        attachmentProgress.addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                spinner.setProgress(newVal.doubleValue());
+            }
+        });
+    }
+
+    /**
      * Creates the file attachment content node for a message.
      *
      * @param message the message to render
      * @return the file attachment content node
      */
-    private static HBox buildFile(MessageVM message) {
+    private static HBox buildFile(MessageVM message, DoubleProperty attachmentProgress) {
         FontIcon icon = new FontIcon(resolveFileIcon(message));
         icon.setIconSize(24);
 
@@ -404,6 +453,7 @@ public final class MessageBubbleFactory {
         HBox fileRow = new HBox(8, icon, fileText);
         if (loadingPlaceholder) {
             ProgressIndicator spinner = new ProgressIndicator();
+            spinner.setMinSize(18, 18);
             spinner.setPrefSize(18, 18);
             spinner.setMaxSize(18, 18);
             spinner.getStyleClass().add("bubble-file-spinner");

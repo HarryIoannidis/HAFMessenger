@@ -143,16 +143,9 @@ public class PreviewController {
     }
 
     /**
-     * Loads an image into the preview component and tracks loading progress.
-     *
-     * @param source URI/path source to load into the preview image view
+     * Resets the visual state of the preview component before loading a new source.
      */
-    private void loadPreviewImage(String source) {
-        if (previewImageView == null) {
-            return;
-        }
-        long previewLoadId = ++activePreviewLoadId;
-
+    private void resetPreviewState() {
         previewImageView.setImage(null);
         previewImageView.setFitWidth(0);
         previewImageView.setFitHeight(0);
@@ -162,6 +155,62 @@ public class PreviewController {
             loadingSpinner.progressProperty().unbind();
             loadingSpinner.setProgress(-1);
         }
+    }
+
+    /**
+     * Cleans up UI and unbinds progress when a preview load error occurs.
+     */
+    private void handlePreviewError() {
+        if (loadingSpinner != null) {
+            loadingSpinner.progressProperty().unbind();
+        }
+        setSpinnerVisible(false);
+        requestPreviewWindowStabilization();
+    }
+
+    /**
+     * Registers progress and error listeners on the image to track the loading state.
+     *
+     * @param image         image being loaded
+     * @param previewLoadId sequence id captured when load started
+     */
+    private void setupPreviewListeners(Image image, long previewLoadId) {
+        if (loadingSpinner != null) {
+            loadingSpinner.progressProperty().bind(image.progressProperty());
+        }
+        setSpinnerVisible(true);
+        image.progressProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && newVal.doubleValue() >= 1.0) {
+                runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
+            }
+        });
+        image.errorProperty().addListener((obs, wasError, isError) -> {
+            if (Boolean.TRUE.equals(isError) && isCurrentPreviewLoad(previewLoadId, image)) {
+                runOnFxThread(this::handlePreviewError);
+            }
+        });
+
+        // Close the listener-registration race: local images can complete
+        // between the initial progress check and listener attachment.
+        if (image.getProgress() >= 1.0) {
+            runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
+        } else if (image.isError()) {
+            runOnFxThread(this::handlePreviewError);
+        }
+    }
+
+    /**
+     * Loads an image into the preview component and tracks loading progress.
+     *
+     * @param source URI/path source to load into the preview image view
+     */
+    private void loadPreviewImage(String source) {
+        if (previewImageView == null) {
+            return;
+        }
+        long previewLoadId = ++activePreviewLoadId;
+        resetPreviewState();
+
         if (source == null || source.isBlank()) {
             setSpinnerVisible(false);
             requestPreviewWindowStabilization();
@@ -171,47 +220,10 @@ public class PreviewController {
         try {
             Image image = new Image(source, true);
             previewImageView.setImage(image);
-            if (loadingSpinner != null) {
-                loadingSpinner.progressProperty().bind(image.progressProperty());
-            }
-            setSpinnerVisible(true);
-            image.progressProperty().addListener((obs, oldVal, newVal) -> {
-                if (newVal != null && newVal.doubleValue() >= 1.0) {
-                    runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
-                }
-            });
-            image.errorProperty().addListener((obs, wasError, isError) -> {
-                if (Boolean.TRUE.equals(isError) && isCurrentPreviewLoad(previewLoadId, image)) {
-                    runOnFxThread(() -> {
-                        if (loadingSpinner != null) {
-                            loadingSpinner.progressProperty().unbind();
-                        }
-                        setSpinnerVisible(false);
-                        requestPreviewWindowStabilization();
-                    });
-                }
-            });
-
-            // Close the listener-registration race: local images can complete
-            // between the initial progress check and listener attachment.
-            if (image.getProgress() >= 1.0) {
-                runOnFxThread(() -> completePreviewLoadIfCurrent(previewLoadId, image));
-            } else if (image.isError()) {
-                runOnFxThread(() -> {
-                    if (loadingSpinner != null) {
-                        loadingSpinner.progressProperty().unbind();
-                    }
-                    setSpinnerVisible(false);
-                    requestPreviewWindowStabilization();
-                });
-            }
+            setupPreviewListeners(image, previewLoadId);
         } catch (Exception ex) {
             LOGGER.warn("Failed to load preview image", ex);
-            if (loadingSpinner != null) {
-                loadingSpinner.progressProperty().unbind();
-            }
-            setSpinnerVisible(false);
-            requestPreviewWindowStabilization();
+            handlePreviewError();
             showAttachmentError("Could not load image preview.");
         }
     }

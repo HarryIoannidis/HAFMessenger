@@ -54,7 +54,12 @@ class MessageViewModelAttachmentTest {
         Files.write(file, pseudoPngBytes(256));
 
         viewModel.sendAttachment("bob", file, "image/png");
-        awaitCondition(() -> sender.sendWithResultCalls == 1 && viewModel.getMessages("bob").size() == 1);
+        awaitCondition(() -> {
+            if (sender.sendWithResultCalls != 1 || viewModel.getMessages("bob").size() != 1) {
+                return false;
+            }
+            return !viewModel.getMessages("bob").getFirst().isLoading();
+        });
 
         assertEquals(0, sender.sendCalls);
         assertEquals(1, sender.sendWithResultCalls);

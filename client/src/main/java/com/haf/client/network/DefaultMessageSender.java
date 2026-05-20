@@ -346,6 +346,48 @@ public class DefaultMessageSender implements MessageSender {
     }
 
     /**
+     * Downloads attachment metadata/content wrapper while reporting progress
+     * through a callback as a 0.0–1.0 ratio.
+     *
+     * @param attachmentId     attachment identifier
+     * @param progressCallback receives download progress as a 0.0–1.0 ratio;
+     *                         may be {@code null}
+     * @return attachment download response
+     * @throws IOException if request or response decoding fails
+     */
+    @Override
+    public AttachmentDownload downloadAttachmentWithProgress(
+            String attachmentId,
+            java.util.function.DoubleConsumer progressCallback) throws IOException {
+        try {
+            AuthHttpClient.DownloadProgressCallback httpCallback = progressCallback == null
+                    ? null
+                    : (bytesRead, totalBytes) -> {
+                        if (totalBytes > 0) {
+                            double ratio = Math.min(1.0, (double) bytesRead / totalBytes);
+                            progressCallback.accept(ratio);
+                        }
+                    };
+            HttpResponse<byte[]> response = authHttpClient.getAuthenticatedBytesStreaming(
+                    "/api/v1/attachments/" + attachmentId, httpCallback);
+            byte[] body = response.body() == null ? new byte[0] : response.body();
+            String resolvedAttachmentId = header(response, AttachmentConstants.HEADER_ATTACHMENT_ID, attachmentId);
+            String contentType = header(response, AttachmentConstants.HEADER_ATTACHMENT_CONTENT_TYPE,
+                    AttachmentConstants.CONTENT_TYPE_ENCRYPTED_BLOB);
+            long encryptedSize = longHeader(response, AttachmentConstants.HEADER_ATTACHMENT_ENCRYPTED_SIZE,
+                    body.length);
+            int chunkCount = intHeader(response, AttachmentConstants.HEADER_ATTACHMENT_CHUNK_COUNT, 0);
+            return new AttachmentDownload(resolvedAttachmentId, contentType, encryptedSize, chunkCount, body);
+        } catch (HttpCommunicationException ex) {
+            throw toIoException(ex);
+        } catch (IOException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IOException("Failed to download attachment", ex);
+        }
+    }
+
+    /**
      * Resolves a JSON HTTP response future and decodes it into the requested
      * response type.
      *

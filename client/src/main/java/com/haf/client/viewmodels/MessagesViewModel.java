@@ -23,6 +23,8 @@ import com.haf.shared.utils.AttachmentPayloadCodec;
 import com.haf.shared.utils.JsonCodec;
 import com.haf.client.utils.RuntimeIssue;
 import javafx.application.Platform;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -171,6 +173,7 @@ public class MessagesViewModel {
     private final List<Consumer<RuntimeIssue>> runtimeIssueListeners = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, ObservableList<MessageVM>> messagesByContact = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ConcurrentMap<String, MessageVM.ReadState>> pendingOutgoingReceiptStates = new ConcurrentHashMap<>();
+    private final ConcurrentMap<MessageVM, DoubleProperty> attachmentProgressByMessage = new ConcurrentHashMap<>();
 
     private final Object policyLock = new Object();
     private volatile MessagingPolicyResponse cachedPolicy;
@@ -826,6 +829,7 @@ public class MessagesViewModel {
             long fileSizeBytes,
             LocalDateTime timestamp) {
         MessageVM loadingVm = buildLoadingAttachmentVm(true, mediaType, fileName, fileSizeBytes, timestamp);
+        attachmentProgressByMessage.put(loadingVm, new SimpleDoubleProperty(0.0));
         MessageVM finalLoadingVm = loadingVm;
         runOnUiThread(() -> {
             getMessages(contactId).add(finalLoadingVm);
@@ -854,7 +858,7 @@ public class MessagesViewModel {
             MessagingPolicyResponse policy,
             LocalDateTime timestamp,
             MessageVM loadingVm) throws Exception {
-        MessageSender.SendResult sendResult = sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy);
+        MessageSender.SendResult sendResult = sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy, loadingVm);
 
         DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
         outgoing = withEnvelopeId(outgoing, sendResult == null ? null : sendResult.envelopeId());
@@ -1038,6 +1042,17 @@ public class MessagesViewModel {
      */
     public StringProperty statusProperty() {
         return status;
+    }
+
+    /**
+     * Returns the attachment transfer progress property for a loading message,
+     * or {@code null} when the message is not tracked.
+     *
+     * @param message loading placeholder message
+     * @return progress property (0.0–1.0), or {@code null}
+     */
+    public DoubleProperty getAttachmentProgress(MessageVM message) {
+        return message == null ? null : attachmentProgressByMessage.get(message);
     }
 
     /**
@@ -1559,6 +1574,8 @@ public class MessagesViewModel {
                 reference.getSizeBytes(),
                 timestamp);
 
+        attachmentProgressByMessage.put(loadingVm, new SimpleDoubleProperty(0.0));
+
         runOnUiThread(() -> {
             getMessages(senderId).add(loadingVm);
             // Notify once, when the inbound envelope is first materialized.
@@ -1566,9 +1583,10 @@ public class MessagesViewModel {
             status.set(buildAttachmentLoadingStatus(senderId, mediaType, false));
         });
 
+        MessageVM progressLoadingVm = loadingVm;
         CompletableFuture.runAsync(() -> {
             try {
-                DecodedMessage loaded = decodeAttachmentReference(senderId, reference, timestamp);
+                DecodedMessage loaded = decodeAttachmentReference(senderId, reference, timestamp, progressLoadingVm);
                 runOnUiThread(() -> {
                     replaceLoadingMessage(
                             senderId,
@@ -1645,6 +1663,7 @@ public class MessagesViewModel {
             MessageVM loadingVm,
             MessageVM loadedVm,
             String resolvedStatus) {
+        attachmentProgressByMessage.remove(loadingVm);
         ObservableList<MessageVM> messages = getMessages(contactId);
         MessageVM resolvedLoadedVm = applyPendingOutgoingReceiptState(contactId, loadedVm);
         int index = messages.indexOf(loadingVm);
@@ -1663,6 +1682,7 @@ public class MessagesViewModel {
      * @param loadingVm loading message to remove when still present
      */
     private void removeLoadingMessage(String contactId, MessageVM loadingVm) {
+        attachmentProgressByMessage.remove(loadingVm);
         getMessages(contactId).remove(loadingVm);
     }
 
@@ -1681,6 +1701,7 @@ public class MessagesViewModel {
             LocalDateTime timestamp,
             String mediaType,
             Exception ex) {
+        attachmentProgressByMessage.remove(loadingVm);
         ObservableList<MessageVM> messages = getMessages(senderId);
         int index = messages.indexOf(loadingVm);
         String noun = attachmentNoun(mediaType);
@@ -1741,7 +1762,8 @@ public class MessagesViewModel {
             String fileName,
             String mediaType,
             byte[] fileBytes,
-            MessagingPolicyResponse policy) throws Exception {
+            MessagingPolicyResponse policy,
+            MessageVM loadingVm) throws Exception {
 
         EncryptedMessage encryptedAttachment = messageSender.encryptMessage(
                 fileBytes,
@@ -1781,7 +1803,8 @@ public class MessagesViewModel {
                     encryptedBlob.length,
                     chunkBytes,
                     recipientId,
-                    mediaType);
+                    mediaType,
+                    loadingVm);
 
             AttachmentCompleteRequest completeRequest = new AttachmentCompleteRequest();
             completeRequest.setExpectedChunks(expectedChunks);
@@ -1832,7 +1855,8 @@ public class MessagesViewModel {
             int encryptedSizeBytes,
             int chunkBytes,
             String recipientId,
-            String mediaType) throws IOException {
+            String mediaType,
+            MessageVM loadingVm) throws IOException {
         int expectedChunks = (int) Math.ceil(encryptedSizeBytes / (double) chunkBytes);
         int concurrency = resolveUploadConcurrency();
         List<CompletableFuture<Void>> futures = new ArrayList<>(expectedChunks);
@@ -1853,7 +1877,7 @@ public class MessagesViewModel {
                                 () -> messageSender.uploadAttachmentChunk(attachmentId, currentIndex, chunk));
                         ensureNoError(chunkResponse.getError());
                         int uploaded = uploadedBytes.addAndGet(chunk.length);
-                        updateAttachmentUploadProgress(recipientId, mediaType, uploaded, encryptedSizeBytes);
+                        updateAttachmentUploadProgress(recipientId, mediaType, uploaded, encryptedSizeBytes, loadingVm);
                     } catch (Exception ex) {
                         throw new CompletionException(ex);
                     }
@@ -1874,13 +1898,20 @@ public class MessagesViewModel {
         }
     }
 
-    private void updateAttachmentUploadProgress(String recipientId, String mediaType, int uploaded, int total) {
+    private void updateAttachmentUploadProgress(String recipientId, String mediaType, int uploaded, int total,
+            MessageVM loadingVm) {
         if (total <= 0) {
             return;
         }
-        int percent = Math.clamp((int) Math.round((uploaded * 100.0) / total), 0, 100);
-        runOnUiThread(
-                () -> status.set(buildAttachmentLoadingStatus(recipientId, mediaType, true) + " " + percent + "%"));
+        double ratio = Math.min(1.0, (double) uploaded / total);
+        int percent = Math.clamp((int) Math.round(ratio * 100.0), 0, 100);
+        runOnUiThread(() -> {
+            status.set(buildAttachmentLoadingStatus(recipientId, mediaType, true) + " " + percent + "%");
+            DoubleProperty progress = loadingVm == null ? null : attachmentProgressByMessage.get(loadingVm);
+            if (progress != null) {
+                progress.set(ratio);
+            }
+        });
     }
 
     private static byte[] readChunk(byte[] source, int offset, int length) {
@@ -1932,7 +1963,7 @@ public class MessagesViewModel {
 
         if (AttachmentConstants.CONTENT_TYPE_REFERENCE.equals(contentType)) {
             AttachmentReferencePayload ref = AttachmentPayloadCodec.fromReferenceJson(plaintext);
-            return decodeAttachmentReference(senderId, ref, timestamp);
+            return decodeAttachmentReference(senderId, ref, timestamp, null);
         }
 
         if (contentType.startsWith("text/")) {
@@ -1980,6 +2011,8 @@ public class MessagesViewModel {
      * @param ref       reference payload carrying attachment id and display
      *                  metadata
      * @param timestamp timestamp to apply to the produced message model
+     * @param loadingVm loading placeholder whose progress property is updated
+     *                  during download; may be {@code null}
      * @return decoded attachment message plus optional image-preview fallback
      *         notice
      * @throws Exception when download payload is invalid or decrypt/parse
@@ -1987,9 +2020,19 @@ public class MessagesViewModel {
      */
     private DecodedMessage decodeAttachmentReference(String senderId,
             AttachmentReferencePayload ref,
-            LocalDateTime timestamp)
+            LocalDateTime timestamp,
+            MessageVM loadingVm)
             throws Exception {
-        MessageSender.AttachmentDownload downloadResponse = messageSender.downloadAttachment(ref.getAttachmentId());
+        java.util.function.DoubleConsumer progressCallback = loadingVm == null
+                ? null
+                : ratio -> {
+                    DoubleProperty progress = attachmentProgressByMessage.get(loadingVm);
+                    if (progress != null) {
+                        runOnUiThread(() -> progress.set(ratio));
+                    }
+                };
+        MessageSender.AttachmentDownload downloadResponse = messageSender.downloadAttachmentWithProgress(
+                ref.getAttachmentId(), progressCallback);
         if (downloadResponse == null
                 || downloadResponse.encryptedBlob() == null
                 || downloadResponse.encryptedBlob().length == 0) {

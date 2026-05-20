@@ -186,19 +186,105 @@
 }
 
 .bubble-image-spinner {
-    -fx-progress-color: #1A7CC5;
+    -fx-progress-color: #007acc;
 }
 
 .bubble-out .bubble-image-spinner {
-    -fx-progress-color: #FFFFFF;
+    -fx-progress-color: #ffffff;
 }
 
 .bubble-file-spinner-in {
-    -fx-progress-color: #1A7CC5;
+    -fx-progress-color: #007acc;
 }
 
 .bubble-file-spinner-out {
-    -fx-progress-color: #FFFFFF;
+    -fx-progress-color: #ffffff;
+}
+
+/* Force absolute size bounds in CSS */
+.bubble-image-spinner {
+    -fx-min-width: 80px;
+    -fx-min-height: 80px;
+    -fx-pref-width: 80px;
+    -fx-pref-height: 80px;
+    -fx-max-width: 80px;
+    -fx-max-height: 80px;
+}
+.bubble-file-spinner {
+    -fx-min-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-width: 18px;
+    -fx-pref-height: 18px;
+    -fx-max-width: 18px;
+    -fx-max-height: 18px;
+}
+
+/* Remove default JavaFX spinner container padding so indicators occupy the full size */
+.bubble-image-spinner .spinner,
+.bubble-file-spinner .spinner {
+    -fx-padding: 0;
+}
+
+/* Hide percentage text completely and remove from layout */
+.bubble-image-spinner .percentage,
+.bubble-file-spinner .percentage,
+.bubble-file-spinner-in .percentage,
+.bubble-file-spinner-out .percentage {
+    -fx-fill: transparent;
+    -fx-font-size: 0px;
+    -fx-visible: false;
+    -fx-padding: 0;
+}
+
+/* Image spinner (large 80x80) */
+.bubble-image-spinner:determinate .indicator {
+    -fx-background-color: transparent;
+    -fx-border-color: #e6e6e6;
+    -fx-border-width: 6px;
+    -fx-border-radius: 40px;
+    -fx-padding: 0;
+}
+.bubble-image-spinner:determinate .progress {
+    -fx-background-color: #007acc;
+    -fx-background-insets: 0;
+    -fx-background-radius: 40px;
+    -fx-padding: 6px;
+}
+
+/* Outgoing overrides for Image spinner (white arc, semi-transparent track) */
+.bubble-out .bubble-image-spinner:determinate .indicator {
+    -fx-border-color: rgba(255, 255, 255, 0.25);
+}
+.bubble-out .bubble-image-spinner:determinate .progress {
+    -fx-background-color: #ffffff;
+}
+
+/* File spinner (small 18x18) */
+.bubble-file-spinner-in:determinate .indicator,
+.bubble-file-spinner-out:determinate .indicator {
+    -fx-background-color: transparent;
+    -fx-border-width: 2px;
+    -fx-border-radius: 9px;
+    -fx-padding: 0;
+}
+.bubble-file-spinner-in:determinate .indicator {
+    -fx-border-color: rgba(0, 0, 0, 0.15);
+}
+.bubble-file-spinner-out:determinate .indicator {
+    -fx-border-color: rgba(255, 255, 255, 0.45);
+}
+
+.bubble-file-spinner-in:determinate .progress,
+.bubble-file-spinner-out:determinate .progress {
+    -fx-background-insets: 0;
+    -fx-background-radius: 9px;
+    -fx-padding: 2px;
+}
+.bubble-file-spinner-in:determinate .progress {
+    -fx-background-color: #007acc;
+}
+.bubble-file-spinner-out:determinate .progress {
+    -fx-background-color: #ffffff;
 }
 
 .plain-text-chat {

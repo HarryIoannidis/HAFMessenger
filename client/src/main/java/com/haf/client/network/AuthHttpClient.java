@@ -3,10 +3,14 @@ package com.haf.client.network;
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.exceptions.SslConfigurationException;
 import com.haf.client.utils.SslContextUtils;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.IOException;
 import java.net.SocketException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
@@ -104,6 +108,43 @@ public class AuthHttpClient {
                 .GET()
                 .build();
         return sendBytesWithRetry(request, "GET");
+    }
+
+    /**
+     * Callback interface for streaming download progress reporting.
+     */
+    @FunctionalInterface
+    public interface DownloadProgressCallback {
+        /**
+         * Called after each chunk of data is read from the response stream.
+         *
+         * @param bytesRead  total bytes read so far
+         * @param totalBytes expected total bytes from Content-Length, or {@code -1}
+         *                   when unknown
+         */
+        void onProgress(long bytesRead, long totalBytes);
+    }
+
+    /**
+     * Executes an authenticated HTTP GET request and returns binary response bytes
+     * while reporting download progress through a callback.
+     *
+     * @param path             relative API path
+     * @param progressCallback callback invoked after each read chunk; may be
+     *                         {@code null}
+     * @return validated binary response including headers
+     * @throws IOException if network or I/O failure occurs
+     */
+    public HttpResponse<byte[]> getAuthenticatedBytesStreaming(
+            String path,
+            DownloadProgressCallback progressCallback) throws IOException {
+        URI requestUri = buildAuthenticatedRequestUri(path);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(requestUri)
+                .header("Authorization", authorizationHeaderValue())
+                .GET()
+                .build();
+        return sendBytesStreaming(request, "GET", progressCallback);
     }
 
     /**
@@ -235,6 +276,93 @@ public class AuthHttpClient {
                     }
                     return CompletableFuture.failedFuture(error);
                 });
+    }
+
+    /**
+     * Sends an HTTP request synchronously and reads the response body as a stream
+     * in 8 KB chunks, invoking a progress callback after each chunk.
+     *
+     * @param request          HTTP request to send
+     * @param method           HTTP method label used for error messages
+     * @param progressCallback optional progress callback; may be {@code null}
+     * @return validated HTTP response with fully-read body bytes
+     * @throws IOException if the request or response streaming fails
+     */
+    private HttpResponse<byte[]> sendBytesStreaming(
+            HttpRequest request,
+            String method,
+            DownloadProgressCallback progressCallback) throws IOException {
+        try {
+            HttpResponse<InputStream> response = httpClient.send(
+                    request, HttpResponse.BodyHandlers.ofInputStream());
+            int statusCode = response.statusCode();
+            if (statusCode < 200 || statusCode >= 300) {
+                byte[] errorBody;
+                try (InputStream errorStream = response.body()) {
+                    errorBody = errorStream == null ? new byte[0] : errorStream.readAllBytes();
+                }
+                String errorText = new String(errorBody, java.nio.charset.StandardCharsets.UTF_8);
+                throw new HttpCommunicationException(
+                        "HTTP " + method + " failed with status " + statusCode + ": " + errorText,
+                        statusCode, errorText);
+            }
+
+            long totalBytes = response.headers()
+                    .firstValueAsLong("Content-Length")
+                    .orElse(-1L);
+
+            try (InputStream inputStream = response.body()) {
+                ByteArrayOutputStream outputBuffer = totalBytes > 0
+                        ? new ByteArrayOutputStream((int) Math.min(totalBytes, Integer.MAX_VALUE))
+                        : new ByteArrayOutputStream();
+                byte[] chunk = new byte[8192];
+                long bytesRead = 0;
+                int read;
+                while ((read = inputStream.read(chunk)) != -1) {
+                    outputBuffer.write(chunk, 0, read);
+                    bytesRead += read;
+                    if (progressCallback != null) {
+                        progressCallback.onProgress(bytesRead, totalBytes);
+                    }
+                }
+                byte[] body = outputBuffer.toByteArray();
+                // Wrap the streamed body into an HttpResponse<byte[]> compatible result.
+                return new StreamedBytesResponse<>(response, body);
+            }
+        } catch (HttpCommunicationException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP streaming download interrupted", ex);
+        } catch (Exception ex) {
+            throw new IOException("HTTP streaming download failed", ex);
+        }
+    }
+
+    /**
+     * Wraps an {@link HttpResponse} header carrier with separately buffered body
+     * bytes so the streaming download result is compatible with existing
+     * {@code HttpResponse<byte[]>} consumers.
+     *
+     * @param <T> original body type of the delegate response
+     */
+    private static final class StreamedBytesResponse<T> implements HttpResponse<byte[]> {
+        private final HttpResponse<T> delegate;
+        private final byte[] body;
+
+        StreamedBytesResponse(HttpResponse<T> delegate, byte[] body) {
+            this.delegate = delegate;
+            this.body = body;
+        }
+
+        @Override public int statusCode() { return delegate.statusCode(); }
+        @Override public HttpRequest request() { return delegate.request(); }
+        @Override public java.util.Optional<HttpResponse<byte[]>> previousResponse() { return java.util.Optional.empty(); }
+        @Override public HttpHeaders headers() { return delegate.headers(); }
+        @Override public byte[] body() { return body; }
+        @Override public java.util.Optional<javax.net.ssl.SSLSession> sslSession() { return delegate.sslSession(); }
+        @Override public URI uri() { return delegate.uri(); }
+        @Override public HttpClient.Version version() { return delegate.version(); }
     }
 
     private String validateResponse(HttpResponse<String> response, String method) {

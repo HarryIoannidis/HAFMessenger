@@ -3,6 +3,7 @@ package com.haf.client.viewmodels;
 import com.haf.client.models.MessageVM;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -281,5 +282,17 @@ public class ChatViewModel {
      */
     private static String normalizeDraft(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Returns the attachment transfer progress property for a loading message,
+     * or {@code null} when the message is not tracked or no backing view-model
+     * exists.
+     *
+     * @param message loading placeholder message
+     * @return progress property (0.0–1.0), or {@code null}
+     */
+    public DoubleProperty getAttachmentProgress(MessageVM message) {
+        return messageViewModel == null ? null : messageViewModel.getAttachmentProgress(message);
     }
 }

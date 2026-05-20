@@ -995,10 +995,12 @@ public class ChatController {
      * @return rendered node for the message
      */
     private Node createMessageNode(MessageVM message) {
+        javafx.beans.property.DoubleProperty attachmentProgress = viewModel.getAttachmentProgress(message);
         Node node = MessageBubbleFactory.create(
                 message,
                 settings.isChatShowMessageTimestamps(),
-                settings.isChatUse24HourTime());
+                settings.isChatUse24HourTime(),
+                attachmentProgress);
         installMessageContextMenu(node, message);
         installImagePrimaryClickPreview(node, message);
         installFilePrimaryClickDownload(node, message);
