@@ -188,9 +188,9 @@ public class MessagesViewModel {
     private static final int DEFAULT_UPLOAD_CONCURRENCY = 2;
     private static final int MIN_UPLOAD_CONCURRENCY = 1;
     private static final int MAX_UPLOAD_CONCURRENCY = 6;
-    private static final int ATTACHMENT_API_RETRY_ATTEMPTS = 4;
-    private static final long ATTACHMENT_API_RETRY_BACKOFF_MS = 750L;
-    private static final long ATTACHMENT_API_RETRY_MAX_DELAY_MS = 8_000L;
+    private static final int ATTACHMENT_API_RETRY_ATTEMPTS = 8;
+    private static final long ATTACHMENT_API_RETRY_BACKOFF_MS = 1500L;
+    private static final long ATTACHMENT_API_RETRY_MAX_DELAY_MS = 15000L;
     private static final ExecutorService ATTACHMENT_SEND_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "attachment-send-worker");
         thread.setDaemon(true);
