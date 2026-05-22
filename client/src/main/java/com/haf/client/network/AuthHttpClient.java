@@ -29,6 +29,7 @@ import javax.net.ssl.SSLParameters;
 public class AuthHttpClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthHttpClient.class);
     private static final int CONNECTION_TIMEOUT_SECONDS = 5;
+    private static final int REQUEST_TIMEOUT_SECONDS = 60;
 
     private final URI httpBaseUri;
     private volatile String sessionId;
@@ -87,6 +88,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .GET()
                 .build();
@@ -104,6 +106,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .GET()
                 .build();
@@ -141,6 +144,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .GET()
                 .build();
@@ -171,6 +175,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
@@ -195,6 +200,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .header("Content-Type", contentType == null || contentType.isBlank()
                         ? "application/octet-stream"
@@ -214,6 +220,7 @@ public class AuthHttpClient {
         URI requestUri = buildAuthenticatedRequestUri(path);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(requestUri)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
                 .header("Authorization", authorizationHeaderValue())
                 .DELETE()
                 .build();

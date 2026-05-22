@@ -185,7 +185,7 @@ public class MessagesViewModel {
     private static final int INLINE_WIRE_HEADROOM_BYTES = 16 * 1024;
     private static final int INLINE_ESTIMATED_ENVELOPE_OVERHEAD_BYTES = 2048;
     private static final int TEMP_ENCRYPTED_BLOB_THRESHOLD_BYTES = 8 * 1024 * 1024;
-    private static final int DEFAULT_UPLOAD_CONCURRENCY = 4;
+    private static final int DEFAULT_UPLOAD_CONCURRENCY = 2;
     private static final int MIN_UPLOAD_CONCURRENCY = 1;
     private static final int MAX_UPLOAD_CONCURRENCY = 6;
     private static final int ATTACHMENT_API_RETRY_ATTEMPTS = 4;
@@ -2228,6 +2228,11 @@ public class MessagesViewModel {
         }
         String message = resolveErrorMessage(error, "").toLowerCase(Locale.ROOT);
         if (message.contains("http 429") || message.contains("rate limit")) {
+            return Math.min(
+                    ATTACHMENT_API_RETRY_MAX_DELAY_MS,
+                    ATTACHMENT_API_RETRY_BACKOFF_MS * Math.max(1, attempt));
+        }
+        if (RuntimeIssue.isConnectionFailure(error)) {
             return Math.min(
                     ATTACHMENT_API_RETRY_MAX_DELAY_MS,
                     ATTACHMENT_API_RETRY_BACKOFF_MS * Math.max(1, attempt));
