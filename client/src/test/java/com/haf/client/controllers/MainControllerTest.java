@@ -281,6 +281,14 @@ class MainControllerTest {
     }
 
     @Test
+    void start_chat_from_search_always_routes_through_messages_tab_open_flow() throws IOException {
+        String source = Files.readString(CONTROLLER_SOURCE);
+
+        assertTrue(source.contains("public void startChatWith(UserSearchResult result) {"));
+        assertTrue(source.contains("selectContactAndOpenChat(target);"));
+    }
+
+    @Test
     void remember_search_sort_setting_is_loaded_saved_and_reset() throws IOException {
         String source = Files.readString(CONTROLLER_SOURCE);
 

@@ -985,10 +985,9 @@ public class MainController implements SearchController.ContactActions {
             return;
         }
 
-        // Select and load chat. Note: activateMessagesTab is triggered by the selection
-        // listener.
-        contactsList.getSelectionModel().select(target);
-        contactsList.setUserData(target);
+        // Always route through the explicit open flow so the Messages tab is shown
+        // even when the same contact is already selected.
+        selectContactAndOpenChat(target);
     }
 
     /**
