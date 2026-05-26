@@ -858,7 +858,8 @@ public class MessagesViewModel {
             MessagingPolicyResponse policy,
             LocalDateTime timestamp,
             MessageVM loadingVm) throws Exception {
-        MessageSender.SendResult sendResult = sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy, loadingVm);
+        MessageSender.SendResult sendResult = sendChunkedAttachment(contactId, fileName, mediaType, fileBytes, policy,
+                loadingVm);
 
         DecodedMessage outgoing = decodeAttachment(contactId, true, fileBytes, mediaType, fileName, timestamp);
         outgoing = withEnvelopeId(outgoing, sendResult == null ? null : sendResult.envelopeId());
@@ -2662,15 +2663,27 @@ public class MessagesViewModel {
         }
         Path tempFile = Files.createTempFile(tempDirectory, prefix, suffix);
         var tempJavaFile = tempFile.toFile();
-        tempJavaFile.setReadable(true, true);
-        tempJavaFile.setWritable(true, true);
+        boolean readablePermissionApplied = tempJavaFile.setReadable(true, true);
+        boolean writablePermissionApplied = tempJavaFile.setWritable(true, true);
 
         // Best effort: Windows often reports false here even when the file is
         // already non-executable, so this must not fail temp-file creation.
-        tempJavaFile.setExecutable(false, false);
+        boolean executablePermissionCleared = tempJavaFile.setExecutable(false, false);
+        if (!executablePermissionCleared && tempJavaFile.canExecute()) {
+            // Best effort fallback for platforms with inconsistent permission APIs.
+            boolean ownerExecutablePermissionCleared = tempJavaFile.setExecutable(false, true);
+            if (!ownerExecutablePermissionCleared && tempJavaFile.canExecute()) {
+                // Keep best-effort behavior: non-executable cannot be guaranteed everywhere.
+            }
+        }
 
         // Enforce only the minimum invariant we rely on for temp attachment files:
         // current process must be able to read and write them.
+        if ((!readablePermissionApplied || !writablePermissionApplied)
+                && (!Files.isReadable(tempFile) || !Files.isWritable(tempFile))) {
+            Files.deleteIfExists(tempFile);
+            throw new IOException("Failed to apply secure temporary-file permissions");
+        }
         if (!Files.isReadable(tempFile) || !Files.isWritable(tempFile)) {
             Files.deleteIfExists(tempFile);
             throw new IOException("Failed to apply secure temporary-file permissions");
