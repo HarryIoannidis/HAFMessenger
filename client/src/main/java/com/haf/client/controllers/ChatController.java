@@ -610,6 +610,29 @@ public class ChatController {
         if (from < 0 || to > chatBox.getChildren().size()) {
             return false;
         }
+
+        // Fast path: when only the read-state changed, update the existing
+        // receipt badge in-place instead of rebuilding the entire bubble.
+        // This prevents image messages from visually "reloading" on read receipts.
+        List<? extends MessageVM> removed = change.getRemoved();
+        List<? extends MessageVM> added = change.getAddedSubList();
+        if (removed.size() == added.size()) {
+            boolean allReadStateOnly = true;
+            for (int i = 0; i < removed.size(); i++) {
+                if (!MessageBubbleFactory.isReadStateOnlyChange(removed.get(i), added.get(i))) {
+                    allReadStateOnly = false;
+                    break;
+                }
+            }
+            if (allReadStateOnly) {
+                for (int i = 0; i < added.size(); i++) {
+                    Node existingNode = chatBox.getChildren().get(from + i);
+                    MessageBubbleFactory.updateReceiptBadge(existingNode, added.get(i));
+                }
+                return true;
+            }
+        }
+
         chatBox.getChildren().remove(from, to);
         int insertionIndex = from;
         for (MessageVM vm : change.getAddedSubList()) {

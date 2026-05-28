@@ -1,6 +1,6 @@
 package com.haf.client.viewmodels;
 
-import com.haf.client.exceptions.UiDispatchException;
+
 import com.haf.client.exceptions.HttpCommunicationException;
 import com.haf.client.models.MessageType;
 import com.haf.client.models.MessageVM;
@@ -49,7 +49,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CountDownLatch;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -677,13 +677,13 @@ public class MessagesViewModel {
             if (shouldSendInlineAttachment(prepared.bytes(), policy, prepared.fileName(), prepared.mediaType())) {
                 if (shouldShowInlineLoadingPlaceholder(prepared.mediaType())) {
                     loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, prepared.mediaType(),
-                            prepared.fileName(), prepared.bytes().length, timestamp);
+                            prepared.fileName(), prepared.bytes().length, timestamp, -1.0);
                 }
                 sendInlineAttachmentAndRender(contactId, prepared.fileName(), prepared.mediaType(), prepared.bytes(),
                         timestamp, loadingVm);
             } else {
                 loadingVm = showOutgoingAttachmentLoadingPlaceholder(contactId, prepared.mediaType(),
-                        prepared.fileName(), prepared.bytes().length, timestamp);
+                        prepared.fileName(), prepared.bytes().length, timestamp, 0.0);
                 sendChunkedAttachmentAndRender(
                         contactId,
                         prepared.fileName(),
@@ -827,9 +827,10 @@ public class MessagesViewModel {
             String mediaType,
             String fileName,
             long fileSizeBytes,
-            LocalDateTime timestamp) {
+            LocalDateTime timestamp,
+            double initialProgress) {
         MessageVM loadingVm = buildLoadingAttachmentVm(true, mediaType, fileName, fileSizeBytes, timestamp);
-        attachmentProgressByMessage.put(loadingVm, new SimpleDoubleProperty(0.0));
+        attachmentProgressByMessage.put(loadingVm, new SimpleDoubleProperty(initialProgress));
         MessageVM finalLoadingVm = loadingVm;
         runOnUiThread(() -> {
             getMessages(contactId).add(finalLoadingVm);
@@ -1462,7 +1463,16 @@ public class MessagesViewModel {
      * Executes a UI mutation either directly (already on FX thread) or via
      * {@link Platform#runLater(Runnable)}.
      *
-     * Falls back to direct execution when JavaFX toolkit checks are unavailable.
+     * <p>This method is <strong>non-blocking</strong>: when called from a
+     * background thread it schedules the action on the FX Application Thread
+     * and returns immediately.  A previous implementation used a
+     * {@code CountDownLatch} to block the caller until the action completed,
+     * but that caused deadlocks when the FX thread was busy rendering chat
+     * content while background threads (WSS receiver, CompletableFuture pool)
+     * attempted to push UI updates.</p>
+     *
+     * <p>Falls back to direct execution when the JavaFX toolkit is not
+     * available (headless tests).</p>
      *
      * @param action UI action to execute
      */
@@ -1482,40 +1492,11 @@ public class MessagesViewModel {
             return;
         }
 
-        CountDownLatch completion = new CountDownLatch(1);
-        AtomicReference<Throwable> actionFailure = new AtomicReference<>();
         try {
-            Platform.runLater(() -> {
-                try {
-                    action.run();
-                } catch (Throwable throwable) {
-                    actionFailure.set(throwable);
-                } finally {
-                    completion.countDown();
-                }
-            });
+            Platform.runLater(action);
         } catch (Throwable _) {
             fxToolkitUnavailable = true;
             action.run();
-            return;
-        }
-
-        try {
-            completion.await();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new UiDispatchException("Interrupted while dispatching UI action", ex);
-        }
-
-        Throwable failure = actionFailure.get();
-        if (failure instanceof RuntimeException runtimeException) {
-            throw runtimeException;
-        }
-        if (failure instanceof Error error) {
-            throw error;
-        }
-        if (failure != null) {
-            throw new UiDispatchException("Error during UI action execution", failure);
         }
     }
 

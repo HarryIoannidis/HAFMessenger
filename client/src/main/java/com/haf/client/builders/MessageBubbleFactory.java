@@ -597,4 +597,64 @@ public final class MessageBubbleFactory {
                 && message.type() == MessageType.TEXT
                 && message.isLoading();
     }
+
+    /**
+     * Checks whether two message view-models differ only in their
+     * {@link MessageVM.ReadState}.  When this returns {@code true}, the caller
+     * can update the existing rendered node in-place instead of rebuilding the
+     * entire bubble (which would re-trigger image loading).
+     *
+     * @param before old message
+     * @param after  replacement message
+     * @return {@code true} when only the read-state field differs
+     */
+    public static boolean isReadStateOnlyChange(MessageVM before, MessageVM after) {
+        if (before == null || after == null) {
+            return false;
+        }
+        return before.outgoing() == after.outgoing()
+                && before.type() == after.type()
+                && java.util.Objects.equals(before.content(), after.content())
+                && java.util.Objects.equals(before.localPath(), after.localPath())
+                && java.util.Objects.equals(before.fileName(), after.fileName())
+                && java.util.Objects.equals(before.fileSize(), after.fileSize())
+                && java.util.Objects.equals(before.timestamp(), after.timestamp())
+                && before.loading() == after.loading()
+                && java.util.Objects.equals(before.envelopeId(), after.envelopeId())
+                && before.readState() != after.readState();
+    }
+
+    /**
+     * Updates the receipt badge inside an existing bubble node to reflect a new
+     * read state, without rebuilding the surrounding bubble content (images,
+     * text, file previews).
+     *
+     * <p>Locates the {@code .bubble-receipt-group-out} node via CSS lookup and
+     * replaces its children with the correct tick icons for the new state.</p>
+     *
+     * @param bubbleNode the existing rendered bubble root node
+     * @param updated    the updated message with the new read state
+     * @return {@code true} when the badge was found and updated in-place
+     */
+    public static boolean updateReceiptBadge(Node bubbleNode, MessageVM updated) {
+        if (bubbleNode == null || updated == null || !updated.isOutgoing()) {
+            return false;
+        }
+        Node found = bubbleNode.lookup(".bubble-receipt-group-out");
+        if (!(found instanceof HBox badge)) {
+            return false;
+        }
+        boolean read = updated.isRead();
+        badge.setSpacing(read ? -4 : 0);
+        badge.getChildren().clear();
+        int checkCount = read ? 2 : 1;
+        for (int i = 0; i < checkCount; i++) {
+            FontIcon receipt = new FontIcon(MaterialDesignC.CHECK);
+            receipt.setIconSize(13);
+            receipt.getStyleClass().add("bubble-receipt-out");
+            receipt.setOpacity(read ? 1.0 : 0.45);
+            badge.getChildren().add(receipt);
+        }
+        return true;
+    }
 }
