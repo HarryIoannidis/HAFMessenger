@@ -77,15 +77,33 @@ FLUSH PRIVILEGES;
 
 ## Running the Server
 
-```bash
-HAF_SERVER_ENV_FILE=.local/hafmessenger/server/variables.env ./mvnw -pl server exec:java
-```
-
-Or, since the bootstrap config is auto-detected:
+### Option A: From Source (Development)
 
 ```bash
 ./mvnw -pl server exec:java
 ```
+
+*(On Windows command prompt, use `.\mvnw.cmd -pl server exec:java`)*
+
+### Option B: Standalone JAR (Production & Easy Execution)
+
+You can compile the server into a single executable standalone JAR file containing all dependencies:
+
+1. Package the server:
+
+   ```bash
+   ./mvnw -pl server clean package -DskipTests
+   ```
+
+   *(Creates the file `server/target/HAFMessengerServer.jar`)*
+
+2. Run it on any OS (Linux/Mac/Windows) with Java installed:
+
+   ```bash
+   java -jar server/target/HAFMessengerServer.jar
+   ```
+
+   *(Alternatively, on Windows or Mac, if your system has `.jar` files associated with the Java Runtime, you can simply **double-click** the `HAFMessengerServer.jar` file to run the server).*
 
 The server starts HTTPS on port `8443` and WSS on port `8444`.
 
