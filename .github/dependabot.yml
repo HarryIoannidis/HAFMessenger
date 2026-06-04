@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 50
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
 
@@ -13,6 +17,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 50
+    groups:
+      all-actions:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "ci"
