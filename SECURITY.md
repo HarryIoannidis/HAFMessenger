@@ -29,7 +29,7 @@ This policy applies to the code in this repository. It does **not** cover:
 
 ## Security Architecture Notes
 
-- The server **never** decrypts message payloads — end-to-end encryption is enforced.
+- The server **never** decrypts message payloads - end-to-end encryption is enforced.
 - TLS is restricted to **TLS 1.3** with hardened cipher suites.
 - Ed25519 signature verification happens before any message processing.
 - All secrets and certificates are generated locally and must never be committed.

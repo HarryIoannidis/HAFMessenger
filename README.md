@@ -1,6 +1,6 @@
 # HAF Secure Messenger
 
-**End-to-end encrypted messaging for desktop — built with Java 25, JavaFX, and modern cryptography.**
+**End-to-end encrypted messaging for desktop - built with Java 25, JavaFX, and modern cryptography.**
 
 [![CI](https://github.com/HarryIoannidis/HAFMessenger/actions/workflows/ci.yml/badge.svg)](https://github.com/HarryIoannidis/HAFMessenger/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -8,18 +8,18 @@
 
 ---
 
-HAFMessenger is an independent secure-messaging prototype built as a portfolio project. It demonstrates a complete encrypted messaging stack: a JavaFX desktop client, an HTTPS/WSS server, and a shared cryptography module — all in a single Maven multi-module repository. **This is not an official deployment — it is a self-contained demo of real-world secure messaging architecture.**
+HAFMessenger is an independent secure-messaging prototype built as a portfolio project. It demonstrates a complete encrypted messaging stack: a JavaFX desktop client, an HTTPS/WSS server, and a shared cryptography module - all in a single Maven multi-module repository. **This is not an official deployment - it is a self-contained demo of real-world secure messaging architecture.**
 
 ## Features
 
 - 🖥️ **JavaFX 25 desktop client** with a modern UI, contact management, and live chat
-- 🔒 **End-to-end encryption** — X25519 (ECDH) key agreement + AES-256-GCM payload encryption
+- 🔒 **End-to-end encryption** - X25519 (ECDH) key agreement + AES-256-GCM payload encryption
 - ✍️ **Ed25519 digital signatures** on every message envelope
-- 🌐 **HTTPS REST + WSS realtime** — TLS 1.3 only, hardened cipher suites
-- 🗄️ **MySQL + Flyway** — versioned schema migrations (V1–V18)
-- 📎 **Encrypted attachment flow** — chunked upload/download with init/complete/bind lifecycle
-- 🛡️ **Server-side hardening** — rate limiting, audit logging, JWT session management
-- 🔑 **Zero-knowledge server** — the server never decrypts message payloads
+- 🌐 **HTTPS REST + WSS realtime** - TLS 1.3 only, hardened cipher suites
+- 🗄️ **MySQL + Flyway** - versioned schema migrations (V1–V18)
+- 📎 **Encrypted attachment flow** - chunked upload/download with init/complete/bind lifecycle
+- 🛡️ **Server-side hardening** - rate limiting, audit logging, JWT session management
+- 🔑 **Zero-knowledge server** - the server never decrypts message payloads
 
 ## Quick Start
 

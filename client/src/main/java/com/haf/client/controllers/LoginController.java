@@ -300,7 +300,7 @@ public class LoginController {
             return;
         }
 
-        // Validation passed — attempt login
+        // Validation passed - attempt login
         viewModel.loadingProperty().set(true);
         signInButton.setText(SIGNING_IN_TEXT);
 

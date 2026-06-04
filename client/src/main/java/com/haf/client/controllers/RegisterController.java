@@ -636,7 +636,7 @@ public class RegisterController {
      * Starts asynchronous registration execution after final-step validation.
      */
     private void performRegistration() {
-        // Validation passed — attempt registration
+        // Validation passed - attempt registration
         viewModel.loadingProperty().set(true);
         viewModel.errorMessageProperty().set("");
         if (dropZoneErrorText != null)

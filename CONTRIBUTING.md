@@ -64,7 +64,7 @@ See [docs/setup/LOCAL_DEV.md](docs/setup/LOCAL_DEV.md) for full local developmen
 1. **Push** your branch to your fork
 2. **Open a Pull Request** against `main`
 3. **Fill out** the PR template
-4. **Wait** for review — maintainers will provide feedback
+4. **Wait** for review - maintainers will provide feedback
 
 ## Security
 

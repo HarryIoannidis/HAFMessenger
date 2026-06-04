@@ -194,7 +194,7 @@ public class LoginViewModel {
             return false;
         }
 
-        // Email format validation — must contain exactly one '@' and have content
+        // Email format validation - must contain exactly one '@' and have content
         // before it
         if (!isValidEmailFormat(emailValue)) {
             emailError.set(true);
@@ -202,7 +202,7 @@ public class LoginViewModel {
             return false;
         }
 
-        // Email domain validation — must end with @haf.gr
+        // Email domain validation - must end with @haf.gr
         if (!emailValue.toLowerCase().endsWith("@haf.gr")) {
             emailError.set(true);
             errorMessage.set(ERROR_EMAIL_WRONG_DOMAIN);

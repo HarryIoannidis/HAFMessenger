@@ -21,7 +21,7 @@ The background task executes 4 sequential gating steps. If any step fails, the b
 
 ### Stage B: Cryptographic Pre-flight (10% → 30%)
 
-- Before even trying to connect to a server, the `SplashViewModel` validates that the localized JVM cryptography provider isn't crippled or operating on a depleted entropy pool—which would cause catastrophic security failures during live chat.
+- Before even trying to connect to a server, the `SplashViewModel` validates that the localized JVM cryptography provider isn't crippled or operating on a depleted entropy pool-which would cause catastrophic security failures during live chat.
 - It tests four critical primitives:
   1. **Entropy:** Forces `SecureRandom.getInstanceStrong()` to dump 16 bytes.
   2. **Symmetric:** Validates `AES/GCM/NoPadding` initialization.
