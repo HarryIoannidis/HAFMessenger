@@ -209,11 +209,19 @@ public final class ServerConfig {
             return overridePath;
         }
 
+        // Preferred: bootstrap-generated local dev config
+        Path localDevPath = Path.of(".local/hafmessenger/server/variables.env");
+        if (java.nio.file.Files.exists(localDevPath)) {
+            return localDevPath;
+        }
+
+        // Legacy: repo-root relative path
         Path repoPath = Path.of("server/src/main/resources/config/variables.env");
         if (java.nio.file.Files.exists(repoPath)) {
             return repoPath;
         }
 
+        // Legacy: module-relative path
         Path modulePath = Path.of("src/main/resources/config/variables.env");
         if (java.nio.file.Files.exists(modulePath)) {
             return modulePath;

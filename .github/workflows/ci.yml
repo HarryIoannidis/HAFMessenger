@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: haf_messenger
+          MYSQL_USER: haf_app
+          MYSQL_PASSWORD: ci-db-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Build shared & server (skip tests first)
+        run: ./mvnw -pl shared,server install -DskipTests -q
+
+      - name: Run shared tests
+        run: ./mvnw -pl shared test
+
+      - name: Run server tests
+        env:
+          HAF_DB_URL: jdbc:mysql://127.0.0.1:3306/haf_messenger?sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=UTC
+          HAF_DB_USER: haf_app
+          HAF_DB_PASS: ci-db-password
+          HAF_DB_POOL_SIZE: "5"
+          HAF_KEY_PASS: ci-key-password
+          HAF_TLS_KEYSTORE_PATH: ""
+          HAF_TLS_KEYSTORE_PASS: ci-tls-password
+          HAF_HTTPS_PORT: "8443"
+          HAF_HTTPS_PATH: /api/v1
+          HAF_WS_PORT: "8444"
+          HAF_WS_PATH: /ws/v1/realtime
+          HAF_SEARCH_CURSOR_SECRET: ci-search-cursor-secret-that-is-long-enough
+          HAF_JWT_SECRET: ci-jwt-signing-secret-that-is-long-enough
+          HAF_LOGIN_SENTINEL_PASSWORD: ci-login-sentinel-password
+        run: ./mvnw -pl server test
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

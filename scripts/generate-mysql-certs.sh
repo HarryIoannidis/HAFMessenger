@@ -19,9 +19,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/server/src/main/resources/config/mysql-ssl}"
-TRUSTSTORE_DIR="${TRUSTSTORE_DIR:-${PROJECT_ROOT}/server/src/main/resources/config}"
-TRUSTSTORE_PASS="${TRUSTSTORE_PASS:-HafMysqlTruststore1}"
+OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/.local/hafmessenger/server/mysql-ssl}"
+TRUSTSTORE_DIR="${TRUSTSTORE_DIR:-${PROJECT_ROOT}/.local/hafmessenger/server}"
+TRUSTSTORE_PASS="${TRUSTSTORE_PASS:-$(openssl rand -base64 48 | tr -d '\n')}"
 TRUSTSTORE_FILE="${TRUSTSTORE_DIR}/mysql-truststore.p12"
 
 CA_SUBJECT="${CA_SUBJECT:-/CN=HAF-MySQL-CA}"

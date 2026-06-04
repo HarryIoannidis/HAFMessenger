@@ -1,0 +1,12 @@
+# HAFMessenger Client Configuration Example
+# Copy to client/src/main/resources/config/client.properties and update URLs.
+# For local dev, run: ./scripts/bootstrap-local-dev.sh
+
+# Production HTTPS server base URL (required)
+server.url.prod=https://localhost:8443/
+
+# Production WSS realtime endpoint (required for live chat)
+server.ws.url.prod=wss://localhost:8444/ws/v1/realtime
+
+# Optional help center base URL; defaults to server.url.prod when omitted
+help.center.url.prod=https://localhost:8443
