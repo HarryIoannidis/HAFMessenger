@@ -13,7 +13,9 @@ Required envelope fields include:
 - ivB64, ephemeralPublicB64, ciphertextB64, tagB64
 - signatureAlgorithm, senderSigningKeyFingerprint, signatureB64
 - contentType, contentLength
+
 Optional/auxiliary field:
+
 - `e2e`
 - Runtime-only field `aadB64` exists on DTO but is ignored by JSON (`@JsonIgnore`) and not treated as trusted wire input.
 
