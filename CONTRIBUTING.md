@@ -7,10 +7,13 @@ Thank you for your interest in contributing! This document provides guidelines f
 1. **Fork** the repository
 2. **Clone** your fork
 3. **Run** the bootstrap script to set up your local environment:
+
    ```bash
    ./scripts/bootstrap-local-dev.sh
    ```
+
 4. **Create a branch** for your work:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -39,10 +42,13 @@ See [docs/setup/LOCAL_DEV.md](docs/setup/LOCAL_DEV.md) for full local developmen
 
 - Add tests for new functionality
 - Ensure all existing tests pass:
+
   ```bash
   ./mvnw test
   ```
+
 - Server tests require a configured environment:
+
   ```bash
   HAF_SERVER_ENV_FILE=.local/hafmessenger/server/variables.env ./mvnw -pl server test
   ```
