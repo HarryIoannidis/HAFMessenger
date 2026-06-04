@@ -32,7 +32,7 @@ class AuditLoggerTest {
         LoggerConfig loggerConfig = config.getLoggerConfig("AuditLogger");
 
         PatternLayout layout = PatternLayout.newBuilder()
-                .withPattern("%m%n")
+                .setPattern("%m%n")
                 .build();
 
         appender = WriterAppender.newBuilder()
