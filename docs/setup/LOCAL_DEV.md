@@ -162,3 +162,39 @@ Ensure:
 1. The server is running
 2. Client `truststore.p12` was generated from the same server keystore
 3. URLs in `client.properties` match the server's listen addresses
+
+## Testing Over the Internet (Optional)
+
+If you want to test the client-server interaction across different networks (e.g. connecting a remote client to your local server), you need to expose your local port `8443` to the internet.
+
+### Option A: Using Microsoft Dev Tunnels (Recommended)
+
+1. Install the CLI tool from Microsoft: [Dev Tunnels installation guide](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels-cli).
+2. Host a secure tunnel targeting the server port:
+
+   ```bash
+   devtunnel host -p 8443 --allow-anonymous
+   ```
+
+3. Copy the public URL generated (e.g., `https://xyz-8443.use.devtunnels.ms`).
+4. Update `client.properties` inside your client resource folder to point to the new URL:
+
+   ```properties
+   server.url=https://xyz-8443.use.devtunnels.ms/api/v1
+   ```
+
+### Option B: Using ngrok
+
+1. Install and authenticate [ngrok](https://ngrok.com/).
+2. Run ngrok to tunnel HTTPS traffic to port `8443`:
+
+   ```bash
+   ngrok http https://localhost:8443
+   ```
+
+3. Copy the public forwarding address.
+4. Update `client.properties` in your client resources to use this address:
+
+   ```properties
+   server.url=https://<your-ngrok-subdomain>.ngrok-free.app/api/v1
+   ```
