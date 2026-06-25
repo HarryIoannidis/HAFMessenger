@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD033 -->
+
 # HAF Secure Messenger
 
 **End-to-end encrypted messaging for desktop - built with Java 25, JavaFX, and modern cryptography.**
@@ -20,6 +22,14 @@ HAFMessenger is an independent secure-messaging prototype built as a portfolio p
 - 📎 **Encrypted attachment flow** - chunked upload/download with init/complete/bind lifecycle
 - 🛡️ **Server-side hardening** - rate limiting, audit logging, JWT session management
 - 🔑 **Zero-knowledge server** - the server never decrypts message payloads
+
+## Screenshots
+
+| Active Chat Window | Privacy Settings |
+| :---: | :---: |
+| ![Active Chat](.github/screenshots/chat_active_conversation.png) | ![Privacy Settings](.github/screenshots/settings_privacy.png) |
+
+*For a full walkthrough of all interface screens, workflows, and dialogs, see the [SCREENSHOTS.md](SCREENSHOTS.md) tour.*
 
 ## Quick Start
 
@@ -69,7 +79,7 @@ cp .local/hafmessenger/client/truststore.p12 client/src/main/resources/config/
 
 ## Architecture
 
-```
+```text
 HAFMessenger/
 ├── shared/     # Crypto primitives, DTOs, validators, keystore utilities
 ├── client/     # JavaFX 25 desktop application
