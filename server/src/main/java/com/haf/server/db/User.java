@@ -287,7 +287,6 @@ public final class User {
         }
     }
 
-    // ── Search ───────────────────────────────────────────────────────────
 
     /**
      * Represents a user record returned by user search.
